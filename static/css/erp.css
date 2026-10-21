@@ -121,8 +121,20 @@ body.sans-barre-verticale .arbre { display: none; }
 .fenetre-titre { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; font-size: .875rem; font-weight: 600;
   border-bottom: 1px solid #dde3ea; background: linear-gradient(#fafbfc, #f0f3f6); border-radius: 6px 6px 0 0; }
 .fenetre-titre > .bi:first-child { color: var(--module); }
-.fenetre-fermer { margin-left: auto; color: #5b6775; padding: 2px 6px; border-radius: 4px; }
-.fenetre-fermer:hover { background: #c62828; color: #fff; }
+.fenetre-boutons { margin-left: auto; display: flex; gap: 2px; }
+.fenetre-boutons button, .fenetre-boutons a { border: 0; background: none; color: #5b6775; padding: 2px 8px; border-radius: 4px; line-height: 1.4; }
+.fenetre-boutons button:hover { background: #dde3ea; color: #111; }
+.fenetre-boutons .fenetre-fermer:hover { background: #c62828; color: #fff; }
+.fenetre-titre { user-select: none; }
+/* Réduire : la fenêtre se replie sur sa barre de titre, en bas de l'espace de travail */
+.fenetre.reduite { flex: 0 0 auto; margin-top: auto; width: 300px; max-width: 100%; }
+.fenetre.reduite .fenetre-contenu { display: none; }
+.fenetre.reduite .fenetre-titre { border-bottom: 0; border-radius: 6px; }
+/* Agrandir : la fenêtre occupe tout l'espace sous la barre d'outils (barre verticale et onglets masqués) */
+body.fenetre-agrandie .arbre, body.fenetre-agrandie .onglets-fenetres { display: none; }
+body.fenetre-agrandie .espace-travail { padding: 0; }
+body.fenetre-agrandie .fenetre { border: 0; border-radius: 0; box-shadow: none; }
+body.fenetre-agrandie .fenetre-titre { border-radius: 0; }
 .fenetre-contenu { padding: 1.25rem; min-width: 0; }
 .fenetre-contenu .card { box-shadow: none; }
 /* Fenêtre › Barre verticale : coche quand la barre est affichée */

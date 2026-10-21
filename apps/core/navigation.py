@@ -514,38 +514,50 @@ COMPTABILITE = Module(
                 E("traitement.fin_exercice.journaux", "Clôture des journaux", "comptabilite:cloture_journaux"),
             ]),
         ]),
+        # Menu Etat de Sage 100 Comptabilité : états généraux, puis groupes « Etats tiers », « Etats analytiques »…
+        # (aide Sage « Etats > Etats tiers > Balance âgée », manuel pédagogique Sage 100 Comptabilité, leçon États tiers)
         Onglet("etat", "Etat", "bi-printer", [
-            E("etats.brouillard", "Brouillard", "comptabilite:journal", icone="bi-hourglass", statut="BROUILLARD"),
-            E("etats.journaux", "Journaux", icone="bi-journals", enfants=[
-                E("etats.journal_general", "Journal général", "comptabilite:journal"),
-                E("etats.journal.liste", "Journaux auxiliaires", dyn=_journaux("comptabilite:journal", "etats.journal")),
+            E("etats.brouillard", "Brouillard", "comptabilite:journal", icone="bi-hourglass", statut="BROUILLARD",
+              preuve="ERG-CLASSIQUE"),
+            E("etats.journaux", "Journaux", icone="bi-journals", preuve="ERG-CLASSIQUE", enfants=[
+                E("etats.journal_general", "Journal général", "comptabilite:journal", preuve="ERG-CLASSIQUE"),
+                E("etats.journal.liste", "Journaux auxiliaires", dyn=_journaux("comptabilite:journal", "etats.journal"),
+                  preuve="ERG-CLASSIQUE"),
             ]),
-            E("etats.grand_livre", "Grand-livre", icone="bi-book", enfants=[
-                E("etats.gl.general", "Grand-livre des comptes", "comptabilite:grand_livre"),
-                E("etats.gl.tiers", "Grand-livre des tiers", "comptabilite:grand_livre", compte_debut="4", compte_fin="4"),
-            ]),
-            E("etats.balance", "Balance", icone="bi-table", enfants=[
-                E("etats.balance.generale", "Balance des comptes", "comptabilite:balance"),
-                E("etats.balance.tiers", "Balance des tiers", "comptabilite:balance", compte_debut="4", compte_fin="4"),
-                E("etats.balance.agee", "Balance âgée", "comptabilite:balance_agee", type="CLIENT"),
-            ]),
-            E("etats.echeancier", "Échéancier", icone="bi-hourglass-split", enfants=[
-                E("etats.echeancier.clients", "Échéancier clients", "comptabilite:balance_agee", type="CLIENT", vue="echeancier"),
-                E("etats.echeancier.fournisseurs", "Échéancier fournisseurs", "comptabilite:balance_agee", type="FOURNISSEUR"),
-            ]),
-            E("etats.analytique", "États analytiques", icone="bi-diagram-2", enfants=[
-                E("etats.analytique.balance", "Balance analytique", "comptabilite:balance_analytique"),
-            ]),
+            E("etats.gl.general", "Grand-livre des comptes", "comptabilite:grand_livre", icone="bi-book", preuve="ERG-CLASSIQUE"),
+            E("etats.balance.generale", "Balance des comptes", "comptabilite:balance", icone="bi-table", preuve="ERG-CLASSIQUE"),
             SEP(),
-            E("etats.financiers", "Bilan et compte de résultat", icone="bi-bank", enfants=[
-                E("etats.financiers.bilan", "Bilan", "comptabilite:bilan"),
-                E("etats.financiers.resultat", "Compte de résultat", "comptabilite:compte_resultat"),
-                E("etats.financiers.sig", "Soldes intermédiaires de gestion", "comptabilite:compte_resultat", vue="sig"),
+            E("etats.tiers", "Etats tiers", icone="bi-people", preuve="ERG-CLASSIQUE", enfants=[
+                E("etats.gl.tiers", "Grand-livre des tiers", "comptabilite:grand_livre", compte_debut="4", compte_fin="4",
+                  preuve="ERG-CLASSIQUE"),
+                E("etats.balance.tiers", "Balance des tiers", "comptabilite:balance", compte_debut="4", compte_fin="4",
+                  preuve="ERG-CLASSIQUE"),
+                E("etats.echeancier", "Echéancier", "comptabilite:balance_agee", type="CLIENT", vue="echeancier",
+                  preuve="ERG-CLASSIQUE"),
+                E("etats.balance.agee", "Balance âgée", "comptabilite:balance_agee", type="CLIENT", preuve="ERG-CLASSIQUE"),
+                SEP(),
+                E("etats.tiers.justificatif", "Justificatif de solde à date", preuve="INDICATIF"),
+                E("etats.tiers.statistiques", "Statistiques tiers", preuve="INDICATIF"),
+                E("etats.tiers.rappels", "Historique des rappels", preuve="INDICATIF"),
             ]),
-            E("etats.declarations", "Déclarations", icone="bi-file-earmark-text", enfants=[
-                E("etats.fiscal.tva", "Déclaration de TVA", "comptabilite:tva", vue="etat"),
-                E("etats.dsf", "Déclaration statistique et fiscale (DSF)"),
+            E("etats.analytique", "Etats analytiques", icone="bi-diagram-2", preuve="ERG-CLASSIQUE", enfants=[
+                E("etats.analytique.journal", "Journal analytique", preuve="ERG-CLASSIQUE"),
+                E("etats.analytique.grand_livre", "Grand-livre analytique", preuve="ERG-CLASSIQUE"),
+                E("etats.analytique.balance", "Balance analytique", "comptabilite:balance_analytique", preuve="ERG-CLASSIQUE"),
             ]),
+            E("etats.budgetaires", "Etats budgétaires", icone="bi-bullseye", preuve="INDICATIF"),
+            SEP(),
+            E("etats.financiers", "Bilan / Compte de résultat", icone="bi-bank", preuve="ERG-CLASSIQUE", enfants=[
+                E("etats.financiers.bilan", "Bilan", "comptabilite:bilan", preuve="ERG-CLASSIQUE"),
+                E("etats.financiers.resultat", "Compte de résultat", "comptabilite:compte_resultat", preuve="ERG-CLASSIQUE"),
+                E("etats.financiers.sig", "Soldes intermédiaires de gestion", "comptabilite:compte_resultat", vue="sig",
+                  preuve="ERG-CLASSIQUE"),
+            ]),
+            E("etats.declarations", "Déclarations", icone="bi-file-earmark-text", preuve="AJOUT-ERP", enfants=[
+                E("etats.fiscal.tva", "Déclaration de TVA", "comptabilite:tva", vue="etat", preuve="AJOUT-ERP"),
+                E("etats.dsf", "Déclaration statistique et fiscale (DSF)", preuve="AJOUT-ERP"),
+            ]),
+            E("etats.controles", "Analyse et contrôles", icone="bi-clipboard-check", preuve="INDICATIF"),
         ]),
         menu_fenetre("comptabilite"),
         menu_aide("comptabilite"),

@@ -150,6 +150,32 @@
     document.getElementById('form-logout')?.addEventListener('submit', () => {
       try { Object.keys(sessionStorage).filter(k => k.startsWith('erp-fenetres-')).forEach(k => sessionStorage.removeItem(k)); } catch (e) {}
     });
+    // Réduire / Agrandir-Restaurer, comme les fenêtres de Sage (double-clic sur la barre de titre = agrandir)
+    const fenetre = document.querySelector('.fenetre');
+    const reduire = document.getElementById('fenetre-reduire'), agrandir = document.getElementById('fenetre-agrandir');
+    const majAgrandir = () => {
+      const oui = document.body.classList.contains('fenetre-agrandie');
+      agrandir.title = oui ? 'Restaurer' : 'Agrandir';
+      agrandir.innerHTML = oui ? '<i class="bi bi-fullscreen-exit"></i>' : '<i class="bi bi-fullscreen"></i>';
+    };
+    try { if (localStorage.getItem('erp-fenetre-agrandie') === 'oui') document.body.classList.add('fenetre-agrandie'); } catch (e) {}
+    const basculerAgrandir = () => {
+      fenetre.classList.remove('reduite');
+      const oui = document.body.classList.toggle('fenetre-agrandie');
+      try { localStorage.setItem('erp-fenetre-agrandie', oui ? 'oui' : 'non'); } catch (e) {}
+      majAgrandir();
+    };
+    majAgrandir();
+    agrandir.addEventListener('click', basculerAgrandir);
+    reduire.addEventListener('click', () => {
+      const reduite = fenetre.classList.toggle('reduite');
+      if (reduite && document.body.classList.contains('fenetre-agrandie')) basculerAgrandir(), fenetre.classList.add('reduite');
+      reduire.title = reduite ? 'Restaurer' : 'Réduire';
+      reduire.innerHTML = reduite ? '<i class="bi bi-window"></i>' : '<i class="bi bi-dash-lg"></i>';
+    });
+    document.querySelector('.fenetre-titre').addEventListener('dblclick', e => {
+      if (!e.target.closest('.fenetre-boutons')) fenetre.classList.contains('reduite') ? reduire.click() : basculerAgrandir();
+    });
     const bouton = document.getElementById('fenetre-fermer');
     if (bouton && location.pathname !== accueil) bouton.addEventListener('click', e => { e.preventDefault(); fermer(ici); });
     else if (bouton) bouton.hidden = true;

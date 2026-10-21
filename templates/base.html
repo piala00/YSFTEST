@@ -77,7 +77,11 @@
       <div class="fenetre-titre d-print-none">
         <i class="bi {{ module.icone }}"></i>
         <span id="fenetre-titre">{% if element_actif %}{{ element_actif.titre }}{% endif %}</span>
-        <a class="fenetre-fermer" href="{% url module.accueil %}" id="fenetre-fermer" title="Fermer la fenêtre"><i class="bi bi-x-lg"></i></a>
+        <span class="fenetre-boutons">
+          <button type="button" id="fenetre-reduire" title="Réduire"><i class="bi bi-dash-lg"></i></button>
+          <button type="button" id="fenetre-agrandir" title="Agrandir"><i class="bi bi-fullscreen"></i></button>
+          <a class="fenetre-fermer" href="{% url module.accueil %}" id="fenetre-fermer" title="Fermer"><i class="bi bi-x-lg"></i></a>
+        </span>
       </div>
       <div class="fenetre-contenu">
     {% endif %}
