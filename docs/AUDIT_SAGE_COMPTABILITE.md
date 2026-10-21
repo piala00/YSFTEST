@@ -7,17 +7,18 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 
 | État | Commandes |
 |---|---|
-| ✅ Réalisé | 52 |
+| ✅ Réalisé | 54 |
 | ✅ Commande d'interface | 14 |
 | ↗ Autre logiciel de l'ERP | 6 |
-| ⬜ Grisé (non développé) | 53 |
+| ⬜ Grisé (non développé) | 51 |
 | **Total des commandes** | **125** |
 
 | Niveau de preuve | Commandes | Signification |
 |---|---|---|
 | AJOUT-ERP | 6 | Ajout propre à l'ERP OHADA (absent de Sage) |
+| DOC-TIERS | 2 | Cité par une source tierce (partenaire, formation), à confirmer sur Sage |
 | ERG-CLASSIQUE | 99 | Ergonomie Sage classique, à vérifier sur une installation V12 |
-| INDICATIF | 20 | Proposition fonctionnelle, non vérifiée sur une capture V12 |
+| INDICATIF | 18 | Proposition fonctionnelle, non vérifiée sur une capture V12 |
 
 ## Détail par menu
 
@@ -133,8 +134,8 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Etat › Etats tiers | Balance des tiers | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/balance/?compte_debut=4&compte_fin=4` |
 | Etat › Etats tiers | Echéancier | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/balance-agee/?type=CLIENT&vue=echeancier` |
 | Etat › Etats tiers | Balance âgée | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/balance-agee/?type=CLIENT` |
-| Etat › Etats tiers | Justificatif de solde à date | INDICATIF | ⬜ Grisé (non développé) |  |
-| Etat › Etats tiers | Statistiques tiers | INDICATIF | ⬜ Grisé (non développé) |  |
+| Etat › Etats tiers | Justificatif de solde à date | DOC-TIERS | ✅ Réalisé | `/comptabilite/tiers/justificatif-solde/?type=CLIENT` |
+| Etat › Etats tiers | Statistiques tiers | DOC-TIERS | ✅ Réalisé | `/comptabilite/tiers/statistiques/?type=CLIENT` |
 | Etat › Etats tiers | Historique des rappels | INDICATIF | ⬜ Grisé (non développé) |  |
 | Etat | **Etats analytiques** | ERG-CLASSIQUE | ▸ Sous-menu |  |
 | Etat › Etats analytiques | Journal analytique | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |

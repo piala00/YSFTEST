@@ -478,3 +478,64 @@ def balance_analytique(date_debut, date_fin):
         lignes.append({"section": sections.get(pk), **d, "resultat": d["produits"] - d["charges"]})
     lignes.sort(key=lambda l: (l["section"] is None, l["section"].code if l["section"] else ""))
     return lignes
+
+
+# ---------------------------------------------------------------------------
+# Etats tiers
+# ---------------------------------------------------------------------------
+def justificatif_solde(date, type_tiers=None, tiers=None):
+    """Etat › Etats tiers › Justificatif de solde à date.
+
+    Pour chaque tiers, les écritures qui composent son solde à la date : un groupe lettré n'est écarté que si
+    toutes ses lignes sont antérieures ou égales à la date (sinon il n'était pas encore soldé à cette date).
+    """
+    qs = lignes_validees(date_fin=date).filter(tiers__isnull=False).select_related("ecriture__journal", "tiers", "compte")
+    if type_tiers:
+        qs = qs.filter(tiers__type_tiers=type_tiers)
+    if tiers is not None:
+        qs = qs.filter(tiers=tiers)
+    lettres_ouverts = set(
+        LigneEcriture.objects.filter(ecriture__date__gt=date).exclude(lettrage="").values_list("compte_id", "lettrage"))
+    blocs = OrderedDict()
+    for ligne in qs.order_by("tiers__nom", "compte__numero", "ecriture__date", "id"):
+        if ligne.lettrage and (ligne.compte_id, ligne.lettrage) not in lettres_ouverts:
+            continue
+        bloc = blocs.setdefault((ligne.tiers_id, ligne.compte_id), {
+            "tiers": ligne.tiers, "compte": ligne.compte, "lignes": [], "debit": ZERO, "credit": ZERO})
+        bloc["lignes"].append(ligne)
+        bloc["debit"] += ligne.debit
+        bloc["credit"] += ligne.credit
+    resultat = []
+    for bloc in blocs.values():
+        bloc["solde"] = bloc["debit"] - bloc["credit"]
+        if bloc["solde"]:
+            resultat.append(bloc)
+    return resultat
+
+
+def statistiques_tiers(date_debut, date_fin, type_tiers):
+    """Etat › Etats tiers › Statistiques tiers : mouvements, solde et délai de règlement de chaque tiers."""
+    from apps.commercial.models import Tiers
+
+    qs = lignes_validees(date_fin=date_fin).filter(tiers__type_tiers=type_tiers)
+    client = type_tiers == Tiers.CLIENT
+    resultats = []
+    for tiers in Tiers.objects.filter(pk__in=qs.values("tiers")).order_by("nom"):
+        lignes = qs.filter(tiers=tiers)
+        avant = lignes.filter(ecriture__date__lt=date_debut).aggregate(d=Sum("debit"), c=Sum("credit"))
+        periode = lignes.filter(ecriture__date__gte=date_debut)
+        mvt = periode.aggregate(d=Sum("debit"), c=Sum("credit"))
+        factures = periode.filter(**({"debit__gt": 0} if client else {"credit__gt": 0}))
+        reglements = periode.filter(**({"credit__gt": 0} if client else {"debit__gt": 0}))
+        report = (avant["d"] or ZERO) - (avant["c"] or ZERO)
+        facture = (mvt["d"] if client else mvt["c"]) or ZERO
+        regle = (mvt["c"] if client else mvt["d"]) or ZERO
+        solde = report + (mvt["d"] or ZERO) - (mvt["c"] or ZERO)
+        resultats.append({
+            "tiers": tiers, "report": report, "facture": facture, "regle": regle, "solde": solde,
+            "nb_factures": factures.count(), "nb_reglements": reglements.count(),
+            "derniere_facture": factures.order_by("-ecriture__date").values_list("ecriture__date", flat=True).first(),
+            "dernier_reglement": reglements.order_by("-ecriture__date").values_list("ecriture__date", flat=True).first(),
+            "taux_recouvrement": (regle / facture * 100) if facture else None,
+        })
+    return sorted(resultats, key=lambda r: -abs(r["solde"]))

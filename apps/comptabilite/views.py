@@ -458,3 +458,31 @@ def balance_analytique_view(request):
     lignes = services.balance_analytique(p["date_debut"], p["date_fin"])
     totaux = {k: sum(l[k] for l in lignes) for k in ("charges", "produits", "resultat")}
     return render(request, "comptabilite/balance_analytique.html", {"form": form, "lignes": lignes, "totaux": totaux, "p": p})
+
+
+# ---------------------------------------------------------------- Etats tiers
+@login_required
+def justificatif_solde_view(request):
+    import datetime
+
+    type_tiers = request.GET.get("type", Tiers.CLIENT)
+    date = parse_date(request.GET.get("date") or "") or datetime.date.today()
+    blocs = services.justificatif_solde(date, type_tiers)
+    return render(request, "comptabilite/justificatif_solde.html", {
+        "blocs": blocs, "date": date, "type_tiers": type_tiers, "total": sum((b["solde"] for b in blocs), 0)})
+
+
+@login_required
+def statistiques_tiers_view(request):
+    form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
+    type_tiers = request.GET.get("type", Tiers.CLIENT)
+    lignes = services.statistiques_tiers(p["date_debut"], p["date_fin"], type_tiers)
+    totaux = {k: sum((l[k] for l in lignes), 0) for k in ("report", "facture", "regle", "solde")}
+    if request.GET.get("export") == "csv":
+        return _export_csv("statistiques_tiers", ["Code", "Tiers", "Report", "Facturé", "Réglé", "Solde", "Nb factures",
+                                                  "Nb règlements", "Dernière facture", "Dernier règlement"],
+                           [[l["tiers"].code, l["tiers"].nom, l["report"], l["facture"], l["regle"], l["solde"],
+                             l["nb_factures"], l["nb_reglements"], l["derniere_facture"], l["dernier_reglement"]]
+                            for l in lignes])
+    return render(request, "comptabilite/statistiques_tiers.html", {
+        "form": form, "p": p, "lignes": lignes, "totaux": totaux, "type_tiers": type_tiers, "export": True})

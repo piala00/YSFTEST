@@ -266,3 +266,36 @@ class EcransComptaTests(BaseCompta):
         for code in relies:
             self.assertTrue(trouves[code].lien(), code)
             self.assertEqual(self.client.get(trouves[code].lien()).status_code, 200, code)
+
+
+class EtatsTiersTests(BaseCompta):
+    def test_justificatif_de_solde_a_date(self):
+        j1, j2, j3 = (self.date + datetime.timedelta(days=n) for n in (0, 5, 20))
+        f1 = self.ecrire([("4111", 1000, 0, {"tiers": self.client_}), ("701", 0, 1000)], journal="VT", date=j1)
+        r1 = self.ecrire([("5711", 1000, 0), ("4111", 0, 1000, {"tiers": self.client_})], journal="CA", date=j2)
+        f2 = self.ecrire([("4111", 3000, 0, {"tiers": self.client_}), ("701", 0, 3000)], journal="VT", date=j2)
+        r2 = self.ecrire([("5711", 3000, 0), ("4111", 0, 3000, {"tiers": self.client_})], journal="CA", date=j3)
+        services.lettrer([self.ligne(f1, "4111"), self.ligne(r1, "4111")])
+        services.lettrer([self.ligne(f2, "4111"), self.ligne(r2, "4111")])
+        # Au jour j2 : la facture 1 est soldée (lettrée avant), la facture 2 ne l'est pas encore (règlement en j3)
+        blocs = services.justificatif_solde(j2, Tiers.CLIENT)
+        self.assertEqual(len(blocs), 1)
+        self.assertEqual(blocs[0]["solde"], Decimal("3000"))
+        self.assertEqual([l.ecriture_id for l in blocs[0]["lignes"]], [f2.pk])
+        self.assertEqual(services.justificatif_solde(j3, Tiers.CLIENT), [])
+        # Le total justifie le solde comptable du tiers à la date
+        solde = sum(l.debit - l.credit for l in services.lignes_validees(date_fin=j2).filter(tiers=self.client_))
+        self.assertEqual(solde, Decimal("3000"))
+
+    def test_statistiques_tiers(self):
+        self.ecrire([("4111", 4000, 0, {"tiers": self.client_}), ("701", 0, 4000)], journal="VT")
+        self.ecrire([("5711", 1000, 0), ("4111", 0, 1000, {"tiers": self.client_})], journal="CA")
+        lignes = services.statistiques_tiers(self.exercice.date_debut, self.exercice.date_fin, Tiers.CLIENT)
+        stat = next(l for l in lignes if l["tiers"] == self.client_)
+        self.assertEqual((stat["facture"], stat["regle"], stat["solde"]), (Decimal("4000"), Decimal("1000"), Decimal("3000")))
+        self.assertEqual(stat["taux_recouvrement"], Decimal("25"))
+        self.client.force_login(get_user_model().objects.create_superuser("stat", "", "x"))
+        for url in (reverse("comptabilite:statistiques_tiers") + "?type=CLIENT",
+                    reverse("comptabilite:statistiques_tiers") + "?type=CLIENT&export=csv",
+                    reverse("comptabilite:justificatif_solde") + "?type=FOURNISSEUR"):
+            self.assertEqual(self.client.get(url).status_code, 200, url)

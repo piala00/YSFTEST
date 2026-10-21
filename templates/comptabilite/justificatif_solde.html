@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Justificatif de solde à date{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Justificatif de solde {% if type_tiers == 'CLIENT' %}clients{% else %}fournisseurs{% endif %} au {{ date|date:"d/m/Y" }}</h1>
+  <div class="btn-group btn-group-sm"><a class="btn btn-outline-primary {% if type_tiers == 'CLIENT' %}active{% endif %}" href="?type=CLIENT&date={{ date|date:'Y-m-d' }}">Clients</a>
+  <a class="btn btn-outline-primary {% if type_tiers == 'FOURNISSEUR' %}active{% endif %}" href="?type=FOURNISSEUR&date={{ date|date:'Y-m-d' }}">Fournisseurs</a></div></div>
+<form class="card card-body d-print-none mb-3"><input type="hidden" name="type" value="{{ type_tiers }}"><div class="row g-2 align-items-end">
+  <div class="col-md-2"><label class="form-label small mb-0">Solde au</label><input type="date" name="date" value="{{ date|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div class="col-md-auto"><button class="btn btn-primary btn-sm">Afficher</button> <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i></button></div>
+</div></form>
+<p class="small text-muted">Détail des écritures non soldées à cette date qui expliquent le solde de chaque tiers (les factures et règlements lettrés avant la date sont écartés).</p>
+{% for b in blocs %}
+<div class="card mb-3"><div class="card-header bg-white d-flex"><strong>{{ b.tiers.code }} — {{ b.tiers.nom }}</strong><span class="ms-auto text-muted">compte {{ b.compte.numero }}</span></div>
+<table class="table table-sm mb-0"><thead class="table-light"><tr><th>Date</th><th>Jnl</th><th>Pièce</th><th>Libellé</th><th>Lettr.</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead><tbody>
+{% for l in b.lignes %}<tr><td>{{ l.ecriture.date|date:"d/m/Y" }}</td><td>{{ l.ecriture.journal.code }}</td><td><a href="{% url 'comptabilite:ecriture_detail' l.ecriture.pk %}">{{ l.ecriture.numero }}</a></td><td>{{ l.libelle }}</td><td>{{ l.lettrage }}</td>
+<td class="num">{{ l.debit|montant_ou_vide }}</td><td class="num">{{ l.credit|montant_ou_vide }}</td></tr>{% endfor %}
+</tbody><tfoot><tr class="total"><td colspan="5">Solde {% if b.solde > 0 %}débiteur{% else %}créditeur{% endif %}</td><td class="num">{{ b.debit|montant }}</td><td class="num">{{ b.credit|montant }}</td></tr>
+<tr><td colspan="5"></td><td colspan="2" class="num fw-semibold">{{ b.solde|absolu|montant }}</td></tr></tfoot></table></div>
+{% empty %}<div class="card card-body text-muted">Aucun solde à justifier à cette date.</div>{% endfor %}
+{% if blocs %}<div class="text-end fw-semibold">Total des soldes : {{ total|montant }}</div>{% endif %}
+{% endblock %}

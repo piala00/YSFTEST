@@ -83,6 +83,7 @@ PREUVES = {
     "ERG-CLASSIQUE": "Ergonomie Sage classique, à vérifier sur une installation V12",
     "INDICATIF": "Proposition fonctionnelle, non vérifiée sur une capture V12",
     "AJOUT-ERP": "Ajout propre à l'ERP OHADA (absent de Sage)",
+    "DOC-TIERS": "Cité par une source tierce (partenaire, formation), à confirmer sur Sage",
 }
 
 
@@ -587,8 +588,10 @@ COMPTABILITE = Module(
                   preuve="ERG-CLASSIQUE"),
                 E("etats.balance.agee", "Balance âgée", "comptabilite:balance_agee", type="CLIENT", preuve="ERG-CLASSIQUE"),
                 SEP(),
-                E("etats.tiers.justificatif", "Justificatif de solde à date", preuve="INDICATIF"),
-                E("etats.tiers.statistiques", "Statistiques tiers", preuve="INDICATIF"),
+                E("etats.tiers.justificatif", "Justificatif de solde à date", "comptabilite:justificatif_solde", type="CLIENT",
+                  preuve="DOC-TIERS"),
+                E("etats.tiers.statistiques", "Statistiques tiers", "comptabilite:statistiques_tiers", type="CLIENT",
+                  preuve="DOC-TIERS"),
                 E("etats.tiers.rappels", "Historique des rappels", preuve="INDICATIF"),
             ]),
             E("etats.analytique", "Etats analytiques", icone="bi-diagram-2", preuve="ERG-CLASSIQUE", enfants=[
