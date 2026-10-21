@@ -26,6 +26,10 @@ Sélectionner tout, Ajouter, Voir/Modifier et Rechercher.
 - `INDICATIF` : proposition non vérifiée ;
 - `AJOUT-ERP` : propre à l'ERP OHADA.
 
+La bibliothèque Sage V5–V12 / X3 est aussi installée dans `.claude/skills/` : orchestrateur ERP, Comptabilité,
+Gestion commerciale, Objets Métiers, BI Reporting et X3. Ses outils Windows (`resources/outils/`) ne font que lire
+(interface, métadonnées SQL, registre COM) : ne jamais les lancer avec un compte qui peut écrire dans une base Sage.
+
 La matrice de traçabilité est générée par `python manage.py audit_navigation --sortie docs/AUDIT_SAGE_V12_GESCOM.md`.
 Les points à confirmer sur une installation V12 réelle sont listés dans `docs/SAGE_V12_POINTS_A_VERIFIER.md`.
 
@@ -128,11 +132,23 @@ Autres fonctions :
     | Encaissement client | D 52x / 57x / 55x / C 4111 |
   | Paiement fournisseur | D 4011 / C 52x / 57x / 55x |
   | Variation de stock | D 311 / C 6031 (ou inverse) |
-- Saisie manuelle d'écritures (brouillard → validation, contrôle d'équilibre).
-- Journaux, **grand livre**, **balance générale à 6 colonnes**, lettrage des comptes de tiers.
+- Saisie manuelle d'écritures (brouillard → validation, contrôle d'équilibre), avec section analytique par ligne.
+- **Structure** : plan comptable, plan tiers, codes journaux, **taux de taxes** (TVA 19,25 % collectée 4431 /
+  déductible 4452), **banques** (RIB, journal de trésorerie), **plan analytique** (sections par plan : agences, activités…).
+- **Traitement** :
+  - interrogation et lettrage, affichage des lignes lettrées et **délettrage** ;
+  - **lettrage automatique** par compte et par tiers : montants identiques, puis reste soldé du tiers ;
+  - **rapprochement bancaire manuel** : pointage des opérations sur un relevé, solde comptable, solde banque attendu, écart ;
+  - **saisie analytique** : ventilation des charges et produits par section ;
+  - **clôture des journaux** : plus aucune saisie ni validation jusqu'à la date choisie ;
+  - **clôture de l'exercice** : contrôles (brouillard, exercice précédent), reports à nouveau des classes 1 à 5
+    détaillés par tiers dans le journal AN de l'exercice suivant (créé si besoin), résultat en 131 ou 139.
+    Les écritures de l'exercice clôturé sont alors remplacées par les à-nouveaux dans la balance, le grand livre et le bilan.
+- **Etat** : brouillard, journaux, **grand livre**, **balance générale à 6 colonnes** (les à-nouveaux du journal AN
+  vont dans les colonnes d'ouverture), balance âgée, échéanciers, **balance analytique**.
 - **Bilan** (actif brut / amortissements / net, passif) et **Compte de résultat** avec les références officielles (TA…, RA…, XA à XI : marge commerciale, valeur ajoutée, EBE, résultat d'exploitation, financier, HAO, résultat net).
 - Récapitulatif de la TVA (collectée / déductible / à reverser).
-- Exercices comptables avec clôture (blocage des saisies).
+- Exercices comptables : la clôture passe uniquement par Traitement › Fin d'exercice.
 
 ### Reporting
 - Tableau de bord : CA, marge commerciale, résultat, trésorerie, créances, dettes, stock, graphiques mensuels, top clients et top articles.
@@ -207,7 +223,14 @@ Authentification : `POST /api/token/` (`username`, `password`), puis en-tête `A
 ```bash
 python manage.py test                                # toute la suite
 python manage.py test apps.commercial.tests_recette  # cahier de recette SAHEL DISTRIBUTION
+python manage.py test apps.comptabilite.tests_recette  # comptabilité et scénarios inter-modules
 ```
+
+La **recette Comptabilité** suit le skill `sage100-comptabilite-v5-v12-expert` et les scénarios de la
+bibliothèque Sage (`SCENARIOS_INTER_MODULES.md`) : C01 facture transférée sans doublon, C07 paiement partiel
+puis lettrage, C08 facture validée non annulable, C10 analytique par agence égale au résultat, plus lettrage
+automatique, délettrage, rapprochement bancaire, clôture des journaux et clôture d'exercice (perte ou bénéfice,
+bilan d'ouverture égal au bilan de clôture).
 
 Le **cahier de recette** rejoue les cas pratiques du skill `sage-100-gescom-v12-formateur-expert` sur la société
 fictive SAHEL DISTRIBUTION : tarification, entrées, transferts, chaîne de vente, livraisons partielles, achats,

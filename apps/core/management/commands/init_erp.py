@@ -5,8 +5,8 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from apps.comptabilite.models import Compte, Journal
-from apps.comptabilite.plan_syscohada import JOURNAUX, LETTRABLES_PREFIXES, PLAN
+from apps.comptabilite.models import Banque, Compte, Journal, SectionAnalytique, Taxe
+from apps.comptabilite.plan_syscohada import JOURNAUX, LETTRABLES_PREFIXES, PLAN, TAXES
 from apps.core.models import Exercice, Societe
 
 
@@ -45,6 +45,14 @@ class Command(BaseCommand):
                 },
             )
         self.log(f"Journaux : {Journal.objects.count()}.")
+
+        for code, intitule, sens, taux, compte in TAXES:
+            Taxe.objects.get_or_create(code=code, defaults={
+                "intitule": intitule, "sens": sens, "taux": Decimal(taux), "compte": Compte.objects.get(numero=compte)})
+        Banque.objects.get_or_create(code="BQ1", defaults={"intitule": "Banque principale", "journal": Journal.objects.get(code="BQ")})
+        for code, intitule in (("SIEGE", "Siège"), ("AGENCE1", "Agence 1")):
+            SectionAnalytique.objects.get_or_create(code=code, defaults={"plan": "Agences", "intitule": intitule})
+        self.log(f"Taxes : {Taxe.objects.count()} · banques : {Banque.objects.count()} · sections : {SectionAnalytique.objects.count()}.")
 
         from apps.commercial.models import Depot
 

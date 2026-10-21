@@ -6,7 +6,7 @@ from django.forms import inlineformset_factory
 from apps.core.forms import BootstrapMixin, DateInput
 from apps.core.models import Exercice
 
-from .models import Compte, Ecriture, Journal, LigneEcriture
+from .models import Banque, Compte, Ecriture, Journal, LigneEcriture, SectionAnalytique, Taxe
 
 
 class CompteForm(BootstrapMixin, forms.ModelForm):
@@ -21,6 +21,24 @@ class JournalForm(BootstrapMixin, forms.ModelForm):
         fields = "__all__"
 
 
+class TaxeForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = Taxe
+        fields = "__all__"
+
+
+class BanqueForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = Banque
+        fields = "__all__"
+
+
+class SectionAnalytiqueForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = SectionAnalytique
+        fields = "__all__"
+
+
 class EcritureForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Ecriture
@@ -31,11 +49,12 @@ class EcritureForm(BootstrapMixin, forms.ModelForm):
 class LigneEcritureForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = LigneEcriture
-        fields = ("compte", "tiers", "libelle", "debit", "credit")
+        fields = ("compte", "tiers", "section", "libelle", "debit", "credit")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["compte"].queryset = Compte.objects.filter(actif=True)
+        self.fields["section"].queryset = SectionAnalytique.objects.filter(actif=True)
         for name in ("debit", "credit"):
             self.fields[name].widget.attrs["class"] += f" ligne-{name} text-end"
             self.fields[name].required = False

@@ -251,3 +251,9 @@ JOURNAUX = [
     ("OD", "Opérations diverses", "OD", None),
     ("AN", "À-nouveaux", "AN", None),
 ]
+
+# Taux de taxes : (code, intitulé, sens, taux, compte) — TVA camerounaise 19,25 % (17,5 % + 10 % de CAC)
+TAXES = [
+    ("C19", "TVA collectée 19,25 %", "COLLECTEE", "19.25", "4431"),
+    ("D19", "TVA déductible 19,25 %", "DEDUCTIBLE", "19.25", "4452"),
+]

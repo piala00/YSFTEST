@@ -76,10 +76,79 @@ class Journal(models.Model):
         Compte, null=True, blank=True, on_delete=models.PROTECT,
         help_text="Pour les journaux de trésorerie (banque, caisse)",
     )
+    cloture_au = models.DateField(
+        "Période clôturée jusqu'au", null=True, blank=True,
+        help_text="Clôture des journaux : aucune écriture ne peut plus être passée ou validée à cette date ou avant",
+    )
 
     class Meta:
         ordering = ["code"]
         verbose_name_plural = "Journaux"
+
+    def __str__(self):
+        return f"{self.code} - {self.intitule}"
+
+    def verifier_periode(self, date):
+        if self.cloture_au and date <= self.cloture_au:
+            raise ValidationError(
+                f"Le journal {self.code} est clôturé jusqu'au {self.cloture_au:%d/%m/%Y} : saisie impossible au {date:%d/%m/%Y}.")
+
+
+class Taxe(models.Model):
+    """Structure > Taux de taxes."""
+
+    COLLECTEE = "COLLECTEE"
+    DEDUCTIBLE = "DEDUCTIBLE"
+    SENS = [(COLLECTEE, "Collectée (ventes)"), (DEDUCTIBLE, "Déductible (achats)")]
+
+    code = models.CharField(max_length=10, unique=True)
+    intitule = models.CharField(max_length=100)
+    sens = models.CharField(max_length=12, choices=SENS)
+    taux = models.DecimalField("Taux (%)", max_digits=5, decimal_places=2)
+    compte = models.ForeignKey(Compte, on_delete=models.PROTECT, related_name="taxes")
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Taux de taxe"
+        verbose_name_plural = "Taux de taxes"
+
+    def __str__(self):
+        return f"{self.code} - {self.intitule} ({self.taux} %)"
+
+
+class Banque(models.Model):
+    """Structure > Banques : compte bancaire de la société, rattaché à un journal de trésorerie."""
+
+    code = models.CharField(max_length=10, unique=True)
+    intitule = models.CharField(max_length=100)
+    domiciliation = models.CharField(max_length=100, blank=True)
+    rib = models.CharField("RIB", max_length=40, blank=True)
+    journal = models.ForeignKey(Journal, on_delete=models.PROTECT, related_name="banques",
+                                limit_choices_to={"type_journal": "TRESORERIE"})
+
+    class Meta:
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} - {self.intitule}"
+
+    @property
+    def compte(self):
+        return self.journal.compte_tresorerie
+
+
+class SectionAnalytique(models.Model):
+    """Structure > Plan analytique : sections regroupées par plan (agences, activités...)."""
+
+    plan = models.CharField("Plan analytique", max_length=50, default="Agences")
+    code = models.CharField(max_length=20, unique=True)
+    intitule = models.CharField(max_length=100)
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["plan", "code"]
+        verbose_name = "Section analytique"
+        verbose_name_plural = "Plan analytique"
 
     def __str__(self):
         return f"{self.code} - {self.intitule}"
@@ -134,6 +203,7 @@ class Ecriture(models.Model):
             raise ValidationError(f"Écriture déséquilibrée : débit {debit} ≠ crédit {credit}.")
         if self.exercice.cloture:
             raise ValidationError("L'exercice est clôturé.")
+        self.journal.verifier_periode(self.date)
         self.statut = self.STATUT_VALIDEE
         self.save(update_fields=["statut"])
 
@@ -146,6 +216,10 @@ class LigneEcriture(models.Model):
     debit = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     credit = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     lettrage = models.CharField(max_length=10, blank=True, db_index=True)
+    section = models.ForeignKey(SectionAnalytique, null=True, blank=True, on_delete=models.PROTECT,
+                                related_name="lignes", verbose_name="Section analytique")
+    date_pointage = models.DateField("Pointé le", null=True, blank=True,
+                                     help_text="Rapprochement bancaire : date du relevé sur lequel la ligne figure")
 
     class Meta:
         ordering = ["id"]

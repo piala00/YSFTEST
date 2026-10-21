@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Balance analytique{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Balance analytique</h1></div>
+{% include "comptabilite/_periode.html" %}
+<div class="card"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>Section</th><th>Plan</th><th class="num">Charges</th><th class="num">Produits</th><th class="num">Résultat</th></tr></thead><tbody>
+{% for l in lignes %}<tr><td>{% if l.section %}{{ l.section }}{% else %}<em class="text-muted">Non ventilé</em>{% endif %}</td><td>{{ l.section.plan|default:"" }}</td><td class="num">{{ l.charges|montant }}</td><td class="num">{{ l.produits|montant }}</td><td class="num">{{ l.resultat|montant }}</td></tr>
+{% empty %}<tr><td colspan="5" class="text-muted text-center p-4">Aucun mouvement de charges ou de produits.</td></tr>{% endfor %}
+</tbody><tfoot class="table-light fw-bold"><tr><td colspan="2">Total</td><td class="num">{{ totaux.charges|montant }}</td><td class="num">{{ totaux.produits|montant }}</td><td class="num">{{ totaux.resultat|montant }}</td></tr></tfoot></table></div>
+{% endblock %}

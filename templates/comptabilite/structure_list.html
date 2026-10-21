@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ titre }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>{{ titre }}</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'comptabilite:structure_create' structure %}"><i class="bi bi-plus"></i> Nouveau</a></div>
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead><tr>{% for e in entetes %}<th>{{ e }}</th>{% endfor %}</tr></thead><tbody>
+{% for pk, valeurs in lignes %}<tr>{% for v in valeurs %}<td>{% if forloop.first %}<a href="{% url 'comptabilite:structure_update' structure pk %}">{{ v }}</a>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
+{% empty %}<tr><td colspan="{{ entetes|length }}" class="text-muted text-center p-4">Aucune fiche.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

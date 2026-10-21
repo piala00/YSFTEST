@@ -34,5 +34,5 @@ class SocieteForm(BootstrapMixin, forms.ModelForm):
 class ExerciceForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Exercice
-        fields = "__all__"
+        fields = ("code", "date_debut", "date_fin")  # la clôture passe par Traitement > Fin d'exercice
         widgets = {"date_debut": DateInput(), "date_fin": DateInput()}

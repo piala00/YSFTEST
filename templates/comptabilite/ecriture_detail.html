@@ -14,8 +14,8 @@
   {% if object.reglement %}<br>Origine : <a href="{% url 'commercial:reglement_detail' object.reglement.pk %}">Règlement {{ object.reglement.numero }}</a>{% endif %}
 </div>
 <div class="card"><table class="table table-sm mb-0">
-<thead class="table-light"><tr><th>Compte</th><th>Intitulé</th><th>Tiers</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th><th>Lettr.</th></tr></thead><tbody>
-{% for l in object.lignes.all %}<tr><td>{{ l.compte.numero }}</td><td>{{ l.compte.intitule }}</td><td>{{ l.tiers.nom|default:"" }}</td><td>{{ l.libelle }}</td>
+<thead class="table-light"><tr><th>Compte</th><th>Intitulé</th><th>Tiers</th><th>Section</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th><th>Lettr.</th></tr></thead><tbody>
+{% for l in object.lignes.all %}<tr><td>{{ l.compte.numero }}</td><td>{{ l.compte.intitule }}</td><td>{{ l.tiers.nom|default:"" }}</td><td>{{ l.section.code|default:"" }}</td><td>{{ l.libelle }}</td>
 <td class="num">{{ l.debit|montant_ou_vide }}</td><td class="num">{{ l.credit|montant_ou_vide }}</td><td>{{ l.lettrage }}</td></tr>{% endfor %}
 </tbody><tfoot><tr class="total"><td colspan="4" class="text-end">Totaux</td><td class="num">{{ object.total_debit|montant }}</td><td class="num">{{ object.total_credit|montant }}</td><td></td></tr></tfoot></table></div>
 {% endblock %}

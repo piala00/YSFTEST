@@ -31,6 +31,7 @@ def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", val
     Les lignes de même compte / tiers / sens sont regroupées.
     """
     exercice = Exercice.pour_date(date)
+    journal.verifier_periode(date)
     regroupees = OrderedDict()
     for ligne in lignes:
         debit = Decimal(ligne.get("debit") or 0)
@@ -41,7 +42,8 @@ def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", val
             debit, credit = debit - credit, ZERO
         if not debit and not credit:
             continue
-        cle = (ligne["compte"].pk, getattr(ligne.get("tiers"), "pk", None), "D" if debit else "C")
+        cle = (ligne["compte"].pk, getattr(ligne.get("tiers"), "pk", None), getattr(ligne.get("section"), "pk", None),
+               "D" if debit else "C")
         if cle in regroupees:
             regroupees[cle]["debit"] += debit
             regroupees[cle]["credit"] += credit
@@ -59,7 +61,7 @@ def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", val
     )
     LigneEcriture.objects.bulk_create([
         LigneEcriture(
-            ecriture=ecriture, compte=l["compte"], tiers=l.get("tiers"),
+            ecriture=ecriture, compte=l["compte"], tiers=l.get("tiers"), section=l.get("section"),
             libelle=(l.get("libelle") or libelle)[:200], debit=l["debit"], credit=l["credit"],
         )
         for l in regroupees.values()
@@ -142,7 +144,17 @@ def comptabiliser_reglement(reglement):
 # ---------------------------------------------------------------------------
 
 def lignes_validees(date_debut=None, date_fin=None, exercice=None):
+    """Lignes validées de la période.
+
+    Les écritures d'un exercice clôturé sont remplacées par les à-nouveaux de l'exercice suivant :
+    elles sont écartées dès que la période interrogée va au-delà de la fin de cet exercice.
+    """
     qs = LigneEcriture.objects.filter(ecriture__statut=Ecriture.STATUT_VALIDEE)
+    clotures = Q(ecriture__exercice__cloture=True)
+    if date_fin:
+        clotures &= Q(ecriture__exercice__date_fin__lt=date_fin)
+    if exercice is None:
+        qs = qs.exclude(clotures)
     if exercice is not None:
         qs = qs.filter(ecriture__exercice=exercice)
     if date_fin:
@@ -160,8 +172,9 @@ def balance(date_debut, date_fin, compte_debut="", compte_fin="", exercice=None)
     if compte_fin:
         base = base.filter(compte__numero__lte=compte_fin + "￿")
 
-    anterieur = base.filter(ecriture__date__lt=date_debut).values("compte").annotate(d=Sum("debit"), c=Sum("credit"))
-    periode = base.filter(ecriture__date__gte=date_debut).values("compte").annotate(d=Sum("debit"), c=Sum("credit"))
+    an = Q(ecriture__date__lt=date_debut) | Q(ecriture__journal__type_journal=Journal.TYPE_AN)
+    anterieur = base.filter(an).values("compte").annotate(d=Sum("debit"), c=Sum("credit"))
+    periode = base.exclude(an).values("compte").annotate(d=Sum("debit"), c=Sum("credit"))
 
     donnees = defaultdict(lambda: {"an_d": ZERO, "an_c": ZERO, "mvt_d": ZERO, "mvt_c": ZERO})
     for row in anterieur:
@@ -196,12 +209,13 @@ def grand_livre(date_debut, date_fin, compte_debut="", compte_fin="", tiers=None
     if tiers is not None:
         qs = qs.filter(tiers=tiers)
 
+    an = Q(ecriture__date__lt=date_debut) | Q(ecriture__journal__type_journal=Journal.TYPE_AN)
     reports = {
         r["compte"]: (r["d"] or ZERO) - (r["c"] or ZERO)
-        for r in qs.filter(ecriture__date__lt=date_debut).values("compte").annotate(d=Sum("debit"), c=Sum("credit"))
+        for r in qs.filter(an).values("compte").annotate(d=Sum("debit"), c=Sum("credit"))
     }
     resultat = OrderedDict()
-    for ligne in qs.filter(ecriture__date__gte=date_debut).order_by("compte__numero", "ecriture__date", "ecriture__numero", "id"):
+    for ligne in qs.exclude(an).order_by("compte__numero", "ecriture__date", "ecriture__numero", "id"):
         bloc = resultat.get(ligne.compte_id)
         if bloc is None:
             report = reports.pop(ligne.compte_id, ZERO)
@@ -257,6 +271,44 @@ def _prochain_code_lettrage(existants):
     raise ValidationError("Plus de code de lettrage disponible.")
 
 
+@transaction.atomic
+def delettrer(compte, code):
+    """Supprime un code de lettrage sur un compte ; renvoie le nombre de lignes délettrées."""
+    return LigneEcriture.objects.filter(compte=compte, lettrage=code).update(lettrage="")
+
+
+@transaction.atomic
+def lettrage_automatique(comptes=None, tiers=None):
+    """Traitement > Lettrage automatique, par compte et par tiers.
+
+    1. Montants identiques : une ligne au débit et une ligne au crédit de même montant (ordre chronologique).
+    2. Solde nul : si le reste des lignes non lettrées du tiers est équilibré, il est lettré d'un seul code.
+    Renvoie le nombre de codes de lettrage attribués.
+    """
+    qs = LigneEcriture.objects.filter(lettrage="", ecriture__statut=Ecriture.STATUT_VALIDEE, compte__lettrable=True)
+    if comptes is not None:
+        qs = qs.filter(compte__in=comptes)
+    if tiers is not None:
+        qs = qs.filter(tiers=tiers)
+    groupes = defaultdict(list)
+    for ligne in qs.select_related("compte").order_by("ecriture__date", "id"):
+        groupes[(ligne.compte_id, ligne.tiers_id)].append(ligne)
+    codes = 0
+    for lignes in groupes.values():
+        restantes = list(lignes)
+        for debit in [l for l in lignes if l.debit]:
+            credit = next((l for l in restantes if l.credit == debit.debit), None)
+            if credit is not None and debit in restantes:
+                lettrer([debit, credit])
+                restantes.remove(debit)
+                restantes.remove(credit)
+                codes += 1
+        if len(restantes) > 1 and sum(l.debit for l in restantes) == sum(l.credit for l in restantes):
+            lettrer(restantes)
+            codes += 1
+    return codes
+
+
 def lignes_non_lettrees(compte, tiers=None):
     qs = LigneEcriture.objects.filter(compte=compte, lettrage="", ecriture__statut=Ecriture.STATUT_VALIDEE)
     if tiers:
@@ -296,3 +348,126 @@ def constater_variation_stock(date):
               [{"compte": variation, "debit": -ecart}, {"compte": stock, "credit": -ecart}])
     return creer_ecriture(_journal("OD"), date, f"Variation des stocks de marchandises au {date:%d/%m/%Y}", lignes,
                           reference="INVENTAIRE")
+
+
+# ---------------------------------------------------------------------------
+# Rapprochement bancaire
+# ---------------------------------------------------------------------------
+def rapprochement(compte, date_releve):
+    """Situation de rapprochement d'un compte de banque à la date d'un relevé."""
+    lignes = lignes_validees(date_fin=date_releve).filter(compte=compte).select_related("ecriture__journal", "tiers")
+    totaux = lignes.aggregate(d=Sum("debit"), c=Sum("credit"))
+    solde_comptable = (totaux["d"] or ZERO) - (totaux["c"] or ZERO)
+    non_pointees = lignes.filter(Q(date_pointage__isnull=True) | Q(date_pointage__gt=date_releve))
+    np = non_pointees.aggregate(d=Sum("debit"), c=Sum("credit"))
+    return {
+        "solde_comptable": solde_comptable,
+        "non_pointees": non_pointees.order_by("ecriture__date", "id"),
+        "non_pointe_debit": np["d"] or ZERO,
+        "non_pointe_credit": np["c"] or ZERO,
+        # Ce que la banque doit afficher : solde comptable moins les opérations qu'elle n'a pas encore passées
+        "solde_banque_theorique": solde_comptable - (np["d"] or ZERO) + (np["c"] or ZERO),
+    }
+
+
+@transaction.atomic
+def pointer(lignes, date_releve):
+    return LigneEcriture.objects.filter(pk__in=[l.pk for l in lignes]).update(date_pointage=date_releve)
+
+
+# ---------------------------------------------------------------------------
+# Fin d'exercice
+# ---------------------------------------------------------------------------
+def exercice_suivant(exercice, creer=True):
+    import datetime
+
+    suivant = Exercice.objects.filter(date_debut=exercice.date_fin + datetime.timedelta(days=1)).first()
+    if suivant is None and creer:
+        debut = exercice.date_fin + datetime.timedelta(days=1)
+        try:
+            fin = debut.replace(year=debut.year + 1) - datetime.timedelta(days=1)
+        except ValueError:          # 29 février
+            fin = debut.replace(year=debut.year + 1, day=28) - datetime.timedelta(days=1)
+        code = str(debut.year) if debut.month == 1 else f"{debut.year}-{fin.year}"
+        suivant = Exercice.objects.create(code=code, date_debut=debut, date_fin=fin)
+    return suivant
+
+
+def controles_cloture(exercice):
+    """Préconditions de la clôture (liste de messages bloquants)."""
+    erreurs = []
+    brouillard = Ecriture.objects.filter(exercice=exercice, statut=Ecriture.STATUT_BROUILLARD).count()
+    if brouillard:
+        erreurs.append(f"{brouillard} écriture(s) au brouillard dans l'exercice : validez-les ou supprimez-les.")
+    precedent = Exercice.objects.filter(date_fin__lt=exercice.date_debut, cloture=False).first()
+    if precedent:
+        erreurs.append(f"L'exercice précédent {precedent.code} doit être clôturé d'abord.")
+    if exercice.cloture:
+        erreurs.append(f"L'exercice {exercice.code} est déjà clôturé.")
+    return erreurs
+
+
+@transaction.atomic
+def cloturer_exercice(exercice):
+    """Traitement > Fin d'exercice > Clôture de l'exercice.
+
+    Génère dans le journal des à-nouveaux de l'exercice suivant les soldes des comptes de bilan
+    (classes 1 à 5, détaillés par tiers), affecte le résultat (classes 6 à 8) en 131 bénéfice
+    ou 139 perte, puis clôture l'exercice : ses écritures ne sont plus modifiables.
+    """
+    erreurs = controles_cloture(exercice)
+    if erreurs:
+        raise ValidationError(erreurs)
+    suivant = exercice_suivant(exercice)
+    lignes_ex = LigneEcriture.objects.filter(ecriture__exercice=exercice, ecriture__statut=Ecriture.STATUT_VALIDEE)
+    soldes = lignes_ex.values("compte", "compte__numero", "tiers").annotate(d=Sum("debit"), c=Sum("credit"))
+    comptes = {c.pk: c for c in Compte.objects.filter(pk__in={s["compte"] for s in soldes})}
+    from apps.commercial.models import Tiers
+    tiers = {t.pk: t for t in Tiers.objects.filter(pk__in={s["tiers"] for s in soldes if s["tiers"]})}
+
+    lignes, resultat = [], ZERO
+    for s in soldes:
+        solde = (s["d"] or ZERO) - (s["c"] or ZERO)
+        if not solde:
+            continue
+        if s["compte__numero"][0] in "678":
+            resultat -= solde
+            continue
+        lignes.append({"compte": comptes[s["compte"]], "tiers": tiers.get(s["tiers"]),
+                       "debit": solde if solde > 0 else ZERO, "credit": -solde if solde < 0 else ZERO,
+                       "libelle": f"À-nouveau {exercice.code}"})
+    if resultat > 0:
+        lignes.append({"compte": Compte.par_numero("131"), "credit": resultat, "libelle": f"Résultat {exercice.code} : bénéfice"})
+    elif resultat < 0:
+        lignes.append({"compte": Compte.par_numero("139"), "debit": -resultat, "libelle": f"Résultat {exercice.code} : perte"})
+    ecriture = None
+    if lignes:
+        journal = Journal.objects.filter(type_journal=Journal.TYPE_AN).first() or _journal("AN")
+        ecriture = creer_ecriture(journal, suivant.date_debut, f"Reports à nouveau de l'exercice {exercice.code}",
+                                  lignes, reference=f"AN {exercice.code}", origine=f"Clôture {exercice.code}")
+    exercice.cloture = True
+    exercice.save(update_fields=["cloture"])
+    return {"exercice_suivant": suivant, "ecriture": ecriture, "resultat": resultat}
+
+
+# ---------------------------------------------------------------------------
+# Analytique
+# ---------------------------------------------------------------------------
+def balance_analytique(date_debut, date_fin):
+    """Charges (classe 6), produits (classe 7) et résultat par section analytique."""
+    from .models import SectionAnalytique
+
+    qs = lignes_validees(date_debut, date_fin).filter(Q(compte__numero__startswith="6") | Q(compte__numero__startswith="7"))
+    donnees = defaultdict(lambda: {"charges": ZERO, "produits": ZERO})
+    for r in qs.values("section", "compte__numero").annotate(d=Sum("debit"), c=Sum("credit")):
+        solde = (r["d"] or ZERO) - (r["c"] or ZERO)
+        if r["compte__numero"].startswith("6"):
+            donnees[r["section"]]["charges"] += solde
+        else:
+            donnees[r["section"]]["produits"] -= solde
+    sections = {s.pk: s for s in SectionAnalytique.objects.filter(pk__in=[k for k in donnees if k])}
+    lignes = []
+    for pk, d in donnees.items():
+        lignes.append({"section": sections.get(pk), **d, "resultat": d["produits"] - d["charges"]})
+    lignes.sort(key=lambda l: (l["section"] is None, l["section"].code if l["section"] else ""))
+    return lignes

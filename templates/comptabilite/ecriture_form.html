@@ -9,8 +9,8 @@
 <div class="card"><div class="card-body p-0">
 {{ formset.management_form }}
 {% if formset.non_form_errors %}<div class="alert alert-danger m-2">{{ formset.non_form_errors }}</div>{% endif %}
-<table class="table table-sm mb-0" id="lignes"><thead class="table-light"><tr><th style="width:28%">Compte</th><th style="width:20%">Tiers</th><th>Libellé</th><th style="width:13%">Débit</th><th style="width:13%">Crédit</th><th></th></tr></thead>
-<tbody>{% for f in formset %}<tr class="ligne"><td>{{ f.id }}{{ f.compte }}{% for e in f.errors.values %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td><td>{{ f.tiers }}</td><td>{{ f.libelle }}</td><td>{{ f.debit }}</td><td>{{ f.credit }}</td>
+<table class="table table-sm mb-0" id="lignes"><thead class="table-light"><tr><th style="width:24%">Compte</th><th style="width:17%">Tiers</th><th style="width:12%">Section</th><th>Libellé</th><th style="width:13%">Débit</th><th style="width:13%">Crédit</th><th></th></tr></thead>
+<tbody>{% for f in formset %}<tr class="ligne"><td>{{ f.id }}{{ f.compte }}{% for e in f.errors.values %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td><td>{{ f.tiers }}</td><td>{{ f.section }}</td><td>{{ f.libelle }}</td><td>{{ f.debit }}</td><td>{{ f.credit }}</td>
 <td>{% if f.instance.pk %}{{ f.DELETE }}{% else %}<span class="d-none">{{ f.DELETE }}</span>{% endif %}</td></tr>{% endfor %}</tbody>
 <tfoot><tr><td colspan="3"><button type="button" class="btn btn-sm btn-outline-secondary" id="ajout-ligne"><i class="bi bi-plus"></i> Ligne</button></td>
 <td class="num fw-bold" id="tot-d">0</td><td class="num fw-bold" id="tot-c">0</td><td></td></tr>
