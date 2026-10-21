@@ -3,6 +3,8 @@
 <link href="{% static 'vendor/bootstrap.min.css' %}" rel="stylesheet">
 <style>body{font-size:11pt;padding:2rem}.num{text-align:right;white-space:nowrap}@media print{body{padding:0}.no-print{display:none}}</style></head>
 <body onload="window.print()">
+{% if object.mentions_manquantes %}<div class="alert alert-warning no-print small">Mentions obligatoires (CGI 2026, art. 150-5) manquantes :
+  {{ object.mentions_manquantes|join:", " }}.</div>{% endif %}
 <div class="d-flex justify-content-between mb-4">
   <div><h4 class="mb-0">{{ societe.raison_sociale }}</h4>
     <div class="small">{{ societe.forme_juridique }} {% if societe.adresse %}· {{ societe.adresse }}{% endif %} · {{ societe.ville }}<br>
@@ -22,7 +24,8 @@
 <td class="num">{% if l.remise %}{{ l.remise }}%{% endif %}</td><td class="num">{{ l.taux_tva }}%</td><td class="num">{{ l.montant_ht|montant }}</td></tr>{% endfor %}</tbody></table>
 <table class="table table-sm ms-auto" style="width:45%">
 <tr><td>Total HT</td><td class="num">{{ object.total_ht|montant }}</td></tr>
-{% if object.est_vente and not societe.assujettie_tva %}<tr><td colspan="2" class="small">TVA non applicable : société non assujettie à la TVA</td></tr>{% else %}{% for v in object.ventilation_tva %}<tr><td>TVA {{ v.taux }} %</td><td class="num">{{ v.tva|montant }}</td></tr>{% endfor %}{% endif %}
+{% if object.est_vente and not societe.assujettie_tva %}<tr><td colspan="2" class="small">TVA non applicable : société non assujettie à la TVA</td></tr>{% else %}{% for v in object.ventilation_tva %}<tr><td>TVA {{ v.taux }} %{% if v.taux_principal %} <span class="small text-muted">(principal {{ v.taux_principal }} % + CAC 10 %)</span>{% endif %}</td><td class="num">{{ v.tva|montant }}</td></tr>
+{% if v.taux_principal %}<tr class="small text-muted"><td class="ps-4">dont TVA principal {{ v.principal|montant }} · CAC {{ v.cac|montant }}</td><td></td></tr>{% endif %}{% endfor %}{% endif %}
 <tr class="fw-bold"><td>{% if object.est_stock %}Valeur{% else %}Net à payer TTC{% endif %}</td><td class="num">{{ object.total_ttc|montant }} {{ societe.devise }}</td></tr></table>
 {% if object.notes %}<p class="small">{{ object.notes|linebreaksbr }}</p>{% endif %}
 {% if societe.pied_facture %}<hr><p class="small text-center text-muted">{{ societe.pied_facture|linebreaksbr }}</p>{% endif %}

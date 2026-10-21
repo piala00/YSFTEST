@@ -311,3 +311,23 @@ droits n'ont **pas** été renommés (attente de la preuve V12, comme vous le re
 3. **Libellés V12 des niveaux de droits** : toute fiche Sage récente (V9 à V12) citant la liste déroulante des
    autorisations (« Autoriser », « Tout autoriser », « Interdire la lecture et l'écriture », « Tout interdire »…).
 4. Puis les lots 2 (R5 à R8, fiscalité Cameroun et SYSCOHADA), 3 (R9 à R11, écrans) et 4 (R12, R13).
+
+
+## Suite — retour sur la livraison 2 (lot « Cameroun / SYSCOHADA », reçue le 21/10/2026)
+
+**Intégré** (skill `ohada-cameroun-fiscalite-comptable` installé) : contrôle des mentions de facture de l'art. 150-5
+(NIU, RCCM, adresses), détail TVA principal 17,5 % + CAC 10 % sur la facture et la déclaration, taux réduit 11 % et
+taux zéro export, comptes fiscaux du guide technique (4433, 4434, 4426, 4491), régime d'imposition (réel, IGS, OBNL,
+non professionnel) sur la société et les tiers. **Non intégré, comme vous le recommandez** : plan candidat en
+quarantaine, retenues AIR / précompte automatiques, arrondi au millier, timbre, mention non-assujetti.
+
+**Demande suivante pour ce lot :**
+1. **Plan SYSCOHADA révisé final** (JO OHADA du 15/02/2017, liste des comptes) : toute diffusion officielle
+   téléchargeable (site OHADA, ministère des Finances, ordre des experts-comptables), pour lever la quarantaine.
+2. **Correspondance comptes → rubriques** du bilan et du compte de résultat (système normal), en particulier les
+   lignes de détail AE à AH, AJ à AN, AR, AS, et le code de l'écart de conversion passif (DV ou DY).
+3. **Assiette de l'AIR et du précompte** au moment de la facture ou du règlement, avec un exemple chiffré officiel
+   (circulaire, avis DGI) ; qui les mentionne sur la facture.
+4. **Mention exacte** d'une facture émise par un non-assujetti à la TVA ou par un contribuable à l'IGS, si un texte
+   la fixe.
+5. **Arrêté d'application** du suivi électronique de la facturation (art. 8 bis) : entreprises concernées, calendrier.

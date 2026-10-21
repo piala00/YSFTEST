@@ -1,0 +1,4 @@
+interface:
+  display_name: "OHADA et fiscalité Cameroun"
+  short_description: "Règles2026, DSF et preuves comptables avec limites explicites"
+  default_prompt: "Vérifie mon paramétrage fiscal camerounais2026 et mes états OHADA avec les sources, en excluant les données non certifiées."

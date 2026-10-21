@@ -330,10 +330,15 @@ def declaration_tva(date_debut, date_fin):
     deductible = qs.filter(compte__numero__startswith="445").aggregate(d=Sum("debit"), c=Sum("credit"))
     tva_collectee = (collectee["c"] or ZERO) - (collectee["d"] or ZERO)
     tva_deductible = (deductible["d"] or ZERO) - (deductible["c"] or ZERO)
+    solde = tva_collectee - tva_deductible
+    principal = (solde / Decimal("1.1")).quantize(Decimal("1")) if solde > 0 else ZERO
     return {
         "collectee": tva_collectee,
         "deductible": tva_deductible,
-        "solde": tva_collectee - tva_deductible,
+        "solde": solde,
+        # TVA camerounaise = principal + CAC (10 % du principal) : répartition indicative du montant dû
+        "principal": principal,
+        "cac": solde - principal if solde > 0 else ZERO,
     }
 
 

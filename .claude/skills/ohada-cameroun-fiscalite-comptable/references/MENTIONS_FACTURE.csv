@@ -1,0 +1,11 @@
+ordre;champ;obligation;fondement;source;preuve
+1;NIU fournisseur et client;Obligatoire au titre de l’article cité;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+2;Date de facturation;Obligatoire;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+3;Nom ou raison sociale et adresse complète du fournisseur;Obligatoire;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+4;Numéro du registre du commerce du fournisseur;Obligatoire;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+5;Identité complète du client;Obligatoire;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+6;Nature objet et détail de la transaction;Obligatoire;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+7;Prix hors taxe;Obligatoire;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+8;Taux et montant de la taxe correspondante;Obligatoire;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+9;Montant TTC dû par le client;Obligatoire;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL
+10;Exonérée ou prise en charge État par produit;Selon le cas;CGI 2026 art.150(5);F01 | https://impots.cm/sites/default/files/documents/CODE%20GENERAL%20DES%20IMPOTS%202026%20SITE%20DGI%20VERSION%20FRANCAISE.pdf | PDF p.115;DOC-OFFICIEL

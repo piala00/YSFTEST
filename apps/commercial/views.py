@@ -553,6 +553,9 @@ def document_valider(request, pk):
         messages.success(request, f"Document {document.numero} validé.")
         if getattr(document, "avertissement", None):
             messages.warning(request, document.avertissement)
+        if document.mentions_manquantes():
+            messages.warning(request, "Mentions obligatoires de la facture (CGI art. 150-5) manquantes : "
+                             + ", ".join(document.mentions_manquantes()) + ". Complétez les fiches.")
     except ValidationError as exc:
         _erreur(request, exc)
     return redirect("commercial:document_detail", pk=pk)

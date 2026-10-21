@@ -107,3 +107,44 @@ class RegimeTvaTests(TestCase):
     def test_init_erp_option_regime(self):
         call_command("init_erp", verbosity=0, regime_tva="non-assujettie")
         self.assertEqual(Societe.get().regime_tva, Societe.TVA_NON_ASSUJETTIE)
+
+
+class FiscaliteCamerounTests(TestCase):
+    """CGI 2026 (skill ohada-cameroun-fiscalite-comptable) : CAC et mentions de facture, art. 150-5."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0, regime_tva="assujettie")
+        cls.client_ = Tiers.objects.create(code="C1", nom="Client")
+        cls.article = Article.objects.create(reference="A1", designation="Article", prix_vente=100000, suivi_stock=False)
+
+    def facture(self):
+        doc = Document.objects.create(type_document=Document.FACTURE, tiers=self.client_)
+        LigneDocument.objects.create(document=doc, article=self.article, quantite=1, prix_unitaire=100000)
+        doc.recalculer()
+        return doc
+
+    def test_tva_principal_et_cac(self):
+        v = self.facture().ventilation_tva()[0]
+        self.assertEqual(v["tva"], Decimal("19250"))
+        self.assertEqual((v["principal"], v["cac"]), (Decimal("17500"), Decimal("1750")))
+
+    def test_mentions_obligatoires(self):
+        doc = self.facture()
+        manque = doc.mentions_manquantes()
+        self.assertIn("NIU de la société", manque)
+        self.assertIn("NIU du client Client", manque)
+        societe = Societe.get()
+        societe.niu, societe.rccm, societe.ville = "M012345678901A", "RC/BTA/2026/B/001", "Bertoua"
+        societe.save()
+        self.client_.niu, self.client_.ville = "P098765432109Z", "Bertoua"
+        self.client_.save()
+        self.assertEqual(self.facture().mentions_manquantes(), [])
+
+    def test_comptes_et_taxes_officiels(self):
+        from apps.comptabilite.models import Compte, Taxe
+
+        for numero in ("4433", "4434", "4426", "4491", "4441", "4449"):
+            self.assertTrue(Compte.objects.filter(numero=numero).exists(), numero)
+        self.assertEqual(Taxe.objects.get(code="C11").taux, Decimal("11"))
+        self.assertEqual(Taxe.objects.get(code="C0").taux, Decimal("0"))

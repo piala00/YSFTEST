@@ -7,6 +7,9 @@
 <div class="card" style="max-width:600px"><table class="table mb-0">
 <tr><td>TVA collectée (443)</td><td class="num">{{ tva.collectee|montant }}</td></tr>
 <tr><td>TVA déductible (445)</td><td class="num">{{ tva.deductible|montant }}</td></tr>
-<tr class="total"><td>{% if tva.solde >= 0 %}TVA due à reverser{% else %}Crédit de TVA{% endif %}</td><td class="num">{{ tva.solde|absolu|montant }}</td></tr>
+<tr class="total"><td>{% if tva.solde >= 0 %}TVA due à reverser (4441){% else %}Crédit de TVA à reporter (4449){% endif %}</td><td class="num">{{ tva.solde|absolu|montant }}</td></tr>
+{% if tva.solde > 0 %}<tr class="small text-muted"><td class="ps-4">dont principal (taux 17,5 % ou 10 %) · CAC 10 % du principal</td><td class="num">{{ tva.principal|montant }} · {{ tva.cac|montant }}</td></tr>{% endif %}
 </table></div>
+<p class="small text-muted mt-2" style="max-width:600px">Répartition principal / CAC calculée à partir du total (TVA × 10/11), à titre indicatif.
+L'arrondi de la base au millier inférieur (CGI art. 141) n'est pas appliqué automatiquement : sa granularité reste à confirmer.</p>
 {% endblock %}

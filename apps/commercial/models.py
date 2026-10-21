@@ -68,6 +68,8 @@ class Tiers(models.Model):
     categorie_tarifaire = models.ForeignKey(CategorieTarifaire, null=True, blank=True, on_delete=models.SET_NULL,
                                             related_name="clients", verbose_name="Catégorie tarifaire")
     assujetti_tva = models.BooleanField("Assujetti à la TVA", default=True)
+    regime_fiscal = models.CharField("Régime d'imposition", max_length=20, choices=Societe.REGIMES_FISCAUX, blank=True,
+                                     help_text="Utile pour l'AIR et le précompte (taux selon le régime)")
     actif = models.BooleanField(default=True)
     cree_le = models.DateTimeField(auto_now_add=True)
 
@@ -451,14 +453,41 @@ class Document(models.Model):
         if save:
             self.save(update_fields=["total_ht", "total_tva", "total_ttc"])
 
+    # Taux TTC → taux du principal : la TVA camerounaise est un principal majoré de 10 % de CAC (CGI 2026)
+    PRINCIPAL_TVA = {Decimal("19.25"): Decimal("17.5"), Decimal("11"): Decimal("10")}
+
     def ventilation_tva(self):
-        """Bases HT et TVA regroupées par taux."""
+        """Bases HT et TVA regroupées par taux, avec la part principal / CAC (centimes additionnels communaux)."""
         bases = {}
         for ligne in self.lignes.all():
             base = bases.setdefault(ligne.taux_tva, {"taux": ligne.taux_tva, "base": ZERO, "tva": ZERO})
             base["base"] += ligne.montant_ht
             base["tva"] += ligne.montant_tva
+        for b in bases.values():
+            principal = self.PRINCIPAL_TVA.get(Decimal(b["taux"]).normalize())
+            if principal is not None:
+                b["taux_principal"] = principal
+                b["principal"] = arrondi(b["tva"] / Decimal("1.1"))
+                b["cac"] = b["tva"] - b["principal"]
         return sorted(bases.values(), key=lambda b: b["taux"])
+
+    def mentions_manquantes(self):
+        """Mentions de la facture exigées par le CGI 2026, art. 150-5, absentes des fiches (liste vide si complet)."""
+        if not (self.est_vente and self.est_facturation):
+            return []
+        societe = Societe.get()
+        manque = []
+        if not societe.niu:
+            manque.append("NIU de la société")
+        if not societe.rccm:
+            manque.append("N° RCCM de la société")
+        if not (societe.adresse or societe.ville):
+            manque.append("adresse de la société")
+        if self.tiers_id and not self.tiers.niu:
+            manque.append(f"NIU du client {self.tiers.nom}")
+        if self.tiers_id and not (self.tiers.adresse or self.tiers.ville):
+            manque.append(f"adresse du client {self.tiers.nom}")
+        return manque
 
     @property
     def est_brouillon_numero(self):

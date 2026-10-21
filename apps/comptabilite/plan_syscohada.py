@@ -102,9 +102,12 @@ PLAN = [
     ("44", "État et collectivités publiques"),
     ("441", "État, impôt sur les bénéfices"),
     ("442", "État, autres impôts et taxes"),
+    ("4426", "Etat, droits de douane"),
     ("443", "État, TVA facturée"),
     ("4431", "TVA facturée sur ventes"),
     ("4432", "TVA facturée sur prestations de services"),
+    ("4433", "Etat, T.V.A. facturée sur travaux"),
+    ("4434", "Etat, T.V.A. facturée sur production livrée à soi-même"),
     ("445", "État, TVA récupérable"),
     ("4451", "TVA récupérable sur immobilisations"),
     ("4452", "TVA récupérable sur achats"),
@@ -115,6 +118,7 @@ PLAN = [
     ("4449", "État, crédit de TVA à reporter"),
     ("447", "État, impôts retenus à la source"),
     ("449", "État, créances et dettes diverses"),
+    ("4491", "Etat, obligations cautionnées"),
     ("45", "Organismes internationaux"),
     ("46", "Apporteurs, associés et groupe"),
     ("462", "Associés, comptes courants"),
@@ -253,7 +257,11 @@ JOURNAUX = [
 ]
 
 # Taux de taxes : (code, intitulé, sens, taux, compte) — TVA camerounaise 19,25 % (17,5 % + 10 % de CAC)
+# CGI 2026 : taux général 17,5 % + CAC 10 % du principal = 19,25 % ; taux réduit 10 % + CAC = 11 % (seules opérations
+# de l'art. 142(4)) ; taux zéro pour les exportations justifiées (≠ exonération). Skill ohada-cameroun-fiscalite-comptable.
 TAXES = [
     ("C19", "TVA collectée 19,25 %", "COLLECTEE", "19.25", "4431"),
+    ("C11", "TVA collectée taux réduit 11 % (art. 142-4)", "COLLECTEE", "11", "4431"),
+    ("C0", "TVA taux zéro — exportations", "COLLECTEE", "0", "4431"),
     ("D19", "TVA déductible 19,25 %", "DEDUCTIBLE", "19.25", "4452"),
 ]

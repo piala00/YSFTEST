@@ -32,6 +32,16 @@ class Societe(models.Model):
         help_text="Non assujettie : les ventes sont facturées sans TVA et la TVA payée aux fournisseurs entre dans "
                   "le coût d'achat (pas de TVA déductible). Confirmez votre régime auprès de votre centre des impôts. "
                   "Le changement s'applique aux documents validés ensuite.")
+    REGIMES_FISCAUX = [
+        ("", "À paramétrer"),
+        ("REEL", "Régime du réel"),
+        ("IGS", "Impôt général synthétique (IGS)"),
+        ("OBNL", "Organisme à but non lucratif"),
+        ("NON_PROFESSIONNEL", "Contribuable non professionnel"),
+    ]
+    regime_fiscal = models.CharField(
+        "Régime d'imposition", max_length=20, choices=REGIMES_FISCAUX, blank=True,
+        help_text="CGI 2026, art. 93 ter et quater. IGS : CA annuel HT < 50 M FCFA (30 M pour les professions libérales).")
     taux_tva_defaut = models.DecimalField("Taux TVA par défaut (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
     stock_negatif_autorise = models.BooleanField(
         "Autoriser le stock négatif", default=False,
