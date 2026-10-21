@@ -17,7 +17,8 @@
     <div class="card">
       <div class="card-header bg-white fw-semibold">Utilisateurs</div>
       <table class="table table-sm mb-0 small"><tbody>
-        {% for u in utilisateurs %}<tr><td><i class="bi bi-person"></i> {{ u.username }}</td><td class="text-muted">{% if u.is_superuser %}Administrateur (tous les droits){% else %}{{ u.groups.all.0.name|default:"Sans profil (tous les droits)" }}{% endif %}</td></tr>{% endfor %}
+        {% for u in utilisateurs %}<tr><td><i class="bi bi-person"></i> {{ u.username }}</td><td class="text-muted">{% if u.is_superuser %}Administrateur (tous les droits){% else %}{{ u.groups.all.0.name|default:"Sans profil (tous les droits)" }}
+          <div>{% for l, code, libelle in u.acces_par_logiciel %}{% if code != "UTILISATEUR" %}<span class="badge text-bg-{% if code == 'AUCUN' %}danger{% else %}warning{% endif %} me-1" title="{{ l.titre }}">{{ l.titre }} : {{ libelle }}</span>{% endif %}{% endfor %}</div>{% endif %}</td></tr>{% endfor %}
       </tbody></table>
       <form method="post" class="card-body border-top">{% csrf_token %}<input type="hidden" name="action" value="utilisateur"><input type="hidden" name="logiciel" value="{{ logiciel.code }}">{% if profil %}<input type="hidden" name="profil" value="{{ profil.pk }}">{% endif %}
         <div class="small text-muted mb-2">Créer un utilisateur, ou changer le profil ou le mot de passe d'un utilisateur existant.</div>
@@ -26,7 +27,12 @@
         <input name="mot_de_passe" type="password" class="form-control form-control-sm mb-2" placeholder="Mot de passe (obligatoire pour un nouvel utilisateur)" autocomplete="new-password">
         <select name="profil_utilisateur" class="form-select form-select-sm mb-2"><option value="">Sans profil (tous les droits)</option>
           {% for p in profils %}<option value="{{ p.pk }}" {% if p == profil %}selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
-        <button class="btn btn-outline-primary btn-sm">Enregistrer l'utilisateur</button></form>
+        <div class="small fw-semibold mt-1">Accès aux fichiers liés</div>
+        <div class="small text-muted mb-1">Les utilisateurs et les profils sont communs à tous les logiciels.</div>
+        {% for l in logiciels %}<div class="row g-1 align-items-center mb-1"><label class="col-6 small" for="acces-{{ l.code }}">{{ l.titre }}</label>
+          <div class="col-6"><select name="acces_{{ l.code }}" id="acces-{{ l.code }}" class="form-select form-select-sm">{% for code, libelle in acces_choix %}<option value="{{ code }}">{{ libelle }}</option>{% endfor %}</select></div></div>{% endfor %}
+        <button class="btn btn-outline-primary btn-sm mt-2">Enregistrer l'utilisateur</button></form>
+      {{ acces_json|json_script:"acces-utilisateurs" }}
     </div>
   </div>
 
@@ -45,7 +51,8 @@
           <td>
             <span style="display:inline-block;width:{% widthratio l.profondeur 1 18 %}px"></span>
             {% if l.a_enfants %}<button type="button" class="btn btn-sm btn-light py-0 px-1 plus" aria-label="Déplier">+</button>{% else %}<span class="d-inline-block" style="width:1.6rem"></span>{% endif %}
-            <span class="{% if l.profondeur == 0 %}fw-semibold{% endif %}">{{ l.titre }}</span></td>
+            <span class="{% if l.profondeur == 0 %}fw-semibold{% endif %}">{{ l.titre }}</span>
+            {% if l.lie %}<i class="bi bi-link-45deg text-primary" title="Écran commun aux fichiers liés : ce droit s'applique aussi dans {{ l.lie }}"></i>{% endif %}</td>
           <td style="width:15rem"><select name="droit_{{ l.code }}" class="form-select form-select-sm">
             <option value="">{% if l.profondeur == 0 %}Hérité : Tout autoriser{% else %}Hérité : {{ l.effectif }}{% endif %}</option>
             {% for code, libelle in niveaux %}<option value="{{ code }}" {% if l.reglage == code %}selected{% endif %}>{{ libelle }}</option>{% endfor %}</select></td></tr>
@@ -61,7 +68,8 @@
       <ul class="mb-0 mt-2"><li><strong>Tout autoriser</strong> : consulter, créer, modifier, supprimer.</li>
       <li><strong>Interdire la suppression</strong> : tout sauf supprimer ou annuler.</li>
       <li><strong>Interdire l'écriture</strong> : consultation seulement.</li>
-      <li><strong>Tout interdire</strong> : la commande est grisée avec un cadenas et la page refusée.</li></ul></div>
+      <li><strong>Tout interdire</strong> : la commande est grisée avec un cadenas et la page refusée.</li></ul>
+      <div class="mt-2"><i class="bi bi-link-45deg text-primary"></i> <strong>Fichiers liés</strong> : profils et utilisateurs sont communs à la Gestion commerciale, à la Comptabilité et au Reporting. Un droit réglé sur un écran commun (tiers, plan comptable, journaux, banques…) s'applique dans chaque logiciel.</div></div>
     {% endif %}
   </div>
 </div>
@@ -80,6 +88,11 @@
     });
   });
   document.getElementById('tout-deplier')?.addEventListener('click', () => lignes.forEach(l => { l.hidden = false; const b = l.querySelector('.plus'); if (b) b.textContent = '−'; }));
+  // Accès aux fichiers liés : préremplis quand on choisit un utilisateur existant
+  const acces = JSON.parse(document.getElementById('acces-utilisateurs').textContent);
+  const nom = document.querySelector('input[name=nom_utilisateur]');
+  nom?.addEventListener('change', () => Object.entries(acces[nom.value] || {}).forEach(([code, valeur]) => {
+    const liste = document.getElementById('acces-' + code); if (liste) liste.value = valeur; }));
   document.getElementById('tout-replier')?.addEventListener('click', () => lignes.forEach(l => { if (l.dataset.parent) l.hidden = true; const b = l.querySelector('.plus'); if (b) b.textContent = '+'; }));
 })();
 </script>{% endblock %}

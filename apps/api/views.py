@@ -200,7 +200,7 @@ def _navigation_avec_droits(request, module):
 
     donnees = serialiser_module(module)
     droits = Droits(request.user, module)
-    if not droits.total and droits.reglages:
+    if not droits.libre:
         for onglet in donnees["onglets"]:
             annoter(onglet["elements"], droits)
     return donnees

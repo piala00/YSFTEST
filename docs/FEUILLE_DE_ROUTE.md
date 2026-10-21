@@ -12,6 +12,7 @@ qui ne sert pas.
 | Menus Gestion commerciale | ✅ découpage officiel V11/V12 | — |
 | Menus Comptabilité | 🟡 menu Etat officiel ; reste à vérifier | GPT, suite du lot 1 (découpage Comptabilité complet) |
 | Autorisations d'accès | 🟡 fonctionnelles ; libellés V12 à confirmer | GPT R3 / captures Sage |
+| Fichiers liés (Gescom ↔ Compta) | 🟢 base unique, accès Utilisateur / Invité / Aucun, droits des écrans communs partagés ; sens V12 d'« invité » à confirmer | GPT R15 |
 | Espace de travail (fenêtres, barre verticale, accueil) | 🟡 fait ; détails V12 à confirmer | GPT R4 |
 | Fenêtres de sélection des états | 🟡 fait pour tous les états ; critères exacts et formats de sélection à faire | GPT R14 / captures Sage |
 | Transformations et règles de saisie | 🟡 règles officielles V12.20 appliquées (encours, compte bloqué, achats) | GPT lot 3 (suite) |

@@ -5,6 +5,13 @@
 {% if facture %}
 <div class="alert alert-info">Règlement de la facture <strong>{{ facture.numero }}</strong> — reste à payer : <strong>{{ facture.reste_a_payer|floatformat:0 }}</strong></div>
 {% endif %}
+{% if fichiers_lies %}
+<div class="card mb-3"><div class="card-header bg-white fw-semibold"><i class="bi bi-link-45deg"></i> Fichiers liés</div>
+  <table class="table table-sm mb-0 small"><tbody>
+  {% for m, partage in fichiers_lies %}<tr><td style="width:14rem"><i class="bi {{ m.icone }}" style="color:{{ m.couleur }}"></i> {{ m.titre }}</td>
+    <td>{{ societe.raison_sociale }} · même base, mise à jour immédiate</td><td class="text-muted">{{ partage }}</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endif %}
 <div class="card"><div class="card-body">
 <form method="post">{% csrf_token %}
   {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}

@@ -678,6 +678,22 @@ MODULES_PAR_CODE = {m.code: m for m in MODULES}
 # ---------------------------------------------------------------------------
 # Résolution de l'élément actif
 # ---------------------------------------------------------------------------
+# Fichiers liés (Fichier › À propos de votre société) : dans Sage, le fichier commercial pointe vers le fichier
+# comptable et inversement. Ici les logiciels partagent une seule base : tout ce qui est créé dans l'un est
+# aussitôt présent dans l'autre.
+PARTAGE = {
+    frozenset({"commercial", "comptabilite"}): "Tiers, plan comptable, codes journaux, banques, taux de taxes, plan analytique, "
+                                               "exercices, utilisateurs, profils et droits des écrans communs",
+    frozenset({"commercial", "reporting"}): "Lecture des documents, articles, familles, stocks et tiers",
+    frozenset({"comptabilite", "reporting"}): "Lecture des écritures, comptes, balances et états financiers",
+}
+
+
+def fichiers_lies(module):
+    """[(logiciel lié, données partagées)…] d'un logiciel."""
+    return [(m, PARTAGE[frozenset({module.code, m.code})]) for m in MODULES if m is not module]
+
+
 def module_pour_chemin(chemin):
     for module in MODULES:
         if chemin.startswith(module.prefixe):

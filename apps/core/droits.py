@@ -20,6 +20,18 @@ NIVEAUX = [
     (INTERDIT, "Tout interdire"),
 ]
 LIBELLES = dict(NIVEAUX)
+RANG = {code: i for i, (code, _) in enumerate(NIVEAUX)}       # du plus large au plus restrictif
+
+# Accès d'un utilisateur à chaque logiciel (fichiers liés de Sage : la Gestion commerciale et la Comptabilité
+# partagent leurs tiers, leurs utilisateurs et leurs profils ; on peut ouvrir l'autre logiciel « en tant
+# qu'utilisateur » ou « en tant qu'invité »). Sans réglage, l'utilisateur a accès à tous les logiciels.
+UTILISATEUR, INVITE, AUCUN = "UTILISATEUR", "INVITE", "AUCUN"
+ACCES = [
+    (UTILISATEUR, "Utilisateur"),
+    (INVITE, "Invité (consultation seule)"),
+    (AUCUN, "Aucun accès"),
+]
+PLAFONDS = {INVITE: LECTURE, AUCUN: INTERDIT}
 
 # Opérations demandées par une requête
 CONSULTER, ECRIRE, SUPPRIMER = "consulter", "écrire", "supprimer"
@@ -58,6 +70,48 @@ def profil_de(utilisateur):
     return utilisateur.groups.order_by("name").first()
 
 
+def acces_de(utilisateur, module_code):
+    """Utilisateur, invité ou aucun accès à un logiciel (l'administrateur a toujours accès)."""
+    from .models import AccesLogiciel
+
+    if utilisateur.is_superuser:
+        return UTILISATEUR
+    reglage = AccesLogiciel.objects.filter(utilisateur=utilisateur, module=module_code).first()
+    return reglage.acces if reglage else UTILISATEUR
+
+
+def jumeaux(module):
+    """{code: [(logiciel, code)…]} : entrées du logiciel qui ouvrent le même écran dans un fichier lié
+    (tiers, plan comptable, journaux, banques, À propos de votre société…). Leurs droits sont partagés."""
+    from django.urls import NoReverseMatch, reverse
+
+    from .navigation import MODULES
+
+    def cle(el):
+        try:
+            vue = resolve(reverse(el.url, args=el.args)).func
+        except NoReverseMatch:
+            return None
+        return (getattr(vue, "view_class", vue), el.url.split(":")[-1], tuple(el.args), tuple(sorted(el.query.items())))
+
+    index = {}
+    for m in MODULES:
+        for onglet, lignes in arbre(m)[0]:
+            if onglet.code in ("fenetre", "aide"):            # commandes de navigation, pas des écrans de données
+                continue
+            for el, _ in lignes:
+                if el.url and (k := cle(el)):
+                    index.setdefault(k, []).append((m.code, el.code))
+    resultat = {}
+    for entrees in index.values():
+        for code_module, code in entrees:
+            if code_module == module.code:
+                autres = [e for e in entrees if e[0] != module.code]
+                if autres:
+                    resultat.setdefault(code, []).extend(autres)
+    return resultat
+
+
 class Droits:
     """Droits effectifs d'un utilisateur dans un logiciel (calculés une fois par requête)."""
 
@@ -67,11 +121,18 @@ class Droits:
         self.module = module
         self.total = utilisateur.is_superuser
         self.profil = None if self.total else profil_de(utilisateur)
+        self.acces = acces_de(utilisateur, module.code)
+        self.plafond = PLAFONDS.get(self.acces)               # invité : consultation seule ; aucun accès : tout interdit
         self.reglages = {}
         if self.profil is not None:
             self.reglages = dict(DroitAcces.objects.filter(groupe=self.profil, module=module.code)
                                  .values_list("code", "niveau"))
         self._parents = None
+
+    @property
+    def libre(self):
+        """Aucune restriction : administrateur, ou utilisateur sans réglage de droits ni limite d'accès."""
+        return self.total or (not self.reglages and self.plafond is None)
 
     @property
     def parents(self):
@@ -80,13 +141,17 @@ class Droits:
         return self._parents
 
     def niveau(self, code):
-        if self.total or not self.reglages:
+        if self.total:
             return TOUT
-        while code:
+        niveau = TOUT
+        while code and self.reglages:
             if code in self.reglages:
-                return self.reglages[code]
+                niveau = self.reglages[code]
+                break
             code = self.parents.get(code)
-        return TOUT
+        if self.plafond and RANG[self.plafond] > RANG[niveau]:
+            return self.plafond
+        return niveau
 
     def permet(self, code, operation):
         return operation in AUTORISE[self.niveau(code)]

@@ -151,6 +151,24 @@ class DroitAcces(models.Model):
         return f"{self.groupe} · {self.module} · {self.code} : {self.get_niveau_display()}"
 
 
+class AccesLogiciel(models.Model):
+    """Accès d'un utilisateur à un logiciel lié : en tant qu'utilisateur, en tant qu'invité, ou aucun accès."""
+
+    from .droits import ACCES as _ACCES
+
+    utilisateur = models.ForeignKey("auth.User", on_delete=models.CASCADE, related_name="acces_logiciels")
+    module = models.CharField("Logiciel", max_length=20)
+    acces = models.CharField("Accès", max_length=20, choices=_ACCES)
+
+    class Meta:
+        unique_together = ("utilisateur", "module")
+        verbose_name = "Accès à un logiciel"
+        verbose_name_plural = "Accès aux logiciels"
+
+    def __str__(self):
+        return f"{self.utilisateur} · {self.module} : {self.get_acces_display()}"
+
+
 class JournalEvenement(models.Model):
     """Journal des événements : trace de chaque création, modification, validation, suppression et connexion."""
 

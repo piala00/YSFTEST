@@ -387,3 +387,25 @@ n'a été retirée ni ajoutée.
 MOUVEMENTS_ET_SIGNES_V12 (19 types de documents conformes). **Question ajoutée** : pour le bon d'avoir financier et la
 facture d'avoir d'achat (mouvement « SORTIE_MONTANT »), comment Sage 100 V12 répartit-il la correction de valeur
 (article par article, au prorata, sur le CMUP) ? Exemple chiffré officiel si possible.
+
+
+## Nouvelle recherche R15 — Fichiers liés, utilisateurs et droits partagés entre Gestion commerciale et Comptabilité
+
+**Pourquoi** : dans Sage 100, le fichier commercial est lié au fichier comptable (Fichier › À propos de votre société).
+Tiers, utilisateurs et autorisations sont partagés, et un utilisateur peut ouvrir l'autre logiciel « en tant
+qu'utilisateur » ou « en tant qu'invité ». L'ERP le reproduit déjà (une seule base ; accès Utilisateur / Invité /
+Aucun accès par logiciel ; droit d'un écran commun reporté dans le logiciel lié). **Ce qui est à confirmer en V12 :**
+
+1. **Où se trouve « Fichier lié »** dans À propos de votre société (Gestion commerciale et Comptabilité) : onglet,
+   libellé exact, modifiable ou non, et message quand le fichier lié est absent.
+2. **Données partagées** par le lien : tiers, plan comptable, journaux, banques, taxes, analytique, devises, modèles…
+   Liste exacte, et ce qui reste propre à chaque logiciel.
+3. **Gestion des utilisateurs en V12** : écran (Fichier › Autorisations d'accès), colonnes, et **sens exact de
+   « invité » et « utilisateur »** (l'invité ne fait-il que consulter ? a-t-il un profil ? compte-t-il une licence ?).
+4. **Héritage des droits** : un profil réglé en Comptabilité est-il le même profil en Gestion commerciale ? Les droits
+   sont-ils stockés une seule fois (dans une table SQL commune) ou par logiciel ? Un
+   écran commun (fiche tiers) a-t-il un seul droit ?
+5. **Tables SQL** concernées (lecture seule) : utilisateurs, profils, droits, fichier lié.
+
+**Livrable** : compléter `sage100-menus-droits-v12/` avec `FICHIERS_LIES.md`, `UTILISATEURS_INVITES.csv`
+(`produit;ecran;champ;valeurs;sens;source;preuve`), `SOURCES.csv`, `INCONNUES.csv`.

@@ -7,16 +7,17 @@
     <div class="text-muted">Choisissez une application — chacune s'ouvre dans sa propre fenêtre.</div>
   </div>
   <div class="row g-4">
-  {% for m in modules %}
+  {% for m, acces in tuiles %}
     <div class="col-md-4">
-      <a class="tuile-module card h-100 text-decoration-none" href="{% url m.accueil %}" target="erp_{{ m.code }}" style="--module: {{ m.couleur }}">
+      {% if acces == "AUCUN" %}<div class="tuile-module card h-100 opacity-50" style="--module: {{ m.couleur }}" title="Aucun accès à ce logiciel">{% else %}
+      <a class="tuile-module card h-100 text-decoration-none" href="{% url m.accueil %}" target="erp_{{ m.code }}" style="--module: {{ m.couleur }}">{% endif %}
         <div class="tuile-entete"><i class="bi {{ m.icone }}"></i></div>
         <div class="card-body">
-          <h2 class="h5">{{ m.titre }}</h2>
+          <h2 class="h5">{{ m.titre }}{% if acces == "INVITE" %} <span class="badge text-bg-warning align-middle">Invité</span>{% elif acces == "AUCUN" %} <i class="bi bi-lock"></i>{% endif %}</h2>
           <p class="text-muted small mb-3">{{ m.description }}</p>
           <div class="d-flex flex-wrap gap-1">{% for o in m.onglets %}<span class="badge text-bg-light border"><i class="bi {{ o.icone }}"></i> {{ o.titre }}</span>{% endfor %}</div>
         </div>
-      </a>
+      {% if acces == "AUCUN" %}</div>{% else %}</a>{% endif %}
     </div>
   {% endfor %}
   </div>

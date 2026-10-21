@@ -12,7 +12,10 @@ from .navigation import MODULES_PAR_CODE
 
 @login_required
 def portail(request):
-    return render(request, "core/portail.html")
+    from . import droits as d
+
+    tuiles = [(m, d.acces_de(request.user, m.code)) for m in MODULES_PAR_CODE.values()]
+    return render(request, "core/portail.html", {"tuiles": tuiles})
 
 
 @login_required
@@ -33,7 +36,7 @@ def accueil_module(request, module):
 
     contexte = PAGES[module]()
     droits = d.Droits(request.user, MODULES_PAR_CODE[module])
-    if not droits.total and droits.reglages:
+    if not droits.libre:
         # Raccourcis et indicateurs limités à ce que le profil peut ouvrir
         contexte["raccourcis"] = [{**g, "liens": [l for l in g["liens"] if d.url_permise(droits, l["url"])]}
                                   for g in contexte["raccourcis"]]
@@ -50,6 +53,12 @@ class SocieteUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_object(self, queryset=None):
         return Societe.get()
+
+    def get_context_data(self, **kwargs):
+        from .navigation import fichiers_lies, module_pour_chemin
+
+        module = module_pour_chemin(self.request.path)
+        return super().get_context_data(**kwargs, fichiers_lies=fichiers_lies(module) if module else [])
 
     def form_valid(self, form):
         reponse = super().form_valid(form)
@@ -98,7 +107,7 @@ def autorisations(request, module):
     from django.shortcuts import redirect
 
     from . import droits as d
-    from .models import DroitAcces
+    from .models import AccesLogiciel, DroitAcces
 
     if not request.user.is_superuser:
         return render(request, "core/acces_refuse.html", {
@@ -138,17 +147,34 @@ def autorisations(request, module):
                 if utilisateur.is_superuser:
                     messages.warning(request, f"{utilisateur} est administrateur : il garde tous les droits.")
                 utilisateur.groups.set([cible] if cible else [])
+                for l in MODULES_PAR_CODE.values():                # fichiers liés : utilisateur, invité ou aucun accès
+                    acces = request.POST.get(f"acces_{l.code}", d.UTILISATEUR)
+                    if acces == d.UTILISATEUR:
+                        AccesLogiciel.objects.filter(utilisateur=utilisateur, module=l.code).delete()
+                    elif acces in dict(d.ACCES):
+                        AccesLogiciel.objects.update_or_create(utilisateur=utilisateur, module=l.code, defaults={"acces": acces})
                 messages.success(request, f"Utilisateur « {utilisateur} » : profil {cible or 'aucun (tous les droits)'}.")
         elif action == "droits" and profil:
             _, parents = d.arbre(logiciel)
+            jumeaux = d.jumeaux(logiciel)
             existants = {r.code: r for r in DroitAcces.objects.filter(groupe=profil, module=logiciel.code)}
+            lies = set()
             for code in [o.code for o in logiciel.onglets] + list(parents):
                 valeur = request.POST.get(f"droit_{code}", "")
-                if valeur in d.LIBELLES:
-                    DroitAcces.objects.update_or_create(groupe=profil, module=logiciel.code, code=code, defaults={"niveau": valeur})
-                elif code in existants:
-                    existants[code].delete()
-            messages.success(request, f"Droits du profil « {profil} » dans {logiciel.titre} enregistrés.")
+                if valeur not in d.LIBELLES:
+                    valeur = ""
+                if valeur == (existants[code].niveau if code in existants else ""):
+                    continue
+                # Le même écran dans un fichier lié (tiers, plan comptable, journaux…) reçoit le même droit
+                for module_code, code_cible in [(logiciel.code, code)] + jumeaux.get(code, []):
+                    if valeur:
+                        DroitAcces.objects.update_or_create(groupe=profil, module=module_code, code=code_cible, defaults={"niveau": valeur})
+                    else:
+                        DroitAcces.objects.filter(groupe=profil, module=module_code, code=code_cible).delete()
+                    if module_code != logiciel.code:
+                        lies.add(MODULES_PAR_CODE[module_code].titre)
+            messages.success(request, f"Droits du profil « {profil} » dans {logiciel.titre} enregistrés."
+                             + (f" Écrans communs reportés dans : {', '.join(sorted(lies))}." if lies else ""))
         return redirect(url + (f"&profil={profil.pk}" if profil else ""))
 
     lignes = []
@@ -158,6 +184,7 @@ def autorisations(request, module):
         droits.reglages = dict(DroitAcces.objects.filter(groupe=profil, module=logiciel.code).values_list("code", "niveau"))
         onglets, parents = d.arbre(logiciel)
         droits._parents = parents
+        jumeaux = d.jumeaux(logiciel)
         for onglet, elements in onglets:
             enfants = {e.code for e, _ in elements if parents.get(e.code) == onglet.code}
             lignes.append({"code": onglet.code, "parent": "", "titre": onglet.titre, "profondeur": 0, "a_enfants": bool(enfants),
@@ -165,10 +192,18 @@ def autorisations(request, module):
             for el, profondeur in elements:
                 lignes.append({"code": el.code, "parent": parents[el.code], "titre": el.titre, "profondeur": profondeur,
                                "a_enfants": bool(el.tous_enfants()), "reglage": droits.reglages.get(el.code, ""),
+                               "lie": ", ".join(sorted({MODULES_PAR_CODE[m].titre for m, _ in jumeaux.get(el.code, [])})),
                                "effectif": d.LIBELLES[droits.niveau(parents[el.code])]})
+    utilisateurs = list(User.objects.order_by("username").prefetch_related("groups", "acces_logiciels"))
+    libelles_acces = dict(d.ACCES)
+    for u in utilisateurs:
+        reglages = {a.module: a.acces for a in u.acces_logiciels.all()}
+        u.acces_par_logiciel = [(l, reglages.get(l.code, d.UTILISATEUR), libelles_acces[reglages.get(l.code, d.UTILISATEUR)])
+                                for l in MODULES_PAR_CODE.values()]
     return render(request, "core/autorisations.html", {
         "profils": Group.objects.order_by("name"), "profil": profil, "logiciel": logiciel, "logiciels": MODULES_PAR_CODE.values(),
-        "utilisateurs": User.objects.order_by("username").prefetch_related("groups"), "lignes": lignes, "niveaux": d.NIVEAUX,
+        "utilisateurs": utilisateurs, "lignes": lignes, "niveaux": d.NIVEAUX, "acces_choix": d.ACCES,
+        "acces_json": {u.username: {l.code: code for l, code, _ in u.acces_par_logiciel} for u in utilisateurs},
     })
 
 

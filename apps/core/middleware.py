@@ -41,7 +41,11 @@ class AutorisationsMiddleware:
         if module is None:
             return None
         droits = request.droits = d.Droits(request.user, module)
-        if droits.total or not droits.reglages:
+        if droits.acces == d.AUCUN:
+            return render(request, "core/acces_refuse.html", {
+                "chemin": module.titre, "operation": "ouvrir ce logiciel", "niveau": "Aucun accès",
+                "profil": droits.profil or "sans profil"}, status=403)
+        if droits.libre:
             return None
         onglets, actif = structure_module(module, request.path, request.GET)
         request.navigation = (module, onglets, actif)

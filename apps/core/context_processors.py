@@ -20,7 +20,7 @@ def societe(request):
     else:
         onglets, element_actif = structure_module(module, request.path, request.GET)
     droits = getattr(request, "droits", None) or Droits(request.user, module)
-    if not droits.total and droits.reglages:
+    if not droits.libre:
         for o in onglets:
             annoter(o["elements"], droits)
     cle_session = f"onglet_{module.code}"
