@@ -23,9 +23,9 @@ Le vrai serveur Django, avec connexion, saisie, validation, états. Défini par 
 
 Mise en place, une seule fois :
 1. Créer un compte gratuit sur https://render.com (connexion avec GitHub).
-2. **New › Blueprint**, choisir le dépôt `piala00/YSFTEST`, valider (**Apply**).
+2. **New › Blueprint**, choisir le dépôt `piala00/YSFTEST`, nom libre (ex. `erp-ohada`), **Branch : `ccr-5592a371-fusjt2`**
+   (le fichier `render.yaml` n'existe pas encore sur `main`), Blueprint Path vide, puis **Apply**.
 3. Renseigner `DEMO_ADMIN_PASSWORD` : mot de passe du compte `admin` (choisissez-en un solide : le site est public).
-4. Laisser `DATABASE_URL` vide pour commencer.
 
 L'adresse est du type `https://erp-ohada-test.onrender.com`. Chaque envoi sur la branche redéploie le site.
 
@@ -33,5 +33,5 @@ L'adresse est du type `https://erp-ohada-test.onrender.com`. Chaque envoi sur la
 - Offre gratuite : le site s'endort après 15 minutes sans visite ; la première ouverture prend alors ~1 minute.
 - Sans `DATABASE_URL`, la base est **remise à la démonstration** à chaque redéploiement ou réveil : idéal pour tester,
   pas pour garder des saisies. Pour les conserver, créer une base PostgreSQL (Render, Neon, Supabase…) et coller son URL
-  dans `DATABASE_URL` (Render › service › Environment).
+  dans une variable `DATABASE_URL` à ajouter (Render › service › Environment).
 - C'est un site de test public : **n'y mettez pas les données réelles d'une société**.

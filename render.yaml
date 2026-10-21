@@ -21,6 +21,4 @@ services:
       - key: DEMO_ADMIN_PASSWORD
         sync: false
       # Sans DATABASE_URL, la base SQLite est recréée à chaque redémarrage (données de démonstration).
-      # Pour conserver les saisies, coller ici l'URL d'une base PostgreSQL (Render, Neon, Supabase…).
-      - key: DATABASE_URL
-        sync: false
+      # Pour conserver les saisies : Render › service › Environment › ajouter DATABASE_URL (URL PostgreSQL).
