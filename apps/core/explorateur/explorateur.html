@@ -1,0 +1,601 @@
+<title>Explorateur des menus ERP OHADA</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Mise en page : fenêtre d'application façon Sage (titre, barre de menus) au-dessus d'un plan de travail
+   à deux volets — arborescence du menu à gauche, fiche de vérification de la commande à droite. */
+:root {
+  --fond: #eef1f5;          /* plan de travail */
+  --surface: #ffffff;       /* volets, menus */
+  --surface-2: #f6f8fb;     /* bandeaux, lignes alternées */
+  --trait: #d3dae3;         /* filets */
+  --texte: #1c2733;
+  --texte-2: #5b6878;       /* libellés secondaires */
+  --texte-3: #98a3b1;       /* commandes grisées */
+  --module: #1565c0;        /* accent : couleur du logiciel affiché */
+  --module-doux: #e3edf9;
+  --ok: #1e7b45;  --ok-doux: #e1f3e8;
+  --ko: #b4361c;  --ko-doux: #fbe7e2;
+  --info: #7a5b00; --info-doux: #fbf1d4;
+  --ombre: 0 6px 18px rgba(20, 32, 48, .16);
+  --police: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --police-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fond: #11161d; --surface: #19202a; --surface-2: #1f2834; --trait: #2f3a48;
+    --texte: #e4e9ef; --texte-2: #a3afbd; --texte-3: #5f6b7a;
+    --module-doux: #1d2c40;
+    --ok: #5bc98a; --ok-doux: #17301f; --ko: #f08b72; --ko-doux: #3a1f18; --info: #e3c15c; --info-doux: #33290f;
+    --ombre: 0 8px 22px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fond: #11161d; --surface: #19202a; --surface-2: #1f2834; --trait: #2f3a48;
+  --texte: #e4e9ef; --texte-2: #a3afbd; --texte-3: #5f6b7a;
+  --module-doux: #1d2c40;
+  --ok: #5bc98a; --ok-doux: #17301f; --ko: #f08b72; --ko-doux: #3a1f18; --info: #e3c15c; --info-doux: #33290f;
+  --ombre: 0 8px 22px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--fond); color: var(--texte); font-family: var(--police); font-size: 14px; line-height: 1.45; }
+.page { max-width: 1320px; margin: 0 auto; padding-block: 18px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.page > * { min-width: 0; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--module); outline-offset: 2px; }
+.mono { font-family: var(--police-mono); font-size: 12.5px; }
+
+/* En-tête */
+.entete { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; justify-content: space-between; }
+.entete h1 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.entete p { margin: 2px 0 0; color: var(--texte-2); max-width: 70ch; }
+.logiciels { display: flex; flex-wrap: wrap; gap: 6px; }
+.logiciels button { border: 1px solid var(--trait); background: var(--surface); border-radius: 6px; padding: 7px 12px;
+  display: inline-flex; gap: 8px; align-items: center; font-weight: 500; }
+.logiciels button .pastille { width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
+.logiciels button[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 -3px 0 var(--c); }
+
+/* Fenêtre simulée */
+.fenetre { background: var(--surface); border: 1px solid var(--trait); border-radius: 8px; box-shadow: var(--ombre); }
+.titre-fenetre { background: var(--module); color: #fff; border-radius: 7px 7px 0 0; padding: 7px 12px;
+  display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.titre-fenetre strong { font-size: 15px; }
+.titre-fenetre span { opacity: .85; font-size: 12.5px; }
+.barre-menus-zone { overflow-x: auto; border-bottom: 1px solid var(--trait); }
+.barre-menus { display: flex; padding: 0 4px; min-width: max-content; position: relative; }
+.menu-titre { background: none; border: 0; padding: 7px 11px; border-radius: 3px; }
+.menu-titre:hover, .menu-titre[aria-expanded="true"] { background: var(--module-doux); color: var(--module); }
+.menu-titre.courant { font-weight: 600; color: var(--module); }
+.deroulant { position: fixed; z-index: 50; min-width: 280px; max-width: min(92vw, 420px); max-height: 70vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--trait); box-shadow: var(--ombre); padding: 4px 0; list-style: none; margin: 0; }
+.deroulant[hidden] { display: none !important; }
+.deroulant li { position: relative; }
+.deroulant .item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0;
+  padding: 5px 12px 5px 10px; white-space: nowrap; }
+.deroulant .item:hover, .deroulant .item.ouvert { background: var(--module); color: #fff; }
+.deroulant .item.grise { color: var(--texte-3); }
+.deroulant .item.grise:hover { background: var(--surface-2); color: var(--texte-3); }
+.deroulant .item .fin { margin-left: auto; padding-left: 18px; font-size: 11px; opacity: .8; }
+.deroulant .sep { border-top: 1px solid var(--trait); margin: 4px 0; }
+.deroulant .verif { width: 8px; height: 8px; border-radius: 50%; flex: none; background: transparent; border: 1px solid var(--texte-3); }
+.verif.conforme { background: var(--ok); border-color: var(--ok); }
+.verif.a_corriger { background: var(--ko); border-color: var(--ko); }
+
+/* Synthèse et filtres */
+.synthese { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 12px; border-bottom: 1px solid var(--trait); }
+.chiffre { display: grid; gap: 2px; }
+.chiffre .val { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chiffre .lib { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--texte-2); }
+.chiffre.ok .val { color: var(--ok); } .chiffre.ko .val { color: var(--ko); }
+.progression { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; display: flex; }
+.progression span { display: block; height: 100%; }
+.filtres { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--trait); background: var(--surface-2); align-items: center; }
+.filtres input[type=search] { flex: 1 1 220px; min-width: 0; }
+.filtres input, .filtres select { border: 1px solid var(--trait); background: var(--surface); border-radius: 5px; padding: 6px 8px; }
+.filtres label { display: inline-flex; gap: 6px; align-items: center; color: var(--texte-2); font-size: 13px; }
+
+/* Plan de travail */
+.travail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); min-height: 520px; }
+.volet { min-width: 0; display: flex; flex-direction: column; }
+.volet + .volet { border-left: 1px solid var(--trait); }
+.volet-tete { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 9px 12px; border-bottom: 1px solid var(--trait); }
+.volet-tete h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--texte-2); font-weight: 600; }
+.volet-tete select { border: 1px solid var(--trait); background: var(--surface); border-radius: 5px; padding: 4px 6px; }
+.arbre { overflow: auto; max-height: 640px; padding: 6px 0; }
+.ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; width: 100%; text-align: left;
+  border: 0; background: none; padding: 5px 12px 5px calc(12px + var(--niveau) * 18px); border-left: 3px solid transparent; }
+.ligne:hover { background: var(--surface-2); }
+.ligne[aria-selected="true"] { background: var(--module-doux); border-left-color: var(--module); }
+.ligne .nom { display: flex; gap: 7px; align-items: center; min-width: 0; }
+.ligne .nom span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ligne.groupe .nom span { font-weight: 600; }
+.ligne.grise .nom span { color: var(--texte-3); }
+.ligne .puces { display: flex; gap: 4px; }
+.puce { font-size: 10.5px; font-weight: 600; letter-spacing: .02em; padding: 1px 6px; border-radius: 3px; white-space: nowrap;
+  background: var(--surface-2); color: var(--texte-2); border: 1px solid var(--trait); }
+.puce.realise, .puce.action { background: var(--ok-doux); color: var(--ok); border-color: transparent; }
+.puce.externe { background: var(--module-doux); color: var(--module); border-color: transparent; }
+.puce.grise { color: var(--texte-3); }
+.puce.p-ERG-CLASSIQUE, .puce.p-INDICATIF { background: var(--info-doux); color: var(--info); border-color: transparent; }
+.puce.p-AJOUT-ERP { background: var(--module-doux); color: var(--module); border-color: transparent; }
+.vide { padding: 24px 16px; color: var(--texte-2); }
+
+/* Fiche de vérification */
+.fiche { padding: 16px; display: grid; gap: 16px; align-content: start; }
+.fiche .chemin { font-size: 12.5px; color: var(--texte-2); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.fiche h3 { font-size: 19px; }
+.fiche dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px 14px; margin: 0; }
+.fiche dt { color: var(--texte-2); }
+.fiche dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.verdict { display: flex; flex-wrap: wrap; gap: 8px; }
+.verdict button { border: 1px solid var(--trait); background: var(--surface); border-radius: 6px; padding: 8px 12px; font-weight: 600; }
+.verdict button[data-statut="conforme"][aria-pressed="true"] { background: var(--ok); border-color: var(--ok); color: #fff; }
+.verdict button[data-statut="a_corriger"][aria-pressed="true"] { background: var(--ko); border-color: var(--ko); color: #fff; }
+.verdict button[data-statut="non_verifie"][aria-pressed="true"] { background: var(--texte-2); border-color: var(--texte-2); color: var(--surface); }
+.fiche textarea { width: 100%; min-height: 96px; border: 1px solid var(--trait); border-radius: 6px; padding: 8px 10px; background: var(--surface); resize: vertical; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--module); background: var(--module); color: #fff; border-radius: 6px; padding: 7px 12px; font-weight: 600; text-decoration: none; }
+.btn.secondaire { background: var(--surface); color: var(--module); }
+.btn[disabled] { opacity: .5; cursor: default; }
+.note { font-size: 12.5px; color: var(--texte-2); }
+.statut-sauvegarde { font-size: 12.5px; color: var(--texte-2); }
+.raccourcis { font-size: 12px; color: var(--texte-2); border-top: 1px dashed var(--trait); padding-top: 10px; }
+kbd { font-family: var(--police-mono); font-size: 11px; border: 1px solid var(--trait); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; background: var(--surface-2); }
+
+/* Liste à corriger */
+.corrections { padding: 12px 14px; display: grid; gap: 10px; }
+.corrections-tete { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.corrections-tete h2 { font-size: 15px; }
+.corrections ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.corrections li button { border: 0; background: none; padding: 0; text-align: left; color: var(--module); font-weight: 500; }
+.corrections li .com { color: var(--texte-2); }
+.serveur { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--texte-2); }
+.serveur input { border: 1px solid var(--trait); background: var(--surface); border-radius: 5px; padding: 5px 8px; min-width: 0; width: 230px; }
+
+@media (max-width: 860px) {
+  .travail { grid-template-columns: minmax(0, 1fr); }
+  .volet + .volet { border-left: 0; border-top: 1px solid var(--trait); }
+  .arbre { max-height: 420px; }
+  .fiche dl { grid-template-columns: minmax(0, 1fr); gap: 2px 0; }
+  .fiche dd { margin-bottom: 8px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ligne, .menu-titre, .deroulant .item { transition: background-color .12s; }
+}
+</style>
+
+<div class="page">
+  <header class="entete">
+    <div>
+      <h1>Explorateur des menus</h1>
+      <p>Parcourez les menus de chaque logiciel de l'ERP OHADA comme dans l'application, contrôlez chaque commande face à votre Sage 100 et notez vos écarts.</p>
+    </div>
+    <div class="logiciels" id="logiciels" role="group" aria-label="Logiciel affiché"></div>
+  </header>
+
+  <section class="fenetre" aria-label="Fenêtre du logiciel">
+    <div class="titre-fenetre"><strong id="titre-logiciel"></strong><span id="sous-titre"></span></div>
+    <div class="barre-menus-zone"><nav class="barre-menus" id="barre-menus" aria-label="Barre de menus"></nav></div>
+    <div class="synthese" id="synthese"></div>
+    <div class="filtres">
+      <input type="search" id="recherche" placeholder="Rechercher une commande (ex. facture, inventaire)…" aria-label="Rechercher une commande">
+      <label>État <select id="filtre-etat">
+        <option value="">Tous</option><option value="realise">Réalisé</option><option value="action">Commande d'interface</option>
+        <option value="externe">Ouvre un autre logiciel</option><option value="grise">Grisé (non développé)</option></select></label>
+      <label>Preuve <select id="filtre-preuve"><option value="">Toutes</option></select></label>
+      <label>Vérification <select id="filtre-statut">
+        <option value="">Toutes</option><option value="non_verifie">Non vérifiées</option>
+        <option value="conforme">Conformes</option><option value="a_corriger">À corriger</option></select></label>
+    </div>
+    <div class="travail">
+      <div class="volet">
+        <div class="volet-tete"><h2>Contenu du menu</h2>
+          <select id="choix-menu" aria-label="Menu affiché dans l'arborescence"></select></div>
+        <div class="arbre" id="arbre" role="tree" aria-label="Commandes du menu" tabindex="0"></div>
+      </div>
+      <div class="volet">
+        <div class="volet-tete"><h2>Fiche de vérification</h2><span class="statut-sauvegarde" id="mode-sauvegarde"></span></div>
+        <div class="fiche" id="fiche"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fenetre corrections" aria-labelledby="titre-corrections">
+    <div class="corrections-tete">
+      <h2 id="titre-corrections">Commandes à corriger</h2>
+      <div class="actions">
+        <div class="serveur"><label for="serveur">Adresse de votre ERP</label><input id="serveur" type="url" placeholder="http://127.0.0.1:8000"></div>
+        <button class="btn secondaire" id="copier-liste" type="button">Copier la liste</button>
+      </div>
+    </div>
+    <div id="liste-corrections"></div>
+  </section>
+</div>
+
+<script id="donnees-menus" type="application/json">/*__DONNEES__*/</script>
+<script>
+(function () {
+  "use strict";
+  const DONNEES = JSON.parse(document.getElementById("donnees-menus").textContent);
+  const ETATS = { realise: "Réalisé", action: "Commande d'interface", externe: "Autre logiciel", grise: "Grisé", sous_menu: "Sous-menu" };
+  const STATUTS = { conforme: "Conforme", a_corriger: "À corriger", non_verifie: "Non vérifié" };
+
+  // ------------------------------------------------------------ Index des commandes
+  const index = new Map();       // clé → {module, onglet, noeud, chemin[], etat}
+  function etatDe(n) {
+    if (n.enfants.length) return "sous_menu";
+    if (n.action) return "action";
+    if (n.module) return "externe";
+    return n.url ? "realise" : "grise";
+  }
+  for (const m of DONNEES.modules) {
+    for (const o of m.onglets) {
+      (function parcourir(noeuds, chemin) {
+        for (const n of noeuds) {
+          if (n.separateur) continue;
+          const cle = m.code + "~" + n.code;
+          index.set(cle, { cle, module: m, onglet: o, noeud: n, chemin, etat: etatDe(n) });
+          parcourir(n.enfants, chemin.concat(n.titre));
+        }
+      })(o.elements, [o.titre]);
+    }
+  }
+
+  // ------------------------------------------------------------ État de la page
+  const etat = { module: DONNEES.modules[0].code, onglet: null, selection: null, verifs: {}, ecriture: "local" };
+  function lireLocal(cle, defaut) { try { const v = localStorage.getItem(cle); return v === null ? defaut : v; } catch (e) { return defaut; } }
+  function ecrireLocal(cle, valeur) { try { localStorage.setItem(cle, valeur); } catch (e) { /* stockage indisponible */ } }
+  try { etat.verifs = JSON.parse(lireLocal("explorateur-verifs", "{}")) || {}; } catch (e) { etat.verifs = {}; }
+  const demande = location.hash.replace("#", "");
+  if (DONNEES.modules.some(m => m.code === demande)) etat.module = demande;
+  else etat.module = lireLocal("explorateur-module", etat.module);
+
+  const $ = id => document.getElementById(id);
+  const moduleCourant = () => DONNEES.modules.find(m => m.code === etat.module) || DONNEES.modules[0];
+  const verif = cle => etat.verifs[cle] || { statut: "non_verifie", commentaire: "" };
+  const el = (tag, attrs, ...enfants) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "class") e.className = v; else if (k === "text") e.textContent = v;
+      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of enfants.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+    return e;
+  };
+
+  // ------------------------------------------------------------ Logiciels
+  function rendreLogiciels() {
+    const zone = $("logiciels"); zone.replaceChildren();
+    for (const m of DONNEES.modules) {
+      zone.append(el("button", { type: "button", "aria-pressed": String(m.code === etat.module), style: `--c:${m.couleur}`,
+        onclick: () => choisirModule(m.code) }, el("span", { class: "pastille" }), m.titre));
+    }
+  }
+  function choisirModule(code) {
+    etat.module = code; etat.onglet = null; etat.selection = null;
+    ecrireLocal("explorateur-module", code);
+    history.replaceState(null, "", "#" + code);
+    toutRendre();
+  }
+
+  // ------------------------------------------------------------ Barre de menus déroulants
+  let ouverts = [];   // pile des listes ouvertes
+  function fermerMenus(depuis = 0) {
+    while (ouverts.length > depuis) ouverts.pop().remove();
+    if (depuis === 0) document.querySelectorAll(".menu-titre").forEach(b => b.setAttribute("aria-expanded", "false"));
+    document.querySelectorAll(".deroulant .item.ouvert").forEach(i => { if (!i.closest(".deroulant")?.isConnected) i.classList.remove("ouvert"); });
+  }
+  function placer(liste, x, y, gauche) {
+    document.body.append(liste);
+    const r = liste.getBoundingClientRect();
+    let px = x, py = y;
+    if (px + r.width > innerWidth - 8) px = Math.max(8, gauche !== undefined ? gauche - r.width : innerWidth - r.width - 8);
+    if (py + r.height > innerHeight - 8) py = Math.max(8, innerHeight - r.height - 8);
+    liste.style.left = px + "px"; liste.style.top = py + "px";
+  }
+  function construireListe(module, noeuds, niveau) {
+    const ul = el("ul", { class: "deroulant", role: "menu" });
+    for (const n of noeuds) {
+      if (n.separateur) { ul.append(el("li", { class: "sep", role: "separator" })); continue; }
+      const info = index.get(module.code + "~" + n.code);
+      const v = verif(info.cle);
+      const fin = info.etat === "sous_menu" ? "▸" : info.etat === "externe" ? "↗" : info.etat === "grise" ? "grisé" : "";
+      const bouton = el("button", { type: "button", role: "menuitem", class: "item" + (info.etat === "grise" ? " grise" : "") },
+        info.etat === "sous_menu" ? null : el("span", { class: "verif " + v.statut, title: STATUTS[v.statut] }),
+        el("span", { text: n.titre }), fin ? el("span", { class: "fin", text: fin }) : null);
+      const li = el("li", { role: "none" }, bouton);
+      if (info.etat === "sous_menu") {
+        const ouvrir = () => {
+          fermerMenus(niveau + 1);
+          ul.querySelectorAll(".item.ouvert").forEach(i => i.classList.remove("ouvert"));
+          bouton.classList.add("ouvert");
+          const sous = construireListe(module, n.enfants, niveau + 1);
+          ouverts.push(sous);
+          const r = bouton.getBoundingClientRect();
+          placer(sous, r.right - 2, r.top - 4, r.left + 2);
+        };
+        bouton.addEventListener("mouseenter", ouvrir);
+        bouton.addEventListener("click", ouvrir);
+      } else {
+        bouton.addEventListener("mouseenter", () => { fermerMenus(niveau + 1); ul.querySelectorAll(".item.ouvert").forEach(i => i.classList.remove("ouvert")); });
+        bouton.addEventListener("click", () => { fermerMenus(); selectionner(info.cle, true); });
+      }
+      ul.append(li);
+    }
+    return ul;
+  }
+  function rendreBarreMenus() {
+    const m = moduleCourant(), barre = $("barre-menus");
+    barre.replaceChildren();
+    for (const o of m.onglets) {
+      const b = el("button", { type: "button", class: "menu-titre" + (o.code === etat.onglet ? " courant" : ""),
+        "aria-haspopup": "true", "aria-expanded": "false", text: o.titre });
+      const ouvrir = () => {
+        fermerMenus();
+        b.setAttribute("aria-expanded", "true");
+        const liste = construireListe(m, o.elements, 0);
+        ouverts.push(liste);
+        const r = b.getBoundingClientRect();
+        placer(liste, r.left, r.bottom + 1);
+      };
+      b.addEventListener("click", e => { e.stopPropagation(); b.getAttribute("aria-expanded") === "true" ? fermerMenus() : ouvrir(); });
+      b.addEventListener("mouseenter", () => { if (ouverts.length && b.getAttribute("aria-expanded") !== "true") ouvrir(); });
+      barre.append(b);
+    }
+  }
+  document.addEventListener("click", e => { if (!e.target.closest(".deroulant, .menu-titre")) fermerMenus(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") fermerMenus(); });
+  addEventListener("resize", () => fermerMenus());
+  addEventListener("scroll", () => fermerMenus(), { passive: true });
+
+  // ------------------------------------------------------------ Synthèse
+  function commandesDu(module) { return [...index.values()].filter(i => i.module.code === module.code && i.etat !== "sous_menu"); }
+  function rendreSynthese() {
+    const m = moduleCourant(), cmds = commandesDu(m);
+    const n = { total: cmds.length, conforme: 0, a_corriger: 0, realise: 0, grise: 0 };
+    for (const c of cmds) { n[verif(c.cle).statut] = (n[verif(c.cle).statut] || 0) + 1; if (c.etat === "realise" || c.etat === "action") n.realise++; if (c.etat === "grise") n.grise++; }
+    const verifiees = n.conforme + n.a_corriger;
+    const pct = x => n.total ? (x / n.total * 100).toFixed(1) + "%" : "0%";
+    $("synthese").replaceChildren(
+      el("div", { class: "chiffre" }, el("span", { class: "val", text: n.total }), el("span", { class: "lib", text: "Commandes" })),
+      el("div", { class: "chiffre" }, el("span", { class: "val", text: n.realise }), el("span", { class: "lib", text: "Réalisées dans l'ERP" })),
+      el("div", { class: "chiffre" }, el("span", { class: "val", text: n.grise }), el("span", { class: "lib", text: "Grisées" })),
+      el("div", { class: "chiffre" }, el("span", { class: "val", text: `${verifiees} / ${n.total}` }), el("span", { class: "lib", text: "Vérifiées" })),
+      el("div", { class: "chiffre ok" }, el("span", { class: "val", text: n.conforme }), el("span", { class: "lib", text: "Conformes" })),
+      el("div", { class: "chiffre ko" }, el("span", { class: "val", text: n.a_corriger }), el("span", { class: "lib", text: "À corriger" })),
+      el("div", { class: "progression", role: "img", "aria-label": `${verifiees} commandes vérifiées sur ${n.total}` },
+        el("span", { style: `width:${pct(n.conforme)};background:var(--ok)` }),
+        el("span", { style: `width:${pct(n.a_corriger)};background:var(--ko)` })));
+  }
+
+  // ------------------------------------------------------------ Arborescence
+  function filtres() {
+    return { q: $("recherche").value.trim().toLowerCase(), etat: $("filtre-etat").value,
+             preuve: $("filtre-preuve").value, statut: $("filtre-statut").value };
+  }
+  function correspond(info, f) {
+    if (info.etat === "sous_menu") return false;
+    if (f.etat && info.etat !== f.etat) return false;
+    if (f.preuve && (info.noeud.preuve || "—") !== f.preuve) return false;
+    if (f.statut && verif(info.cle).statut !== f.statut) return false;
+    if (f.q && !(info.chemin.join(" ") + " " + info.noeud.titre).toLowerCase().includes(f.q)) return false;
+    return true;
+  }
+  function rendreChoixMenu() {
+    const m = moduleCourant(), choix = $("choix-menu");
+    if (!etat.onglet || !m.onglets.some(o => o.code === etat.onglet)) etat.onglet = (m.onglets.find(o => o.code === "traitement") || m.onglets[0]).code;
+    choix.replaceChildren(...m.onglets.map(o => el("option", { value: o.code, selected: o.code === etat.onglet, text: o.titre })));
+  }
+  function lignesVisibles() { return [...$("arbre").querySelectorAll(".ligne:not(.groupe)")]; }
+  function rendreArbre() {
+    const m = moduleCourant(), f = filtres(), arbre = $("arbre");
+    const filtre = f.q || f.etat || f.preuve || f.statut;
+    const onglets = filtre ? m.onglets : m.onglets.filter(o => o.code === etat.onglet);
+    arbre.replaceChildren();
+    let total = 0;
+    for (const o of onglets) {
+      const bloc = [];
+      (function parcourir(noeuds, niveau) {
+        let vu = false;
+        for (const n of noeuds) {
+          if (n.separateur) continue;
+          const info = index.get(m.code + "~" + n.code);
+          if (info.etat === "sous_menu") {
+            const debut = bloc.length;
+            bloc.push(null);
+            const enfants = parcourir(n.enfants, niveau + 1);
+            if (enfants) { bloc[debut] = ligne(info, niveau); vu = true; } else bloc.splice(debut, 1);
+          } else if (!filtre || correspond(info, f)) { bloc.push(ligne(info, niveau)); vu = true; total++; }
+        }
+        return vu;
+      })(o.elements, filtre ? 1 : 0);
+      if (bloc.length) {
+        if (filtre) arbre.append(el("div", { class: "ligne groupe", style: "--niveau:0", role: "presentation" },
+          el("span", { class: "nom" }, el("span", { text: o.titre })), el("span")));
+        arbre.append(...bloc);
+      }
+    }
+    if (!arbre.children.length) arbre.append(el("p", { class: "vide", text: filtre ? "Aucune commande ne correspond à ces critères." : "Ce menu est vide." }));
+  }
+  function ligne(info, niveau) {
+    const n = info.noeud, v = verif(info.cle), sousMenu = info.etat === "sous_menu";
+    const puces = sousMenu ? [] : [
+      el("span", { class: "puce " + info.etat, text: ETATS[info.etat] }),
+      n.preuve ? el("span", { class: "puce p-" + n.preuve, text: n.preuve }) : null,
+    ];
+    return el("button", { type: "button", role: "treeitem", class: "ligne" + (sousMenu ? " groupe" : "") + (info.etat === "grise" ? " grise" : ""),
+      style: `--niveau:${niveau}`, "aria-selected": String(info.cle === etat.selection), "data-cle": info.cle,
+      onclick: () => selectionner(info.cle) },
+      el("span", { class: "nom" }, sousMenu ? el("span", { class: "fin", text: "▾" }) : el("span", { class: "verif " + v.statut, title: STATUTS[v.statut], style: "width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;border:1px solid var(--texte-3)" }),
+        el("span", { text: n.titre })),
+      el("span", { class: "puces" }, puces));
+  }
+
+  // ------------------------------------------------------------ Fiche
+  function adresseServeur() { return ($("serveur").value.trim() || "http://127.0.0.1:8000").replace(/\/+$/, ""); }
+  function selectionner(cle, depuisMenu) {
+    const info = index.get(cle);
+    if (!info) return;
+    if (info.etat === "sous_menu") return;
+    etat.selection = cle;
+    if (depuisMenu || !$("arbre").querySelector(`[data-cle="${CSS.escape(cle)}"]`)) {
+      etat.onglet = info.onglet.code;
+      $("choix-menu").value = etat.onglet;
+      rendreArbre();
+    }
+    $("arbre").querySelectorAll(".ligne").forEach(l => l.setAttribute("aria-selected", String(l.dataset.cle === cle)));
+    $("arbre").querySelector(`[data-cle="${CSS.escape(cle)}"]`)?.scrollIntoView({ block: "nearest" });
+    rendreBarreMenus();
+    rendreFiche();
+  }
+  function rendreFiche() {
+    const fiche = $("fiche");
+    const info = etat.selection && index.get(etat.selection);
+    if (!info) {
+      fiche.replaceChildren(el("p", { class: "vide" }, "Choisissez une commande dans la barre de menus ou dans l'arborescence pour la vérifier."),
+        raccourcis());
+      return;
+    }
+    const n = info.noeud, v = verif(info.cle);
+    const ecran = info.etat === "action" ? `Commande d'interface « ${n.action} »`
+      : n.url ? n.url : "Aucun écran : commande grisée, non développée dans l'ERP";
+    const lien = n.url && !n.action ? el("a", { class: "btn secondaire", href: adresseServeur() + n.url, target: "_blank", rel: "noopener", text: "Ouvrir l'écran dans l'ERP" }) : null;
+    const commentaire = el("textarea", { id: "commentaire", placeholder: "Écart constaté, libellé exact dans votre Sage, position attendue…" });
+    commentaire.value = v.commentaire || "";
+    const etatSauvegarde = el("span", { class: "statut-sauvegarde", id: "etat-sauvegarde",
+      text: v.maj ? "Enregistré le " + new Date(v.maj).toLocaleString("fr-FR") : "" });
+    fiche.replaceChildren(
+      el("div", { class: "chemin" }, el("span", { text: info.module.titre }),
+        ...info.chemin.map(c => [el("span", { "aria-hidden": "true", text: "›" }), el("span", { text: c })]).flat()),
+      el("h3", { text: n.titre }),
+      el("dl", {},
+        el("dt", { text: "État dans l'ERP" }), el("dd", {}, el("span", { class: "puce " + info.etat, text: ETATS[info.etat] }),
+          info.etat === "externe" ? " Ouvre le logiciel « " + (DONNEES.modules.find(x => x.code === n.module)?.titre || n.module) + " »" : ""),
+        el("dt", { text: "Niveau de preuve" }), el("dd", {}, n.preuve ? el("span", { class: "puce p-" + n.preuve, text: n.preuve }) : "—",
+          " ", DONNEES.preuves[n.preuve] || "Hors périmètre du découpage Gestion commerciale"),
+        el("dt", { text: "Écran ou action" }), el("dd", { class: n.url ? "mono" : "", text: ecran }),
+        el("dt", { text: "Code interne" }), el("dd", { class: "mono", text: n.code })),
+      el("div", { class: "verdict", role: "group", "aria-label": "Verdict" },
+        ...Object.entries(STATUTS).map(([s, lib]) => el("button", { type: "button", "data-statut": s, "aria-pressed": String(v.statut === s),
+          onclick: () => enregistrer(info, s, commentaire.value) }, lib))),
+      el("label", { for: "commentaire", class: "note", text: "Commentaire" }), commentaire,
+      el("div", { class: "actions" },
+        el("button", { type: "button", class: "btn", onclick: () => enregistrer(info, verif(info.cle).statut, commentaire.value) }, "Enregistrer le commentaire"),
+        lien, etatSauvegarde),
+      raccourcis());
+  }
+  function raccourcis() {
+    return el("p", { class: "raccourcis" }, "Raccourcis : ", el("kbd", { text: "↓" }), " ", el("kbd", { text: "↑" }), " commande suivante ou précédente · ",
+      el("kbd", { text: "C" }), " conforme · ", el("kbd", { text: "X" }), " à corriger · ", el("kbd", { text: "N" }), " non vérifié");
+  }
+
+  // ------------------------------------------------------------ Enregistrement (db partagé, sinon navigateur)
+  let db = null;
+  async function enregistrer(info, statut, commentaire) {
+    const precedent = verif(info.cle);
+    if (precedent.statut === statut && (precedent.commentaire || "") === commentaire) return;
+    const doc = { module: info.module.code, code: info.noeud.code, logiciel: info.module.titre,
+      chemin: info.chemin.concat(info.noeud.titre).join(" › "), titre: info.noeud.titre, preuve: info.noeud.preuve || "",
+      etat_erp: info.etat, statut, commentaire, maj: new Date().toISOString() };
+    etat.verifs[info.cle] = doc;
+    ecrireLocal("explorateur-verifs", JSON.stringify(etat.verifs));
+    rendreApresVerif();
+    if (!db || etat.ecriture === "lecture") return;
+    try {
+      await db.collection("verifications").doc(info.cle).set(doc);
+      const s = $("etat-sauvegarde"); if (s) s.textContent = "Enregistré et partagé";
+    } catch (err) {
+      if (err && err.code === "invalid_argument") { etat.ecriture = "lecture"; majModeSauvegarde(); }
+      const s = $("etat-sauvegarde"); if (s) s.textContent = "Non partagé : enregistré dans ce navigateur seulement";
+    }
+  }
+  function rendreApresVerif() {
+    rendreSynthese(); rendreArbre(); rendreFiche(); rendreCorrections();
+    $("arbre").querySelectorAll(".ligne").forEach(l => l.setAttribute("aria-selected", String(l.dataset.cle === etat.selection)));
+  }
+  function majModeSauvegarde() {
+    $("mode-sauvegarde").textContent = etat.ecriture === "partage" ? "Vérifications partagées"
+      : etat.ecriture === "lecture" ? "Lecture seule : vos verdicts restent dans ce navigateur" : "Vérifications gardées dans ce navigateur";
+  }
+
+  // ------------------------------------------------------------ Liste à corriger
+  function aCorriger() {
+    return Object.entries(etat.verifs).filter(([, v]) => v.statut === "a_corriger")
+      .map(([cle, v]) => ({ cle, ...v })).sort((a, b) => (a.logiciel + a.chemin).localeCompare(b.logiciel + b.chemin, "fr"));
+  }
+  function rendreCorrections() {
+    const liste = aCorriger(), zone = $("liste-corrections");
+    $("titre-corrections").textContent = `Commandes à corriger (${liste.length})`;
+    if (!liste.length) { zone.replaceChildren(el("p", { class: "note", text: "Aucune commande signalée. Marquez une commande « À corriger » pour la retrouver ici." })); return; }
+    zone.replaceChildren(el("ol", {}, ...liste.map(v => el("li", {},
+      el("button", { type: "button", onclick: () => { if (v.module !== etat.module) choisirModule(v.module); selectionner(v.cle, true); } },
+        `${v.logiciel} › ${v.chemin}`),
+      v.commentaire ? el("span", { class: "com", text: " — " + v.commentaire }) : null))));
+  }
+  $("copier-liste").addEventListener("click", () => {
+    const texte = aCorriger().map((v, i) => `${i + 1}. ${v.logiciel} › ${v.chemin}${v.commentaire ? " : " + v.commentaire : ""}`).join("\n") || "Aucune commande à corriger.";
+    const bouton = $("copier-liste");
+    const ok = () => { bouton.textContent = "Liste copiée"; setTimeout(() => (bouton.textContent = "Copier la liste"), 1800); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(texte).then(ok, () => (bouton.textContent = "Copie refusée"));
+    else bouton.textContent = "Copie indisponible";
+  });
+
+  // ------------------------------------------------------------ Clavier
+  document.addEventListener("keydown", e => {
+    if (e.target.matches("input, textarea, select") || e.ctrlKey || e.metaKey || e.altKey) return;
+    const lignes = lignesVisibles();
+    const i = lignes.findIndex(l => l.dataset.cle === etat.selection);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (!lignes.length) return;
+      e.preventDefault();
+      const suivant = lignes[Math.min(lignes.length - 1, Math.max(0, i + (e.key === "ArrowDown" ? 1 : -1)))] || lignes[0];
+      selectionner(suivant.dataset.cle);
+      return;
+    }
+    const statut = { c: "conforme", x: "a_corriger", n: "non_verifie" }[e.key.toLowerCase()];
+    if (statut && etat.selection) {
+      e.preventDefault();
+      enregistrer(index.get(etat.selection), statut, verif(etat.selection).commentaire || "");
+    }
+  });
+
+  // ------------------------------------------------------------ Assemblage
+  function toutRendre() {
+    const m = moduleCourant();
+    document.documentElement.style.setProperty("--module", m.couleur);
+    $("titre-logiciel").textContent = m.titre;
+    $("sous-titre").textContent = `${m.description} · menus générés le ${DONNEES.genere}`;
+    rendreLogiciels(); rendreChoixMenu(); rendreBarreMenus(); rendreSynthese(); rendreArbre(); rendreFiche(); rendreCorrections();
+  }
+  const preuves = [...new Set([...index.values()].filter(i => i.etat !== "sous_menu").map(i => i.noeud.preuve || "—"))].sort();
+  $("filtre-preuve").append(...preuves.map(p => el("option", { value: p, text: p })));
+  for (const id of ["recherche", "filtre-etat", "filtre-preuve", "filtre-statut"]) $(id).addEventListener("input", rendreArbre);
+  $("choix-menu").addEventListener("change", e => { etat.onglet = e.target.value; rendreArbre(); rendreBarreMenus(); });
+  $("serveur").value = lireLocal("explorateur-serveur", "");
+  $("serveur").addEventListener("change", e => { ecrireLocal("explorateur-serveur", e.target.value.trim()); rendreFiche(); });
+  majModeSauvegarde();
+  toutRendre();
+
+  // Vérifications partagées : disponibles quand la page est ouverte dans Claude
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("db").then(base => {
+      if (!base) return;
+      db = base; etat.ecriture = "partage"; majModeSauvegarde();
+      db.collection("verifications").onSnapshot(snap => {
+        const partagees = {};
+        for (const d of snap.docs) partagees[d.id] = d.data();
+        etat.verifs = Object.assign({}, etat.verifs, partagees);
+        rendreApresVerif();
+      }, () => { etat.ecriture = "local"; majModeSauvegarde(); });
+    });
+  }
+})();
+</script>

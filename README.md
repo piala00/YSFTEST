@@ -29,6 +29,12 @@ Sélectionner tout, Ajouter, Voir/Modifier et Rechercher.
 La matrice de traçabilité est générée par `python manage.py audit_navigation --sortie docs/AUDIT_SAGE_V12_GESCOM.md`.
 Les points à confirmer sur une installation V12 réelle sont listés dans `docs/SAGE_V12_POINTS_A_VERIFIER.md`.
 
+**Explorateur des menus** (`docs/explorateur-menus-autonome.html`, à ouvrir dans un navigateur). Il reproduit
+les barres de menus des trois logiciels. Pour chaque commande, il indique son état dans l'ERP, son niveau de
+preuve et l'écran qu'elle ouvre, et permet de la noter « conforme » ou « à corriger », avec un commentaire.
+Pour le régénérer après une modification des menus :
+`python manage.py explorateur_menus --sortie docs/explorateur-menus-autonome.html --autonome`.
+
 | Logiciel | Barre de menus |
 |---|---|
 | **Gestion commerciale** | Fichier · Structure · Traitement · État · Fenêtre · ? |
