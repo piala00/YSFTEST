@@ -240,10 +240,12 @@ class FenetreDocument(ctk.CTkToplevel):
         if not messagebox.askyesno("Validation", "Valider définitivement ce document ?", parent=self):
             return
         try:
-            self.api.valider_document(self.pk)
+            resultat = self.api.valider_document(self.pk)
         except ApiError as exc:
             messagebox.showerror("Erreur", str(exc), parent=self)
             return
+        if resultat.get("avertissement"):
+            messagebox.showwarning("Encours client", resultat["avertissement"], parent=self)
         self.recharger()
         self.page.rafraichir()
 
@@ -414,7 +416,6 @@ ECRANS_COMMERCIAL = {
     "comptes.fournisseurs": lambda app, el: PageTiers(app, el["titre"], "FOURNISSEUR"),
     "articles.liste": lambda app, el: PageArticles(app, el["titre"]),
     "comptes.articles": lambda app, el: PageArticles(app, el["titre"]),
-    "traitement.besoins": lambda app, el: PageArticles(app, el["titre"], alerte_seulement=True),
     "ventes.tous": lambda app, el: PageDocuments(app, el["titre"], "ventes"),
     "achats.tous": lambda app, el: PageDocuments(app, el["titre"], "achats"),
     "stocks.tous": lambda app, el: PageDocuments(app, el["titre"], "stocks"),

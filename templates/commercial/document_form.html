@@ -42,12 +42,20 @@
 </div>
 </form>
 {{ articles_json|json_script:"articles-data" }}
+{{ tiers_json|json_script:"tiers-data" }}
 {% endblock %}
 {% block scripts %}
 <script>
 const ARTICLES = JSON.parse(document.getElementById('articles-data').textContent);
 const EST_VENTE = {{ est_vente|yesno:"true,false" }};
 const DOMAINE = '{{ domaine }}';
+const TIERS = JSON.parse(document.getElementById('tiers-data').textContent);
+// Prix de vente : catégorie tarifaire du client, sinon prix de la fiche article
+function prixVente(a) {
+  const t = TIERS[(document.getElementById('id_tiers') || {}).value];
+  if (t && t.categorie && a.tarifs[t.categorie] !== undefined) return [a.tarifs[t.categorie], 'catégorie ' + t.libelle];
+  return [a.prix_vente, 'fiche article'];
+}
 const TVA_DEFAUT = '{{ societe.taux_tva_defaut|unlocalize }}';
 const fmt = n => Math.round(n).toLocaleString('fr-FR');
 const num = el => parseFloat((el && el.value || '0').replace(',', '.')) || 0;
@@ -73,9 +81,10 @@ function brancher(tr) {
     const a = ARTICLES[e.target.value];
     if (!a) return;
     tr.querySelector('input[name$="-designation"]').value = a.designation;
-    tr.querySelector('.ligne-prix_unitaire').value = DOMAINE === 'ventes' ? a.prix_vente : (DOMAINE === 'achats' ? a.prix_achat : a.cout);
+    const [pv, source] = prixVente(a);
+    tr.querySelector('.ligne-prix_unitaire').value = DOMAINE === 'ventes' ? pv : (DOMAINE === 'achats' ? a.prix_achat : a.cout);
     tr.querySelector('.ligne-taux_tva').value = DOMAINE === 'stocks' ? 0 : a.taux_tva;
-    const info = tr.querySelector('.stock-info'); if (info) info.textContent = 'Stock total : ' + a.stock.toLocaleString('fr-FR');
+    const info = tr.querySelector('.stock-info'); if (info) info.textContent = 'Stock total : ' + a.stock.toLocaleString('fr-FR') + (DOMAINE === 'ventes' ? ' · prix : ' + source : '');
     recalc();
   });
   tr.querySelectorAll('input').forEach(i => i.addEventListener('input', recalc));

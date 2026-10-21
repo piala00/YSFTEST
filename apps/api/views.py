@@ -94,7 +94,7 @@ class DocumentViewSet(RechercheMixin, viewsets.ModelViewSet):
             document = self.get_object().valider()
         except DjangoValidationError as exc:
             return _erreur(exc)
-        return Response(self.get_serializer(document).data)
+        return Response({**self.get_serializer(document).data, "avertissement": getattr(document, "avertissement", None)})
 
     @action(detail=True, methods=["post"])
     def transformer(self, request, pk=None):

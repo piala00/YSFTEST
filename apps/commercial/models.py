@@ -18,6 +18,21 @@ def arrondi(valeur, decimales=0):
     return Decimal(valeur).quantize(quantum, rounding=ROUND_HALF_UP)
 
 
+class CategorieTarifaire(models.Model):
+    """Catégorie tarifaire client (Fichier › Paramètres société › Tiers), ex. GROS, DÉTAIL."""
+
+    code = models.CharField(max_length=20, unique=True)
+    intitule = models.CharField(max_length=100)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Catégorie tarifaire"
+        verbose_name_plural = "Catégories tarifaires"
+
+    def __str__(self):
+        return self.intitule
+
+
 class Tiers(models.Model):
     CLIENT = "CLIENT"
     FOURNISSEUR = "FOURNISSEUR"
@@ -38,6 +53,15 @@ class Tiers(models.Model):
     )
     delai_paiement = models.PositiveIntegerField("Délai de paiement (jours)", default=30)
     plafond_credit = models.DecimalField("Plafond d'encours", max_digits=18, decimal_places=2, default=ZERO)
+    RISQUE_AUCUN = "AUCUN"
+    RISQUE_AVERTIR = "AVERTIR"
+    RISQUE_BLOQUER = "BLOQUER"
+    CODES_RISQUE = [(RISQUE_AUCUN, "Pas de contrôle"), (RISQUE_AVERTIR, "Avertissement si dépassement"),
+                    (RISQUE_BLOQUER, "Blocage si dépassement")]
+    code_risque = models.CharField("Code risque", max_length=10, choices=CODES_RISQUE, default=RISQUE_AVERTIR,
+                                   help_text="Réaction quand l'encours dépasse le plafond (clients)")
+    categorie_tarifaire = models.ForeignKey(CategorieTarifaire, null=True, blank=True, on_delete=models.SET_NULL,
+                                            related_name="clients", verbose_name="Catégorie tarifaire")
     assujetti_tva = models.BooleanField("Assujetti à la TVA", default=True)
     actif = models.BooleanField(default=True)
     cree_le = models.DateTimeField(auto_now_add=True)
@@ -65,6 +89,13 @@ class Tiers(models.Model):
         """Solde du tiers en comptabilité (débiteur > 0 pour un client qui doit de l'argent)."""
         agg = self.lignes_ecriture.aggregate(d=Sum("debit"), c=Sum("credit"))
         return (agg["d"] or ZERO) - (agg["c"] or ZERO)
+
+    def depassement_encours(self, montant_supplementaire=ZERO):
+        """Montant au-delà du plafond si l'on ajoute `montant_supplementaire` à l'encours (0 si aucun)."""
+        if not self.plafond_credit:
+            return ZERO
+        total = self.encours() + montant_supplementaire
+        return max(total - self.plafond_credit, ZERO)
 
     def encours(self):
         """Montant restant dû sur les factures validées."""
@@ -140,12 +171,23 @@ class Article(models.Model):
     cmup = models.DecimalField("CMUP", max_digits=18, decimal_places=4, default=ZERO,
                                help_text="Coût moyen unitaire pondéré, recalculé à chaque entrée en stock")
     stock_minimum = models.DecimalField("Stock d'alerte", max_digits=18, decimal_places=3, default=ZERO)
+    fournisseur_principal = models.ForeignKey(Tiers, null=True, blank=True, on_delete=models.SET_NULL, related_name="articles_fournis",
+                                              limit_choices_to={"type_tiers": "FOURNISSEUR"},
+                                              help_text="Fournisseur proposé par le réapprovisionnement")
     compte_vente = models.ForeignKey("comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     compte_achat = models.ForeignKey("comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     actif = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["designation"]
+
+    def prix_pour(self, tiers):
+        """Prix de vente HT pour un client et sa source (« catégorie GROS », « fiche article »)."""
+        if tiers is not None and tiers.categorie_tarifaire_id:
+            tarif = self.tarifs.filter(categorie_id=tiers.categorie_tarifaire_id).first()
+            if tarif:
+                return tarif.prix_vente, f"catégorie tarifaire {tiers.categorie_tarifaire}"
+        return self.prix_vente, "fiche article"
 
     def __str__(self):
         return f"{self.reference} - {self.designation}"
@@ -444,6 +486,26 @@ class Document(models.Model):
         if self.tiers.type_tiers != attendu:
             raise ValidationError({"tiers": f"Ce type de document requiert un tiers de type « {attendu.lower()} »."})
 
+    # Pièces de vente soumises au contrôle d'encours (plafond et code risque du client)
+    TYPES_CONTROLE_ENCOURS = (COMMANDE, PREPARATION, LIVRAISON, FACTURE)
+
+    def controler_encours(self):
+        """Bloque (ValidationError) ou renvoie un avertissement si la pièce fait dépasser le plafond."""
+        if self.type_document not in self.TYPES_CONTROLE_ENCOURS or not self.tiers_id:
+            return None
+        tiers = self.tiers
+        if tiers.code_risque == Tiers.RISQUE_AUCUN or not tiers.plafond_credit:
+            return None
+        # Une facture issue d'un BL ou d'une commande ne compte qu'une fois : seule la facture crée la créance
+        depassement = tiers.depassement_encours(self.total_ttc)
+        if not depassement:
+            return None
+        message = (f"Encours de {tiers.nom} : {tiers.encours() + self.total_ttc:,.0f} pour un plafond de "
+                   f"{tiers.plafond_credit:,.0f} (dépassement de {depassement:,.0f}).").replace(",", " ")
+        if tiers.code_risque == Tiers.RISQUE_BLOQUER:
+            raise ValidationError(f"Validation refusée. {message}")
+        return message
+
     @transaction.atomic
     def valider(self):
         from apps.comptabilite.services import comptabiliser_document
@@ -454,6 +516,7 @@ class Document(models.Model):
             raise ValidationError("Le document ne contient aucune ligne.")
         self.clean()
         self.recalculer(save=False)
+        self.avertissement = self.controler_encours()
         if self.est_brouillon_numero:
             self.numero = Sequence.suivant(self.PREFIXES[self.type_document], self.date.year)
         self.statut = self.VALIDE
@@ -698,12 +761,34 @@ class Imputation(models.Model):
         verbose_name = "Imputation de règlement"
 
 
+class TarifCategorie(models.Model):
+    """Prix de vente d'un article pour une catégorie tarifaire."""
+
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="tarifs")
+    categorie = models.ForeignKey(CategorieTarifaire, on_delete=models.CASCADE, related_name="tarifs")
+    prix_vente = models.DecimalField("Prix de vente HT", max_digits=18, decimal_places=2)
+
+    class Meta:
+        unique_together = ("article", "categorie")
+        ordering = ["categorie__code"]
+        verbose_name = "Tarif par catégorie"
+
+
 class StockDepot(models.Model):
-    """Quantité en stock d'un article dans un dépôt."""
+    """Quantité en stock d'un article dans un dépôt, et seuils de réapprovisionnement de ce dépôt."""
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="stocks_depots")
     depot = models.ForeignKey(Depot, on_delete=models.PROTECT, related_name="stocks")
     quantite = models.DecimalField(max_digits=18, decimal_places=3, default=ZERO)
+    stock_mini = models.DecimalField("Stock mini", max_digits=18, decimal_places=3, default=ZERO)
+    stock_maxi = models.DecimalField("Stock maxi", max_digits=18, decimal_places=3, default=ZERO)
+
+    @property
+    def besoin(self):
+        """Quantité à commander pour revenir au maxi lorsque le stock est sous le mini."""
+        if self.stock_mini and self.quantite < self.stock_mini:
+            return max((self.stock_maxi or self.stock_mini) - self.quantite, ZERO)
+        return ZERO
 
     class Meta:
         unique_together = ("article", "depot")

@@ -15,6 +15,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--demo", action="store_true", help="Crée des tiers, articles et documents de démonstration")
+        parser.add_argument("--sahel", action="store_true",
+                            help="Crée la société fictive SAHEL DISTRIBUTION des exercices du formateur Sage 100")
         parser.add_argument("--admin", metavar="MOT_DE_PASSE", help="Crée le super-utilisateur « admin » avec ce mot de passe")
 
     def log(self, message):
@@ -64,7 +66,23 @@ class Command(BaseCommand):
 
         if options["demo"]:
             self._demo()
+        if options["sahel"]:
+            self._sahel()
         self.log(self.style.SUCCESS("Initialisation terminée."))
+
+    def _sahel(self):
+        from apps.commercial import sahel
+        from apps.commercial.models import Tiers
+
+        if Tiers.objects.exists():
+            self.log("Des tiers existent déjà : la société SAHEL DISTRIBUTION n'est pas chargée (utilisez une base vierge).")
+            return
+        societe = Societe.get()
+        societe.raison_sociale, societe.forme_juridique, societe.ville = "SAHEL DISTRIBUTION (fictive)", "SARL", "Cameroun"
+        societe.save()
+        donnees = sahel.creer_societe()
+        sahel.saisir_stocks_initiaux(donnees, Exercice.objects.first().date_debut)
+        self.log("Société fictive SAHEL DISTRIBUTION créée (dépôts, articles, catégories GROS/DÉTAIL, tiers, stocks initiaux).")
 
     def _demo(self):
         from apps.commercial.models import Article, Depot, Document, FamilleArticle, LigneDocument, Reglement, Tiers
@@ -87,6 +105,10 @@ class Command(BaseCommand):
             Tiers.objects.create(code="F0002", nom="Sodecoton Distribution", type_tiers=Tiers.FOURNISSEUR, ville="Garoua"),
         ]
         famille = FamilleArticle.objects.create(code="BTP", libelle="Matériaux de construction")
+        from apps.commercial.models import CategorieTarifaire
+
+        CategorieTarifaire.objects.create(code="GROS", intitule="Gros")
+        CategorieTarifaire.objects.create(code="DETAIL", intitule="Détail")
         articles = [
             Article.objects.create(reference="CIM50", designation="Ciment CPJ 42.5 - sac 50 kg", famille=famille,
                                    unite="Sac", prix_achat=Decimal("4800"), prix_vente=Decimal("5600"), stock_minimum=50),

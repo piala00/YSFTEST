@@ -7,10 +7,10 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 
 | État | Commandes |
 |---|---|
-| ✅ Réalisé | 70 |
+| ✅ Réalisé | 71 |
 | ✅ Commande d'interface | 14 |
 | ↗ Autre logiciel de l'ERP | 13 |
-| ⬜ Grisé (non développé) | 113 |
+| ⬜ Grisé (non développé) | 112 |
 | **Total des commandes** | **210** |
 
 | Niveau de preuve | Commandes | Signification |
@@ -34,7 +34,8 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Fichier › Paramètres société | Sécurité | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier › Paramètres société | Articles | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier › Paramètres société | Comptes généraux | DOC-V12 | ⬜ Grisé (non développé) |  |
-| Fichier › Paramètres société | Tiers | DOC-V12 | ⬜ Grisé (non développé) |  |
+| Fichier › Paramètres société | **Tiers** | DOC-V12 | ▸ Sous-menu |  |
+| Fichier › Paramètres société › Tiers | Catégories tarifaires | DOC-V12 | ✅ Réalisé | `/commercial/categories-tarifaires/` |
 | Fichier › Paramètres société | Ressources | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier › Paramètres société | Analytique | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier › Paramètres société | Tva et taxes | DOC-V12 | ⬜ Grisé (non développé) |  |
@@ -177,7 +178,7 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Traitement › Gestion des comptes | Gestion des collaborateurs | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Traitement › Gestion des comptes | Gestion des ressources | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Traitement › Gestion des comptes | Suivi traçabilité série/ lot | DOC-V12 | ⬜ Grisé (non développé) |  |
-| Traitement | Gestion des besoins | DOC-V12 | ✅ Réalisé | `/commercial/articles/?alerte=1` |
+| Traitement | Gestion des besoins | DOC-V12 | ✅ Réalisé | `/commercial/besoins/` |
 | Traitement | Traçabilité des documents | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Traitement | **Recherche de documents** | DOC-V12 | ▸ Sous-menu |  |
 | Traitement › Recherche de documents | Entêtes de documents | DOC-V12 | ✅ Réalisé | `/commercial/recherche/entetes/` |

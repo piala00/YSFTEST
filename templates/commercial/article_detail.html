@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% load erp %}
+{% extends "base.html" %}{% load erp l10n %}
 {% block title %}{{ object.designation }}{% endblock %}
 {% block content %}
 <div class="page-title"><h1>{{ object.designation }} <small class="text-muted fs-6">{{ object.reference }}</small></h1>
@@ -9,8 +9,25 @@
   <div class="col-md-3"><div class="card kpi p-3"><div class="label">Prix de vente HT</div><div class="value">{{ object.prix_vente|montant }}</div><div class="small text-muted">Achat : {{ object.prix_achat|montant }}</div></div></div>
   <div class="col-md-3"><div class="card p-3 small">Compte de vente : {{ object.get_compte_vente }}<br>Compte d'achat : {{ object.get_compte_achat }}</div></div>
 </div>
-{% if stocks_depots %}<div class="card mb-3"><div class="card-header bg-white fw-semibold">Stock par dépôt</div>
-<table class="table table-sm mb-0"><tbody>{% for s in stocks_depots %}<tr><td>{{ s.depot }}</td><td class="num fw-semibold">{{ s.quantite|floatformat:"-3" }} {{ object.unite }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+<form method="post" action="{% url 'commercial:article_parametres' object.pk %}">{% csrf_token %}
+<div class="row g-3 mb-3">
+  <div class="col-lg-5"><div class="card h-100"><div class="card-header bg-white fw-semibold">Tarifs par catégorie tarifaire</div>
+  <table class="table table-sm mb-0"><thead><tr><th>Catégorie</th><th class="num" style="width:150px">Prix de vente HT</th></tr></thead><tbody>
+  <tr class="text-muted"><td>Prix de la fiche article (par défaut)</td><td class="num">{{ object.prix_vente|montant }}</td></tr>
+  {% for c, prix in tarifs %}<tr><td>{{ c.intitule }} <span class="text-muted small">{{ c.code }}</span></td>
+  <td><input name="tarif_{{ c.pk }}" value="{% if prix is not None %}{{ prix|unlocalize }}{% endif %}" class="form-control form-control-sm text-end" inputmode="decimal" placeholder="—" aria-label="Prix {{ c.intitule }}"></td></tr>
+  {% empty %}<tr><td colspan="2" class="text-muted small">Aucune catégorie tarifaire : créez-les dans Fichier › Paramètres société › Tiers.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+  <div class="col-lg-7"><div class="card h-100"><div class="card-header bg-white fw-semibold">Stock et seuils par dépôt</div>
+  <table class="table table-sm mb-0"><thead><tr><th>Dépôt</th><th class="num">Stock</th><th class="num" style="width:120px">Mini</th><th class="num" style="width:120px">Maxi</th></tr></thead><tbody>
+  {% for d, s in seuils %}<tr><td>{{ d }}</td><td class="num fw-semibold">{% if s %}{{ s.quantite|floatformat:"-3" }}{% else %}0{% endif %} {{ object.unite }}</td>
+  <td><input name="mini_{{ d.pk }}" value="{% if s and s.stock_mini %}{{ s.stock_mini.normalize|unlocalize }}{% endif %}" class="form-control form-control-sm text-end" inputmode="decimal" aria-label="Stock mini {{ d }}"></td>
+  <td><input name="maxi_{{ d.pk }}" value="{% if s and s.stock_maxi %}{{ s.stock_maxi.normalize|unlocalize }}{% endif %}" class="form-control form-control-sm text-end" inputmode="decimal" aria-label="Stock maxi {{ d }}"></td></tr>{% endfor %}
+  </tbody></table>
+  <div class="card-footer bg-white small text-muted">Fournisseur principal : {{ object.fournisseur_principal.nom|default:"non renseigné (Modifier la fiche)" }}</div></div></div>
+</div>
+<div class="mb-3"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-save"></i> Enregistrer tarifs et seuils</button></div>
+</form>
 <div class="card"><div class="card-header bg-white fw-semibold">Mouvements de stock</div>
 <table class="table table-sm mb-0"><thead><tr><th>Date</th><th>Dépôt</th><th>Libellé</th><th class="num">Entrée</th><th class="num">Sortie</th><th class="num">Coût unitaire</th></tr></thead><tbody>
 {% for m in mouvements %}<tr><td>{{ m.date|date:"d/m/Y" }}</td><td class="small">{{ m.depot|default:"" }}</td><td>{% if m.document %}<a href="{% url 'commercial:document_detail' m.document.pk %}">{{ m.libelle }}</a>{% else %}{{ m.libelle }}{% endif %}</td>

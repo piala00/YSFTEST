@@ -86,6 +86,9 @@ Bon d'avoir financier, Facture, Facture de retour, Facture d'avoir.
 | Annulation | Un BL validé peut être annulé : le stock est rétabli et le reliquat de la commande d'origine aussi |
 
 Autres fonctions :
+- **Catégories tarifaires (GROS, DÉTAIL…) :** le prix proposé dépend de la catégorie du client, et sa source est affichée.
+- **Code risque :** si l'encours dépasse le plafond, la pièce est soit validée avec un avertissement, soit bloquée. Le contrôle porte sur les commandes, préparations, BL et factures.
+- **Gestion des besoins :** les seuils mini/maxi sont définis par dépôt, et l'ERP propose des bons de commande fournisseur en brouillon.
 - **Recherche de documents :** par entêtes ou par lignes, avec filtres domaine, type, statut, dépôt, dates, tiers, n° de pièce et article.
 - **Gestion des comptes :** clients et fournisseurs avec solde comptable et reste dû, interrogation des articles.
 - **Gestion des livraisons clients et des réceptions fournisseurs :** commandes en attente.
@@ -192,8 +195,14 @@ Authentification : `POST /api/token/` (`username`, `password`), puis en-tête `A
 ## Tests
 
 ```bash
-python manage.py test
+python manage.py test                                # toute la suite
+python manage.py test apps.commercial.tests_recette  # cahier de recette SAHEL DISTRIBUTION
 ```
+
+Le **cahier de recette** rejoue les cas pratiques du skill `sage-100-gescom-v12-formateur-expert` sur la société
+fictive SAHEL DISTRIBUTION : tarification, entrées, transferts, chaîne de vente, livraisons partielles, achats,
+inventaire, règlements, encours, retours et avoirs, états, réapprovisionnement. Le détail est dans
+`docs/RECETTE_SAHEL_DISTRIBUTION.md`. Pour faire les exercices à la main : `python manage.py init_erp --sahel`.
 
 ## Structure
 

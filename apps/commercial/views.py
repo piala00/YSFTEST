@@ -15,7 +15,8 @@ from apps.comptabilite.models import Journal
 
 from .forms import (ArticleForm, DepotForm, DocumentForm, FamilleArticleForm, InventaireForm, LigneDocumentFormSet,
                     LigneInventaireFormSet, ReglementForm, TiersForm)
-from .models import Article, Depot, Document, FamilleArticle, Inventaire, MouvementStock, Reglement, StockDepot, Tiers, ZERO
+from .models import (Article, CategorieTarifaire, Depot, Document, FamilleArticle, Inventaire, MouvementStock, Reglement,
+                     StockDepot, TarifCategorie, Tiers, ZERO)
 
 
 def _erreur(request, exc):
@@ -130,7 +131,106 @@ class ArticleDetailView(LoginRequiredMixin, DetailView):
         ctx = super().get_context_data(**kwargs)
         ctx["mouvements"] = self.object.mouvements.select_related("document", "depot")[:100]
         ctx["stocks_depots"] = self.object.stocks_depots.select_related("depot")
+        tarifs = {t.categorie_id: t.prix_vente for t in self.object.tarifs.all()}
+        ctx["tarifs"] = [(c, tarifs.get(c.pk)) for c in CategorieTarifaire.objects.all()]
+        seuils = {s.depot_id: s for s in self.object.stocks_depots.all()}
+        ctx["seuils"] = [(d, seuils.get(d.pk)) for d in Depot.objects.filter(actif=True)]
         return ctx
+
+
+@login_required
+@require_POST
+def article_parametres(request, pk):
+    """Enregistre les tarifs par catégorie et les seuils mini/maxi par dépôt de la fiche article."""
+    from decimal import Decimal, InvalidOperation
+
+    article = get_object_or_404(Article, pk=pk)
+
+    def nombre(cle):
+        valeur = "".join((request.POST.get(cle) or "").split()).replace("\u202f", "").replace(",", ".")
+        if not valeur:
+            return None
+        try:
+            return Decimal(valeur)
+        except InvalidOperation:
+            raise ValidationError(f"Valeur invalide : « {request.POST.get(cle)} ».")
+
+    try:
+        with transaction.atomic():
+            for categorie in CategorieTarifaire.objects.all():
+                prix = nombre(f"tarif_{categorie.pk}")
+                if prix is None:
+                    TarifCategorie.objects.filter(article=article, categorie=categorie).delete()
+                else:
+                    TarifCategorie.objects.update_or_create(article=article, categorie=categorie, defaults={"prix_vente": prix})
+            for depot in Depot.objects.filter(actif=True):
+                mini, maxi = nombre(f"mini_{depot.pk}") or ZERO, nombre(f"maxi_{depot.pk}") or ZERO
+                if maxi and maxi < mini:
+                    raise ValidationError(f"Dépôt {depot} : le stock maxi doit être supérieur ou égal au mini.")
+                ligne = StockDepot.objects.filter(article=article, depot=depot).first()
+                if ligne or mini or maxi:
+                    StockDepot.objects.update_or_create(article=article, depot=depot,
+                                                        defaults={"stock_mini": mini, "stock_maxi": maxi})
+        messages.success(request, "Tarifs et seuils enregistrés.")
+    except ValidationError as exc:
+        _erreur(request, exc)
+    return redirect("commercial:article_detail", pk=pk)
+
+
+# ---------------------------------------------------------------- Catégories tarifaires
+class CategorieListView(LoginRequiredMixin, ListView):
+    model = CategorieTarifaire
+    template_name = "commercial/categorie_list.html"
+
+
+@login_required
+def categorie_create(request):
+    from django import forms
+
+    from apps.core.forms import BootstrapMixin
+
+    class CategorieForm(BootstrapMixin, forms.ModelForm):
+        class Meta:
+            model = CategorieTarifaire
+            fields = "__all__"
+
+    form = CategorieForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Catégorie tarifaire créée.")
+        return redirect("commercial:categories")
+    return render(request, "core/form.html", {"form": form, "titre": "Nouvelle catégorie tarifaire"})
+
+
+# ---------------------------------------------------------------- Gestion des besoins
+@login_required
+def besoins(request):
+    from decimal import Decimal, InvalidOperation
+
+    from . import reappro
+
+    depot = Depot.objects.filter(pk=request.GET.get("depot")).first() if request.GET.get("depot") else None
+    lignes = reappro.propositions(depot)
+    if request.method == "POST":
+        choisies = []
+        for stock in lignes:
+            if f"choisir_{stock.pk}" in request.POST:
+                try:
+                    quantite = Decimal((request.POST.get(f"quantite_{stock.pk}") or "0").replace(",", "."))
+                except InvalidOperation:
+                    quantite = ZERO
+                choisies.append((stock, quantite))
+        commandes, sans_fournisseur = reappro.generer_commandes(choisies, request.user)
+        for c in commandes:
+            messages.success(request, f"Bon de commande en brouillon créé pour {c.tiers.nom} ({c.depot}).")
+        for s in sans_fournisseur:
+            messages.warning(request, f"{s.article.reference} : aucun fournisseur principal sur la fiche article, ligne ignorée.")
+        if not commandes and not sans_fournisseur:
+            messages.info(request, "Aucune ligne sélectionnée.")
+        if len(commandes) == 1:
+            return redirect("commercial:document_detail", pk=commandes[0].pk)
+        return redirect(request.get_full_path())
+    return render(request, "commercial/besoins.html", {"lignes": lignes, "depot": depot, "depots": Depot.objects.all()})
 
 
 class FamilleListView(LoginRequiredMixin, ListView):
@@ -364,9 +464,16 @@ def _articles_json():
     return {
         a.pk: {"designation": a.designation, "prix_vente": float(a.prix_vente),
                "prix_achat": float(a.prix_achat), "cout": round(float(a.cout_unitaire), 2),
-               "taux_tva": float(a.taux_tva), "stock": float(a.stock)}
-        for a in Article.objects.filter(actif=True)
+               "taux_tva": float(a.taux_tva), "stock": float(a.stock),
+               "tarifs": {t.categorie_id: float(t.prix_vente) for t in a.tarifs.all()}}
+        for a in Article.objects.filter(actif=True).prefetch_related("tarifs")
     }
+
+
+def _tiers_json():
+    return {t.pk: {"categorie": t.categorie_tarifaire_id,
+                   "libelle": str(t.categorie_tarifaire) if t.categorie_tarifaire_id else ""}
+            for t in Tiers.objects.filter(type_tiers=Tiers.CLIENT).select_related("categorie_tarifaire")}
 
 
 def _document_form(request, document, type_document):
@@ -388,6 +495,8 @@ def _document_form(request, document, type_document):
                     try:
                         doc.valider()
                         messages.success(request, f"Document {doc.numero} validé.")
+                        if getattr(doc, "avertissement", None):
+                            messages.warning(request, doc.avertissement)
                     except ValidationError as exc:
                         _erreur(request, exc)
                 else:
@@ -399,7 +508,7 @@ def _document_form(request, document, type_document):
     return render(request, "commercial/document_form.html", {
         "form": form, "formset": formset, "document": document,
         "titre": dict(Document.TYPES)[type_document], "est_vente": est_vente, "domaine": document.domaine,
-        "articles_json": _articles_json(),
+        "articles_json": _articles_json(), "tiers_json": _tiers_json(),
     })
 
 
@@ -442,6 +551,8 @@ def document_valider(request, pk):
     try:
         document.valider()
         messages.success(request, f"Document {document.numero} validé.")
+        if getattr(document, "avertissement", None):
+            messages.warning(request, document.avertissement)
     except ValidationError as exc:
         _erreur(request, exc)
     return redirect("commercial:document_detail", pk=pk)

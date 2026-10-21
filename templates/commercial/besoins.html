@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load erp l10n %}
+{% block title %}Gestion des besoins{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Gestion des besoins</h1>
+  <form><select name="depot" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Tous les dépôts</option>
+  {% for d in depots %}<option value="{{ d.pk }}" {% if depot.pk == d.pk %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></form></div>
+<p class="text-muted small">Articles dont le stock d'un dépôt est passé sous le <strong>stock mini</strong> de ce dépôt (fiche article › Paramètres par dépôt). La quantité proposée ramène le stock au <strong>stock maxi</strong>. Les bons de commande sont créés <strong>en brouillon</strong>, groupés par fournisseur principal et par dépôt : vérifiez-les avant de les valider.</p>
+<form method="post">{% csrf_token %}
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead class="table-light"><tr><th><input type="checkbox" class="form-check-input" id="tout" checked aria-label="Tout sélectionner"></th><th>Dépôt</th><th>Article</th><th>Fournisseur principal</th>
+<th class="num">Stock</th><th class="num">Mini</th><th class="num">Maxi</th><th class="num" style="width:130px">À commander</th></tr></thead><tbody>
+{% for s in lignes %}<tr>
+<td><input type="checkbox" class="form-check-input choix" name="choisir_{{ s.pk }}" checked aria-label="Commander {{ s.article.reference }}"></td>
+<td>{{ s.depot }}</td><td><a href="{% url 'commercial:article_detail' s.article.pk %}">{{ s.article.reference }}</a> {{ s.article.designation }}</td>
+<td>{% if s.article.fournisseur_principal %}{{ s.article.fournisseur_principal.nom }}{% else %}<span class="text-danger small">À renseigner sur la fiche article</span>{% endif %}</td>
+<td class="num text-danger fw-semibold">{{ s.quantite|floatformat:"-3" }}</td><td class="num">{{ s.stock_mini|floatformat:"-3" }}</td><td class="num">{{ s.stock_maxi|floatformat:"-3" }}</td>
+<td><input type="number" step="any" min="0" name="quantite_{{ s.pk }}" value="{{ s.besoin|unlocalize }}" class="form-control form-control-sm text-end"></td></tr>
+{% empty %}<tr><td colspan="8" class="text-muted text-center p-4">Aucun besoin : tous les stocks sont au-dessus de leur mini.</td></tr>{% endfor %}
+</tbody></table></div>
+{% if lignes %}<div class="mt-3"><button class="btn btn-primary"><i class="bi bi-cart-plus"></i> Générer les bons de commande fournisseur</button></div>{% endif %}
+</form>
+{% endblock %}
+{% block scripts %}<script>
+const tout = document.getElementById('tout');
+if (tout) tout.addEventListener('change', () => document.querySelectorAll('.choix').forEach(c => c.checked = tout.checked));
+</script>{% endblock %}

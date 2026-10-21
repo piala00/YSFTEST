@@ -16,7 +16,9 @@
     {% if object.telephone %}<i class="bi bi-telephone"></i> {{ object.telephone }}<br>{% endif %}
     {% if object.email %}<i class="bi bi-envelope"></i> {{ object.email }}<br>{% endif %}
     NIU : {{ object.niu|default:"—" }} · RCCM : {{ object.rccm|default:"—" }}<br>
-    Compte : {{ object.get_compte_collectif.numero }}</div></div>
+    Compte : {{ object.get_compte_collectif.numero }}
+    {% if object.est_client %}<br>Catégorie tarifaire : {{ object.categorie_tarifaire|default:"—" }}
+    <br>Plafond d'encours : {% if object.plafond_credit %}{{ object.plafond_credit|montant }} · {{ object.get_code_risque_display }}{% else %}aucun{% endif %}{% endif %}</div></div>
 </div>
 <div class="row g-3">
 <div class="col-lg-7"><div class="card"><div class="card-header bg-white fw-semibold">Documents</div>

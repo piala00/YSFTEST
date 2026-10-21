@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Catégories tarifaires{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Catégories tarifaires</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'commercial:categorie_create' %}"><i class="bi bi-plus"></i> Nouvelle catégorie</a></div>
+<p class="text-muted small">Le prix proposé en saisie d'une pièce de vente est celui de la catégorie du client, défini dans la fiche article ; à défaut, le prix de vente de la fiche article.</p>
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead><tr><th>Code</th><th>Intitulé</th><th class="num">Clients</th><th class="num">Articles tarifés</th></tr></thead><tbody>
+{% for c in object_list %}<tr><td>{{ c.code }}</td><td>{{ c.intitule }}</td><td class="num">{{ c.clients.count }}</td><td class="num">{{ c.tarifs.count }}</td></tr>
+{% empty %}<tr><td colspan="4" class="text-muted text-center p-4">Aucune catégorie. Créez par exemple GROS et DÉTAIL.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

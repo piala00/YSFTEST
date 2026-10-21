@@ -227,7 +227,9 @@ GESTION_COMMERCIALE = Module(
                 E("fichier.parametres.securite", "Sécurité"),
                 E("fichier.parametres.articles", "Articles"),
                 E("fichier.parametres.comptes", "Comptes généraux"),
-                E("fichier.parametres.tiers", "Tiers"),
+                E("fichier.parametres.tiers", "Tiers", enfants=[
+                    E("fichier.parametres.tiers.categories", "Catégories tarifaires", "commercial:categories"),
+                ]),
                 E("fichier.parametres.ressources", "Ressources"),
                 E("fichier.parametres.analytique", "Analytique"),
                 E("fichier.parametres.tva", "Tva et taxes"),
@@ -358,7 +360,7 @@ GESTION_COMMERCIALE = Module(
                 E("comptes.ressources", "Gestion des ressources"),
                 E("comptes.tracabilite", "Suivi traçabilité série/ lot"),
             ]),
-            E("traitement.besoins", "Gestion des besoins", "commercial:articles", icone="bi-exclamation-triangle", alerte=1),
+            E("traitement.besoins", "Gestion des besoins", "commercial:besoins", icone="bi-exclamation-triangle"),
             E("traitement.tracabilite_documents", "Traçabilité des documents"),
             E("recherche", "Recherche de documents", icone="bi-search", enfants=[
                 E("recherche.entetes", "Entêtes de documents", "commercial:recherche_entetes"),
