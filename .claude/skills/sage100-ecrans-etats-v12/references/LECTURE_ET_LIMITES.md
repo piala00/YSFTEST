@@ -2,7 +2,7 @@
 
 Relevé du 21 octobre 2026. R9, R10 et R11 restent partiels. Le tableau COUVERTURE.csv suit tous les objets demandés, y compris ceux dont aucun catalogue complet n’a pu être établi.
 
-Le paquet contient 57 zones Gescom, 76 zones Comptabilité, 17 fonctions d’écran, 30 entrées d’options/colonnes/variantes d’états et 36 sources. Ces nombres mesurent le relevé, pas un pourcentage de complétude. Les 154 paires de transformations comprennent 11 possibilités OM confirmées sous conditions, 18 absences de fonction UI documentées sans build précis et 125 inconnues.
+Le paquet contient 101 zones Gescom et 77 zones Comptabilité, 17 fonctions d’écran, 48 entrées d’options/colonnes/variantes et 48 sources. Ces nombres incluent des témoins historiques et ne mesurent pas la complétude V12. Les 154 paires de transformations comprennent 11 possibilités OM confirmées sous conditions, 18 absences de fonction UI documentées sans build précis et 125 inconnues.
 
 ## Versions et preuves
 

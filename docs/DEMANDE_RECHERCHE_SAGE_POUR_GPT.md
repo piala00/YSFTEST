@@ -379,3 +379,11 @@ n'a été retirée ni ajoutée.
 3. **U04 / U05 : en-tête, grille et pied** des documents d'achat et de stock V12.
 4. **U01 : le neuvième type de document d'achat** (s'il existe en V12) et les transformations depuis bon de retour,
    bon d'avoir financier et demande d'achat.
+
+
+## Suite — livraison 3 complétée (version 0.2)
+
+**Intégré** : skill mis à jour ; test automatique de conformité du sens des mouvements de stock à la table
+MOUVEMENTS_ET_SIGNES_V12 (19 types de documents conformes). **Question ajoutée** : pour le bon d'avoir financier et la
+facture d'avoir d'achat (mouvement « SORTIE_MONTANT »), comment Sage 100 V12 répartit-il la correction de valeur
+(article par article, au prorata, sur le CMUP) ? Exemple chiffré officiel si possible.

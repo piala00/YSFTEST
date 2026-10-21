@@ -5,7 +5,7 @@ description: Vérifier les champs, onglets, transformations et états Sage 100 a
 
 # Sage 100 — écrans, transformations et états
 
-Traiter R9 à R11 du cahier ERP OHADA du 21 octobre 2026. Livraison documentaire partielle, version 0.1. Ne pas présenter ce paquet comme une reproduction exhaustive des écrans V12.
+Traiter R9 à R11 du cahier ERP OHADA du 21 octobre 2026. Livraison documentaire partielle, version 0.2. Ne pas présenter ce paquet comme une reproduction exhaustive des écrans V12.
 
 ## Lire dans cet ordre
 
@@ -15,6 +15,10 @@ Traiter R9 à R11 du cahier ERP OHADA du 21 octobre 2026. Livraison documentaire
 4. Lire `ETATS_STANDARDS.csv` **avec** `STATUT_ETATS.csv`. Une variante d’état n’est pas une colonne imprimée.
 5. Consulter `COMPORTEMENTS.csv` pour les règles de saisie et `CAS_DE_REVUE.csv` pour préparer une vérification fonctionnelle. Ces cas sont proposés, pas exécutés sur un Sage V12.
 6. Consulter `FORMAT_IMPORT_V5_TEMOIN.csv` seulement pour un ancien format V5 explicitement identifié. Ne jamais le convertir en schéma d’écran V12.
+
+## Complément de la version 0.2
+
+Lire `references/APPROFONDISSEMENT.md`, `TYPES_DOCUMENTS_V12.csv`, `PROVENANCES_DOCUMENTS_V12.csv` et `MOUVEMENTS_ET_SIGNES_V12.csv` pour distinguer type, provenance et signe. Lire `DIVERGENCES_SOURCES.csv` avant de convertir un libellé documentaire en contrainte. Les obligations anciennes restent dans `CONTRAINTES_HISTORIQUES.csv` ; `EMPREINTES_COMPLEMENT.csv` identifie la copie consultée.
 
 ## Appliquer les limites
 

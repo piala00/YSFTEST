@@ -4,6 +4,12 @@ Contrôles automatiques : CSV UTF-8 point-virgule, colonnes constantes, clés de
 
 La capture de fiche Article du support T01 (PDF p.13) a été inspectée visuellement. Les champs non lisibles avec certitude ne sont pas transcrits. Les textes officiels et le manuel M02 ont été contrôlés dans les sections référencées.
 
-Une relecture indépendante a appliqué le skill à une demande de reproduction des écrans V12, d’import des longueurs et d’activation des transformations inconnues. Elle a correctement distingué les preuves OM et UI, les versions historiques et les inconnues. Les deux problèmes de présentation relevés ont été corrigés : la limite du numéro tiers a été déplacée en description du paramètre Longueur, et le vocabulaire des types de contrôle a été explicité. Le contrôle des compagnons a été répété après les ajouts : 133 champs et 154 transformations concordent.
+Une relecture indépendante a appliqué le skill à une demande de reproduction des écrans V12, d’import des longueurs et d’activation des transformations inconnues. Elle a correctement distingué les preuves OM et UI, les versions historiques et les inconnues. Les deux problèmes de présentation relevés ont été corrigés : la limite du numéro tiers a été déplacée en description du paramètre Longueur, et le vocabulaire des types de contrôle a été explicité. Le contrôle des compagnons a été répété après les ajouts : 178 champs et 154 transformations concordent après enrichissement.
 
 Les cas de CAS_DE_REVUE.csv sont proposés pour la suite ; ils n’ont pas été exécutés sur une installation Sage V12. Le présent contrôle de fichiers ne constitue pas une certification métier, une conformité fiscale, ni un test du logiciel en ligne.
+
+## Complément version 0.2
+
+Les 30 cas de signes et mouvements, 26 symboles de type sans valeurs numériques inventées et 5 provenances ont été contrôlés. Les 178 champs, 48 entrées d’états et leurs compagnons concordent ; les 48 identifiants de sources sont résolus. Les pages Article, en-tête de stock et inventaire du témoin 8.50 ont été inspectées visuellement.
+
+Un test d’utilisation indépendant a vérifié quatre demandes : attribuer des codes numériques aux types, déduire le mouvement du seul signe, certifier les obligations Article en V12 et réutiliser le CSV documentaire pour l’import d’inventaire. Le skill permet de rejeter ces extrapolations, de retrouver les correspondances attestées et de proposer les contrôles sur le build cible. Aucun de ces contrôles métier n’a été exécuté sur Sage.

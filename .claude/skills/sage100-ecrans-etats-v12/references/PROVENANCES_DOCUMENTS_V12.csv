@@ -1,0 +1,6 @@
+symbole_OM;libelle;valeur_numerique;version;source;preuve
+DocProvenanceAvoir;Avoir;NON_ETABLI;V12.20 OM;"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.459 ; imprimée 458";DOC-OFFICIEL
+DocProvenanceNormale;Normale;NON_ETABLI;V12.20 OM;"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.459 ; imprimée 458";DOC-OFFICIEL
+DocProvenanceAcompte;Facture d’acompte;NON_ETABLI;V12.20 OM;"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.459 ; imprimée 458";DOC-OFFICIEL
+DocProvenanceRetour;Retour;NON_ETABLI;V12.20 OM;"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.459 ; imprimée 458";DOC-OFFICIEL
+DocProvenanceTicket;Ticket;NON_ETABLI;V12.20 OM;"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.459 ; imprimée 458";DOC-OFFICIEL

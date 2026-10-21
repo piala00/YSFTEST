@@ -29,3 +29,21 @@ ligne_csv;produit;etat;type;libelle;version_documentee;preuve_v12;limite
 29;GESCOM;Réapprovisionnement (état/proposition);OPTION;Ajustement quantité;"Sage 100 ; version exacte non précisée";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
 30;GESCOM;Statistiques clients;VARIANTE;Statistiques clients;"Couverture 2026-09-02 V1.1 ; copyright 2018 ; version logiciel non établie";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
 31;GESCOM;Statistiques collaborateurs;VARIANTE;Statistiques collaborateurs;"Couverture 2026-09-02 V1.1 ; copyright 2018 ; version logiciel non établie";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+32;GESCOM;Journaux comptables;OPTION;Domaine;"Sage 100 ; build non précisé ; page 2022-12-09";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+33;GESCOM;Journaux comptables;OPTION;Journal comptable;"Sage 100 ; build non précisé ; page 2022-12-09";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+34;GESCOM;Journaux comptables;OPTION;Journal analytique;"Sage 100 ; build non précisé ; page 2022-12-09";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+35;GESCOM;Journaux comptables;OPTION;Récapitulation;"Sage 100 ; build non précisé ; page 2022-12-09";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+36;GESCOM;Journaux comptables;OPTION;Inclure les factures non validées;"Sage 100 ; build non précisé ; page 2022-12-09";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+37;GESCOM;Inventaire;OPTION;Type d’état;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+38;GESCOM;Inventaire;OPTION;Type d’inventaire;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+39;GESCOM;Inventaire;OPTION;Date d’inventaire;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+40;GESCOM;Inventaire;OPTION;Valorisation;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+41;GESCOM;Inventaire;OPTION;Stock Qté positif;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+42;GESCOM;Inventaire;OPTION;Stock Qté négatif;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+43;GESCOM;Inventaire;OPTION;Stock Qté nul;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+44;GESCOM;Inventaire > Etat préparatoire;COLONNE;Qtés relevées;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+45;GESCOM;Inventaire > Etat préparatoire;COLONNE;Ecart;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+46;GESCOM;Statistiques articles;OPTION;Type d’état;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+47;GESCOM;Statistiques articles;OPTION;Documents;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+48;GESCOM;Statistiques articles;OPTION;Date de / à;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés
+49;GESCOM;Statistiques articles;OPTION;Article de / à;"8.50 ; copyright 2016 ; 1508 pages PDF ; couverture Gescom PDF p.282";A-CONFIRMER;Version UI précise et ordre imprimé non certifiés

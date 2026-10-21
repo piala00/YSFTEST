@@ -2,7 +2,7 @@
 
 ## Matrice
 
-La matrice couvre les paires du périmètre relevé, pas tous les types possibles du logiciel. Elle conserve INCONNU lorsqu’une règle manque. Les neuf types de vente viennent du périmètre du cahier. Pour l’achat, huit types ont été identifiés ; le neuvième annoncé reste à déterminer. Ajouter arbitrairement « Préparation de livraison achat » serait une invention. Les documents internes et la fabrication ne sont pas exhaustivement traités.
+La matrice couvre les paires du périmètre relevé, pas tous les types possibles du logiciel. Elle conserve INCONNU lorsqu’une règle manque. Les neuf types de vente viennent du périmètre du cahier. La matrice conserve les huit formes achat du premier relevé. Le complément V12.20 distingue maintenant les types OM (dont Demande d’achat, Facture comptabilisée et Archive) de la provenance ; il ne faut ni ajouter arbitrairement une Préparation de livraison achat ni assimiler formes UI et codes techniques. Les documents internes et la fabrication ne sont pas exhaustivement traités.
 
 Onze paires sont positivement documentées par les processus V12.20 : vente devis vers commande ; devis/commande/préparation vers livraison ; devis/commande/préparation/livraison vers facture ; achat préparation vers commande et préparation/commande vers livraison. M02 : pages PDF 437–438, imprimées 436–437. L’existence d’une méthode Préparer ou Facturer achat (PDF p.297) ne prouve pas toutes ses origines. Le paragraphe descriptif reste incomplet par rapport à la liste des interfaces ; conserver cette divergence.
 

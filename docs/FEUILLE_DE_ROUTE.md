@@ -19,6 +19,13 @@ qui ne sert pas.
 | Fiscalité Cameroun / SYSCOHADA | 🟡 TVA facultative, CAC, régimes ; plan complet et AIR / précompte à venir | GPT lot 2 (suite) |
 | Reprise des données Sage | ✅ outil en lecture seule | GPT R12 pour confirmer les colonnes |
 
+### Écarts connus avec Sage (sources : skills GPT)
+
+- **Avoirs financiers d'achat** (bon d'avoir financier, facture d'avoir) : Sage corrige la **valeur** du stock (mouvement
+  « en montant », sans quantité) ; l'ERP ne le fait pas encore. Test de conformité : `apps/commercial/tests_conformite_sage.py`.
+- **Adresses de livraison et de facturation** distinctes sur la fiche client (C11) : une seule adresse dans l'ERP.
+- **Centrale d'achat** et tarifs particuliers (C13), **calendriers fournisseurs** (C14) : absents.
+
 ## Phase 2 — Combler les manquements de Sage (à prioriser avec le propriétaire)
 
 - Version web consultable partout, en plus du poste Windows.

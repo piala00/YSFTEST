@@ -1,10 +1,10 @@
 recherche;objet;statut;sources_principales;inconnues
-R9;Article;PARTIEL;"G02-G07 ; T01";U02
-R9;Client;PARTIEL;G01/G02/G06/H13;U03
-R9;Fournisseur;PARTIEL;G02/G06;U03
+R9;Article;PARTIEL;"G02-G07 ; T01 ; H28/T02";U02
+R9;Client;PARTIEL;"G01/G02/G06/H13 ; H24-H27";U03
+R9;Fournisseur;PARTIEL;"G02/G06 ; H24-H26/H28";U03
 R9;Documents vente;PARTIEL;H01-H04/H15;U08
-R9;Documents achat;NON_RELEVE;M02 (processus uniquement);U04
-R9;Documents stock;NON_RELEVE;Cahier (périmètre uniquement);U05
+R9;Documents achat;PARTIEL;"H29 ; M02 (signes et types OM)";U04
+R9;Documents stock;PARTIEL_HISTORIQUE_ET_OM_V12;"T02 (en-tête 8.50) ; M02 (mouvements V12.20)";U05
 R9;Famille;NON_RELEVE;G02 (héritage uniquement);U06
 R9;Dépôt;NON_RELEVE;G03 (mini/maxi article par dépôt);U06
 R9;Catégorie tarifaire;PARTIEL;H12/G05;U08
@@ -21,5 +21,5 @@ R10;Rapprochement;PARTIEL_HISTORIQUE;H20/M01;U12
 R10;Banque;PARTIEL_TEMOIN;M03;U09
 R10;Taxe;PARTIEL;G02;U09
 R10;Exercices;PARTIEL;H11;U09
-R11;Etats Gescom;PARTIEL;H14/G03/T01;U13
+R11;Etats Gescom;PARTIEL;"H14/G03/T01 ; H31/T02";U13
 R11;Etats Comptabilité;PARTIEL_HISTORIQUE;M01;U14
