@@ -86,6 +86,10 @@ PREUVES = {
 }
 
 
+# Gestion commerciale : découpage officiel V11/V12 ; Comptabilité : ergonomie Sage 100 classique et skill
+# « sage100-comptabilite-v5-v12-expert », à confirmer sur le découpage officiel Comptabilité ; Reporting : propre à l'ERP
+PREUVE_PAR_DEFAUT = {"commercial": "DOC-V12", "comptabilite": "ERG-CLASSIQUE", "reporting": "AJOUT-ERP"}
+
 _compteur = itertools.count()
 
 
@@ -96,6 +100,46 @@ def SEP():
 # ---------------------------------------------------------------------------
 # Menus communs
 # ---------------------------------------------------------------------------
+def menu_fichier_comptabilite():
+    """Fichier de Sage 100 Comptabilité : même trame que les autres logiciels Sage 100 (skill Comptabilité :
+    dossier, paramètres société, droits, import/export, formats, mise en page, maintenance, outils)."""
+    I = "INDICATIF"
+    return Onglet("fichier", "Fichier", "bi-folder2", [
+        E("fichier.nouveau", "Nouveau", icone="bi-file-earmark-plus"),
+        E("fichier.ouvrir", "Ouvrir", icone="bi-folder2-open"),
+        E("fichier.fermer", "Fermer", icone="bi-x-square", action="fermer"),
+        SEP(),
+        E("fichier.societe", "À propos de votre société", icone="bi-building", enfants=[
+            E("fichier.societe.identification", "Identification", "comptabilite:societe"),
+            E("fichier.societe.exercices", "Exercices comptables", "comptabilite:exercices"),
+            E("fichier.societe.comptes", "Comptes", preuve=I),
+            E("fichier.societe.tiers", "Tiers", preuve=I),
+            E("fichier.societe.taxes", "Taxes", "comptabilite:structure", "taxes", preuve=I, vue="parametres"),
+            E("fichier.societe.analytique", "Analytique", preuve=I),
+            E("fichier.societe.devises", "Devises", preuve=I),
+            E("fichier.societe.banques", "Banques", "comptabilite:structure", "banques", preuve=I, vue="parametres"),
+            E("fichier.societe.editions", "Éditions", preuve=I),
+        ]),
+        E("fichier.lire_infos", "Lire les informations"),
+        E("fichier.autorisations", "Autorisations d'accès", "comptabilite:autorisations", icone="bi-shield-lock"),
+        SEP(),
+        E("fichier.importer", "Importer", icone="bi-box-arrow-in-down"),
+        E("fichier.exporter", "Exporter", icone="bi-box-arrow-up"),
+        E("fichier.format_import", "Format import/export paramétrable"),
+        SEP(),
+        E("fichier.mise_en_page", "Mise en page"),
+        E("fichier.imprimer", "Imprimer…", icone="bi-printer", action="imprimer"),
+        E("fichier.impression_differee", "Impression différée"),
+        SEP(),
+        E("fichier.outils", "Outils", icone="bi-tools", enfants=[
+            E("fichier.outils.maintenance", "Maintenance", preuve=I),
+            E("fichier.outils.sauvegarde", "Sauvegarde", preuve=I),
+        ]),
+        SEP(),
+        E("fichier.quitter", "Quitter", icone="bi-power", action="quitter"),
+    ])
+
+
 def menu_fichier(module, societe_url, fermer=True):
     return Onglet("fichier", "Fichier", "bi-folder2", [
         E("fichier.societe", "À propos de votre société", icone="bi-building", enfants=[
@@ -468,7 +512,7 @@ COMPTABILITE = Module(
     prefixe="/comptabilite/",
     accueil="comptabilite:accueil",
     onglets=[
-        menu_fichier("comptabilite", "comptabilite:societe"),
+        menu_fichier_comptabilite(),
         menu_edition(),
         Onglet("structure", "Structure", "bi-diagram-3", [
             E("structure.plan", "Plan comptable", "comptabilite:comptes", icone="bi-list-ol"),
@@ -483,6 +527,7 @@ COMPTABILITE = Module(
             E("structure.journaux", "Codes journaux", "comptabilite:journaux", icone="bi-collection"),
             E("structure.journaux_analytiques", "Codes journaux analytiques"),
             E("structure.postes_budgetaires", "Postes budgétaires"),
+            E("structure.devises", "Devises", preuve="INDICATIF"),
             SEP(),
             E("structure.banques", "Banques", "comptabilite:structure", "banques", icone="bi-bank2"),
             E("structure.modeles_saisie", "Modèles de saisie"),
@@ -496,22 +541,28 @@ COMPTABILITE = Module(
             ], dyn=_journaux("comptabilite:ecritures", "traitement.saisie_journaux")),
             E("traitement.saisie_piece", "Saisie par pièce", "comptabilite:ecriture_create", icone="bi-pencil-square"),
             E("traitement.saisie_bancaire", "Saisie des opérations bancaires"),
+            E("traitement.saisie_lot", "Saisie par lot", preuve="INDICATIF"),
             E("traitement.saisie_analytique", "Saisie des écritures analytiques", "comptabilite:ventilation", icone="bi-diagram-2"),
             E("traitement.brouillard", "Écritures au brouillard", "comptabilite:ecritures", icone="bi-hourglass", statut="BROUILLARD"),
             SEP(),
             E("traitement.lettrage", "Interrogation et lettrage", "comptabilite:lettrage", icone="bi-link-45deg"),
             E("traitement.lettrage_auto", "Lettrage automatique", "comptabilite:lettrage_auto", icone="bi-magic"),
+            E("traitement.recherche", "Recherche d'écritures", "comptabilite:ecritures", icone="bi-search", vue="recherche"),
             E("traitement.rapprochement", "Rapprochement bancaire manuel", "comptabilite:rapprochement", icone="bi-check2-square"),
+            E("traitement.rapprochement_auto", "Rapprochement bancaire automatique", preuve="INDICATIF"),
+            E("traitement.extraits", "Gestion des extraits", preuve="INDICATIF"),
             E("traitement.reglement_tiers", "Règlement tiers", "commercial:reglement_create"),
             E("traitement.relance", "Rappel / relance clients", "comptabilite:balance_agee", type="CLIENT", vue="relance"),
             SEP(),
             E("traitement.tva", "Déclaration de taxes", "comptabilite:tva", icone="bi-percent"),
             E("traitement.revision", "Révision par cycle"),
+            E("traitement.abonnements", "Abonnements", preuve="INDICATIF"),
             SEP(),
             E("traitement.fin_exercice", "Fin d'exercice", icone="bi-calendar-check", enfants=[
                 E("traitement.fin_exercice.nouvel", "Nouvel exercice", "comptabilite:exercice_create"),
                 E("traitement.fin_exercice.cloture", "Clôture de l'exercice et reports à nouveau", "comptabilite:cloture_exercice"),
                 E("traitement.fin_exercice.journaux", "Clôture des journaux", "comptabilite:cloture_journaux"),
+                E("traitement.fin_exercice.archivage", "Archivage", preuve="INDICATIF"),
             ]),
         ]),
         # Menu Etat de Sage 100 Comptabilité : états généraux, puis groupes « Etats tiers », « Etats analytiques »…
@@ -647,7 +698,7 @@ def _arbre(module, elements, chemin, parametres, meilleur):
         enfants = _arbre(module, el.tous_enfants(), chemin, parametres, meilleur)
         lien = el.lien()
         cible = _module_cible(module, lien)
-        preuve = el.preuve or ("DOC-V12" if module.code == "commercial" else "")
+        preuve = el.preuve or PREUVE_PAR_DEFAUT.get(module.code, "")
         noeud = {"code": el.code, "titre": el.titre, "icone": el.icone, "url": lien, "enfants": enfants,
                  "action": el.action, "module": cible, "separateur": False, "preuve": preuve,
                  "disponible": bool(lien or enfants or el.action), "actif": False, "ouvert": False}

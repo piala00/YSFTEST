@@ -7,10 +7,10 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 
 | État | Commandes |
 |---|---|
-| ✅ Réalisé | 71 |
+| ✅ Réalisé | 72 |
 | ✅ Commande d'interface | 14 |
-| ↗ Autre logiciel de l'ERP | 13 |
-| ⬜ Grisé (non développé) | 112 |
+| ↗ Autre logiciel de l'ERP | 14 |
+| ⬜ Grisé (non développé) | 110 |
 | **Total des commandes** | **210** |
 
 | Niveau de preuve | Commandes | Signification |
@@ -51,7 +51,7 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Fichier › Paramètres société | Colonnage | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier | Lire les informations | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier | Configuration système et partage | DOC-V12 | ⬜ Grisé (non développé) |  |
-| Fichier | Autorisations d'accès | DOC-V12 | ↗ Autre logiciel de l'ERP | `/admin/auth/user/` |
+| Fichier | Autorisations d'accès | DOC-V12 | ✅ Réalisé | `/commercial/autorisations/` |
 | Fichier | Importer | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier | Exporter | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier | Format import/export paramétrable | DOC-V12 | ⬜ Grisé (non développé) |  |
@@ -87,7 +87,7 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Structure | Nomenclatures | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Structure | **Comptabilité** | DOC-V12 | ▸ Sous-menu |  |
 | Structure › Comptabilité | Plan comptable | DOC-V12 | ↗ Autre logiciel de l'ERP | `/comptabilite/plan/` |
-| Structure › Comptabilité | Plan analytique | DOC-V12 | ⬜ Grisé (non développé) |  |
+| Structure › Comptabilité | Plan analytique | DOC-V12 | ↗ Autre logiciel de l'ERP | `/comptabilite/structure/sections/` |
 | Structure › Comptabilité | **Taux de taxes** | DOC-V12 | ▸ Sous-menu |  |
 | Structure › Comptabilité › Taux de taxes | TVA/ débit - Vente de biens | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Structure › Comptabilité › Taux de taxes | TVA/ encaissement - Prestation de services | DOC-V12 | ⬜ Grisé (non développé) |  |
@@ -96,7 +96,7 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Structure › Comptabilité › Taux de taxes | TP/ poids | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Structure › Comptabilité › Taux de taxes | Surtaxe | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Structure › Comptabilité | Codes journaux | DOC-V12 | ↗ Autre logiciel de l'ERP | `/comptabilite/journaux/` |
-| Structure › Comptabilité | Banques | DOC-V12 | ⬜ Grisé (non développé) |  |
+| Structure › Comptabilité | Banques | DOC-V12 | ↗ Autre logiciel de l'ERP | `/comptabilite/structure/banques/` |
 | Structure › Comptabilité | Modèle de règlement | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Structure › Comptabilité | Modèle de grille | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Structure | Codes affaires | DOC-V12 | ⬜ Grisé (non développé) |  |
