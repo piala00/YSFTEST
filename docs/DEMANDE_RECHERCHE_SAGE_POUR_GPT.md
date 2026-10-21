@@ -331,3 +331,34 @@ quarantaine, retenues AIR / précompte automatiques, arrondi au millier, timbre,
 4. **Mention exacte** d'une facture émise par un non-assujetti à la TVA ou par un contribuable à l'IGS, si un texte
    la fixe.
 5. **Arrêté d'application** du suivi électronique de la facturation (art. 8 bis) : entreprises concernées, calendrier.
+
+
+## Nouvelle recherche R14 — Expérience utilisateur complète de Sage 100 V12 (prioritaire après le lot 1)
+
+**Pourquoi** : le propriétaire veut que l'ERP reprenne **toute l'expérience utilisateur et toutes les interfaces** de
+Sage 100 (Gestion commerciale et Comptabilité), puis les améliore. Les menus ne suffisent pas : il faut savoir comment
+chaque écran se comporte. Relever ce que Sage publie (aides en ligne, manuels « Ergonomie et fonctions communes »,
+fiches de la base de connaissances, vidéos officielles), en séparant V12 et versions plus anciennes.
+
+1. **Fenêtres de sélection des états** : pour chaque état des menus Etat (Comptabilité et Gestion commerciale), les
+   critères proposés (libellés, type : plage de dates, de… à…, liste, case à cocher, option), leurs valeurs par défaut,
+   les onglets éventuels, les boutons (OK, Annuler, Aperçu, Imprimer, Exporter…), et les **formats de sélection**
+   (enregistrer, rappeler, partager une sélection).
+2. **Aperçu et impression** : aperçu avant impression, choix du modèle de mise en page, export (PDF, Excel, e-mail).
+3. **Listes** (clients, articles, documents, écritures…) : colonnes par défaut, tris, filtres, recherche, sélection
+   multiple, personnalisation de la liste et ajustement des colonnes, boutons en bas de liste, menu contextuel (clic droit).
+4. **Fiches** (tiers, article, compte, journal…) : onglets, boutons (Précédent, Suivant, Rechercher, Atteindre…),
+   enregistrement / abandon, confirmation à la fermeture d'une fiche modifiée.
+5. **Saisie des documents de vente / achat / stock** : en-tête, saisie des lignes (touches Entrée, Tab, F-touches),
+   recherche d'article ou de tiers pendant la saisie, pied de document, transformation, impression, règlement.
+6. **Saisie comptable** : journaux de saisie (bandeau, période, colonnes), saisie par pièce, interrogation et lettrage
+   (critères, couleurs, boutons), rapprochement bancaire.
+7. **Raccourcis clavier** par défaut des deux logiciels.
+8. **Messages** : confirmations, avertissements, blocages (encours client, stock insuffisant, période clôturée…),
+   leur texte et leurs boutons.
+9. **Assistants** (mode assistant) et **page d'accueil IntuiSage** : contenu, indicateurs, personnalisation.
+
+**Livrable** : `sage100-ux-v12/` (même règles et même format de skill) avec `SELECTIONS_ETATS.csv`
+(`produit;etat;chemin_menu;critere;type;valeur_defaut;onglet;source;preuve`), `LISTES.csv`, `FICHES.csv`,
+`SAISIE_DOCUMENTS.md`, `SAISIE_COMPTABLE.md`, `RACCOURCIS.csv`, `MESSAGES.csv`, `ACCUEIL_ASSISTANTS.md`,
+`SOURCES.csv`, `INCONNUES.csv`.
