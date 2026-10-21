@@ -177,7 +177,9 @@ def compte_resultat(request):
 
 @api_view(["GET"])
 def balance_agee(request):
-    data = reporting.balance_agee(request.query_params.get("type", Tiers.CLIENT))
+    q = request.query_params
+    data = reporting.balance_agee(q.get("type", Tiers.CLIENT), d_apres=q.get("d_apres") or reporting.D_APRES_ECRITURE,
+                                  delais=(q.get("delai1"), q.get("delai2"), q.get("delai3")) if q.get("delai1") else reporting.DELAIS_SAGE)
     for l in data["lignes"]:
         l["tiers"] = {"id": l["tiers"].id, "code": l["tiers"].code, "nom": l["tiers"].nom}
     return Response(data)

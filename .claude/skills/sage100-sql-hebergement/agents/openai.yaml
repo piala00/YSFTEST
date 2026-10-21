@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sage 100 SQL et hébergement"
+  short_description: "Reprise SQL Sage V12 et hébergement Django vérifiés"
+  default_prompt: "Utilise $sage100-sql-hebergement pour préparer une reprise Sage en lecture seule et choisir un hébergement Django avec sauvegardes."

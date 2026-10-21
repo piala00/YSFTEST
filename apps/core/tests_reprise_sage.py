@@ -129,7 +129,8 @@ class RepriseSageTests(TestCase):
     def test_commande(self):
         sortie = StringIO()
         call_command("reprise_sage", correspondance=True, stdout=sortie)
-        self.assertIn("À CONFIRMER", sortie.getvalue())
+        self.assertIn("CT_Sommeil      facultatif  DOCUMENTÉ V12.20", sortie.getvalue())   # confirmé au catalogue V12.20
+        self.assertNotIn("À CONFIRMER", sortie.getvalue())
         call_command("reprise_sage", dossier=str(self.dossier), date_bascule=self.date.isoformat(), stdout=StringIO())
         self.assertFalse(Tiers.objects.exists())
         with self.assertRaises(CommandError):

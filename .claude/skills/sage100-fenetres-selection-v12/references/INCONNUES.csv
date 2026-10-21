@@ -1,0 +1,11 @@
+sujet;question;pistes;impact
+Exhaustivité;Toutes les fenêtres et variantes V12 existent-elles dans cet inventaire ?;"Parcours de chaque fonction sur le build et l’édition cibles ; COUVERTURE_A_COMPLETER.csv";Aucune exhaustivité V12 revendiquée
+Version;Quels build, édition, localisation et options font foi ?;Relever A propos sur une installation Sage autorisée;Les pages sans build ou 8.50 ne deviennent pas V12
+Colonnes des sélecteurs;Quelles colonnes par défaut et personnalisables pour chaque appel ?;Captures avant et après Personnaliser la liste;Ne pas copier les colonnes des fiches ou SQL
+Clavier;F4, Entrée, Tabulation, Echap et double-clic ont-ils le même effet selon fenêtre ?;"Recette par contexte ; pas extrapolation générale";Garder les raccourcis limités aux contextes attestés
+Cardinalité;Choix unique ou multiple ? La sélection persiste-t-elle hors page et filtre ?;Recette multi-lignes et pagination;Pas de multisélection inventée
+Droits;Quelles restrictions filtrent les résultats et les actions ?;Profils, dépôts, souches, prix/marge et éléments en sommeil;La recherche doit respecter le périmètre métier
+Persistance;Quels réglages sont par utilisateur, dossier, poste ou fonction ?;Fermeture/réouverture et changement utilisateur/dossier;Ne pas globaliser les préférences
+Formats;Quelle extension et compatibilité pour recherche, sélection et mise en page ?;"H02/H03 mentionnent .sma ; vérifier par produit ; .fma/.fgc sont des formats de sélection";Ne pas confondre un critère sauvegardé et un modèle d’impression
+Moteur logique;Quels opérateurs, priorités, valeurs vides, accents et jokers exacts en V12 ?;"Recette à résultats attendus ; règles historiques comme témoins";Ne pas utiliser la priorité SQL sans contrôle
+Relevés historiques;Les repères typographiques sont-ils des champs, groupes, boutons ou texte ?;Lire la page citée et observer V12 avant intégration;REPERES_TYPOGRAPHIQUES non importable comme schéma UI

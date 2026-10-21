@@ -1,0 +1,21 @@
+id;cas;controle_attendu;statut
+T01;Appel article par préfixe;Résultats, ligne active et retour dans le bon champ;NON_EXECUTE_SUR_SAGE
+T02;Article inconnu et doublon de référence fournisseur;"Pas de choix arbitraire ; chemin de création selon droits";NON_EXECUTE_SUR_SAGE
+T03;Annuler puis Echap;"Aucune valeur rapatriée ou création non souhaitée ; retour du focus";NON_EXECUTE_SUR_SAGE
+T04;Compte mis en sommeil;Alerte ou blocage selon paramétrage du build;NON_EXECUTE_SUR_SAGE
+T05;Journal vente/achat/trésorerie;Comparer le préfiltre tiers et les options de tri;NON_EXECUTE_SUR_SAGE
+T06;Deux termes dans recherche de liste;"Vérifier OU documenté H06 ; ne pas imposer ET";NON_EXECUTE_SUR_SAGE
+T07;Critère vide;"Mesurer le sens selon famille ; ne pas généraliser depuis H01";NON_EXECUTE_SUR_SAGE
+T08;Critères combinés;Comparer A et B ou C et D et la version regroupée;NON_EXECUTE_SUR_SAGE
+T09;Soit et Sans;"Vérifier exclusivité et exclusion ; documenter parenthèses";NON_EXECUTE_SUR_SAGE
+T10;Traitement Rapide simplifié;Tester un critère ajouté que le mode ignore dans la source;NON_EXECUTE_SUR_SAGE
+T11;Sauvegarder puis rouvrir;Distinguer validation de ligne temporaire et sauvegarde durable;NON_EXECUTE_SUR_SAGE
+T12;Changement domaine Client/Fournisseur;Vérifier les fichiers de critères en format avancé;NON_EXECUTE_SUR_SAGE
+T13;Journal général;"Vérifier si le build a un format avancé ; le témoin historique dit non";NON_EXECUTE_SUR_SAGE
+T14;Date inventaire;Vérifier activation selon type et bornes exactes;NON_EXECUTE_SUR_SAGE
+T15;Modèle standard/personnalisé;Respecter les trois parcours d’impression de H04;NON_EXECUTE_SUR_SAGE
+T16;Cadenas colonne;Interdire le retrait des colonnes verrouillées;NON_EXECUTE_SUR_SAGE
+T17;Liste vide, choix unique, choix multiple;Valider boutons, compteur et valeur de retour séparément;NON_EXECUTE_SUR_SAGE
+T18;Changement utilisateur/dossier;Vérifier absence de fuite de périmètre et préférences;NON_EXECUTE_SUR_SAGE
+T19;Sélection et pagination;Vérifier tri stable, recherche et sélection hors page;NON_EXECUTE_SUR_SAGE
+T20;Sélection avant traitement;"Présenter les éléments retenus et les rejets ; appliquer le traitement une seule fois";NON_EXECUTE_SUR_SAGE

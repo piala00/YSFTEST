@@ -1,0 +1,21 @@
+id;titre;editeur;url;version_ou_date;consulte_le
+M01;Structure des bases Sage 100;Sage;https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937;"V12.20 ; actualisation juillet 2026";2026-10-21
+MS01;sys.columns;Microsoft;https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-columns-transact-sql?view=sql-server-ver17;Documentation SQL Server consultée le 21/10/2026;2026-10-21
+R01;Deploy for Free;Render;https://render.com/docs/free;Consultation 21/10/2026;2026-10-21
+R02;Render Compute Plans;Render;https://render.com/docs/compute-plans;"Nouveaux identifiants 2026 ; anciens noms conservés en correspondance";2026-10-21
+R03;Pricing;Render;https://render.com/pricing;"21/10/2026 ; montants dans extrait de recherche officiel ; corps dynamique incomplet";2026-10-21
+R04;Postgres Recovery and Backups;Render;https://render.com/docs/postgresql-backups;Consultation 21/10/2026;2026-10-21
+R05;Hosting cost for small businesses;Render;https://render.com/articles/how-much-does-cloud-application-hosting-cost-for-small-businesses;"Repère de coût daté juillet 2026 ; ne vaut pas devis actuel";2026-10-21
+W01;Pricing;Railway;https://railway.com/pricing;Consultation 21/10/2026;2026-10-21
+W02;Pricing Plans;Railway;https://docs.railway.com/pricing/plans;Consultation 21/10/2026;2026-10-21
+W03;Volume Backups;Railway;https://docs.railway.com/volumes/backups;Consultation 21/10/2026;2026-10-21
+W04;Serverless;Railway;https://docs.railway.com/deployments/serverless;Consultation 21/10/2026;2026-10-21
+N01;Pricing;Neon;https://neon.com/pricing;Consultation 21/10/2026;2026-10-21
+N02;Plans;Neon;https://neon.com/docs/introduction/plans;Consultation 21/10/2026;2026-10-21
+S01;Pricing;Supabase;https://supabase.com/pricing;Consultation 21/10/2026;2026-10-21
+S02;Database Backups;Supabase;https://supabase.com/docs/guides/platform/backups;Consultation 21/10/2026;2026-10-21
+F01;Resource Pricing;Fly.io;https://docs.fly.io/about/pricing;Consultation 21/10/2026;2026-10-21
+F02;Managed Postgres;Fly.io;https://docs.fly.io/postgres;Consultation 21/10/2026;2026-10-21
+P01;pg_dump;PostgreSQL;https://www.postgresql.org/docs/18/app-pgdump.html;PostgreSQL 18;2026-10-21
+P02;pg_restore;PostgreSQL;https://www.postgresql.org/docs/18/app-pgrestore.html;PostgreSQL 18;2026-10-21
+D01;Deployment checklist;Django;https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/;"Django 5.2 ; adapter à la version installée";2026-10-21

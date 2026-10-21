@@ -68,3 +68,25 @@ class FenetreSelectionTests(TestCase):
                          "text/csv; charset=utf-8")
         reponse = self.client.get(reverse("comptabilite:grand_livre") + f"?tiers={self.client1.pk}&ok=1")
         self.assertTemplateUsed(reponse, "comptabilite/grand_livre.html")
+
+    def test_balance_agee_selon_sage(self):
+        """Fenêtre P008 : « D'après la date d' » écriture (défaut) ou échéance, délais 30 / 45 / 60 par défaut."""
+        from apps.reporting import services
+
+        url = reverse("comptabilite:balance_agee")
+        fenetre = self.client.get(url + "?type=CLIENT")
+        self.assertContains(fenetre, 'name="delai2" value="45"')
+        self.assertContains(fenetre, "D'après la date d'")
+        facture = Document.objects.filter(type_document=Document.FACTURE, tiers=self.client1).first()
+        Document.objects.filter(pk=facture.pk).update(date=datetime.date.today() - datetime.timedelta(days=50),
+                                                      date_echeance=datetime.date.today() - datetime.timedelta(days=20))
+        data = self.client.get(url + "?type=CLIENT&tiers=%d&ok=1" % self.client1.pk).context["data"]
+        self.assertEqual([k for k, _ in data["tranches"]], ["j30", "j60", "j90", "plus"])   # pas de « Non échu »
+        self.assertEqual(data["tranches"][2][1], "46-60 j")
+        self.assertEqual(data["lignes"][0]["j90"], facture.reste_a_payer)                   # 50 jours depuis la facture
+        reponse = self.client.get(url + "?type=CLIENT&tiers=%d&d_apres=ECHEANCE&delai1=10&delai2=20&delai3=30&ok=1" % self.client1.pk)
+        data = reponse.context["data"]
+        self.assertEqual(data["tranches"][0], ("non_echu", "Non échu"))
+        self.assertEqual(data["lignes"][0]["j60"], facture.reste_a_payer)                   # 20 jours de retard : 11-20 j
+        self.assertContains(reponse, "date d&#x27;échéance, délais 10 / 20 / 30 j")
+        self.assertEqual(services.delais_valides(("60", "45", "30")), services.DELAIS_SAGE)  # délais incohérents

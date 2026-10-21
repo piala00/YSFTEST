@@ -22,6 +22,13 @@
           <label class="btn btn-outline-secondary" for="sel-clients">Clients</label>
           <input type="radio" class="btn-check" name="type" id="sel-fournisseurs" value="FOURNISSEUR" {% if valeurs.type == "FOURNISSEUR" %}checked{% endif %}>
           <label class="btn btn-outline-secondary" for="sel-fournisseurs">Fournisseurs</label></div></div>
+      {% elif c.critere == "anciennete" %}
+      <div class="mb-2"><label class="form-label small mb-0" for="sel-d-apres">D'après la date d'</label>
+        <select name="d_apres" id="sel-d-apres" class="form-select form-select-sm">
+          <option value="ECRITURE" {% if valeurs.d_apres != "ECHEANCE" %}selected{% endif %}>Écriture</option>
+          <option value="ECHEANCE" {% if valeurs.d_apres == "ECHEANCE" %}selected{% endif %}>Échéance</option></select></div>
+      <div class="row g-2 mb-2">{% for nom, libelle in delais %}<div class="col-4"><label class="form-label small mb-0">{{ libelle }}</label>
+        <input type="number" min="1" name="{{ nom }}" value="{{ valeurs|valeur:nom }}" class="form-control form-control-sm" required></div>{% endfor %}</div>
       {% else %}
       <div class="mb-2"><label class="form-label small mb-0">{% if c.critere == "journal" %}Journal{% elif c.critere == "tiers" %}Tiers{% elif c.critere == "depot" %}Dépôt{% elif c.critere == "famille" %}Famille{% else %}Article{% endif %}</label>
         <select name="{{ c.critere }}" class="form-select form-select-sm">

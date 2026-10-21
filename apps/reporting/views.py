@@ -50,7 +50,10 @@ def balance_agee(request):
 
     type_tiers = request.GET.get("type", Tiers.CLIENT)
     date = parse_date(request.GET.get("date") or "") or datetime.date.today()
-    data = services.balance_agee(type_tiers, date, tiers=request.GET.get("tiers") or None)
+    g = request.GET
+    data = services.balance_agee(type_tiers, date, tiers=g.get("tiers") or None,
+                                 d_apres=g.get("d_apres") or services.D_APRES_ECRITURE,
+                                 delais=(g.get("delai1"), g.get("delai2"), g.get("delai3")) if g.get("delai1") else services.DELAIS_SAGE)
     return render(request, "reporting/balance_agee.html", {"data": data, "type_tiers": type_tiers, "date": date})
 
 

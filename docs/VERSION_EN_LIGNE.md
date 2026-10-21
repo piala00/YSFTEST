@@ -37,3 +37,19 @@ L'adresse est du type `https://erp-ohada-test.onrender.com`. Chaque envoi sur la
 - Pour garder vos saisies sans base PostgreSQL : **Fichier › Sauvegarde et restauration** avant une mise à jour,
   puis restauration du fichier ensuite.
 - C'est un site de test public : **n'y mettez pas les données réelles d'une société**.
+
+## Choisir une base durable (relevé du 21/10/2026, skill `sage100-sql-hebergement`)
+
+Prix en dollars US, hors taxes et frais de change : à revérifier avant de s'engager. Aucune de ces offres n'a été
+testée depuis le Cameroun : mesurer la vitesse sur les connexions des utilisateurs avant d'y mettre une vraie société.
+
+| Offre | Ce qu'il faut savoir |
+|---|---|
+| Render gratuit (site + PostgreSQL) | La base gratuite **expire au bout de 30 jours** (puis 14 jours avant suppression), sans sauvegarde. Pour tester seulement. |
+| Render payant (site 7 $ + base 6 $ par mois environ, hors stockage) | Site toujours éveillé ; restauration à un instant donné sur 3 jours (Hobby) ou 7 jours (Pro). |
+| Neon (PostgreSQL seul) | Gratuit : 1 Go, la base s'endort après 5 min mais n'est pas supprimée ; le site Django reste à héberger ailleurs. |
+| Supabase (PostgreSQL seul) | Gratuit : 500 Mo, mis en pause après une semaine sans activité. Pro à partir de 25 $/mois avec sauvegardes quotidiennes. |
+| Railway, Fly.io | Site et base sur le même compte, facturés à la consommation (Fly.io : environ 44 $/mois dans l'exemple officiel). |
+
+Quelle que soit l'offre : faire aussi une **sauvegarde indépendante** (Fichier › Sauvegarde et restauration), et
+vérifier au moins une fois qu'elle se restaure. Un fichier de sauvegarde jamais restauré n'est pas une garantie.

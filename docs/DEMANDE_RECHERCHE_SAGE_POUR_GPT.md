@@ -409,3 +409,20 @@ Aucun accès par logiciel ; droit d'un écran commun reporté dans le logiciel l
 
 **Livrable** : compléter `sage100-menus-droits-v12/` avec `FICHIERS_LIES.md`, `UTILISATEURS_INVITES.csv`
 (`produit;ecran;champ;valeurs;sens;source;preuve`), `SOURCES.csv`, `INCONNUES.csv`.
+
+
+## Suite — livraisons « SQL et hébergement (étape 4) » et « fenêtres de sélection V12 » (reçues le 21/10/2026)
+
+**Intégré** (skills `sage100-sql-hebergement` et `sage100-fenetres-selection-v12` installés) :
+- Reprise Sage : colonnes tiers, comptes et prix articles passées « documentées V12.20 » ; `soldes.csv` prend la
+  date comptable (JM_Date + EC_Jour), la norme nationale (EC_Norme 0 ou 1) et écarte les journaux de situation.
+- Hébergement : limites des offres gratuites (base Render gratuite expirée à 30 jours) ajoutées au guide de mise en ligne.
+- Balance âgée (P008) : « D'après la date d'écriture / d'échéance » et trois délais 30 / 45 / 60 dans la fenêtre de
+  sélection, avec ces valeurs par défaut.
+
+**Demande suivante (fenêtres de sélection, priorité aux états les plus utilisés) :**
+1. Les critères **relevés sur V12** (pas seulement le manuel 8.50) de : Balance des comptes (P006), Echéancier (P007),
+   Grand livre des tiers (P009), Balance des tiers (P010), Justificatif de solde (P011), Mouvements de stock (G066),
+   Inventaire (G068), Statistiques clients et articles (G052, G064) : libellés, valeurs proposées, valeurs par défaut.
+2. Confirmer en V12 les défauts de P008 (date d'écriture, 30 / 45 / 60) et les colonnes de l'état imprimé.
+3. Les boutons « Plus » (format avancé) et « Différer » existent-ils encore en V12 sur ces fenêtres ?

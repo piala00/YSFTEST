@@ -98,11 +98,31 @@ def achats_par_fournisseur(debut, fin):
     return sorted(lignes, key=lambda l: -l["ca_ht"])
 
 
-def balance_agee(type_tiers=Tiers.CLIENT, date_ref=None, tiers=None):
-    """Factures non soldées, émises au plus tard à la date de situation, réparties par ancienneté de l'échéance."""
+# Balance âgée, fenêtre de sélection Sage (skill sage100-fenetres-selection-v12, P008) : « D'après la date
+# d'écriture » par défaut, ou d'échéance ; trois délais, 30, 45 et 60 jours par défaut.
+D_APRES_ECRITURE, D_APRES_ECHEANCE = "ECRITURE", "ECHEANCE"
+DELAIS_SAGE = (30, 45, 60)
+
+
+def delais_valides(delais):
+    """Trois délais croissants et positifs, sinon ceux de Sage."""
+    try:
+        d1, d2, d3 = (int(d) for d in delais)
+    except (TypeError, ValueError):
+        return DELAIS_SAGE
+    return (d1, d2, d3) if 0 < d1 < d2 < d3 else DELAIS_SAGE
+
+
+def balance_agee(type_tiers=Tiers.CLIENT, date_ref=None, tiers=None, d_apres=D_APRES_ECRITURE, delais=DELAIS_SAGE):
+    """Factures non soldées, émises au plus tard à la date de situation, réparties par ancienneté : depuis la
+    date de la facture (date d'écriture) ou depuis son échéance (la colonne « Non échu » n'existe qu'alors)."""
     date_ref = date_ref or datetime.date.today()
     type_facture = Document.FACTURE if type_tiers == Tiers.CLIENT else Document.ACHAT_FACTURE
-    tranches = [("non_echu", "Non échu"), ("j30", "1-30 j"), ("j60", "31-60 j"), ("j90", "61-90 j"), ("plus", "> 90 j")]
+    d1, d2, d3 = delais_valides(delais)
+    echeance = d_apres == D_APRES_ECHEANCE
+    tranches = ([("non_echu", "Non échu"), ("j30", f"1-{d1} j")] if echeance else [("j30", f"0-{d1} j")]) + [
+        ("j60", f"{d1 + 1}-{d2} j"), ("j90", f"{d2 + 1}-{d3} j"), ("plus", f"> {d3} j")]
+    cles = ["non_echu", "j30", "j60", "j90", "plus"]
     par_tiers = {}
     factures = Document.objects.filter(type_document=type_facture, statut=Document.VALIDE, date__lte=date_ref)
     if tiers:
@@ -111,14 +131,16 @@ def balance_agee(type_tiers=Tiers.CLIENT, date_ref=None, tiers=None):
         reste = doc.reste_a_payer
         if reste <= 0:
             continue
-        retard = (date_ref - (doc.date_echeance or doc.date)).days
-        cle = "non_echu" if retard <= 0 else "j30" if retard <= 30 else "j60" if retard <= 60 else "j90" if retard <= 90 else "plus"
-        ligne = par_tiers.setdefault(doc.tiers_id, {"tiers": doc.tiers, "total": ZERO, **{k: ZERO for k, _ in tranches}})
+        age = (date_ref - ((doc.date_echeance or doc.date) if echeance else doc.date)).days
+        cle = ("non_echu" if echeance and age <= 0 else "j30" if age <= d1 else "j60" if age <= d2
+               else "j90" if age <= d3 else "plus")
+        ligne = par_tiers.setdefault(doc.tiers_id, {"tiers": doc.tiers, "total": ZERO, **{k: ZERO for k in cles}})
         ligne[cle] += reste
         ligne["total"] += reste
     lignes = sorted(par_tiers.values(), key=lambda l: -l["total"])
-    totaux = {k: sum(l[k] for l in lignes) for k, _ in tranches + [("total", "")]}
-    return {"tranches": tranches, "lignes": lignes, "totaux": totaux}
+    totaux = {k: sum((l[k] for l in lignes), ZERO) for k in cles + ["total"]}
+    return {"tranches": tranches, "lignes": lignes, "totaux": totaux, "d_apres": D_APRES_ECHEANCE if echeance else D_APRES_ECRITURE,
+            "delais": [d1, d2, d3]}
 
 
 def tresorerie(date_fin):

@@ -1,0 +1,45 @@
+table;colonne;type;longueur;signification;valeurs;page;preuve
+F_COMPTET;CT_Num;Chaîne Alphanumérique Maj.;17;Identifiant tiers;;M01 PDF 56 / imprimée 54;DOC-OFFICIEL
+F_COMPTET;CT_Intitule;Chaîne de caractères;69;Désignation tiers;;M01 PDF 56 / imprimée 54;DOC-OFFICIEL
+F_COMPTET;CT_Type;Numérique : Entier;SANS_OBJET;Catégorie du tiers;0=Client|1=Fournisseur|2=Salarié|3=Autre;M01 PDF 56 / imprimée 54;DOC-OFFICIEL
+F_COMPTET;CG_NumPrinc;Chaîne Alphanumérique Maj.;13;Compte général principal;;M01 PDF 56 / imprimée 54;DOC-OFFICIEL
+F_COMPTET;CT_Ville;Chaîne de caractères;35;Ville;;M01 PDF 56 / imprimée 54;DOC-OFFICIEL
+F_COMPTET;CT_Telephone;Chaîne de caractères;21;Téléphone;;M01 PDF 57 / imprimée 55;DOC-OFFICIEL
+F_COMPTET;CT_EMail;Chaîne de caractères;69;Courriel;;M01 PDF 57 / imprimée 55;DOC-OFFICIEL
+F_COMPTET;CT_Sommeil;Numérique : Entier;SANS_OBJET;Inactivité du tiers;0=Non|1=Oui;M01 PDF 57 / imprimée 55;DOC-OFFICIEL
+F_COMPTET;CT_Encours;Numérique : Réel double;SANS_OBJET;"Paramètre d’encours ; ne pas assimiler sans contrôle à un solde calculé";;M01 PDF 56 / imprimée 54;DOC-OFFICIEL
+F_COMPTET;CT_Assurance;Numérique : Réel double;SANS_OBJET;Limite d’assurance crédit;;M01 PDF 56 / imprimée 54;DOC-OFFICIEL
+F_COMPTET;N_CatTarif;Numérique : Entier;SANS_OBJET;Indice de catégorie tarifaire Gescom;1..32;M01 PDF 60 / imprimée 58;DOC-OFFICIEL
+F_COMPTET;CT_ControlEnc;Numérique : Entier;SANS_OBJET;Mode de contrôle d’encours;0=Contrôle automatique|1=Selon code risque|2=Compte bloqué;M01 PDF 57 / imprimée 55;DOC-OFFICIEL
+F_COMPTEG;CG_Num;Chaîne Alphanumérique Maj.;13;Identifiant compte général;;M01 PDF 41 / imprimée 39;DOC-OFFICIEL
+F_COMPTEG;CG_Intitule;Chaîne de caractères;35;Désignation compte;;M01 PDF 41 / imprimée 39;DOC-OFFICIEL
+F_COMPTEG;CG_Type;Numérique : Entier;SANS_OBJET;Compte de détail ou total;0=Type Détail|1=Type Total;M01 PDF 41 / imprimée 39;DOC-OFFICIEL
+F_COMPTEG;CG_Lettrage;Numérique : Entier;SANS_OBJET;"Activation de l’option lettrage ; ne représente pas les lettres des écritures";0=Non validée|1=Validée;M01 PDF 42 / imprimée 40;DOC-OFFICIEL
+F_ARTICLE;AR_Ref;Chaîne Alphanumérique Maj.;18;Identifiant article;;M01 PDF 206 / imprimée 204;DOC-OFFICIEL
+F_ARTICLE;AR_Design;Chaîne Alphanumérique;69;Désignation article;;M01 PDF 206 / imprimée 204;DOC-OFFICIEL
+F_ARTICLE;FA_CodeFamille;Chaîne Alphanumérique Maj.;10;Famille associée;;M01 PDF 207 / imprimée 205;DOC-OFFICIEL
+F_ARTICLE;AR_PrixAch;Numérique : Réel double;SANS_OBJET;"Prix d’achat de la fiche ; ne vaut pas CMUP";;M01 PDF 207 / imprimée 205;DOC-OFFICIEL
+F_ARTICLE;AR_PrixVen;Numérique : Réel double;SANS_OBJET;"Prix de vente de la fiche ; pas tous les tarifs clients";;M01 PDF 207 / imprimée 205;DOC-OFFICIEL
+F_ARTICLE;AR_UniteVen;Numérique : Entier;SANS_OBJET;"Indice d’unité de vente ; pas son libellé";1..30;M01 PDF 207 / imprimée 205;DOC-OFFICIEL
+F_ARTICLE;AR_SuiviStock;Numérique : Entier;SANS_OBJET;Mode de suivi stock;0=Aucun|1=Sérialisé|2=CMUP|3=FIFO|4=LIFO|5=Par lot;M01 PDF 207 / imprimée 205;DOC-OFFICIEL
+F_JOURNAUX;JO_Num;Chaîne de caractères;6;Identifiant journal;;M01 PDF 75 / imprimée 73;DOC-OFFICIEL
+F_JOURNAUX;JO_Intitule;Chaîne de caractères;35;Désignation journal;;M01 PDF 75 / imprimée 73;DOC-OFFICIEL
+F_JOURNAUX;JO_Type;Numérique : Entier;SANS_OBJET;Famille du journal;0=Achats|1=Ventes|2=Trésorerie|3=Général|4=Situation;M01 PDF 75 / imprimée 73;DOC-OFFICIEL
+F_ECRITUREC;EC_No;Numérique : Entier long;SANS_OBJET;Identifiant interne de l’écriture;Compteur;M01 PDF 104 / imprimée 102;DOC-OFFICIEL
+F_ECRITUREC;JO_Num;Chaîne de caractères;6;Journal de l’écriture;;M01 PDF 104 / imprimée 102;DOC-OFFICIEL
+F_ECRITUREC;JM_Date;Date;SANS_OBJET;Période comptable;;M01 PDF 104 / imprimée 102;DOC-OFFICIEL
+F_ECRITUREC;EC_Jour;Numérique : Entier;SANS_OBJET;Jour dans la période;1..31;M01 PDF 104 / imprimée 102;DOC-OFFICIEL
+F_ECRITUREC;EC_Date;Date;SANS_OBJET;"Date de saisie ; pas nécessairement date comptable";;M01 PDF 104 / imprimée 102;DOC-OFFICIEL
+F_ECRITUREC;EC_Piece;Chaîne Alphanumérique Maj.;13;Référence de pièce;;M01 PDF 104 / imprimée 102;DOC-OFFICIEL
+F_ECRITUREC;CG_Num;Chaîne Alphanumérique Maj.;13;Compte général;;M01 PDF 105 / imprimée 103;DOC-OFFICIEL
+F_ECRITUREC;CT_Num;Chaîne Alphanumérique Maj.;17;Tiers associé;;M01 PDF 105 / imprimée 103;DOC-OFFICIEL
+F_ECRITUREC;EC_Sens;Numérique : Entier;SANS_OBJET;Sens comptable;0=Débit|1=Crédit;M01 PDF 105 / imprimée 103;DOC-OFFICIEL
+F_ECRITUREC;EC_Montant;Numérique : Réel double;SANS_OBJET;"Montant de l’écriture ; conserver le sens séparément";;M01 PDF 105 / imprimée 103;DOC-OFFICIEL
+F_ECRITUREC;EC_Norme;Numérique : Entier;SANS_OBJET;Appartenance à une norme;0=Les 2|1=Nationale|2=IFRS;M01 PDF 106 / imprimée 104;DOC-OFFICIEL
+F_ECRITUREC;EC_CType;Numérique : Entier;SANS_OBJET;"Nature de centralisation ; pas un marqueur de simulation";0=Normal|1=Central;M01 PDF 105 / imprimée 103;DOC-OFFICIEL
+F_ECRITUREC;EC_Cloture;Numérique : Entier;SANS_OBJET;"Clôture de l’écriture ; pas un marqueur de simulation";0=Ecriture non clôturée|1=Ecriture clôturée;M01 PDF 105 / imprimée 103;DOC-OFFICIEL
+F_ECRITUREC;EC_Impression;Numérique : Entier;SANS_OBJET;"Etat d’impression ; pas un marqueur de simulation";0=Non imprimée|1=Brouillard|2=Journal;M01 PDF 105 / imprimée 103;DOC-OFFICIEL
+P_UNITE;U_Intitule;Chaîne de caractères;21;Libellé unité achat/vente;;M01 PDF 160 / imprimée 158;DOC-OFFICIEL
+P_UNITE;cbIndice;Numérique : Entier;SANS_OBJET;"Indice logique de ligne de paramétrage ; présence physique à relever";1..30;M01 PDF 161 / imprimée 159;DOC-OFFICIEL
+P_CATTARIF;CT_Intitule;Chaîne de caractères;35;Libellé catégorie tarifaire;;M01 PDF 166 / imprimée 164;DOC-OFFICIEL
+P_CATTARIF;cbIndice;Numérique : Entier;SANS_OBJET;"Indice logique de catégorie ; présence physique à relever";1..32;M01 PDF 166 / imprimée 164;DOC-OFFICIEL

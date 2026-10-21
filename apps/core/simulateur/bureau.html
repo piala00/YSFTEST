@@ -488,6 +488,8 @@ button, input, select { font: inherit; color: inherit; }
       p.racine.append(p.tableau.racine);
       p.rafraichir = () => {
         const d = API.balance_agee[type];
+        const titres = Object.fromEntries(d.tranches || []);
+        p.tableau.racine.querySelectorAll("th").forEach((th, i) => { const c = ["nom", ...cles][i]; if (c in titres || c === "non_echu") th.textContent = titres[c] || ""; });
         const lignes = d.lignes.map(l => ({ nom: l.tiers.nom, ...Object.fromEntries(cles.map(k => [k, Number(l[k]) ? montant(l[k]) : ""])) }));
         lignes.push({ nom: "TOTAL", ...Object.fromEntries(cles.map(k => [k, montant(d.totaux[k])])), _total: true });
         p.tableau.remplir(lignes, l => l._total ? "total" : "");

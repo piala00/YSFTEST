@@ -1,0 +1,17 @@
+id;titre;editeur;url;version_ou_date;preuve;consulte_le
+H01;Utiliser la fonction Rechercher / Remplacer;Sage;https://sage100cloud.online-help.sage.fr/fonction-rechercher-remplacer/;"13/12/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H02;Enregistrer une recherche;Sage;https://sage100cloud.online-help.sage.fr/enregistrer-une-recherche/;"12/12/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H03;Effectuer une recherche à partir d’un fichier de recherche;Sage;https://sage100cloud.online-help.sage.fr/recherche-depuis-fichier-enregistre/;"12/12/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H04;Imprimer un document;Sage;https://sage100cloud.online-help.sage.fr/imprimer-un-document/;"13/12/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H05;Personnaliser les listes;Sage;https://sage100cloud.online-help.sage.fr/personnaliser-les-listes/;"06/12/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H06;Exploiter mes listes dans Sage 100;Sage;https://sage100cloud.online-help.sage.fr/exploiter-mes-listes-dans-sage-100cloud/;"31/03/2021 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H07;Chercher une écriture sur un journal;Sage;https://sage100cloud.online-help.sage.fr/chercher-une-ecriture-sur-un-journal/;"21/10/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H08;Rechercher des écritures;Sage;https://sage100cloud.online-help.sage.fr/rechercher-une-ecriture-par-libelle/;"13/12/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H09;Liste des raccourcis clavier;Sage;https://sage100cloud.online-help.sage.fr/quels-sont-les-raccourcis-clavier-sur-sage-100cloud/;"21/11/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+H10;Personnaliser le colonnage;Sage;https://sage100cloud.online-help.sage.fr/personnaliser-le-colonnage/;"06/12/2022 ; build non précisé";DOC-OFFICIEL;2026-10-21
+M01;Ergonomie et fonctions communes + Comptabilité;Sage;https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=220125200004187;"8.50 ; juillet 2016 ; 1071 pages composite";DOC-OFFICIEL;2026-10-21
+M02;Sage 100 Essentials et Standard : déploiement SQL Express;Sage;https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230112151128413;"V10.00 et sup. ; septembre 2023 ; 99 pages";DOC-OFFICIEL;2026-10-21
+M03;Sage 100 Premium : déploiement SQL Standard;Sage;https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230112152037430;"V10.00 et sup. ; septembre 2023 ; 120 pages ; pagination composite irrégulière";DOC-OFFICIEL;2026-10-21
+T01;Manuel composite Ergonomie + Gestion commerciale, copie Wilroad;"Sage ; hébergement Wilroad";https://wilroad.com/documentation/Manuel%20Sage%20100%20Gestion%20Commerciale.pdf;"8.50 ; 2015/2016 ; 1508 pages ; copie tierce";DOC-TIERS;2026-10-21
+K01;Affacturage : formats de sélection du répertoire Factor;Sage;https://fr-kb.sage.com/portal/app/portlets/results/viewsolution.jsp?solutionid=211010150076462;"Publié 28/12/2017 ; build non certifié";DOC-OFFICIEL;2026-10-21
+K02;Corriger Format de fichier incorrect en import Sage;Sage;https://fr-kb.sage.com/portal/app/portlets/results/viewsolution.jsp?solutionid=211010150033258;"17/06/2021 ; révision 05/06/2023 ; build non précisé";DOC-OFFICIEL;2026-10-21

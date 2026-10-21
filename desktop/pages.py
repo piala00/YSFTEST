@@ -181,6 +181,11 @@ class PageBalanceAgee(PageListe):
         cles = ("non_echu", "j30", "j60", "j90", "plus", "total")
 
         def remplir(data):
+            # Intitulés des tranches renvoyés par le serveur (délais et « d'après la date d' » de la sélection)
+            titres = dict(data.get("tranches", []))
+            for cle in cles[:-1]:
+                self.tableau.tree.heading(cle, text=titres.get(cle, ""))
+            self.tableau.colonnes = [(c, titres.get(c, t), l, a) if c in titres else (c, t, l, a) for c, t, l, a in self.tableau.colonnes]
             lignes = [{"nom": l["tiers"]["nom"], **{k: montant(l[k]) if float(l[k]) else "" for k in cles}} for l in data["lignes"]]
             lignes.append({"nom": "TOTAL", **{k: montant(data["totaux"][k]) for k in cles}, "_total": True})
             self.tableau.remplir(lignes, tags=lambda l: "total" if l.get("_total") else "")

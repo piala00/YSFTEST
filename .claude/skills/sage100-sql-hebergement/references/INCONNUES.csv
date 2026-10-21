@@ -1,0 +1,12 @@
+sujet;question;pistes;impact
+Types physiques SQL;Quels varchar/nvarchar, smallint/int/float, précisions et nullabilités sont installés ?;Exécuter 01_metadata_lecture_seule.sql avec visibilité suffisante sur une copie autorisée;Pas de DDL cible présenté comme reproduction exacte
+Simulation;Quel stockage exact pour les simulations du build cible ?;"Cas témoin dans Sage 100 ; distinguer journaux Situation et autres produits Sage";Pas de clause universelle de suppression proposée
+Paramètres P_;cbIndice est-il une colonne physique ou un indice de la couche d’accès dans ce dossier ?;"Métadonnées et accès Sage autorisé ; pas de colonne inventée";Jointures unités et catégories conditionnelles
+Compatibilité V9-V11;Les colonnes sont-elles identiques aux V12.20 dans les dossiers antérieurs ?;"Relevé réel par dossier ; ne pas utiliser le manuel V12 pour certifier V9";Adaptateur par version
+Hébergement réel;Quel moteur, plan et stockage utilise actuellement le site ERP ?;"Configuration du déploiement et facture fournisseur ; accès non réalisé dans cette étape";Aucune affirmation sur l’état effectif du site
+Render prix;Le tarif final de commande est-il bien 7+6 USD avant stockage ?;"Extrait officiel actuel et repère juillet consultés ; contrôler écran de commande dynamique";13 USD reste estimation et pas coût tout compris
+Réseau Cameroun;Quelles latence, stabilité et modalités de paiement depuis les sites utilisateurs ?;"Mesures sur connexions locales ; essai et vérification du moyen de paiement";Aucune disponibilité locale ou latence garantie
+Fly sauvegardes;Quelle fenêtre de rétention Managed Postgres est contractuellement active ?;Documentation recovery et contrat du plan lors du choix;Ne pas confondre sauvegarde DB et snapshot de volume
+Supabase pause;Quelle durée de conservation et reprise exacte pour le projet gratuit arrêté ?;Conditions de pause en vigueur dans le compte;Ne pas traiter une pause comme garantie de conservation illimitée
+Dimensionnement;Combien de sociétés, utilisateurs, écritures et pièces jointes ?;Mesurer RAM, requêtes, disque, exports, tâches planifiées;Les plus petites offres ne sont pas une capacité ERP certifiée
+Reprise exécutée;Les requêtes et rapprochements passent-ils sur la base Sage cible ?;"Aucun serveur SQL Sage connecté ; suivre PROTOCOLE_REPRISE.md";"Dossier documentaire et modèles ; pas de recette métier déclarée passée"

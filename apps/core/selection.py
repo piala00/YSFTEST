@@ -24,6 +24,7 @@ CHAMPS = {
     "depot": ("depot",),
     "famille": ("famille",),
     "article": ("article",),
+    "anciennete": ("d_apres", "delai1", "delai2", "delai3"),   # balance âgée (Sage P008)
 }
 
 TIERS = ["type_tiers", "tiers"]
@@ -33,7 +34,7 @@ ETATS = {
     "comptabilite:balance": (["periode", "comptes"], "csv"),
     "comptabilite:grand_livre": (["periode", "comptes", "tiers"], "csv"),
     "comptabilite:journal": (["periode", "journal"], None),
-    "comptabilite:balance_agee": (["date"] + TIERS, None),
+    "comptabilite:balance_agee": (["date"] + TIERS + ["anciennete"], None),
     "comptabilite:justificatif_solde": (["date"] + TIERS, None),
     "comptabilite:statistiques_tiers": (["periode"] + TIERS, "csv"),
     "comptabilite:bilan": (["periode"], None),
@@ -46,10 +47,10 @@ ETATS = {
     "commercial:statistique": (["periode", "tiers", "depot", "famille", "article"], "csv"),
     "commercial:etat_ventes": (["periode"], None),
     "commercial:etat_achats": (["periode"], "csv"),
-    "commercial:etat_balance_agee": (["date"] + TIERS, None),
+    "commercial:etat_balance_agee": (["date"] + TIERS + ["anciennete"], None),
     # Reporting
     "reporting:ventes": (["periode"], None),
-    "reporting:balance_agee": (["date"] + TIERS, None),
+    "reporting:balance_agee": (["date"] + TIERS + ["anciennete"], None),
     "reporting:bilan": (["periode"], None),
     "reporting:compte_resultat": (["periode"], None),
 }
@@ -86,6 +87,8 @@ def _valeurs_par_defaut():
         "date_debut": (exercice.date_debut if exercice else aujourdhui.replace(month=1, day=1)).isoformat(),
         "date_fin": (exercice.date_fin if exercice else aujourdhui).isoformat(),
         "date": aujourdhui.isoformat(),
+        # Balance âgée : valeurs par défaut de Sage (date d'écriture, délais 30 / 45 / 60 jours)
+        "d_apres": "ECRITURE", "delai1": "30", "delai2": "45", "delai3": "60",
     }
 
 
@@ -123,7 +126,8 @@ def fenetre(request):
     occupes = {champ for c in criteres for champ in CHAMPS[c]}
     caches = [(k, v) for k, v in request.GET.items() if k not in occupes and k not in ("ok", "page")]
     champs = [{"critere": c, "choix": _choix(c, valeurs)} for c in criteres]
-    return render(request, "core/selection.html", {"champs": champs, "valeurs": valeurs, "caches": caches})
+    delais = [("delai1", "1er délai"), ("delai2", "2ème délai"), ("delai3", "3ème délai")]
+    return render(request, "core/selection.html", {"champs": champs, "valeurs": valeurs, "caches": caches, "delais": delais})
 
 
 def resume(request):
@@ -148,6 +152,9 @@ def resume(request):
             morceaux.append(f"au {date_fr(g['date'])}")
         elif c == "comptes" and (g.get("compte_debut") or g.get("compte_fin")):
             morceaux.append(f"comptes {g.get('compte_debut') or '…'} à {g.get('compte_fin') or '…'}")
+        elif c == "anciennete" and g.get("delai1"):
+            morceaux.append(f"d'après la date d'{'échéance' if g.get('d_apres') == 'ECHEANCE' else 'écriture'}, "
+                            f"délais {g.get('delai1')} / {g.get('delai2')} / {g.get('delai3')} j")
         elif c == "type_tiers" and g.get("type"):
             morceaux.append("clients" if g["type"] == "CLIENT" else "fournisseurs")
         elif c in ("journal", "tiers", "depot", "famille", "article"):

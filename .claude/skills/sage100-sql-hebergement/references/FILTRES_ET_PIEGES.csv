@@ -1,0 +1,11 @@
+id;sujet;regle_proposee;statut;source;test
+F01;Norme nationale;EC_Norme IN (0,1);DEDUCTION_DES_CODES_DOCUMENTES;M01 PDF 106 / imprimée 104;Comparer balance Sage nationale sur période identique
+F02;Norme IFRS;EC_Norme IN (0,2);DEDUCTION_DES_CODES_DOCUMENTES;M01 PDF 106 / imprimée 104;"Comparer balance Sage IFRS ; éviter de sommer deux éditions contenant les lignes communes"
+F03;Situation;"JO_Type=4 identifie les journaux Situation ; exclusion selon périmètre métier";CODE_DOCUMENTE_POLITIQUE_A_VALIDER;M01 PDF 75 / imprimée 73;"Comparer résultat avec et sans ces journaux ; ne pas appeler ce filtre exclusion universelle de simulation"
+F04;Simulation;"Ne pas inventer EC_Type ou EC_Simulation ; aucun filtre universel établi ici";NON_ETABLI;M01 section F_ECRITUREC PDF 104-108;Obtenir un cas de simulation sur le build cible et tracer son stockage
+F05;Centralisation;"EC_CType distingue Normal et Central ; choisir le niveau de détail dans la recette";CODE_DOCUMENTE_POLITIQUE_A_VALIDER;M01 PDF 105 / imprimée 103;"Rapprocher balance ; vérifier les lignes centrales avant toute exclusion"
+F06;Date;Reconstituer la date comptable à partir de la période JM_Date et du jour EC_Jour après contrôle de validité;DEDUCTION_DES_CHAMPS_DOCUMENTES;M01 PDF 104 / imprimée 102;"Tester périodes décalées et fin de mois ; EC_Date reste date de saisie"
+F07;Encours;"Importer CT_Encours comme paramètre source ; calculer et rapprocher séparément la créance";GARDE_FOU_DE_CONCEPTION;M01 PDF 56 / imprimée 54;"Comparer fiche tiers et balance âgée ; pas de solde tiré du seul champ"
+F08;Stock;"AR_PrixAch ne remplace pas le CMUP ; AR_SuiviStock=2 désigne le suivi CMUP";CODE_DOCUMENTE_ET_GARDE_FOU;M01 PDF 207 / imprimée 205;Rapprocher quantités et valorisation par dépôt avant migration de stock
+F09;Droits;Une colonne absente du catalogue visible peut être cachée par les permissions;CONTROLE_TECHNIQUE;MS01;"Faire confirmer les droits de visibilité ; ne pas déduire absence définitive"
+F10;Sommeil;Ne pas exclure automatiquement les tiers en sommeil lors de la reprise historique;CHOIX_DE_CONCEPTION;M01 PDF 57 / imprimée 55;Préserver les tiers portant encore des écritures

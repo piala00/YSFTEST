@@ -24,8 +24,8 @@ couvertes par le solde de chaque tiers ; à lettrer ensuite dans l'ERP contre le
 1. **Sur une copie de test du dossier Sage**, avec un compte SQL en lecture seule : ouvrir
    `apps/core/reprise_sage/export_sage100_lecture_seule.sql` (ou `python manage.py reprise_sage --sql`),
    régler `@DebutExercice` et `@DateBascule`, exécuter, enregistrer chaque grille dans le CSV indiqué.
-2. Si une colonne marquée **À CONFIRMER** n'existe pas dans votre version, la retirer de la requête
-   (les colonnes facultatives peuvent manquer ; les obligatoires sont listées par `--correspondance`).
+2. Toutes les colonnes figurent au catalogue V12.20. Sur une version plus ancienne, si une colonne facultative
+   n'existe pas, la retirer de la requête (les obligatoires sont listées par `--correspondance`).
 3. Dans l'ERP (base neuve, `init_erp` fait, exercice ouvert à la date de bascule) :
 
        python manage.py reprise_sage --dossier exports --date-bascule 2027-01-01
@@ -55,8 +55,11 @@ Jeu d'exemple fictif : `apps/core/reprise_sage/exemple/`.
 - `stocks.csv` reprend AS_QteSto seule : ne pas y ajouter quantités réservées, commandées ou préparées (RGX001).
 - `soldes.csv` part du **premier jour de l'exercice en cours** (à-nouveaux compris). Partir du début du dossier
   compterait deux fois les exercices clôturés.
-- Les écritures de simulation ou d'autres normes éventuelles ne sont pas filtrées : c'est la comparaison
-  avec la balance Sage qui le révèle. Bascule conseillée en début d'exercice.
+- `soldes.csv` prend la **date comptable** (période JM_Date + jour EC_Jour), pas EC_Date qui est la date de
+  saisie ; il garde la norme nationale (EC_Norme 0 ou 1, jamais l'IFRS seule) et écarte les journaux de
+  situation (JO_Type = 4). Ces filtres sont déduits du manuel V12.20 (skill `sage100-sql-hebergement`) :
+  la comparaison avec la balance Sage les valide. Bascule conseillée en début d'exercice.
+- CT_Encours est un plafond, pas un solde : le solde de chaque tiers vient des écritures.
 
 ## Correspondance des colonnes
 
@@ -75,17 +78,17 @@ familles.csv ← F_FAMILLE
 
 comptes.csv ← F_COMPTEG
   CG_Num          obligatoire DOCUMENTÉ V12.20  C085         Numéro de compte
-  CG_Intitule     obligatoire À CONFIRMER                    Intitulé du compte
+  CG_Intitule     obligatoire DOCUMENTÉ V12.20  M01 V12.20   Intitulé du compte
 
 tiers.csv ← F_COMPTET
   CT_Num          obligatoire DOCUMENTÉ V12.20  C070         Code tiers
-  CT_Intitule     obligatoire À CONFIRMER                    Raison sociale
-  CT_Type         obligatoire À CONFIRMER                    0 = client, 1 = fournisseur ; les autres types sont ignorés
-  CG_NumPrinc     facultatif  À CONFIRMER                    Compte collectif
-  CT_Ville        facultatif  À CONFIRMER                    Ville
-  CT_Telephone    facultatif  À CONFIRMER                    Téléphone
-  CT_EMail        facultatif  À CONFIRMER                    E-mail
-  CT_Sommeil      facultatif  À CONFIRMER                    1 = en sommeil (repris inactif)
+  CT_Intitule     obligatoire DOCUMENTÉ V12.20  M01 V12.20   Raison sociale
+  CT_Type         obligatoire DOCUMENTÉ V12.20  M01 V12.20   0 = client, 1 = fournisseur ; les autres types sont ignorés
+  CG_NumPrinc     facultatif  DOCUMENTÉ V12.20  M01 V12.20   Compte collectif
+  CT_Ville        facultatif  DOCUMENTÉ V12.20  M01 V12.20   Ville
+  CT_Telephone    facultatif  DOCUMENTÉ V12.20  M01 V12.20   Téléphone
+  CT_EMail        facultatif  DOCUMENTÉ V12.20  M01 V12.20   E-mail
+  CT_Sommeil      facultatif  DOCUMENTÉ V12.20  M01 V12.20   1 = en sommeil (repris inactif)
 
 articles.csv ← F_ARTICLE
   AR_Ref          obligatoire DOCUMENTÉ V12.20  C058         Référence
@@ -93,8 +96,8 @@ articles.csv ← F_ARTICLE
   FA_CodeFamille  facultatif  DOCUMENTÉ V12.20  C059         Famille
   AR_SuiviStock   facultatif  DOCUMENTÉ V12.20  CX015        0 = sans suivi de stock, autre valeur = suivi
   AR_Sommeil      facultatif  DOCUMENTÉ V12.20  IX006        1 = en sommeil (repris inactif)
-  AR_PrixAch      facultatif  À CONFIRMER                    Prix d'achat HT
-  AR_PrixVen      facultatif  À CONFIRMER                    Prix de vente HT
+  AR_PrixAch      facultatif  DOCUMENTÉ V12.20  M01 V12.20   Prix d'achat HT
+  AR_PrixVen      facultatif  DOCUMENTÉ V12.20  M01 V12.20   Prix de vente HT
 
 stocks.csv ← F_ARTSTOCK
   AR_Ref          obligatoire DOCUMENTÉ V12.20  C061         Article
