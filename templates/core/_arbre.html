@@ -1,0 +1,18 @@
+<ul class="arbre-liste niveau-{{ niveau }}">
+{% for n in noeuds %}
+  <li>
+    {% if n.enfants %}
+      <a class="noeud {% if n.actif %}actif{% endif %} {% if not n.ouvert %}collapsed{% endif %}" data-bs-toggle="collapse" href="#arbre-{{ n.code|slugify }}" role="button" aria-expanded="{{ n.ouvert|yesno:'true,false' }}">
+        <i class="bi bi-chevron-right chevron"></i>{% if n.icone %}<i class="bi {{ n.icone }}"></i>{% endif %} {{ n.titre }}
+      </a>
+      <div class="collapse {% if n.ouvert %}show{% endif %}" id="arbre-{{ n.code|slugify }}">
+        {% include "core/_arbre.html" with noeuds=n.enfants niveau=niveau|add:1 %}
+      </div>
+    {% else %}
+      <a class="noeud feuille {% if n.actif %}actif{% endif %}" href="{{ n.url }}">
+        {% if n.icone %}<i class="bi {{ n.icone }}"></i>{% else %}<i class="bi bi-dot"></i>{% endif %} {{ n.titre }}
+      </a>
+    {% endif %}
+  </li>
+{% endfor %}
+</ul>

@@ -138,7 +138,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "reporting:dashboard"
+LOGIN_REDIRECT_URL = "core:portail"
 LOGOUT_REDIRECT_URL = "login"
 
 REST_FRAMEWORK = {

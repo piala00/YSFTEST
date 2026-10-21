@@ -1,28 +1,30 @@
 {% extends "base.html" %}{% load static erp %}
 {% block title %}Analyse des ventes{% endblock %}
 {% block content %}
-<div class="page-title"><h1>Analyse des ventes</h1><span class="fw-semibold">CA HT : {{ total_ca|montant }}</span></div>
+<div class="page-title"><h1>{{ element_actif.titre|default:"Analyse des ventes" }}</h1><span class="fw-semibold">CA HT : {{ total_ca|montant }}</span></div>
 {% include "comptabilite/_periode.html" %}
-<div class="card p-3 mb-3"><canvas id="g" height="80"></canvas></div>
+{% with vue=request.GET.vue %}
+{% if not vue or vue == "mois" %}<div class="card p-3 mb-3"><canvas id="g" height="80"></canvas></div>{% endif %}
 <div class="row g-3">
-<div class="col-xl-6"><div class="card"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Par client</span>
+{% if not vue or vue == "clients" %}<div class="{% if vue %}col-12{% else %}col-xl-6{% endif %}"><div class="card"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Par client</span>
 <a class="btn btn-sm btn-outline-success" href="?{{ request.GET.urlencode }}&export=clients"><i class="bi bi-filetype-csv"></i></a></div>
 <table class="table table-sm mb-0"><thead><tr><th>Client</th><th class="num">Fact.</th><th class="num">CA HT</th><th class="num">Encours</th></tr></thead><tbody>
 {% for l in par_client %}<tr><td><a href="{% url 'commercial:tiers_detail' l.tiers.pk %}">{{ l.tiers.nom }}</a></td><td class="num">{{ l.nb }}</td><td class="num">{{ l.ca_ht|montant }}</td><td class="num">{{ l.encours|montant_ou_vide }}</td></tr>
-{% empty %}<tr><td colspan="4" class="text-muted">Aucune vente.</td></tr>{% endfor %}</tbody></table></div></div>
-<div class="col-xl-6"><div class="card"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Par article</span>
+{% empty %}<tr><td colspan="4" class="text-muted">Aucune vente.</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+{% if not vue or vue == "articles" %}<div class="{% if vue %}col-12{% else %}col-xl-6{% endif %}"><div class="card"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Par article</span>
 <a class="btn btn-sm btn-outline-success" href="?{{ request.GET.urlencode }}&export=articles"><i class="bi bi-filetype-csv"></i></a></div>
 <table class="table table-sm mb-0"><thead><tr><th>Article</th><th class="num">Qté</th><th class="num">CA HT</th><th class="num">Marge</th><th class="num">%</th></tr></thead><tbody>
 {% for a in par_article %}<tr><td>{{ a.article__designation }}</td><td class="num">{{ a.quantite|floatformat:"-3" }}</td><td class="num">{{ a.total|montant }}</td><td class="num">{{ a.marge|montant }}</td><td class="num">{{ a.taux_marge|floatformat:1 }}</td></tr>
-{% empty %}<tr><td colspan="5" class="text-muted">Aucune vente.</td></tr>{% endfor %}</tbody></table></div></div>
+{% empty %}<tr><td colspan="5" class="text-muted">Aucune vente.</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
 </div>
+{% endwith %}
 {{ serie_json|json_script:"serie" }}
 {% endblock %}
 {% block scripts %}
 <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
 <script>
 const S = JSON.parse(document.getElementById('serie').textContent);
-new Chart(document.getElementById('g'), { type: 'line',
+if (document.getElementById('g')) new Chart(document.getElementById('g'), { type: 'line',
   data: { labels: S.map(x => x.mois), datasets: [{ label: 'CA HT', data: S.map(x => x.montant), borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.1)', fill: true, tension: .3 }] },
   options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => v.toLocaleString('fr-FR') } } } } });
 </script>

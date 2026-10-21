@@ -37,13 +37,43 @@ class PagesEtApiTests(TestCase):
             reverse("comptabilite:journal"), reverse("comptabilite:grand_livre"), reverse("comptabilite:balance"),
             reverse("comptabilite:bilan"), reverse("comptabilite:compte_resultat"), reverse("comptabilite:tva"),
             reverse("comptabilite:lettrage") + "?compte=" + str(doc.ecriture.lignes.first().compte_id),
-            reverse("core:societe"), reverse("core:exercices"),
+            reverse("commercial:societe"), reverse("comptabilite:exercices"), reverse("comptabilite:exercice_create"),
+            reverse("core:portail"), reverse("commercial:accueil"), reverse("comptabilite:accueil"),
+            reverse("commercial:mouvements"), reverse("commercial:etat_ventes") + "?vue=clients",
+            reverse("commercial:etat_balance_agee") + "?type=CLIENT", reverse("reporting:bilan"), reverse("reporting:compte_resultat"),
+            reverse("reporting:ventes") + "?vue=mois", reverse("commercial:documents", args=["ventes"]) + "?impayees=1",
+            reverse("commercial:reglements") + "?sens=E",
             reverse("comptabilite:balance") + "?export=csv", reverse("comptabilite:grand_livre") + "?export=csv",
             reverse("reporting:ventes") + "?export=clients", reverse("reporting:ventes") + "?export=articles",
         ]
         for url in urls:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_tous_les_elements_de_navigation(self):
+        """Chaque élément de chaque onglet de chaque module mène à une page valide."""
+        from apps.core.navigation import MODULES, structure_module
+
+        def parcourir(noeuds):
+            for n in noeuds:
+                if n["url"]:
+                    yield n
+                yield from parcourir(n["enfants"])
+
+        total = 0
+        for module in MODULES:
+            onglets, _ = structure_module(module)
+            for onglet in onglets:
+                for noeud in parcourir(onglet["elements"]):
+                    with self.subTest(module=module.code, element=noeud["code"]):
+                        response = self.client.get(noeud["url"])
+                        self.assertEqual(response.status_code, 200)
+                        # La page met en évidence le bon module, le bon onglet et le bon élément
+                        self.assertEqual(response.context["module"].code, module.code)
+                        self.assertEqual(response.context["onglet_actif"]["code"], onglet["code"])
+                        self.assertEqual(response.context["element_actif"]["code"], noeud["code"])
+                    total += 1
+        self.assertGreater(total, 60)
 
     def test_saisie_facture_par_formulaire(self):
         tiers = Tiers.objects.filter(type_tiers=Tiers.CLIENT).first()
@@ -72,7 +102,7 @@ class PagesEtApiTests(TestCase):
         for url in ("/api/tiers/", "/api/articles/", "/api/documents/?domaine=ventes", "/api/reglements/",
                     "/api/comptes/", "/api/journaux/", "/api/ecritures/", "/api/reporting/dashboard/",
                     "/api/reporting/balance/", "/api/reporting/bilan/", "/api/reporting/compte-resultat/",
-                    "/api/reporting/balance-agee/"):
+                    "/api/reporting/balance-agee/", "/api/navigation/", "/api/navigation/?module=comptabilite"):
             with self.subTest(url=url):
                 self.assertEqual(api.get(url).status_code, 200)
 

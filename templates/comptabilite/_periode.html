@@ -1,5 +1,6 @@
 <form class="card card-body d-print-none mb-3"><div class="row g-2 align-items-end">
   {% for field in form %}<div class="col-md-2"><label class="form-label small mb-0">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+  {% if request.GET.vue %}<input type="hidden" name="vue" value="{{ request.GET.vue }}">{% endif %}
   {% if tiers %}<input type="hidden" name="tiers" value="{{ tiers.pk }}">{% endif %}
   <div class="col-md-auto"><button class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Afficher</button>
   <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i></button>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load erp %}
 {% block title %}{{ domaine|capfirst }}{% endblock %}
 {% block content %}
-<div class="page-title"><h1>{{ domaine|capfirst }}</h1>
+<div class="page-title"><h1>{{ element_actif.titre|default:domaine|capfirst }}</h1>
   <div class="dropdown"><button class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus"></i> Nouveau</button>
     <ul class="dropdown-menu dropdown-menu-end">{% for code, lib in types %}<li><a class="dropdown-item" href="{% url 'commercial:document_create' code %}">{{ lib }}</a></li>{% endfor %}</ul></div></div>
 <form class="row g-2 mb-3">

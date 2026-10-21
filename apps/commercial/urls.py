@@ -1,10 +1,18 @@
 from django.urls import path
 
+from apps.core import views as core_views
+from apps.reporting import views as reporting_views
+
 from . import views
 
 app_name = "commercial"
 
 urlpatterns = [
+    path("", core_views.accueil_module, {"module": "commercial"}, name="accueil"),
+    path("societe/", core_views.SocieteUpdateView.as_view(), name="societe"),
+    path("etats/ventes/", reporting_views.ventes, name="etat_ventes"),
+    path("etats/balance-agee/", reporting_views.balance_agee, name="etat_balance_agee"),
+    path("stock/mouvements/", views.MouvementListView.as_view(), name="mouvements"),
     path("clients/", views.TiersListView.as_view(), {"type_tiers": "CLIENT"}, name="clients"),
     path("fournisseurs/", views.TiersListView.as_view(), {"type_tiers": "FOURNISSEUR"}, name="fournisseurs"),
     path("tiers/nouveau/", views.TiersCreateView.as_view(), name="tiers_create"),

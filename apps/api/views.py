@@ -10,6 +10,7 @@ from apps.commercial.models import Article, Document, Reglement, Tiers
 from apps.comptabilite import etats, services as compta
 from apps.comptabilite.models import Compte, Ecriture, Journal
 from apps.core.models import Exercice
+from apps.core.navigation import MODULES, MODULES_PAR_CODE, serialiser_module
 from apps.reporting import services as reporting
 
 from . import serializers as s
@@ -178,3 +179,14 @@ def balance_agee(request):
     for l in data["lignes"]:
         l["tiers"] = {"id": l["tiers"].id, "code": l["tiers"].code, "nom": l["tiers"].nom}
     return Response(data)
+
+
+@api_view(["GET"])
+def navigation(request):
+    """Structure Module → Onglets → Éléments → Sous-éléments (utilisée par le client bureau)."""
+    code = request.query_params.get("module")
+    if code:
+        if code not in MODULES_PAR_CODE:
+            return Response({"detail": "Module inconnu."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(serialiser_module(MODULES_PAR_CODE[code]))
+    return Response([serialiser_module(m) for m in MODULES])

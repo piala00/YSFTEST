@@ -5,6 +5,31 @@ ERP conçu pour les PME de l'espace OHADA (FCFA, TVA 19,25 % par défaut — Cam
 - un **serveur web Django** (interface navigateur + API REST), compatible **PostgreSQL**, **SQL Server** ou SQLite ;
 - un **client bureau CustomTkinter** (Windows / Linux / macOS) qui se connecte au serveur par l'API.
 
+## Architecture : 3 logiciels, des onglets, des éléments et des sous-éléments
+
+Chaque module est un **logiciel à part entière**, avec sa fenêtre, sa couleur et sa propre navigation :
+
+```
+Logiciel (module)          ex. Gestion commerciale
+ └─ Onglets                 Structure · Ventes · Achats · Stock · Règlements · États
+     └─ Éléments            Documents de vente · Nouveau document · Suivi
+         └─ Sous-éléments   Devis · Bons de commande · Bons de livraison · Factures · Avoirs
+```
+
+| Logiciel | Onglets |
+|---|---|
+| **Gestion commerciale** | Structure, Ventes, Achats, Stock, Règlements, États |
+| **Comptabilité OHADA** | Structure, Saisie, Traitement, États |
+| **Reporting** | Synthèse, Ventes, Tiers, Finances |
+
+Toute la navigation est décrite à un seul endroit : `apps/core/navigation.py`. Pour ajouter un onglet, un élément ou
+un sous-élément, il suffit de l'y déclarer. Certains sous-éléments sont générés à partir des données, comme le plan
+comptable par classe ou les écritures par journal. Cette même définition alimente :
+
+- **le web** : le portail (`/`) ouvre chaque logiciel dans sa propre fenêtre du navigateur. Chaque logiciel affiche
+  un en-tête à sa couleur, la barre d'onglets, l'arborescence des éléments à gauche et un fil d'Ariane ;
+- **le client bureau** : il lit la structure via `/api/navigation/?module=<code>`.
+
 ## Modules
 
 ### Gestion commerciale
@@ -49,7 +74,7 @@ python manage.py init_erp --demo --admin admin123   # plan comptable + journaux 
 python manage.py runserver
 ```
 
-Ouvrir http://127.0.0.1:8000 et se connecter avec `admin` / `admin123`.
+Ouvrir http://127.0.0.1:8000, se connecter avec `admin` / `admin123`, puis choisir un logiciel sur le portail.
 
 Sous Windows, double-cliquer sur `DEMARRER_SERVEUR.bat`.
 
@@ -64,16 +89,30 @@ Ensuite : `python manage.py migrate && python manage.py init_erp --admin <mot_de
 
 ## Client bureau (CustomTkinter)
 
+Trois logiciels indépendants et un lanceur :
+
+| Programme | Lancement | Exécutable Windows |
+|---|---|---|
+| Lanceur (choix du logiciel) | `python lanceur.py` | `ERP_OHADA.exe` |
+| Gestion commerciale | `python commercial.py` | `ERP_Commercial.exe` |
+| Comptabilité OHADA | `python comptabilite.py` | `ERP_Comptabilite.exe` |
+| Reporting | `python reporting.py` | `ERP_Reporting.exe` |
+
 ```bash
 cd desktop
 pip install -r requirements.txt
-python app.py
+python lanceur.py
 ```
 
-Au premier lancement, saisir l'adresse du serveur (ex. `http://192.168.1.10:8000`), l'utilisateur et le mot de passe.
-Le jeton est conservé dans `~/.erp_ohada.json`. Sous Windows : `desktop\DEMARRER_CLIENT.bat`, et `desktop\COMPILER.bat` pour produire `ERP_OHADA.exe`.
+Chaque logiciel est organisé ainsi : en-tête à sa couleur, barre d'onglets, arborescence des éléments et
+sous-éléments, puis zone de travail. Les éléments qui disposent d'un écran natif s'affichent dans la fenêtre :
+tableau de bord, tiers, articles, documents de vente et d'achat, saisie de factures et de règlements, balance, bilan,
+compte de résultat et balances âgées. Les autres proposent de s'ouvrir dans le navigateur, et un double-clic les
+ouvre directement.
 
-Fonctions disponibles : tableau de bord, ventes / achats (consultation, saisie et validation de factures, règlements), clients, fournisseurs, articles, balance, bilan, compte de résultat, balance âgée, exports CSV.
+Au premier lancement, saisir l'adresse du serveur (ex. `http://192.168.1.10:8000`), l'utilisateur et le mot de passe.
+Le jeton est conservé dans `~/.erp_ohada.json` et partagé par les trois logiciels.
+Sous Windows : `desktop\DEMARRER_CLIENT.bat`, et `desktop\COMPILER.bat` produit les 4 exécutables dans `dist\`.
 
 ## API REST
 
@@ -87,6 +126,7 @@ Authentification : `POST /api/token/` (`username`, `password`), puis en-tête `A
 | Règlements | `/api/reglements/` |
 | Plan comptable, journaux, écritures | `/api/comptes/`, `/api/journaux/`, `/api/ecritures/` |
 | Reporting | `/api/reporting/dashboard/`, `balance/`, `bilan/`, `compte-resultat/`, `balance-agee/` (paramètres `du`, `au`) |
+| Navigation | `/api/navigation/` (tous les logiciels) ou `/api/navigation/?module=commercial` |
 
 ## Tests
 
@@ -98,11 +138,11 @@ python manage.py test
 
 ```
 erp/                 configuration Django (settings, urls)
-apps/core/           société, exercices, numérotation, commande init_erp
+apps/core/           société, exercices, numérotation, navigation (modules/onglets/éléments), init_erp
 apps/commercial/     tiers, articles, documents, règlements, stock
 apps/comptabilite/   plan SYSCOHADA, journaux, écritures, états financiers
 apps/reporting/      indicateurs et analyses
 apps/api/            API REST (Django REST Framework)
 templates/, static/  interface web (Bootstrap 5, Chart.js — servis localement, fonctionne hors ligne)
-desktop/             client bureau CustomTkinter
+desktop/             logiciels bureau CustomTkinter (shell commun, écrans, lanceur)
 ```

@@ -3,63 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}ERP{% endblock %} · {{ societe.raison_sociale|default:"ERP OHADA" }}</title>
+  <title>{% block title %}ERP{% endblock %} · {% if module %}{{ module.titre }}{% else %}ERP OHADA{% endif %}</title>
   <link href="{% static 'vendor/bootstrap.min.css' %}" rel="stylesheet">
   <link href="{% static 'vendor/bootstrap-icons.min.css' %}" rel="stylesheet">
   <link href="{% static 'css/erp.css' %}" rel="stylesheet">
+  {% if module %}<style>:root { --module: {{ module.couleur }}; }</style>{% endif %}
   {% block head %}{% endblock %}
 </head>
 <body>
 {% if user.is_authenticated %}
-<div class="d-flex">
-  <nav class="sidebar d-print-none">
-    <a class="brand" href="{% url 'reporting:dashboard' %}"><i class="bi bi-grid-3x3-gap-fill"></i> ERP OHADA</a>
-    <div class="small text-white-50 px-3 mb-2">{{ societe.raison_sociale }}{% if exercice_courant %} · Exercice {{ exercice_courant.code }}{% endif %}</div>
-
-    <div class="nav-section">Reporting</div>
-    <a href="{% url 'reporting:dashboard' %}"><i class="bi bi-speedometer2"></i> Tableau de bord</a>
-    <a href="{% url 'reporting:ventes' %}"><i class="bi bi-graph-up"></i> Analyse des ventes</a>
-    <a href="{% url 'reporting:balance_agee' %}"><i class="bi bi-hourglass-split"></i> Balance âgée</a>
-
-    <div class="nav-section">Gestion commerciale</div>
-    <a href="{% url 'commercial:documents' 'ventes' %}"><i class="bi bi-receipt"></i> Ventes</a>
-    <a href="{% url 'commercial:documents' 'achats' %}"><i class="bi bi-cart"></i> Achats</a>
-    <a href="{% url 'commercial:reglements' %}"><i class="bi bi-cash-coin"></i> Règlements</a>
-    <a href="{% url 'commercial:clients' %}"><i class="bi bi-people"></i> Clients</a>
-    <a href="{% url 'commercial:fournisseurs' %}"><i class="bi bi-truck"></i> Fournisseurs</a>
-    <a href="{% url 'commercial:articles' %}"><i class="bi bi-box-seam"></i> Articles</a>
-    <a href="{% url 'commercial:stock' %}"><i class="bi bi-boxes"></i> Stock</a>
-
-    <div class="nav-section">Comptabilité OHADA</div>
-    <a href="{% url 'comptabilite:ecritures' %}"><i class="bi bi-journal-text"></i> Écritures</a>
-    <a href="{% url 'comptabilite:journal' %}"><i class="bi bi-journals"></i> Journaux</a>
-    <a href="{% url 'comptabilite:grand_livre' %}"><i class="bi bi-book"></i> Grand livre</a>
-    <a href="{% url 'comptabilite:balance' %}"><i class="bi bi-table"></i> Balance</a>
-    <a href="{% url 'comptabilite:lettrage' %}"><i class="bi bi-link-45deg"></i> Lettrage</a>
-    <a href="{% url 'comptabilite:bilan' %}"><i class="bi bi-bank"></i> Bilan</a>
-    <a href="{% url 'comptabilite:compte_resultat' %}"><i class="bi bi-calculator"></i> Compte de résultat</a>
-    <a href="{% url 'comptabilite:tva' %}"><i class="bi bi-percent"></i> TVA</a>
-
-    <div class="nav-section">Paramètres</div>
-    <a href="{% url 'core:societe' %}"><i class="bi bi-building"></i> Société</a>
-    <a href="{% url 'core:exercices' %}"><i class="bi bi-calendar3"></i> Exercices</a>
-    <a href="{% url 'comptabilite:comptes' %}"><i class="bi bi-list-ol"></i> Plan comptable</a>
-    <a href="{% url 'comptabilite:journaux' %}"><i class="bi bi-collection"></i> Paramétrage journaux</a>
-    <a href="{% url 'commercial:familles' %}"><i class="bi bi-tags"></i> Familles d'articles</a>
-    {% if user.is_staff %}<a href="{% url 'admin:index' %}"><i class="bi bi-gear"></i> Administration</a>{% endif %}
-    <form method="post" action="{% url 'logout' %}" class="mt-3 px-3">{% csrf_token %}
-      <button class="btn btn-sm btn-outline-light w-100"><i class="bi bi-box-arrow-right"></i> {{ user.username }}</button>
-    </form>
-  </nav>
-  <main class="flex-grow-1 p-4 main">
-    {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show d-print-none">
-        {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  <header class="topbar d-print-none {% if not module %}topbar-portail{% endif %}">
+    <a class="app-nom" href="{% if module %}{% url module.accueil %}{% else %}{% url 'core:portail' %}{% endif %}">
+      <i class="bi {{ module.icone|default:'bi-grid-3x3-gap-fill' }}"></i>
+      {% if module %}{{ module.titre }}{% else %}ERP OHADA{% endif %}
+    </a>
+    <span class="contexte">{{ societe.raison_sociale }}{% if exercice_courant %} · Exercice {{ exercice_courant.code }}{% endif %}</span>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-topbar dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-grid-3x3-gap"></i> Modules</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="{% url 'core:portail' %}" target="erp_portail"><i class="bi bi-house"></i> Portail ERP</a></li>
+          <li><hr class="dropdown-divider"></li>
+          {% for m in modules %}<li><a class="dropdown-item {% if m.code == module.code %}active{% endif %}" href="{% url m.accueil %}" target="erp_{{ m.code }}"><i class="bi {{ m.icone }}" style="color:{{ m.couleur }}"></i> {{ m.titre }}</a></li>{% endfor %}
+          {% if user.is_staff %}<li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-gear"></i> Administration</a></li>{% endif %}
+        </ul>
       </div>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+        <button class="btn btn-sm btn-topbar" title="Déconnexion"><i class="bi bi-person-circle"></i> {{ user.username }} <i class="bi bi-box-arrow-right"></i></button>
+      </form>
+    </div>
+  </header>
+
+  {% if module %}
+  <nav class="onglets d-print-none">
+    <a class="onglet {% if request.path == module.prefixe %}actif{% endif %}" href="{% url module.accueil %}" title="Accueil du module"><i class="bi bi-house-door"></i></a>
+    {% for o in onglets %}
+      <a class="onglet {% if o.code == onglet_actif.code and request.path != module.prefixe %}actif{% endif %}" href="{{ o.url }}"><i class="bi {{ o.icone }}"></i> {{ o.titre }}</a>
     {% endfor %}
+  </nav>
+  <div class="d-flex espace">
+    <aside class="arbre d-print-none">
+      <div class="arbre-titre"><i class="bi {{ onglet_actif.icone }}"></i> {{ onglet_actif.titre }}</div>
+      {% include "core/_arbre.html" with noeuds=onglet_actif.elements niveau=0 %}
+    </aside>
+  {% endif %}
+  <main class="flex-grow-1 p-4 main">
+    {% if fil_ariane %}<nav class="fil-ariane d-print-none"><span>{{ onglet_actif.titre }}</span>{% for n in fil_ariane %} <i class="bi bi-chevron-right"></i> <span>{{ n.titre }}</span>{% endfor %}</nav>{% endif %}
+    {% include "core/_messages.html" %}
     {% block content %}{% endblock %}
   </main>
-</div>
+  {% if module %}</div>{% endif %}
 {% else %}
   {% block public %}{% endblock %}
 {% endif %}

@@ -106,8 +106,8 @@ class ErpApi:
     def dashboard(self):
         return self.get("reporting/dashboard/")
 
-    def balance(self, du=None, au=None):
-        return self.get("reporting/balance/", du=du, au=au)
+    def balance(self, du=None, au=None, compte_debut="", compte_fin=""):
+        return self.get("reporting/balance/", du=du, au=au, compte_debut=compte_debut, compte_fin=compte_fin)
 
     def bilan(self, au=None):
         return self.get("reporting/bilan/", au=au)
@@ -117,3 +117,6 @@ class ErpApi:
 
     def balance_agee(self, type_tiers="CLIENT"):
         return self.get("reporting/balance-agee/", type=type_tiers)
+
+    def navigation(self, module):
+        return self.get("navigation/", module=module)

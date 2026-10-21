@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Accueil{% endblock %}
+{% block content %}
+<div class="page-title"><h1><i class="bi {{ module.icone }}" style="color:var(--module)"></i> {{ module.titre }}</h1><span class="text-muted">{{ module.description }}</span></div>
+<div class="row g-3">
+{% for o in onglets %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-semibold"><a class="text-decoration-none" href="{{ o.url }}"><i class="bi {{ o.icone }}" style="color:var(--module)"></i> {{ o.titre }}</a></div>
+      <div class="card-body small">
+        {% for e in o.elements %}
+          <div class="mb-2">
+            {% if e.url %}<a href="{{ e.url }}" class="fw-semibold">{{ e.titre }}</a>{% else %}<span class="fw-semibold">{{ e.titre }}</span>{% endif %}
+            {% if e.enfants %}<div class="ms-2">{% for s in e.enfants %}{% if s.url %}<a href="{{ s.url }}" class="d-inline-block me-2 text-muted">{{ s.titre }}</a>{% else %}<span class="d-inline-block me-2 text-muted">{{ s.titre }} ({{ s.enfants|length }})</span>{% endif %}{% endfor %}</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% endblock %}

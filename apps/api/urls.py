@@ -15,6 +15,7 @@ router.register("ecritures", views.EcritureViewSet)
 
 urlpatterns = [
     path("token/", obtain_auth_token, name="api_token"),
+    path("navigation/", views.navigation),
     path("reporting/dashboard/", views.dashboard),
     path("reporting/balance/", views.balance),
     path("reporting/bilan/", views.bilan),

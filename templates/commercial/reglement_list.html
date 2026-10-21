@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load erp %}
 {% block title %}Règlements{% endblock %}
 {% block content %}
-<div class="page-title"><h1>Règlements</h1>
+<div class="page-title"><h1>{{ element_actif.titre|default:"Règlements" }}</h1>
   <div class="d-flex gap-2"><form><input name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="Rechercher…"></form>
   <a class="btn btn-primary btn-sm" href="{% url 'commercial:reglement_create' %}"><i class="bi bi-plus"></i> Nouveau règlement</a></div></div>
 <div class="card"><table class="table table-sm table-hover mb-0">

@@ -1,5 +1,5 @@
 @echo off
-REM Lance le client bureau ERP OHADA
+REM Lance le portail des logiciels ERP OHADA
 cd /d "%~dp0"
 if not exist .venv (
     python -m venv .venv
@@ -8,4 +8,4 @@ if not exist .venv (
 ) else (
     call .venv\Scripts\activate.bat
 )
-python app.py
+start "" pythonw lanceur.py

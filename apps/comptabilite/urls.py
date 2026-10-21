@@ -1,10 +1,16 @@
 from django.urls import path
 
+from apps.core import views as core_views
+
 from . import views
 
 app_name = "comptabilite"
 
 urlpatterns = [
+    path("", core_views.accueil_module, {"module": "comptabilite"}, name="accueil"),
+    path("exercices/", core_views.ExerciceListView.as_view(), name="exercices"),
+    path("exercices/nouveau/", core_views.ExerciceCreateView.as_view(), name="exercice_create"),
+    path("exercices/<int:pk>/", core_views.ExerciceUpdateView.as_view(), name="exercice_update"),
     path("plan/", views.CompteListView.as_view(), name="comptes"),
     path("plan/nouveau/", views.CompteCreateView.as_view(), name="compte_create"),
     path("plan/<int:pk>/", views.CompteUpdateView.as_view(), name="compte_update"),

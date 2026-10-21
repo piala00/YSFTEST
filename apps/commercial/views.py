@@ -175,6 +175,18 @@ def stock_comptabiliser(request):
     return redirect("commercial:stock")
 
 
+class MouvementListView(LoginRequiredMixin, ListView):
+    template_name = "commercial/mouvement_list.html"
+    paginate_by = 100
+
+    def get_queryset(self):
+        qs = MouvementStock.objects.select_related("article", "document")
+        q = self.request.GET.get("q")
+        if q:
+            qs = qs.filter(Q(article__reference__icontains=q) | Q(article__designation__icontains=q) | Q(libelle__icontains=q))
+        return qs
+
+
 # ---------------------------------------------------------------- Documents
 class DocumentListView(LoginRequiredMixin, ListView):
     model = Document
@@ -194,6 +206,9 @@ class DocumentListView(LoginRequiredMixin, ListView):
         q = self.request.GET.get("q")
         if q:
             qs = qs.filter(Q(numero__icontains=q) | Q(tiers__nom__icontains=q) | Q(reference_externe__icontains=q))
+        if self.request.GET.get("impayees"):
+            qs = [d for d in qs.filter(type_document__in=(Document.FACTURE, Document.ACHAT_FACTURE), statut=Document.VALIDE)
+                  if d.reste_a_payer > 0]
         return qs
 
     def get_context_data(self, **kwargs):
@@ -323,6 +338,9 @@ class ReglementListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         qs = Reglement.objects.select_related("tiers", "journal")
+        sens = self.request.GET.get("sens")
+        if sens:
+            qs = qs.filter(tiers__type_tiers=Tiers.CLIENT if sens == "E" else Tiers.FOURNISSEUR)
         q = self.request.GET.get("q")
         if q:
             qs = qs.filter(Q(numero__icontains=q) | Q(tiers__nom__icontains=q) | Q(reference__icontains=q))
