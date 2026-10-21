@@ -8,9 +8,11 @@ Construit par `.github/workflows/apercu.yml` : tests, puis simulateurs web et bu
 avec les données de démonstration. Rien à installer ; les écrans et les chiffres sont ceux du vrai logiciel,
 mais les saisies ne sont pas conservées (simulation).
 
-Mise en place, une seule fois (si le premier déploiement échoue sur l'étape « configure-pages ») :
-GitHub › dépôt `YSFTEST` › **Settings › Pages › Build and deployment › Source : GitHub Actions**, puis
-onglet **Actions › Aperçu de l'ERP › Re-run jobs**.
+Mise en place, une seule fois, par le propriétaire du dépôt (GitHub ne permet pas à l'automatisme de le faire) :
+1. GitHub › dépôt `YSFTEST` › **Settings › Pages › Build and deployment › Source : GitHub Actions**.
+2. **Settings › Environments › github-pages › Deployment branches and tags** : ajouter la branche
+   `ccr-5592a371-fusjt2` (par défaut seule `main` a le droit de publier).
+3. Onglet **Actions › Aperçu de l'ERP** › dernière exécution › **Re-run all jobs**.
 
 L'état de chaque construction est visible dans l'onglet **Actions** du dépôt (vert = publié, rouge = un test a échoué :
 l'ancienne version reste en ligne).
