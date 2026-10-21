@@ -19,7 +19,10 @@ zone de travail ; les autres s'ouvrent dans le navigateur.
 """
 import csv
 import json
+import subprocess
+import sys
 import threading
+import tkinter as tk
 import webbrowser
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -59,6 +62,19 @@ def sauver_config(config):
         CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
     except OSError:
         pass
+
+
+DOSSIER = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
+EXECUTABLES = {"commercial": "ERP_Commercial", "comptabilite": "ERP_Comptabilite", "reporting": "ERP_Reporting"}
+
+
+def lancer_module(code):
+    """Ouvre un autre logiciel de l'ERP dans sa propre fenêtre (processus séparé)."""
+    if getattr(sys, "frozen", False):
+        commande = [str(DOSSIER / f"{EXECUTABLES[code]}.exe")]
+    else:
+        commande = [sys.executable, str(DOSSIER / f"{code}.py")]
+    subprocess.Popen(commande, cwd=DOSSIER)
 
 
 def assombrir(couleur, facteur=0.8):
@@ -232,7 +248,7 @@ class FenetreConnexion(ctk.CTkToplevel):
 # Logiciel d'un module
 # ---------------------------------------------------------------------------
 class ModuleApp(ctk.CTk):
-    """Fenêtre principale d'un module : en-tête, onglets, arborescence, zone de travail.
+    """Fenêtre principale d'un module : barre de menus, en-tête, barre de navigation, zone de travail.
 
     `ecrans` associe le code d'un élément de navigation à une fabrique
     `fabrique(app, element) -> Page | None` (None : action sans écran, ex. ouvrir une fenêtre).
@@ -256,6 +272,7 @@ class ModuleApp(ctk.CTk):
         self.pages = {}
         self.noeuds = {}
         self.page_courante = None
+        self.onglet_courant = None
 
         style = ttk.Style()
         style.theme_use("clam")
@@ -287,85 +304,157 @@ class ModuleApp(ctk.CTk):
             self.destroy()
             return
         self.deiconify()
+        self._barre_menus()
         self._entete()
-        self._onglets()
         corps = ctk.CTkFrame(self, fg_color="#f4f6f9", corner_radius=0)
         corps.pack(fill="both", expand=True)
-        self._arbre(corps)
+        self._barre_navigation(corps)
         self.contenu = ctk.CTkFrame(corps, fg_color="transparent")
         self.contenu.pack(side="left", fill="both", expand=True, padx=16, pady=14)
-        self.choisir_onglet(self.navigation["onglets"][0]["titre"])
+        onglets = self.navigation["onglets"]
+        defaut = next((o for o in onglets if o["code"] in ("traitement", "etat")), onglets[0])
+        self.choisir_onglet(defaut["titre"])
+
+    def _barre_menus(self):
+        """Barre de menus Windows native : Fichier · Structure · Traitement · État · Fenêtre · ?"""
+        barre = tk.Menu(self, tearoff=0)
+
+        def remplir(menu, elements):
+            for el in elements:
+                if el.get("separateur"):
+                    menu.add_separator()
+                elif el["enfants"]:
+                    sous_menu = tk.Menu(menu, tearoff=0)
+                    remplir(sous_menu, el["enfants"])
+                    menu.add_cascade(label=el["titre"], menu=sous_menu)
+                elif self.element_disponible(el):
+                    menu.add_command(label=el["titre"], command=lambda e=el: self.ouvrir_depuis_menu(e))
+                else:
+                    menu.add_command(label=el["titre"], state="disabled")
+
+        for onglet in self.navigation["onglets"]:
+            menu = tk.Menu(barre, tearoff=0)
+            remplir(menu, onglet["elements"])
+            barre.add_cascade(label=onglet["titre"], menu=menu)
+        self.configure(menu=barre)
 
     def _entete(self):
-        entete = ctk.CTkFrame(self, fg_color=self.couleur, corner_radius=0, height=48)
+        entete = ctk.CTkFrame(self, fg_color=self.couleur, corner_radius=0, height=44)
         entete.pack(fill="x")
-        ctk.CTkLabel(entete, text=self.titre, text_color="white", font=ctk.CTkFont(size=18, weight="bold")).pack(side="left", padx=16, pady=10)
+        ctk.CTkLabel(entete, text=self.titre, text_color="white", font=ctk.CTkFont(size=17, weight="bold")).pack(side="left", padx=16, pady=8)
         self.libelle_statut = ctk.CTkLabel(entete, text="", text_color="#e0e0e0")
         self.libelle_statut.pack(side="left", padx=10)
-        options = dict(fg_color="transparent", border_width=1, border_color="#ffffff", text_color="white",
-                       hover_color=assombrir(self.couleur), width=120)
-        ctk.CTkButton(entete, text="Déconnexion", command=self.deconnecter, **options).pack(side="right", padx=(4, 12))
-        ctk.CTkButton(entete, text="Version web", command=lambda: webbrowser.open(self.api.base_url + self.navigation["accueil"]),
-                      **options).pack(side="right", padx=4)
         ctk.CTkLabel(entete, text=f"{self.config_data.get('utilisateur', '')} · {self.api.base_url}",
-                     text_color="#e0e0e0").pack(side="right", padx=12)
+                     text_color="#e0e0e0").pack(side="right", padx=16)
 
-    def _onglets(self):
-        barre = ctk.CTkFrame(self, fg_color="white", corner_radius=0)
-        barre.pack(fill="x")
-        self.selecteur = ctk.CTkSegmentedButton(
-            barre, values=[o["titre"] for o in self.navigation["onglets"]], command=self.choisir_onglet,
-            selected_color=self.couleur, selected_hover_color=assombrir(self.couleur), font=ctk.CTkFont(size=13),
-        )
-        self.selecteur.pack(side="left", padx=12, pady=8)
-
-    def _arbre(self, parent):
-        cadre = ctk.CTkFrame(parent, fg_color="white", corner_radius=0, width=270)
+    def _barre_navigation(self, parent):
+        cadre = ctk.CTkFrame(parent, fg_color="white", corner_radius=0, width=280)
         cadre.pack(side="left", fill="y")
         cadre.pack_propagate(False)
-        self.titre_onglet = ctk.CTkLabel(cadre, text="", text_color="gray", font=ctk.CTkFont(size=11))
-        self.titre_onglet.pack(anchor="w", padx=14, pady=(12, 4))
+        menus = [o["titre"] for o in self.navigation["onglets"] if o["code"] != "aide"]
+        self.choix_menu = ctk.CTkOptionMenu(cadre, values=menus, command=self.choisir_onglet, fg_color=self.couleur,
+                                            button_color=assombrir(self.couleur), button_hover_color=assombrir(self.couleur, 0.7))
+        self.choix_menu.pack(fill="x", padx=10, pady=(10, 6))
         self.arbre = ttk.Treeview(cadre, show="tree", style="Arbre.Treeview", selectmode="browse")
         self.arbre.pack(fill="both", expand=True, padx=(6, 0), pady=(0, 8))
         self.arbre.tag_configure("groupe", font=("Segoe UI", 10, "bold"))
+        self.arbre.tag_configure("desactive", foreground="#a3abb4")
         self.arbre.bind("<<TreeviewSelect>>", self._element_choisi)
         self.arbre.bind("<Double-1>", self._double_clic)
 
     # --- Navigation ------------------------------------------------------
+    def element_disponible(self, el):
+        return bool(el["url"] or el["action"] or el["code"] in self.ecrans)
+
     def choisir_onglet(self, titre):
         onglet = next(o for o in self.navigation["onglets"] if o["titre"] == titre)
-        self.selecteur.set(titre)
-        self.titre_onglet.configure(text=onglet["titre"].upper())
+        self.choix_menu.set(titre)
         self.arbre.delete(*self.arbre.get_children())
         self.noeuds.clear()
+        self.onglet_courant = onglet["code"]
 
         def inserer(parent, elements):
             for el in elements:
-                iid = self.arbre.insert(parent, "end", text=("  " if el["enfants"] else "  • ") + el["titre"],
-                                        open=True, tags=("groupe",) if el["enfants"] else ())
+                if el.get("separateur"):
+                    continue
+                if el["enfants"]:
+                    texte, tags = "  " + el["titre"], ("groupe",)
+                else:
+                    externe = "  ↗" if el["module"] else ""
+                    texte = "  • " + el["titre"] + externe
+                    tags = () if self.element_disponible(el) else ("desactive",)
+                iid = self.arbre.insert(parent, "end", text=texte, open=True, tags=tags)
                 self.noeuds[iid] = el
                 inserer(iid, el["enfants"])
 
         inserer("", onglet["elements"])
-        premier = next((iid for iid, el in self.noeuds.items() if el["url"] or el["code"] in self.ecrans), None)
+        premier = next((iid for iid, el in self.noeuds.items()
+                        if not el["module"] and not el["action"] and (el["url"] or el["code"] in self.ecrans)), None)
         if premier:
             self.arbre.selection_set(premier)
             self.arbre.see(premier)
 
+    def ouvrir_depuis_menu(self, element):
+        """Commande choisie dans la barre de menus : synchronise la barre de navigation."""
+        if element["module"] or element["action"]:
+            self.ouvrir_element(element)
+            return
+        onglet = next((o for o in self.navigation["onglets"] if self._contient(o["elements"], element["code"])), None)
+        if onglet and onglet["code"] != "aide" and onglet["code"] != self.onglet_courant:
+            self.choisir_onglet(onglet["titre"])
+        iid = next((i for i, el in self.noeuds.items() if el["code"] == element["code"]), None)
+        if iid:
+            self.arbre.selection_set(iid)
+            self.arbre.see(iid)
+        else:
+            self.ouvrir_element(element)
+
+    def _contient(self, elements, code):
+        return any(el["code"] == code or self._contient(el["enfants"], code) for el in elements)
+
     def _element_choisi(self, _event=None):
         sel = self.arbre.selection()
         if sel:
-            self.ouvrir_element(self.noeuds[sel[0]])
+            el = self.noeuds[sel[0]]
+            if not el["module"] and not el["action"]:   # les commandes externes s'ouvrent au double-clic
+                self.ouvrir_element(el)
 
     def _double_clic(self, _event=None):
         sel = self.arbre.selection()
-        if sel:
-            el = self.noeuds[sel[0]]
-            if el["code"] not in self.ecrans and el["url"]:
-                webbrowser.open(self.api.base_url + el["url"])
+        if not sel:
+            return
+        el = self.noeuds[sel[0]]
+        if el["module"] or el["action"]:
+            self.ouvrir_element(el)
+        elif el["code"] not in self.ecrans and el["url"]:
+            webbrowser.open(self.api.base_url + el["url"])
 
     def ouvrir_element(self, element):
         code = element["code"]
+        action = element.get("action")
+        if action == "quitter":
+            self.deconnecter()
+            return
+        if action == "fermer":
+            self.destroy()
+            return
+        if action == "imprimer":
+            page = self.page_courante
+            if isinstance(page, PageWeb):
+                page.ouvrir()
+            elif page is not None and hasattr(page, "tableau"):
+                page.tableau.exporter()
+            return
+        if element["module"] in MODULES:
+            lancer_module(element["module"])
+            return
+        if element["module"]:          # page web hors logiciel (administration, portail…)
+            webbrowser.open(self.api.base_url + element["url"])
+            return
+        if code == "aide.a_propos":
+            messagebox.showinfo("À propos", f"ERP OHADA — {self.titre}\nServeur : {self.api.base_url}\n"
+                                            f"Utilisateur : {self.config_data.get('utilisateur', '')}")
+            return
         if code in self.pages:
             self.afficher(self.pages[code])
             return
@@ -376,7 +465,7 @@ class ModuleApp(ctk.CTk):
         elif element["url"]:
             page = PageWeb(self, element["titre"], element["url"])
         else:
-            return                    # simple groupe d'éléments
+            return                    # sous-menu ou commande non disponible
         self.pages[code] = page
         self.afficher(page)
 

@@ -16,6 +16,15 @@ def portail(request):
 
 
 @login_required
+def a_propos(request):
+    from django import get_version
+
+    from .navigation import VERSION
+
+    return render(request, "core/a_propos.html", {"version": VERSION, "django": get_version()})
+
+
+@login_required
 def accueil_module(request, module):
     """Page d'accueil d'un module : vue d'ensemble de ses onglets et éléments."""
     return render(request, "core/module_accueil.html", {"module_def": MODULES_PAR_CODE[module]})

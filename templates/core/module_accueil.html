@@ -3,20 +3,22 @@
 {% block content %}
 <div class="page-title"><h1><i class="bi {{ module.icone }}" style="color:var(--module)"></i> {{ module.titre }}</h1><span class="text-muted">{{ module.description }}</span></div>
 <div class="row g-3">
-{% for o in onglets %}
-  <div class="col-md-6 col-xl-4">
+{% for o in onglets %}{% if o.code != "fichier" and o.code != "fenetre" and o.code != "aide" %}
+  <div class="col-lg-6 col-xxl-4">
     <div class="card h-100">
-      <div class="card-header bg-white fw-semibold"><a class="text-decoration-none" href="{{ o.url }}"><i class="bi {{ o.icone }}" style="color:var(--module)"></i> {{ o.titre }}</a></div>
+      <div class="card-header bg-white fw-semibold"><i class="bi {{ o.icone }}" style="color:var(--module)"></i> {{ o.titre }}</div>
       <div class="card-body small">
-        {% for e in o.elements %}
-          <div class="mb-2">
-            {% if e.url %}<a href="{{ e.url }}" class="fw-semibold">{{ e.titre }}</a>{% else %}<span class="fw-semibold">{{ e.titre }}</span>{% endif %}
-            {% if e.enfants %}<div class="ms-2">{% for s in e.enfants %}{% if s.url %}<a href="{{ s.url }}" class="d-inline-block me-2 text-muted">{{ s.titre }}</a>{% else %}<span class="d-inline-block me-2 text-muted">{{ s.titre }} ({{ s.enfants|length }})</span>{% endif %}{% endfor %}</div>{% endif %}
+        {% for e in o.elements %}{% if not e.separateur %}
+          <div class="mb-1">
+            {% if e.url %}<a href="{{ e.url }}"{% if e.module %} target="erp_{{ e.module }}"{% endif %} class="fw-semibold">{{ e.titre }}</a>
+            {% elif e.enfants %}<span class="fw-semibold">{{ e.titre }}</span>
+            {% else %}<span class="text-body-tertiary" title="Non disponible dans cette version">{{ e.titre }}</span>{% endif %}
+            {% if e.enfants %}<div class="ms-3">{% for s in e.enfants %}{% if s.url %}<a href="{{ s.url }}"{% if s.module %} target="erp_{{ s.module }}"{% endif %} class="d-inline-block me-2 text-muted">{{ s.titre }}</a>{% elif s.enfants %}<span class="d-inline-block me-2 text-muted">{{ s.titre }} ›</span>{% elif not s.separateur %}<span class="d-inline-block me-2 text-body-tertiary">{{ s.titre }}</span>{% endif %}{% endfor %}</div>{% endif %}
           </div>
-        {% endfor %}
+        {% endif %}{% endfor %}
       </div>
     </div>
   </div>
-{% endfor %}
+{% endif %}{% endfor %}
 </div>
 {% endblock %}

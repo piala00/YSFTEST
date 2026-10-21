@@ -5,30 +5,38 @@ ERP conçu pour les PME de l'espace OHADA (FCFA, TVA 19,25 % par défaut — Cam
 - un **serveur web Django** (interface navigateur + API REST), compatible **PostgreSQL**, **SQL Server** ou SQLite ;
 - un **client bureau CustomTkinter** (Windows / Linux / macOS) qui se connecte au serveur par l'API.
 
-## Architecture : 3 logiciels, des onglets, des éléments et des sous-éléments
+## Architecture : 3 logiciels avec une barre de menus façon Sage 100c
 
-Chaque module est un **logiciel à part entière**, avec sa fenêtre, sa couleur et sa propre navigation :
+Chaque module est un **logiciel à part entière**, avec sa fenêtre, sa couleur et sa propre **barre de menus**,
+organisée comme Sage 100c :
 
 ```
-Logiciel (module)          ex. Gestion commerciale
- └─ Onglets                 Structure · Ventes · Achats · Stock · Règlements · États
-     └─ Éléments            Documents de vente · Nouveau document · Suivi
-         └─ Sous-éléments   Devis · Bons de commande · Bons de livraison · Factures · Avoirs
+Fichier · Structure · Traitement · État · Fenêtre · ?
+   └─ commandes, séparateurs, sous-menus en cascade ▸
 ```
 
-| Logiciel | Onglets |
+| Logiciel | Barre de menus |
 |---|---|
-| **Gestion commerciale** | Structure, Ventes, Achats, Stock, Règlements, États |
-| **Comptabilité OHADA** | Structure, Saisie, Traitement, États |
-| **Reporting** | Synthèse, Ventes, Tiers, Finances |
+| **Gestion commerciale** | Fichier · Structure · Traitement · État · Fenêtre · ? |
+| **Comptabilité OHADA** | Fichier · Structure · Traitement · État · Fenêtre · ? |
+| **Reporting** | Fichier · État · Fenêtre · ? |
 
-Toute la navigation est décrite à un seul endroit : `apps/core/navigation.py`. Pour ajouter un onglet, un élément ou
-un sous-élément, il suffit de l'y déclarer. Certains sous-éléments sont générés à partir des données, comme le plan
-comptable par classe ou les écritures par journal. Cette même définition alimente :
+Exemples :
+- *Gestion commerciale › Traitement › Documents des ventes ▸* Devis, Bons de commande, Bons de livraison, Factures, Factures d'avoir, Nouveau ▸
+- *Comptabilité › Traitement › Saisie des journaux ▸* un sous-menu par code journal (VT, AC, BQ, CA…)
+- *Comptabilité › État › Bilan et compte de résultat ▸* Bilan, Compte de résultat, Soldes intermédiaires de gestion
+- *Fichier* : À propos de votre société, Autorisations d'accès, Imprimer, Import/Export, Fermer, Quitter
+- *Fenêtre* : ouvre les autres logiciels, chacun dans sa propre fenêtre
 
-- **le web** : le portail (`/`) ouvre chaque logiciel dans sa propre fenêtre du navigateur. Chaque logiciel affiche
-  un en-tête à sa couleur, la barre d'onglets, l'arborescence des éléments à gauche et un fil d'Ariane ;
-- **le client bureau** : il lit la structure via `/api/navigation/?module=<code>`.
+Les commandes qui ne sont pas encore développées (Gammes, Dépôts, Rapprochement bancaire, Plan analytique…) apparaissent
+**grisées**, comme dans Sage. Sous la barre de menus, une **barre de navigation** à gauche reprend le contenu du menu
+choisi sous forme d'arborescence.
+
+Toute la structure est décrite à un seul endroit : `apps/core/navigation.py`. Pour activer une commande grisée,
+il suffit de lui associer une page. La même définition alimente :
+
+- **le web** : menus déroulants avec cascades, séparateurs et commandes grisées, ainsi que le portail (`/`) ;
+- **le client bureau** : il construit une vraie barre de menus Windows à partir de `/api/navigation/?module=<code>`.
 
 ## Modules
 
@@ -104,8 +112,8 @@ pip install -r requirements.txt
 python lanceur.py
 ```
 
-Chaque logiciel est organisé ainsi : en-tête à sa couleur, barre d'onglets, arborescence des éléments et
-sous-éléments, puis zone de travail. Les éléments qui disposent d'un écran natif s'affichent dans la fenêtre :
+Chaque logiciel s'ouvre avec la barre de menus Windows native (Fichier, Structure, Traitement, État,
+Fenêtre, ?), un en-tête à sa couleur, la barre de navigation et la zone de travail. Les éléments qui disposent d'un écran natif s'affichent dans la fenêtre :
 tableau de bord, tiers, articles, documents de vente et d'achat, saisie de factures et de règlements, balance, bilan,
 compte de résultat et balances âgées. Les autres proposent de s'ouvrir dans le navigateur, et un double-clic les
 ouvre directement.
@@ -138,7 +146,7 @@ python manage.py test
 
 ```
 erp/                 configuration Django (settings, urls)
-apps/core/           société, exercices, numérotation, navigation (modules/onglets/éléments), init_erp
+apps/core/           société, exercices, numérotation, menus façon Sage (navigation.py), init_erp
 apps/commercial/     tiers, articles, documents, règlements, stock
 apps/comptabilite/   plan SYSCOHADA, journaux, écritures, états financiers
 apps/reporting/      indicateurs et analyses

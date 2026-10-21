@@ -19,7 +19,8 @@ def societe(request):
         if actif is None and request.GET.get("onglet"):
             actif = next((o for o in onglets if o["code"] == request.GET["onglet"]), None)
     if actif is None:
-        actif = onglets[0]
+        # Par défaut, comme dans Sage, on présente le menu Traitement (ou État pour le Reporting)
+        actif = next((o for o in onglets if o["code"] in ("traitement", "etat")), onglets[0])
     request.session[cle_session] = actif["code"]
     contexte.update(module=module, onglets=onglets, onglet_actif=actif, element_actif=element_actif,
                     fil_ariane=chemin_vers_actif(actif["elements"]))

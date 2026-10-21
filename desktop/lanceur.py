@@ -1,22 +1,7 @@
 """ERP OHADA — lanceur : ouvre chacun des logiciels dans sa propre fenêtre.  Lancer : python lanceur.py"""
-import subprocess
-import sys
-from pathlib import Path
-
 import customtkinter as ctk
 
-from shell import MODULES, assombrir
-
-DOSSIER = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
-EXECUTABLES = {"commercial": "ERP_Commercial", "comptabilite": "ERP_Comptabilite", "reporting": "ERP_Reporting"}
-
-
-def lancer_module(code):
-    if getattr(sys, "frozen", False):
-        commande = [str(DOSSIER / f"{EXECUTABLES[code]}.exe")]
-    else:
-        commande = [sys.executable, str(DOSSIER / f"{code}.py")]
-    subprocess.Popen(commande, cwd=DOSSIER)
+from shell import MODULES, assombrir, lancer_module
 
 
 class Lanceur(ctk.CTk):

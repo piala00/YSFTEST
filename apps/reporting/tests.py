@@ -51,7 +51,7 @@ class PagesEtApiTests(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 200)
 
     def test_tous_les_elements_de_navigation(self):
-        """Chaque élément de chaque onglet de chaque module mène à une page valide."""
+        """Chaque commande de chaque menu de chaque logiciel mène à une page valide."""
         from apps.core.navigation import MODULES, structure_module
 
         def parcourir(noeuds):
@@ -68,12 +68,24 @@ class PagesEtApiTests(TestCase):
                     with self.subTest(module=module.code, element=noeud["code"]):
                         response = self.client.get(noeud["url"])
                         self.assertEqual(response.status_code, 200)
-                        # La page met en évidence le bon module, le bon onglet et le bon élément
+                        if noeud["module"] or noeud["code"].startswith("fenetre."):
+                            continue  # commande qui ouvre un autre logiciel (ou l'administration)
+                        # La page met en évidence le bon logiciel, le bon menu et la bonne commande
                         self.assertEqual(response.context["module"].code, module.code)
                         self.assertEqual(response.context["onglet_actif"]["code"], onglet["code"])
                         self.assertEqual(response.context["element_actif"]["code"], noeud["code"])
                     total += 1
-        self.assertGreater(total, 60)
+        self.assertGreater(total, 80)
+
+    def test_menus_comme_sage(self):
+        from apps.core.navigation import MODULES
+
+        for module in MODULES:
+            titres = [o.titre for o in module.onglets]
+            self.assertEqual(titres[0], "Fichier")
+            self.assertEqual(titres[-2:], ["Fenêtre", "?"])
+        compta = [o.titre for o in MODULES[1].onglets]
+        self.assertEqual(compta, ["Fichier", "Structure", "Traitement", "État", "Fenêtre", "?"])
 
     def test_saisie_facture_par_formulaire(self):
         tiers = Tiers.objects.filter(type_tiers=Tiers.CLIENT).first()

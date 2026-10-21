@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}À propos{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px">
+  <div class="card-body">
+    <h1 class="h4"><i class="bi {{ module.icone|default:'bi-grid-3x3-gap-fill' }}" style="color:var(--module)"></i> ERP OHADA {% if module %}— {{ module.titre }}{% endif %}</h1>
+    <p class="text-muted mb-3">Gestion commerciale · Comptabilité SYSCOHADA révisé · Reporting</p>
+    <dl class="row small mb-0">
+      <dt class="col-5">Version</dt><dd class="col-7">{{ version }}</dd>
+      <dt class="col-5">Société</dt><dd class="col-7">{{ societe.raison_sociale }}</dd>
+      <dt class="col-5">Exercice courant</dt><dd class="col-7">{{ exercice_courant|default:"—" }}</dd>
+      <dt class="col-5">Utilisateur</dt><dd class="col-7">{{ user.username }}</dd>
+      <dt class="col-5">Framework</dt><dd class="col-7">Django {{ django }}</dd>
+    </dl>
+  </div>
+</div>
+{% endblock %}

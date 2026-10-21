@@ -10,16 +10,35 @@ body { background: #f4f6f9; font-size: .92rem; }
 .btn-topbar { color: #fff; border: 1px solid rgba(255,255,255,.35); }
 .btn-topbar:hover, .btn-topbar.show { color: #fff; background: rgba(255,255,255,.15); }
 
-/* Onglets du module */
-.onglets { display: flex; gap: .15rem; background: #fff; border-bottom: 1px solid #dde3ea; padding: 0 .75rem; overflow-x: auto; }
-.onglets .onglet { padding: .6rem 1rem; color: #495057; text-decoration: none; border-bottom: 3px solid transparent; white-space: nowrap; }
-.onglets .onglet:hover { color: var(--module); background: #f6f8fb; }
-.onglets .onglet.actif { color: var(--module); border-bottom-color: var(--module); font-weight: 600; }
+/* Barre de menus façon Sage 100c */
+.barre-menus { display: flex; background: #fff; border-bottom: 1px solid #d5dce4; padding: 0 .4rem; position: relative; z-index: 1030; user-select: none; }
+.barre-menus .menu { position: relative; }
+.barre-menus .menu-titre { background: none; border: 0; padding: .45rem .8rem; color: #212529; font-size: .9rem; }
+.barre-menus .menu-titre:hover, .barre-menus .menu.ouvert > .menu-titre { background: #e8eef7; color: var(--module); }
+.barre-menus .menu-titre.courant { color: var(--module); font-weight: 600; }
+.menu-deroulant { display: none; position: absolute; top: 100%; left: 0; min-width: 270px; margin: 0; padding: .3rem 0; list-style: none;
+  background: #fff; border: 1px solid #c9d2dc; box-shadow: 2px 4px 12px rgba(0,0,0,.15); }
+.barre-menus .menu.ouvert > .menu-deroulant { display: block; }
+.menu-deroulant li { position: relative; }
+.menu-deroulant .item { display: flex; align-items: center; gap: .55rem; width: 100%; padding: .32rem .9rem; color: #212529;
+  text-decoration: none; background: none; border: 0; text-align: left; white-space: nowrap; font-size: .88rem; cursor: default; }
+.menu-deroulant a.item, .menu-deroulant button.item { cursor: pointer; }
+.menu-deroulant .item:hover, .menu-deroulant .sous:hover > .item { background: var(--module); color: #fff; }
+.menu-deroulant .item.actif { font-weight: 600; }
+.menu-deroulant .item.desactive, .menu-deroulant .item.desactive:hover { color: #a3abb4; background: none; }
+.menu-deroulant .item > i:first-child { width: 1rem; text-align: center; }
+.menu-deroulant .fleche, .menu-deroulant .externe { margin-left: auto; font-size: .7rem; padding-left: 1rem; }
+.menu-deroulant .sep { border-top: 1px solid #e1e6ec; margin: .3rem 0; }
+.menu-deroulant .sous > .menu-deroulant { top: -.35rem; left: 100%; }
+.menu-deroulant .sous:hover > .menu-deroulant { display: block; }
+.bi-blank::before { content: ""; display: inline-block; width: 1em; }
 
 /* Arborescence des éléments */
-.espace { min-height: calc(100vh - 95px); }
+.espace { min-height: calc(100vh - 88px); }
 .arbre { width: 260px; flex-shrink: 0; background: #fff; border-right: 1px solid #dde3ea; padding: .75rem 0; }
-.arbre-titre { padding: .25rem 1rem .6rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #7f8fa4; }
+.arbre-choix { margin: 0 .75rem .6rem; width: calc(100% - 1.5rem); }
+.arbre .noeud.desactive { color: #a3abb4; }
+.arbre .noeud.desactive:hover { background: none; color: #a3abb4; }
 .arbre-liste { list-style: none; margin: 0; padding: 0; }
 .arbre-liste .arbre-liste { padding-left: .9rem; }
 .arbre .noeud { display: flex; align-items: center; gap: .4rem; padding: .3rem .9rem; color: #33404f; text-decoration: none; border-left: 3px solid transparent; }

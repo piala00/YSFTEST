@@ -1,12 +1,14 @@
 from django.urls import path
 
 from apps.comptabilite import views as compta_views
+from apps.core import views as core_views
 
 from . import views
 
 app_name = "reporting"
 
 urlpatterns = [
+    path("a-propos/", core_views.a_propos, name="a_propos"),
     path("", views.dashboard, name="dashboard"),
     path("ventes/", views.ventes, name="ventes"),
     path("balance-agee/", views.balance_agee, name="balance_agee"),

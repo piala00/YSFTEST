@@ -1,17 +1,28 @@
-"""Structure de navigation de l'ERP : Module → Onglets → Éléments → Sous-éléments.
+"""Menus de l'ERP, organisés comme Sage 100c.
 
-Chaque module est une application à part entière (sa fenêtre, son en-tête, ses
-onglets). Cette définition unique alimente l'interface web (barre d'onglets et
-arborescence latérale) et le client bureau (via /api/navigation/).
+Chaque module est un logiciel à part entière doté d'une barre de menus :
 
-Pour ajouter une entrée : ajouter un `Element` dans l'onglet voulu. Un élément
-peut avoir des `enfants` (sous-éléments), statiques ou calculés (`enfants_dynamiques`).
+    Fichier · Structure · Traitement · État · Fenêtre · ?
+
+Chaque menu contient des éléments, qui peuvent ouvrir des sous-menus en cascade.
+Comme dans Sage, les commandes non encore disponibles restent visibles mais grisées.
+Cette définition unique alimente l'interface web et le client bureau (/api/navigation/).
+
+Construire un élément avec `E(code, titre, nom_url, *args, **paramètres)` :
+  - sans URL ni enfants      → commande grisée (non disponible) ;
+  - `enfants=[...]`          → sous-menu ;
+  - `dyn=fonction`           → sous-menu calculé à partir des données ;
+  - `action="imprimer"`      → commande d'interface (imprimer, fermer, quitter) ;
+  - `SEP()`                  → séparateur.
 """
+import itertools
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 from urllib.parse import parse_qsl, urlencode
 
 from django.urls import reverse
+
+VERSION = "1.0"
 
 
 @dataclass
@@ -24,6 +35,8 @@ class Element:
     icone: str = ""
     enfants: list = field(default_factory=list)
     enfants_dynamiques: Optional[Callable] = None
+    action: str = ""                   # imprimer | fermer | quitter
+    separateur: bool = False
 
     def lien(self):
         if not self.url:
@@ -37,6 +50,7 @@ class Element:
 
 @dataclass
 class Onglet:
+    """Un menu de la barre de menus (Fichier, Structure, Traitement, État…)."""
     code: str
     titre: str
     icone: str
@@ -55,12 +69,63 @@ class Module:
     onglets: list
 
 
-def E(code, titre, url="", *args, icone="", enfants=None, dyn=None, **query):
-    return Element(code, titre, url, args, query, icone, enfants or [], dyn)
+def E(code, titre, url="", *args, icone="", enfants=None, dyn=None, action="", **query):
+    return Element(code, titre, url, args, query, icone, enfants or [], dyn, action)
+
+
+_compteur = itertools.count()
+
+
+def SEP():
+    return Element(f"sep{next(_compteur)}", "", separateur=True)
 
 
 # ---------------------------------------------------------------------------
-# Éléments calculés à partir des données
+# Menus communs
+# ---------------------------------------------------------------------------
+def menu_fichier(module, societe_url, fermer=True):
+    return Onglet("fichier", "Fichier", "bi-folder2", [
+        E("fichier.societe", "À propos de votre société", icone="bi-building", enfants=[
+            E("fichier.societe.identification", "Identification", societe_url),
+            *([E("fichier.societe.exercices", "Exercices comptables", "comptabilite:exercices")] if module == "comptabilite" else []),
+        ]),
+        E("fichier.autorisations", "Autorisations d'accès", "admin:auth_user_changelist", icone="bi-shield-lock"),
+        SEP(),
+        E("fichier.imprimer", "Imprimer…", icone="bi-printer", action="imprimer"),
+        E("fichier.import", "Import", icone="bi-box-arrow-in-down"),
+        E("fichier.export", "Export", icone="bi-box-arrow-up"),
+        SEP(),
+        *([E("fichier.fermer", "Fermer", icone="bi-x-square", action="fermer")] if fermer else []),
+        E("fichier.quitter", "Quitter", icone="bi-power", action="quitter"),
+    ])
+
+
+def menu_fenetre(module):
+    return Onglet("fenetre", "Fenêtre", "bi-window-stack", [
+        E("fenetre.accueil", "Page d'accueil", MODULES_ACCUEIL[module], icone="bi-house"),
+        SEP(),
+        E("fenetre.portail", "Portail ERP OHADA", "core:portail", icone="bi-grid-3x3-gap"),
+        *[E(f"fenetre.{code}", titre, accueil, icone=icone)
+          for code, titre, accueil, icone in AUTRES_LOGICIELS if code != module],
+    ])
+
+
+def menu_aide(module):
+    return Onglet("aide", "?", "bi-question-circle", [
+        E("aide.a_propos", "À propos de l'ERP OHADA", f"{module}:a_propos", icone="bi-info-circle"),
+    ])
+
+
+MODULES_ACCUEIL = {"commercial": "commercial:accueil", "comptabilite": "comptabilite:accueil", "reporting": "reporting:dashboard"}
+AUTRES_LOGICIELS = [
+    ("commercial", "Gestion commerciale", "commercial:accueil", "bi-shop"),
+    ("comptabilite", "Comptabilité OHADA", "comptabilite:accueil", "bi-calculator"),
+    ("reporting", "Reporting", "reporting:dashboard", "bi-bar-chart-line"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Sous-menus calculés à partir des données
 # ---------------------------------------------------------------------------
 def _journaux(url, prefixe):
     def construire():
@@ -70,14 +135,7 @@ def _journaux(url, prefixe):
     return construire
 
 
-def _classes_comptables():
-    from apps.comptabilite.models import CLASSES_SYSCOHADA
-
-    return [E(f"plan.classe{n}", f"Classe {n} - {lib}", "comptabilite:comptes", classe=n) for n, lib in CLASSES_SYSCOHADA.items()]
-
-
 def _documents(domaine, types):
-    """Sous-éléments « liste » et « nouveau » pour chaque type de document."""
     return [E(f"{domaine}.{code.lower()}", titre, "commercial:documents", domaine, type=code) for code, titre in types]
 
 
@@ -86,17 +144,17 @@ def _nouveaux(domaine, types):
 
 
 TYPES_VENTE = [("DEVIS", "Devis"), ("COMMANDE", "Bons de commande"), ("LIVRAISON", "Bons de livraison"),
-               ("FACTURE", "Factures"), ("AVOIR", "Avoirs")]
-TYPES_ACHAT = [("ACHAT_COMMANDE", "Commandes fournisseurs"), ("ACHAT_RECEPTION", "Bons de réception"),
-               ("ACHAT_FACTURE", "Factures fournisseurs"), ("ACHAT_AVOIR", "Avoirs fournisseurs")]
+               ("FACTURE", "Factures"), ("AVOIR", "Factures d'avoir")]
+TYPES_ACHAT = [("ACHAT_COMMANDE", "Bons de commande"), ("ACHAT_RECEPTION", "Bons de réception"),
+               ("ACHAT_FACTURE", "Factures"), ("ACHAT_AVOIR", "Factures d'avoir")]
 NOUVEAUX_VENTE = [("DEVIS", "Devis"), ("COMMANDE", "Bon de commande"), ("LIVRAISON", "Bon de livraison"),
-                  ("FACTURE", "Facture"), ("AVOIR", "Avoir")]
-NOUVEAUX_ACHAT = [("ACHAT_COMMANDE", "Commande fournisseur"), ("ACHAT_RECEPTION", "Bon de réception"),
-                  ("ACHAT_FACTURE", "Facture fournisseur"), ("ACHAT_AVOIR", "Avoir fournisseur")]
+                  ("FACTURE", "Facture"), ("AVOIR", "Facture d'avoir")]
+NOUVEAUX_ACHAT = [("ACHAT_COMMANDE", "Bon de commande"), ("ACHAT_RECEPTION", "Bon de réception"),
+                  ("ACHAT_FACTURE", "Facture"), ("ACHAT_AVOIR", "Facture d'avoir")]
 
 
 # ---------------------------------------------------------------------------
-# Modules
+# Gestion commerciale
 # ---------------------------------------------------------------------------
 GESTION_COMMERCIALE = Module(
     code="commercial",
@@ -107,71 +165,96 @@ GESTION_COMMERCIALE = Module(
     prefixe="/commercial/",
     accueil="commercial:accueil",
     onglets=[
+        menu_fichier("commercial", "commercial:societe"),
         Onglet("structure", "Structure", "bi-diagram-3", [
-            E("tiers", "Tiers", icone="bi-people", enfants=[
-                E("tiers.clients", "Clients", "commercial:clients"),
-                E("tiers.fournisseurs", "Fournisseurs", "commercial:fournisseurs"),
-                E("tiers.nouveau_client", "Nouveau client", "commercial:tiers_create", type="CLIENT"),
-                E("tiers.nouveau_fournisseur", "Nouveau fournisseur", "commercial:tiers_create", type="FOURNISSEUR"),
+            E("tiers.clients", "Clients", "commercial:clients", icone="bi-people"),
+            E("tiers.fournisseurs", "Fournisseurs", "commercial:fournisseurs", icone="bi-truck"),
+            E("structure.collaborateurs", "Collaborateurs", icone="bi-person-badge"),
+            SEP(),
+            E("articles.familles", "Familles", "commercial:familles", icone="bi-tags"),
+            E("articles.liste", "Articles", "commercial:articles", icone="bi-box-seam"),
+            E("structure.gammes", "Gammes"),
+            E("structure.conditionnements", "Conditionnements"),
+            E("structure.glossaires", "Glossaires"),
+            SEP(),
+            E("structure.depots", "Dépôts de stockage", icone="bi-house-gear"),
+            E("structure.baremes", "Barèmes", icone="bi-percent", enfants=[
+                E("structure.baremes.remises", "Rabais, remises et ristournes"),
+                E("structure.baremes.commissions", "Commissions"),
+                E("structure.baremes.promotions", "Soldes et promotions"),
             ]),
-            E("articles", "Articles", icone="bi-box-seam", enfants=[
-                E("articles.liste", "Liste des articles", "commercial:articles"),
-                E("articles.familles", "Familles d'articles", "commercial:familles"),
-                E("articles.nouveau", "Nouvel article", "commercial:article_create"),
-                E("articles.nouvelle_famille", "Nouvelle famille", "commercial:famille_create"),
-            ]),
-            E("parametres", "Paramètres", icone="bi-gear", enfants=[
-                E("parametres.societe", "Société", "commercial:societe"),
-            ]),
+            SEP(),
+            E("structure.plan_comptable", "Plan comptable", "comptabilite:comptes", icone="bi-list-ol"),
+            E("structure.taux_taxes", "Taux de taxes"),
+            E("structure.codes_journaux", "Codes journaux", "comptabilite:journaux"),
+            E("structure.banques", "Banques"),
+            E("structure.modeles_reglement", "Modèles de règlement"),
         ]),
-        Onglet("ventes", "Ventes", "bi-receipt", [
-            E("ventes.documents", "Documents de vente", icone="bi-folder2-open", enfants=[
+        Onglet("traitement", "Traitement", "bi-gear-wide-connected", [
+            E("ventes.documents", "Documents des ventes", icone="bi-receipt", enfants=[
                 E("ventes.tous", "Tous les documents", "commercial:documents", "ventes"),
+                SEP(),
                 *_documents("ventes", TYPES_VENTE),
+                SEP(),
+                E("ventes.nouveau", "Nouveau", enfants=_nouveaux("ventes", NOUVEAUX_VENTE)),
             ]),
-            E("ventes.nouveau", "Nouveau document", icone="bi-plus-square", enfants=_nouveaux("ventes", NOUVEAUX_VENTE)),
-            E("ventes.suivi", "Suivi", icone="bi-eye", enfants=[
-                E("ventes.brouillons", "Brouillons", "commercial:documents", "ventes", statut="BROUILLON"),
-                E("ventes.impayees", "Factures non réglées", "commercial:documents", "ventes", impayees=1),
-            ]),
-        ]),
-        Onglet("achats", "Achats", "bi-cart", [
-            E("achats.documents", "Documents d'achat", icone="bi-folder2-open", enfants=[
+            E("achats.documents", "Documents des achats", icone="bi-cart", enfants=[
                 E("achats.tous", "Tous les documents", "commercial:documents", "achats"),
+                SEP(),
                 *_documents("achats", TYPES_ACHAT),
+                SEP(),
+                E("achats.nouveau", "Nouveau", enfants=_nouveaux("achats", NOUVEAUX_ACHAT)),
             ]),
-            E("achats.nouveau", "Nouveau document", icone="bi-plus-square", enfants=_nouveaux("achats", NOUVEAUX_ACHAT)),
-            E("achats.suivi", "Suivi", icone="bi-eye", enfants=[
-                E("achats.brouillons", "Brouillons", "commercial:documents", "achats", statut="BROUILLON"),
-                E("achats.impayees", "Factures à payer", "commercial:documents", "achats", impayees=1),
+            E("stock.documents", "Documents des stocks", "commercial:mouvements", icone="bi-arrow-left-right"),
+            E("traitement.documents_internes", "Documents internes"),
+            SEP(),
+            E("stock.inventaire", "Saisie des inventaires", "commercial:stock", icone="bi-clipboard-data"),
+            E("stock.reappro", "Gestion des réapprovisionnements", "commercial:articles", icone="bi-exclamation-triangle", alerte=1),
+            SEP(),
+            E("reglements.clients", "Règlements clients", "commercial:reglements", icone="bi-cash-coin", sens="E"),
+            E("reglements.fournisseurs", "Règlements fournisseurs", "commercial:reglements", icone="bi-cash-stack", sens="D"),
+            E("reglements.nouveau", "Saisie d'un règlement", "commercial:reglement_create"),
+            SEP(),
+            E("traitement.encours", "Contrôle de l'encours client", "commercial:documents", "ventes", icone="bi-shield-exclamation", impayees=1),
+            E("traitement.interrogation", "Interrogation commerciale", icone="bi-search", enfants=[
+                E("traitement.interrogation.articles", "Articles", "commercial:stock", vue="interrogation"),
+                E("traitement.interrogation.achats_a_payer", "Factures fournisseurs à payer", "commercial:documents", "achats", impayees=1),
+                E("traitement.interrogation.brouillons_ventes", "Ventes en brouillon", "commercial:documents", "ventes", statut="BROUILLON"),
+                E("traitement.interrogation.brouillons_achats", "Achats en brouillon", "commercial:documents", "achats", statut="BROUILLON"),
             ]),
-        ]),
-        Onglet("stock", "Stock", "bi-boxes", [
-            E("stock.etat", "État du stock", "commercial:stock", icone="bi-clipboard-data"),
-            E("stock.mouvements", "Mouvements de stock", "commercial:mouvements", icone="bi-arrow-left-right"),
-            E("stock.alertes", "Articles en alerte", "commercial:articles", icone="bi-exclamation-triangle", alerte=1),
-        ]),
-        Onglet("reglements", "Règlements", "bi-cash-coin", [
-            E("reglements.liste", "Règlements", icone="bi-list-ul", enfants=[
-                E("reglements.tous", "Tous les règlements", "commercial:reglements"),
-                E("reglements.encaissements", "Encaissements clients", "commercial:reglements", sens="E"),
-                E("reglements.decaissements", "Paiements fournisseurs", "commercial:reglements", sens="D"),
-            ]),
-            E("reglements.nouveau", "Nouveau règlement", "commercial:reglement_create", icone="bi-plus-square"),
-        ]),
-        Onglet("etats", "États", "bi-printer", [
-            E("etats.ventes", "Analyse des ventes", icone="bi-graph-up", enfants=[
-                E("etats.ventes.clients", "Ventes par client", "commercial:etat_ventes", vue="clients"),
-                E("etats.ventes.articles", "Ventes par article", "commercial:etat_ventes", vue="articles"),
-            ]),
-            E("etats.echeances", "Échéancier", icone="bi-hourglass-split", enfants=[
-                E("etats.balance_agee_clients", "Balance âgée clients", "commercial:etat_balance_agee", type="CLIENT"),
-                E("etats.balance_agee_fournisseurs", "Balance âgée fournisseurs", "commercial:etat_balance_agee", type="FOURNISSEUR"),
+            E("traitement.maj_comptable", "Mise à jour comptable", icone="bi-journal-arrow-up", enfants=[
+                E("traitement.maj_comptable.ventes", "Écritures du journal des ventes", "comptabilite:ecritures", journal="VT"),
+                E("traitement.maj_comptable.achats", "Écritures du journal des achats", "comptabilite:ecritures", journal="AC"),
             ]),
         ]),
+        Onglet("etat", "État", "bi-printer", [
+            E("etats.statistiques", "Statistiques", icone="bi-graph-up", enfants=[
+                E("etats.ventes.clients", "Statistiques clients", "commercial:etat_ventes", vue="clients"),
+                E("etats.ventes.articles", "Statistiques articles", "commercial:etat_ventes", vue="articles"),
+                E("etats.stats_fournisseurs", "Statistiques fournisseurs"),
+                E("etats.stats_collaborateurs", "Statistiques collaborateurs"),
+            ]),
+            E("etats.palmares", "Palmarès", icone="bi-trophy", enfants=[
+                E("etats.palmares.clients", "Palmarès clients", "commercial:etat_ventes", vue="clients", tri="ca"),
+                E("etats.palmares.articles", "Palmarès articles", "commercial:etat_ventes", vue="articles", tri="ca"),
+            ]),
+            SEP(),
+            E("etats.inventaire", "Inventaire", "commercial:stock", icone="bi-clipboard-check", vue="inventaire"),
+            E("etats.mouvements", "Mouvements de stock", "commercial:mouvements", icone="bi-arrow-left-right", vue="etat"),
+            SEP(),
+            E("etats.echeancier", "Échéancier", icone="bi-hourglass-split", enfants=[
+                E("etats.balance_agee_clients", "Échéancier clients", "commercial:etat_balance_agee", type="CLIENT"),
+                E("etats.balance_agee_fournisseurs", "Échéancier fournisseurs", "commercial:etat_balance_agee", type="FOURNISSEUR"),
+            ]),
+        ]),
+        menu_fenetre("commercial"),
+        menu_aide("commercial"),
     ],
 )
 
+# ---------------------------------------------------------------------------
+# Comptabilité
+# ---------------------------------------------------------------------------
 COMPTABILITE = Module(
     code="comptabilite",
     titre="Comptabilité OHADA",
@@ -181,88 +264,119 @@ COMPTABILITE = Module(
     prefixe="/comptabilite/",
     accueil="comptabilite:accueil",
     onglets=[
+        menu_fichier("comptabilite", "comptabilite:societe"),
         Onglet("structure", "Structure", "bi-diagram-3", [
-            E("plan", "Plan comptable", icone="bi-list-ol", enfants=[
-                E("plan.tout", "Tout le plan", "comptabilite:comptes"),
-                E("plan.classes", "Par classe", dyn=_classes_comptables),
-                E("plan.nouveau", "Nouveau compte", "comptabilite:compte_create"),
+            E("structure.plan", "Plan comptable", "comptabilite:comptes", icone="bi-list-ol"),
+            E("structure.plan_tiers", "Plan tiers", icone="bi-people", enfants=[
+                E("structure.plan_tiers.clients", "Clients", "commercial:clients"),
+                E("structure.plan_tiers.fournisseurs", "Fournisseurs", "commercial:fournisseurs"),
             ]),
-            E("journaux", "Journaux", icone="bi-collection", enfants=[
-                E("journaux.liste", "Liste des journaux", "comptabilite:journaux"),
-                E("journaux.nouveau", "Nouveau journal", "comptabilite:journal_create"),
-            ]),
-            E("exercices", "Exercices", icone="bi-calendar3", enfants=[
-                E("exercices.liste", "Liste des exercices", "comptabilite:exercices"),
-                E("exercices.nouveau", "Nouvel exercice", "comptabilite:exercice_create"),
-            ]),
-        ]),
-        Onglet("saisie", "Saisie", "bi-pencil-square", [
-            E("saisie.nouvelle", "Saisie d'écriture", "comptabilite:ecriture_create", icone="bi-plus-square"),
-            E("saisie.ecritures", "Écritures", icone="bi-journal-text", enfants=[
-                E("saisie.toutes", "Toutes les écritures", "comptabilite:ecritures"),
-                E("saisie.brouillard", "Brouillard", "comptabilite:ecritures", statut="BROUILLARD"),
-                E("saisie.validees", "Écritures validées", "comptabilite:ecritures", statut="VALIDEE"),
-                E("saisie.par_journal", "Par journal", dyn=_journaux("comptabilite:ecritures", "saisie.journal")),
-            ]),
+            E("structure.plan_analytique", "Plan analytique"),
+            E("structure.plan_reporting", "Plan reporting"),
+            SEP(),
+            E("structure.taux_taxes", "Taux de taxes"),
+            E("structure.journaux", "Codes journaux", "comptabilite:journaux", icone="bi-collection"),
+            E("structure.journaux_analytiques", "Codes journaux analytiques"),
+            E("structure.postes_budgetaires", "Postes budgétaires"),
+            SEP(),
+            E("structure.banques", "Banques"),
+            E("structure.modeles_saisie", "Modèles de saisie"),
+            E("structure.modeles_grille", "Modèles de grille"),
+            E("structure.modeles_reglement", "Modèles de règlement"),
         ]),
         Onglet("traitement", "Traitement", "bi-gear-wide-connected", [
-            E("traitement.lettrage", "Lettrage", "comptabilite:lettrage", icone="bi-link-45deg"),
+            E("traitement.saisie_journaux", "Saisie des journaux", icone="bi-journal-text", enfants=[
+                E("traitement.saisie_journaux.tous", "Tous les journaux", "comptabilite:ecritures"),
+                SEP(),
+            ], dyn=_journaux("comptabilite:ecritures", "traitement.saisie_journaux")),
+            E("traitement.saisie_piece", "Saisie par pièce", "comptabilite:ecriture_create", icone="bi-pencil-square"),
+            E("traitement.saisie_bancaire", "Saisie des opérations bancaires"),
+            E("traitement.saisie_analytique", "Saisie des écritures analytiques"),
+            E("traitement.brouillard", "Écritures au brouillard", "comptabilite:ecritures", icone="bi-hourglass", statut="BROUILLARD"),
+            SEP(),
+            E("traitement.lettrage", "Interrogation et lettrage", "comptabilite:lettrage", icone="bi-link-45deg"),
+            E("traitement.lettrage_auto", "Lettrage automatique"),
+            E("traitement.rapprochement", "Rapprochement bancaire manuel"),
+            E("traitement.reglement_tiers", "Règlement tiers", "commercial:reglement_create"),
+            E("traitement.relance", "Rappel / relance clients", "comptabilite:balance_agee", type="CLIENT", vue="relance"),
+            SEP(),
+            E("traitement.tva", "Déclaration de taxes", "comptabilite:tva", icone="bi-percent"),
+            E("traitement.revision", "Révision par cycle"),
+            SEP(),
+            E("traitement.fin_exercice", "Fin d'exercice", icone="bi-calendar-check", enfants=[
+                E("traitement.fin_exercice.nouvel", "Nouvel exercice", "comptabilite:exercice_create"),
+                E("traitement.fin_exercice.cloture", "Clôture de l'exercice", "comptabilite:exercices", vue="cloture"),
+                E("traitement.fin_exercice.journaux", "Clôture des journaux"),
+            ]),
         ]),
-        Onglet("etats", "États", "bi-printer", [
+        Onglet("etat", "État", "bi-printer", [
             E("etats.journaux", "Journaux", icone="bi-journals", enfants=[
                 E("etats.journal_general", "Journal général", "comptabilite:journal"),
                 E("etats.journal.liste", "Journaux auxiliaires", dyn=_journaux("comptabilite:journal", "etats.journal")),
             ]),
-            E("etats.grand_livre", "Grand livre", icone="bi-book", enfants=[
-                E("etats.gl.general", "Grand livre général", "comptabilite:grand_livre"),
-                E("etats.gl.tiers", "Grand livre des tiers", "comptabilite:grand_livre", compte_debut="4", compte_fin="4"),
+            E("etats.grand_livre", "Grand-livre", icone="bi-book", enfants=[
+                E("etats.gl.general", "Grand-livre des comptes", "comptabilite:grand_livre"),
+                E("etats.gl.tiers", "Grand-livre des tiers", "comptabilite:grand_livre", compte_debut="4", compte_fin="4"),
             ]),
             E("etats.balance", "Balance", icone="bi-table", enfants=[
-                E("etats.balance.generale", "Balance générale", "comptabilite:balance"),
+                E("etats.balance.generale", "Balance des comptes", "comptabilite:balance"),
                 E("etats.balance.tiers", "Balance des tiers", "comptabilite:balance", compte_debut="4", compte_fin="4"),
+                E("etats.balance.agee", "Balance âgée", "comptabilite:balance_agee", type="CLIENT"),
             ]),
-            E("etats.financiers", "États financiers", icone="bi-bank", enfants=[
+            E("etats.echeancier", "Échéancier", icone="bi-hourglass-split", enfants=[
+                E("etats.echeancier.clients", "Échéancier clients", "comptabilite:balance_agee", type="CLIENT", vue="echeancier"),
+                E("etats.echeancier.fournisseurs", "Échéancier fournisseurs", "comptabilite:balance_agee", type="FOURNISSEUR"),
+            ]),
+            SEP(),
+            E("etats.financiers", "Bilan et compte de résultat", icone="bi-bank", enfants=[
                 E("etats.financiers.bilan", "Bilan", "comptabilite:bilan"),
                 E("etats.financiers.resultat", "Compte de résultat", "comptabilite:compte_resultat"),
+                E("etats.financiers.sig", "Soldes intermédiaires de gestion", "comptabilite:compte_resultat", vue="sig"),
             ]),
-            E("etats.fiscal", "Fiscalité", icone="bi-percent", enfants=[
-                E("etats.fiscal.tva", "Récapitulatif TVA", "comptabilite:tva"),
+            E("etats.declarations", "Déclarations", icone="bi-file-earmark-text", enfants=[
+                E("etats.fiscal.tva", "Déclaration de TVA", "comptabilite:tva", vue="etat"),
+                E("etats.dsf", "Déclaration statistique et fiscale (DSF)"),
             ]),
         ]),
+        menu_fenetre("comptabilite"),
+        menu_aide("comptabilite"),
     ],
 )
 
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
 REPORTING = Module(
     code="reporting",
     titre="Reporting",
-    description="Tableaux de bord, analyses des ventes, échéances et états de synthèse",
+    description="Tableaux de bord, statistiques, échéanciers et états de synthèse",
     icone="bi-bar-chart-line",
     couleur="#6a1b9a",
     prefixe="/reporting/",
     accueil="reporting:dashboard",
     onglets=[
-        Onglet("synthese", "Synthèse", "bi-speedometer2", [
+        menu_fichier("reporting", "commercial:societe"),
+        Onglet("etat", "État", "bi-printer", [
             E("synthese.dashboard", "Tableau de bord", "reporting:dashboard", icone="bi-speedometer2"),
-        ]),
-        Onglet("ventes", "Ventes", "bi-graph-up", [
-            E("ventes.analyses", "Analyses", icone="bi-graph-up", enfants=[
+            SEP(),
+            E("ventes.analyses", "Statistiques des ventes", icone="bi-graph-up", enfants=[
                 E("ventes.mois", "Évolution mensuelle", "reporting:ventes", vue="mois"),
                 E("ventes.clients", "Par client", "reporting:ventes", vue="clients"),
                 E("ventes.articles", "Par article", "reporting:ventes", vue="articles"),
             ]),
-        ]),
-        Onglet("tiers", "Tiers", "bi-people", [
-            E("tiers.echeances", "Balances âgées", icone="bi-hourglass-split", enfants=[
+            E("tiers.echeances", "Échéanciers", icone="bi-hourglass-split", enfants=[
                 E("tiers.balance_agee_clients", "Clients", "reporting:balance_agee", type="CLIENT"),
                 E("tiers.balance_agee_fournisseurs", "Fournisseurs", "reporting:balance_agee", type="FOURNISSEUR"),
             ]),
-        ]),
-        Onglet("finances", "Finances", "bi-bank", [
+            SEP(),
             E("finances.etats", "États de synthèse", icone="bi-bank", enfants=[
                 E("finances.bilan", "Bilan", "reporting:bilan"),
                 E("finances.resultat", "Compte de résultat", "reporting:compte_resultat"),
+                E("finances.sig", "Soldes intermédiaires de gestion", "reporting:compte_resultat", vue="sig"),
             ]),
         ]),
+        menu_fenetre("reporting"),
+        menu_aide("reporting"),
     ],
 )
 
@@ -280,6 +394,14 @@ def module_pour_chemin(chemin):
     return None
 
 
+def _module_cible(module, lien):
+    """Code du logiciel qui affiche ce lien (« » si c'est le module lui-même, « web » hors logiciel)."""
+    if not lien or lien.startswith(module.prefixe):
+        return ""
+    autre = module_pour_chemin(lien)
+    return autre.code if autre else "web"
+
+
 def _score(element, chemin, parametres):
     """Score de correspondance d'un élément avec la page courante (None si aucune)."""
     lien = element.lien()
@@ -287,22 +409,27 @@ def _score(element, chemin, parametres):
         return None
     chemin_el, _, requete = lien.partition("?")
     attendus = dict(parse_qsl(requete))
-    if any(parametres.get(k) != v for k, v in attendus.items()):
+    if chemin_el != chemin or any(parametres.get(k) != v for k, v in attendus.items()):
         return None
-    if chemin_el == chemin:
-        return (2, len(attendus))
-    return None
+    return len(attendus)
 
 
-def _arbre(elements, chemin, parametres, meilleur):
+def _arbre(module, elements, chemin, parametres, meilleur):
     """Construit l'arbre sérialisable et mémorise le meilleur élément correspondant."""
     noeuds = []
     for el in elements:
-        enfants = _arbre(el.tous_enfants(), chemin, parametres, meilleur)
-        noeud = {"code": el.code, "titre": el.titre, "icone": el.icone, "url": el.lien(),
-                 "enfants": enfants, "actif": False, "ouvert": False}
-        score = _score(el, chemin, parametres)
-        if score and (meilleur["score"] is None or score > meilleur["score"]):
+        if el.separateur:
+            noeuds.append({"code": el.code, "separateur": True, "titre": "", "enfants": [], "url": None,
+                           "actif": False, "ouvert": False, "disponible": False, "action": "", "module": ""})
+            continue
+        enfants = _arbre(module, el.tous_enfants(), chemin, parametres, meilleur)
+        lien = el.lien()
+        cible = _module_cible(module, lien)
+        noeud = {"code": el.code, "titre": el.titre, "icone": el.icone, "url": lien, "enfants": enfants,
+                 "action": el.action, "module": cible, "separateur": False,
+                 "disponible": bool(lien or enfants or el.action), "actif": False, "ouvert": False}
+        score = _score(el, chemin, parametres) if not cible else None
+        if score is not None and (meilleur["score"] is None or score > meilleur["score"]):
             meilleur.update(score=score, noeud=noeud)
         noeuds.append(noeud)
     return noeuds
@@ -331,7 +458,7 @@ def chemin_vers_actif(noeuds):
 
 def premier_lien(noeuds):
     for n in noeuds:
-        if n["url"]:
+        if n["url"] and not n["module"]:
             return n["url"]
         lien = premier_lien(n["enfants"])
         if lien:
@@ -340,13 +467,13 @@ def premier_lien(noeuds):
 
 
 def structure_module(module, chemin="", parametres=None):
-    """Onglets + arbres du module, avec l'onglet et l'élément actifs."""
+    """Menus du module, avec le menu et l'élément actifs."""
     parametres = parametres or {}
     meilleur = {"score": None, "noeud": None}
     onglets = []
     for onglet in module.onglets:
         avant = meilleur["noeud"]
-        arbre = _arbre(onglet.elements, chemin, parametres, meilleur)
+        arbre = _arbre(module, onglet.elements, chemin, parametres, meilleur)
         onglets.append({"code": onglet.code, "titre": onglet.titre, "icone": onglet.icone, "elements": arbre,
                         "url": premier_lien(arbre), "contient_actif": False})
         if meilleur["noeud"] is not avant:

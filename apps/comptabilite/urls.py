@@ -1,13 +1,17 @@
 from django.urls import path
 
 from apps.core import views as core_views
+from apps.reporting import views as reporting_views
 
 from . import views
 
 app_name = "comptabilite"
 
 urlpatterns = [
+    path("a-propos/", core_views.a_propos, name="a_propos"),
     path("", core_views.accueil_module, {"module": "comptabilite"}, name="accueil"),
+    path("societe/", core_views.SocieteUpdateView.as_view(), name="societe"),
+    path("balance-agee/", reporting_views.balance_agee, name="balance_agee"),
     path("exercices/", core_views.ExerciceListView.as_view(), name="exercices"),
     path("exercices/nouveau/", core_views.ExerciceCreateView.as_view(), name="exercice_create"),
     path("exercices/<int:pk>/", core_views.ExerciceUpdateView.as_view(), name="exercice_update"),

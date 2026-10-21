@@ -12,6 +12,7 @@
 </head>
 <body>
 {% if user.is_authenticated %}
+  <form id="form-logout" method="post" action="{% url 'logout' %}" class="d-none">{% csrf_token %}</form>
   <header class="topbar d-print-none {% if not module %}topbar-portail{% endif %}">
     <a class="app-nom" href="{% if module %}{% url module.accueil %}{% else %}{% url 'core:portail' %}{% endif %}">
       <i class="bi {{ module.icone|default:'bi-grid-3x3-gap-fill' }}"></i>
@@ -19,32 +20,38 @@
     </a>
     <span class="contexte">{{ societe.raison_sociale }}{% if exercice_courant %} · Exercice {{ exercice_courant.code }}{% endif %}</span>
     <div class="ms-auto d-flex align-items-center gap-2">
+      {% if not module %}
       <div class="dropdown">
-        <button class="btn btn-sm btn-topbar dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-grid-3x3-gap"></i> Modules</button>
+        <button class="btn btn-sm btn-topbar dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-grid-3x3-gap"></i> Logiciels</button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{% url 'core:portail' %}" target="erp_portail"><i class="bi bi-house"></i> Portail ERP</a></li>
-          <li><hr class="dropdown-divider"></li>
-          {% for m in modules %}<li><a class="dropdown-item {% if m.code == module.code %}active{% endif %}" href="{% url m.accueil %}" target="erp_{{ m.code }}"><i class="bi {{ m.icone }}" style="color:{{ m.couleur }}"></i> {{ m.titre }}</a></li>{% endfor %}
+          {% for m in modules %}<li><a class="dropdown-item" href="{% url m.accueil %}" target="erp_{{ m.code }}"><i class="bi {{ m.icone }}" style="color:{{ m.couleur }}"></i> {{ m.titre }}</a></li>{% endfor %}
           {% if user.is_staff %}<li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-gear"></i> Administration</a></li>{% endif %}
         </ul>
       </div>
-      <form method="post" action="{% url 'logout' %}">{% csrf_token %}
-        <button class="btn btn-sm btn-topbar" title="Déconnexion"><i class="bi bi-person-circle"></i> {{ user.username }} <i class="bi bi-box-arrow-right"></i></button>
-      </form>
+      {% endif %}
+      <button form="form-logout" class="btn btn-sm btn-topbar" title="Quitter"><i class="bi bi-person-circle"></i> {{ user.username }} <i class="bi bi-box-arrow-right"></i></button>
     </div>
   </header>
 
   {% if module %}
-  <nav class="onglets d-print-none">
-    <a class="onglet {% if request.path == module.prefixe %}actif{% endif %}" href="{% url module.accueil %}" title="Accueil du module"><i class="bi bi-house-door"></i></a>
+  <nav class="barre-menus d-print-none" id="barre-menus">
     {% for o in onglets %}
-      <a class="onglet {% if o.code == onglet_actif.code and request.path != module.prefixe %}actif{% endif %}" href="{{ o.url }}"><i class="bi {{ o.icone }}"></i> {{ o.titre }}</a>
+      <div class="menu">
+        <button type="button" class="menu-titre {% if o.code == onglet_actif.code %}courant{% endif %}">{{ o.titre }}</button>
+        {% include "core/_menu.html" with noeuds=o.elements %}
+      </div>
     {% endfor %}
   </nav>
   <div class="d-flex espace">
     <aside class="arbre d-print-none">
-      <div class="arbre-titre"><i class="bi {{ onglet_actif.icone }}"></i> {{ onglet_actif.titre }}</div>
-      {% include "core/_arbre.html" with noeuds=onglet_actif.elements niveau=0 %}
+      <select class="form-select form-select-sm arbre-choix" id="arbre-choix" aria-label="Barre de navigation">
+        {% for o in onglets %}{% if o.code != "aide" %}<option value="{{ o.code }}" {% if o.code == onglet_actif.code %}selected{% endif %}>{{ o.titre }}</option>{% endif %}{% endfor %}
+      </select>
+      {% for o in onglets %}{% if o.code != "aide" %}
+        <div class="arbre-menu" data-menu="{{ o.code }}" {% if o.code != onglet_actif.code %}hidden{% endif %}>
+          {% include "core/_arbre.html" with noeuds=o.elements niveau=0 prefixe=o.code %}
+        </div>
+      {% endif %}{% endfor %}
     </aside>
   {% endif %}
   <main class="flex-grow-1 p-4 main">
@@ -57,6 +64,7 @@
   {% block public %}{% endblock %}
 {% endif %}
 <script src="{% static 'vendor/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'js/menus.js' %}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
