@@ -190,5 +190,17 @@ def navigation(request):
     if code:
         if code not in MODULES_PAR_CODE:
             return Response({"detail": "Module inconnu."}, status=status.HTTP_404_NOT_FOUND)
-        return Response(serialiser_module(MODULES_PAR_CODE[code]))
-    return Response([serialiser_module(m) for m in MODULES])
+        return Response(_navigation_avec_droits(request, MODULES_PAR_CODE[code]))
+    return Response([_navigation_avec_droits(request, m) for m in MODULES])
+
+
+def _navigation_avec_droits(request, module):
+    """Menus du logiciel, les entrées interdites au profil marquées (« interdit ») et sans lien."""
+    from apps.core.droits import Droits, annoter
+
+    donnees = serialiser_module(module)
+    droits = Droits(request.user, module)
+    if not droits.total and droits.reglages:
+        for onglet in donnees["onglets"]:
+            annoter(onglet["elements"], droits)
+    return donnees

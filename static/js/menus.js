@@ -109,6 +109,52 @@
     });
   });
 
+  // ------------------------------------------------------------------
+  // Fenêtres ouvertes : chaque page consultée devient un onglet de l'espace de travail
+  // ------------------------------------------------------------------
+  const zone = document.getElementById('onglets-fenetres');
+  if (zone) {
+    const cle = 'erp-fenetres-' + zone.dataset.module, accueil = zone.dataset.accueil;
+    const ici = location.pathname + location.search;
+    const titre = (document.getElementById('fenetre-titre').textContent.trim() || document.title.split(' · ')[0]).trim();
+    document.getElementById('fenetre-titre').textContent = titre;
+    let fenetres = [];
+    try { fenetres = JSON.parse(sessionStorage.getItem(cle) || '[]'); } catch (e) {}
+    if (location.pathname !== accueil && !document.getElementById('acces-refuse')) {
+      // Une même commande rouverte (autres filtres) reprend sa fenêtre au lieu d'en ouvrir une deuxième
+      const existante = fenetres.find(f => f.url === ici || f.titre === titre);
+      if (existante) existante.url = ici; else fenetres.push({ url: ici, titre });
+      fenetres = fenetres.slice(-8);
+    }
+    const enregistrer = () => { try { sessionStorage.setItem(cle, JSON.stringify(fenetres)); } catch (e) {} };
+    enregistrer();
+    const fermer = url => {
+      fenetres = fenetres.filter(f => f.url !== url); enregistrer();
+      if (url === ici) location.href = fenetres.length ? fenetres[fenetres.length - 1].url : accueil;
+      else afficher();
+    };
+    function afficher() {
+      zone.innerHTML = '';
+      fenetres.forEach(f => {
+        const a = document.createElement('a');
+        a.className = 'onglet-fenetre' + (f.url === ici ? ' courant' : '');
+        a.href = f.url; a.title = f.titre;
+        const s = document.createElement('span'); s.textContent = f.titre; a.appendChild(s);
+        const x = document.createElement('button'); x.type = 'button'; x.title = 'Fermer'; x.innerHTML = '<i class="bi bi-x"></i>';
+        x.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fermer(f.url); });
+        a.appendChild(x); zone.appendChild(a);
+      });
+    }
+    afficher();
+    // Déconnexion : les fenêtres ouvertes ne passent pas à l'utilisateur suivant
+    document.getElementById('form-logout')?.addEventListener('submit', () => {
+      try { Object.keys(sessionStorage).filter(k => k.startsWith('erp-fenetres-')).forEach(k => sessionStorage.removeItem(k)); } catch (e) {}
+    });
+    const bouton = document.getElementById('fenetre-fermer');
+    if (bouton && location.pathname !== accueil) bouton.addEventListener('click', e => { e.preventDefault(); fermer(ici); });
+    else if (bouton) bouton.hidden = true;
+  }
+
   // Barre de navigation : choix du menu affiché
   const choix = document.getElementById('arbre-choix');
   if (choix) choix.addEventListener('change', () => {

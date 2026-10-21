@@ -11,13 +11,14 @@
     {% elif n.action == "quitter" %}
       <button type="submit" form="form-logout" class="noeud feuille w-100 text-start border-0 bg-transparent"><i class="bi {{ n.icone|default:'bi-dot' }}"></i> {{ n.titre }}</button>
     {% elif n.action %}
-      <a class="noeud feuille" href="#" data-action="{{ n.action }}"><i class="bi {{ n.icone|default:'bi-dot' }}"></i> {{ n.titre }}</a>
+      <a class="noeud feuille" href="#" data-action="{{ n.action }}"><i class="bi {{ n.icone|default:'bi-dot' }}"></i> {{ n.titre }}{% if n.action == "barre_verticale" %}<i class="bi bi-check-lg coche-barre ms-auto" aria-hidden="true"></i>{% endif %}</a>
     {% elif n.url %}
       <a class="noeud feuille {% if n.actif %}actif{% endif %}" href="{{ n.url }}"{% if n.module == "web" %} target="_blank"{% elif n.module %} target="erp_{{ n.module }}"{% endif %}>
         <i class="bi {{ n.icone|default:'bi-dot' }}"></i> {{ n.titre }}{% if n.module %} <i class="bi bi-box-arrow-up-right small text-muted ms-auto"></i>{% endif %}
       </a>
     {% else %}
-      <span class="noeud feuille desactive" title="Non disponible dans cette version"><i class="bi {{ n.icone|default:'bi-dot' }}"></i> {{ n.titre }}</span>
+      {% if n.interdit %}<span class="noeud feuille desactive" title="Interdit par vos autorisations d'accès"><i class="bi bi-lock"></i> {{ n.titre }}</span>
+      {% else %}<span class="noeud feuille desactive" title="Non disponible dans cette version"><i class="bi {{ n.icone|default:'bi-dot' }}"></i> {{ n.titre }}</span>{% endif %}
     {% endif %}
   </li>
 {% endif %}{% endfor %}

@@ -105,3 +105,35 @@ body.sans-barre-verticale .arbre { display: none; }
 .raccourci i { font-size: 1.5rem; color: var(--module); }
 .raccourci:hover { border-color: var(--module); background: #f8f9fa; }
 .indicateur:hover { border-color: var(--module); }
+
+/* Espace de travail : fond neutre, la page ouverte est une fenêtre (barre de titre + fermeture) */
+.espace-travail { background: #e9edf1; padding: 12px 16px 16px; display: flex; flex-direction: column; }
+.onglets-fenetres { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+.onglets-fenetres:empty { display: none; }
+.onglet-fenetre { display: flex; align-items: center; gap: 6px; max-width: 230px; padding: 4px 6px 4px 10px; font-size: .8rem;
+  background: #f6f8fa; border: 1px solid #cfd6dd; border-radius: 6px 6px 0 0; color: #3a4654; text-decoration: none; }
+.onglet-fenetre span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onglet-fenetre.courant { background: #fff; border-color: var(--module); color: #111; font-weight: 600; }
+.onglet-fenetre button { border: 0; background: none; padding: 0 2px; line-height: 1; color: #6b7785; }
+.onglet-fenetre button:hover { color: #c62828; }
+.fenetre { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #fff; border: 1px solid #c9d1d9;
+  border-radius: 6px; box-shadow: 0 2px 8px rgba(20, 30, 40, .08); }
+.fenetre-titre { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; font-size: .875rem; font-weight: 600;
+  border-bottom: 1px solid #dde3ea; background: linear-gradient(#fafbfc, #f0f3f6); border-radius: 6px 6px 0 0; }
+.fenetre-titre > .bi:first-child { color: var(--module); }
+.fenetre-fermer { margin-left: auto; color: #5b6775; padding: 2px 6px; border-radius: 4px; }
+.fenetre-fermer:hover { background: #c62828; color: #fff; }
+.fenetre-contenu { padding: 1.25rem; min-width: 0; }
+.fenetre-contenu .card { box-shadow: none; }
+/* Fenêtre › Barre verticale : coche quand la barre est affichée */
+.coche-barre { margin-left: auto; }
+body.sans-barre-verticale .coche-barre { visibility: hidden; }
+@media (max-width: 768px) {
+  .espace-travail { padding: 8px; }
+  .fenetre-contenu { padding: .75rem; }
+}
+@media print {
+  .espace-travail { background: none; padding: 0; }
+  .fenetre { border: 0; box-shadow: none; }
+  .fenetre-contenu { padding: 0; }
+}

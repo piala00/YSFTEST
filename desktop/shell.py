@@ -368,6 +368,8 @@ class ModuleApp(ctk.CTk):
     ACTIONS_BUREAU = {"imprimer", "fermer", "quitter", "actualiser", "copier", "rechercher", "ajouter", "barre_verticale"}
 
     def element_disponible(self, el):
+        if el.get("interdit"):            # Fichier › Autorisations d'accès
+            return False
         if el["action"]:
             return el["action"] in self.ACTIONS_BUREAU
         return bool(el["url"] or el["code"] in self.ecrans)

@@ -9,6 +9,7 @@ app_name = "commercial"
 
 urlpatterns = [
     path("a-propos/", core_views.a_propos, name="a_propos"),
+    path("autorisations/", core_views.autorisations, {"module": "commercial"}, name="autorisations"),
     path("", core_views.accueil_module, {"module": "commercial"}, name="accueil"),
     path("societe/", core_views.SocieteUpdateView.as_view(), name="societe"),
     path("etats/ventes/", reporting_views.ventes, name="etat_ventes"),

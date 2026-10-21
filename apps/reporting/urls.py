@@ -9,6 +9,7 @@ app_name = "reporting"
 
 urlpatterns = [
     path("a-propos/", core_views.a_propos, name="a_propos"),
+    path("autorisations/", core_views.autorisations, {"module": "reporting"}, name="autorisations"),
     path("", views.dashboard, name="dashboard"),
     path("ventes/", views.ventes, name="ventes"),
     path("balance-agee/", views.balance_agee, name="balance_agee"),

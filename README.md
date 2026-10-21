@@ -73,6 +73,16 @@ il suffit de lui associer une page. La même définition alimente :
 - **le web** : menus déroulants avec cascades, séparateurs et commandes grisées, ainsi que le portail (`/`) ;
 - **le client bureau** : il construit une vraie barre de menus Windows à partir de `/api/navigation/?module=<code>`.
 
+## Espace de travail et autorisations d'accès
+- **Espace de travail** : menus en haut, barre verticale à gauche, et au centre la fenêtre de la commande ouverte
+  (barre de titre, bouton de fermeture). Les fenêtres ouvertes restent en onglets au-dessus pour passer de l'une à
+  l'autre. **Fenêtre › Barre verticale** (coché / décoché) affiche ou masque la barre de gauche.
+- **Fichier › Autorisations d'accès** (administrateur) : profils et utilisateurs ; pour chaque logiciel, l'arbre de
+  tous les menus, éléments et sous-éléments (boutons + / −), avec quatre niveaux : *Tout autoriser*, *Interdire la
+  suppression*, *Interdire l'écriture* (consultation seule), *Tout interdire*. Un élément sans réglage hérite de son
+  menu parent ; un utilisateur sans profil et l'administrateur ont tous les droits. Les commandes interdites sont
+  grisées avec un cadenas, et le contrôle est fait par le serveur (pages web et API du client bureau).
+
 ## Modules
 
 ### Gestion commerciale (découpage Sage 100 Gestion commerciale V11)

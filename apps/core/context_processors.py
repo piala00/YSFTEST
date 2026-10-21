@@ -1,3 +1,4 @@
+from .droits import Droits, annoter
 from .models import Exercice, Societe
 from .navigation import MODULES, chemin_vers_actif, module_pour_chemin, structure_module
 
@@ -10,7 +11,15 @@ def societe(request):
     if module is None:
         return contexte
 
-    onglets, element_actif = structure_module(module, request.path, request.GET)
+    navigation = getattr(request, "navigation", None)
+    if navigation and navigation[0] is module:
+        onglets, element_actif = navigation[1], navigation[2]
+    else:
+        onglets, element_actif = structure_module(module, request.path, request.GET)
+    droits = getattr(request, "droits", None) or Droits(request.user, module)
+    if not droits.total and droits.reglages:
+        for o in onglets:
+            annoter(o["elements"], droits)
     cle_session = f"onglet_{module.code}"
     actif = next((o for o in onglets if o["contient_actif"]), None)
     if actif is None:

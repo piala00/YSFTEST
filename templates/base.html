@@ -69,13 +69,25 @@
       {% endif %}{% endfor %}
     </aside>
   {% endif %}
-  <main class="flex-grow-1 p-4 main">
+  <main class="flex-grow-1 main{% if module %} espace-travail{% else %} p-4{% endif %}">
+    {% if module %}
+    {# Espace de travail façon Sage : chaque commande s'ouvre dans une fenêtre au centre, les menus restent autour #}
+    <div class="onglets-fenetres d-print-none" id="onglets-fenetres" data-module="{{ module.code }}" data-accueil="{% url module.accueil %}"></div>
+    <section class="fenetre">
+      <div class="fenetre-titre d-print-none">
+        <i class="bi {{ module.icone }}"></i>
+        <span id="fenetre-titre">{% if element_actif %}{{ element_actif.titre }}{% endif %}</span>
+        <a class="fenetre-fermer" href="{% url module.accueil %}" id="fenetre-fermer" title="Fermer la fenêtre"><i class="bi bi-x-lg"></i></a>
+      </div>
+      <div class="fenetre-contenu">
+    {% endif %}
     {% if fil_ariane %}<nav class="fil-ariane d-print-none"><span>{{ onglet_actif.titre }}</span>{% for n in fil_ariane %} <i class="bi bi-chevron-right"></i> <span>{{ n.titre }}</span>{% endfor %}</nav>{% endif %}
     {% include "core/_messages.html" %}
     {% if societe.tva_a_parametrer and user.is_authenticated %}<div class="alert alert-warning d-print-none py-2 small" id="alerte-tva">
       <i class="bi bi-exclamation-triangle"></i> <strong>Régime de TVA non paramétré.</strong> Les documents sont calculés comme pour une société assujettie (TVA {{ societe.taux_tva_defaut }} %).
       Si votre société n'est pas assujettie, indiquez-le dans <a href="{% url 'commercial:societe' %}">Fichier › À propos de votre société</a>.</div>{% endif %}
     {% block content %}{% endblock %}
+    {% if module %}</div></section>{% endif %}
   </main>
   {% if module %}</div>{% endif %}
 {% else %}

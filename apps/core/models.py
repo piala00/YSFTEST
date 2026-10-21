@@ -117,3 +117,22 @@ class Sequence(models.Model):
             seq.dernier_numero += 1
             seq.save(update_fields=["dernier_numero"])
         return f"{code}{annee}-{seq.dernier_numero:0{largeur}d}"
+
+
+class DroitAcces(models.Model):
+    """Fichier › Autorisations d'accès : niveau d'un profil (groupe) sur une entrée de menu d'un logiciel."""
+
+    from .droits import NIVEAUX as _NIVEAUX
+
+    groupe = models.ForeignKey("auth.Group", on_delete=models.CASCADE, related_name="droits", verbose_name="Profil")
+    module = models.CharField("Logiciel", max_length=20)
+    code = models.CharField("Entrée de menu", max_length=100)
+    niveau = models.CharField(max_length=20, choices=_NIVEAUX)
+
+    class Meta:
+        unique_together = ("groupe", "module", "code")
+        verbose_name = "Autorisation d'accès"
+        verbose_name_plural = "Autorisations d'accès"
+
+    def __str__(self):
+        return f"{self.groupe} · {self.module} · {self.code} : {self.get_niveau_display()}"

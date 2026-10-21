@@ -8,12 +8,13 @@
   {% elif n.action == "quitter" %}
     <li><button type="submit" form="form-logout" class="item"><i class="bi {{ n.icone|default:'bi-blank' }}"></i><span>{{ n.titre }}</span></button></li>
   {% elif n.action %}
-    <li><a href="#" class="item" data-action="{{ n.action }}"><i class="bi {{ n.icone|default:'bi-blank' }}"></i><span>{{ n.titre }}</span></a></li>
+    <li><a href="#" class="item" data-action="{{ n.action }}"><i class="bi {{ n.icone|default:'bi-blank' }}"></i><span>{{ n.titre }}</span>{% if n.action == "barre_verticale" %}<i class="bi bi-check-lg coche-barre" aria-hidden="true"></i>{% endif %}</a></li>
   {% elif n.url %}
     <li><a class="item {% if n.actif %}actif{% endif %}" href="{{ n.url }}"{% if n.module == "web" %} target="_blank"{% elif n.module %} target="erp_{{ n.module }}" title="S'ouvre dans le logiciel concerné"{% endif %}>
       <i class="bi {{ n.icone|default:'bi-blank' }}"></i><span>{{ n.titre }}</span>{% if n.module %}<i class="bi bi-box-arrow-up-right externe"></i>{% endif %}</a></li>
   {% else %}
-    <li><span class="item desactive" title="Non disponible dans cette version"><i class="bi {{ n.icone|default:'bi-blank' }}"></i><span>{{ n.titre }}</span></span></li>
+    {% if n.interdit %}<li><span class="item desactive" title="Interdit par vos autorisations d'accès"><i class="bi bi-lock"></i><span>{{ n.titre }}</span></span></li>
+    {% else %}<li><span class="item desactive" title="Non disponible dans cette version"><i class="bi {{ n.icone|default:'bi-blank' }}"></i><span>{{ n.titre }}</span></span></li>{% endif %}
   {% endif %}
 {% endfor %}
 </ul>

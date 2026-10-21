@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Accès refusé{% endblock %}
+{% block content %}
+<div class="card card-body" style="max-width:640px" id="acces-refuse">
+  <h1 class="h4"><i class="bi bi-shield-lock text-danger"></i> Accès refusé</h1>
+  <p class="mb-2">Votre profil <strong>{{ profil }}</strong> ne permet pas de <strong>{{ operation }}</strong> dans
+    <strong>{{ chemin }}</strong> (autorisation : « {{ niveau }} »).</p>
+  <p class="small text-muted mb-3">Les droits se règlent dans Fichier › Autorisations d'accès, par l'administrateur.</p>
+  <div><a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">Retour</a></div>
+</div>
+{% endblock %}
