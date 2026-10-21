@@ -1,0 +1,26 @@
+# Version en ligne de test de l'ERP sur Render (https://render.com), redéployée à chaque envoi sur la branche.
+# Mise en place, une seule fois : Render › New › Blueprint › choisir le dépôt piala00/YSFTEST › Apply,
+# puis saisir DEMO_ADMIN_PASSWORD (mot de passe du compte « admin »). Voir docs/VERSION_EN_LIGNE.md.
+services:
+  - type: web
+    name: erp-ohada-test
+    runtime: python
+    plan: free
+    branch: ccr-5592a371-fusjt2
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: bash deploy/demarrer_render.sh
+    healthCheckPath: /connexion/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEMO_ADMIN_PASSWORD
+        sync: false
+      # Sans DATABASE_URL, la base SQLite est recréée à chaque redémarrage (données de démonstration).
+      # Pour conserver les saisies, coller ici l'URL d'une base PostgreSQL (Render, Neon, Supabase…).
+      - key: DATABASE_URL
+        sync: false

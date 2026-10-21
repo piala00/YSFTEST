@@ -19,7 +19,7 @@ class Command(BaseCommand):
                             help="Crée la société fictive SAHEL DISTRIBUTION des exercices du formateur Sage 100")
         parser.add_argument("--regime-tva", choices=["assujettie", "non-assujettie"],
                             help="Régime de TVA de la société (sinon : à paramétrer dans la fiche société)")
-        parser.add_argument("--admin", metavar="MOT_DE_PASSE", help="Crée le super-utilisateur « admin » avec ce mot de passe")
+        parser.add_argument("--admin", metavar="MOT_DE_PASSE", help="Crée le super-utilisateur « admin » (ou lui redonne ce mot de passe)")
 
     def log(self, message):
         if self.verbosity:
@@ -74,9 +74,14 @@ class Command(BaseCommand):
 
         if options["admin"]:
             User = get_user_model()
-            if not User.objects.filter(username="admin").exists():
+            admin = User.objects.filter(username="admin").first()
+            if admin is None:
                 User.objects.create_superuser("admin", "", options["admin"])
                 self.log("Super-utilisateur « admin » créé.")
+            elif not admin.check_password(options["admin"]):
+                admin.set_password(options["admin"])
+                admin.save(update_fields=["password"])
+                self.log("Mot de passe du super-utilisateur « admin » mis à jour.")
 
         if options["demo"]:
             self._demo()

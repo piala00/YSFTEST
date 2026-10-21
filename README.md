@@ -173,6 +173,13 @@ produits par des requêtes **SELECT uniquement** (`--sql`). Simulation par défa
 - Analyse des ventes par client et par article (avec marge), exports CSV.
 - Balance âgée des clients et des fournisseurs (non échu, 1-30, 31-60, 61-90, > 90 jours).
 
+## Suivre le développement en ligne
+- **Aperçu** (simulateurs web et bureau, explorateur des menus), reconstruit à chaque envoi :
+  https://piala00.github.io/YSFTEST/
+- **Version en ligne réelle** (Render, saisie possible) : `render.yaml`, à connecter une fois.
+
+Mise en place et limites : `docs/VERSION_EN_LIGNE.md`.
+
 ## Installation rapide (développement, SQLite)
 
 ```bash

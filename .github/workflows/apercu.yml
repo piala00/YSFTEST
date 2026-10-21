@@ -1,0 +1,56 @@
+# À chaque envoi : tests, puis publication sur GitHub Pages des simulateurs web et bureau et de l'explorateur
+# des menus, régénérés depuis le code envoyé (données de démonstration).
+name: Aperçu de l'ERP
+
+on:
+  push:
+    branches: [ccr-5592a371-fusjt2, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Tests
+        run: python manage.py test -v1
+      - name: Simulateurs et explorateur
+        run: |
+          rm -f db.sqlite3
+          python manage.py migrate --noinput -v0
+          python manage.py init_erp --demo --regime-tva assujettie -v0
+          mkdir -p _site
+          python manage.py simulateur --dossier _site
+          python manage.py explorateur_menus --autonome --sortie _site/explorateur-menus.html
+          sed -e "s/{{COMMIT}}/${GITHUB_SHA::7}/" -e "s/{{DATE}}/$(TZ=Africa/Douala date '+%d\/%m\/%Y %H:%M')/" \
+              deploy/apercu_index.html > _site/index.html
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  publier:
+    needs: construire
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - id: deploiement
+        uses: actions/deploy-pages@v4

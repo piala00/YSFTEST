@@ -39,6 +39,14 @@ DEBUG = env_bool("DEBUG", True)
 ALLOWED_HOSTS = [h.strip() for h in env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 
+# Hébergement Render (version en ligne de test) : le nom d'hôte public est fourni par la plateforme
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = True
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -58,6 +66,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",       # fichiers statiques servis sans serveur web séparé
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -87,6 +96,15 @@ TEMPLATES = [
 WSGI_APPLICATION = "erp.wsgi.application"
 
 DB_ENGINE = env("DB_ENGINE", "sqlite").lower()
+if env("DATABASE_URL"):
+    # postgresql://utilisateur:mot_de_passe@hôte:port/base (format des hébergeurs)
+    from urllib.parse import unquote, urlsplit
+
+    _url = urlsplit(env("DATABASE_URL"))
+    DB_ENGINE = "postgresql"
+    os.environ.update({"DB_NAME": _url.path.lstrip("/"), "DB_USER": unquote(_url.username or ""),
+                       "DB_PASSWORD": unquote(_url.password or ""), "DB_HOST": _url.hostname or "",
+                       "DB_PORT": str(_url.port or 5432)})
 if DB_ENGINE == "postgresql":
     DATABASES = {
         "default": {
@@ -134,6 +152,10 @@ USE_THOUSAND_SEPARATOR = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
