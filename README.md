@@ -5,15 +5,29 @@ ERP conçu pour les PME de l'espace OHADA (FCFA, TVA 19,25 % par défaut — Cam
 - un **serveur web Django** (interface navigateur + API REST), compatible **PostgreSQL**, **SQL Server** ou SQLite ;
 - un **client bureau CustomTkinter** (Windows / Linux / macOS) qui se connecte au serveur par l'API.
 
-## Architecture : 3 logiciels avec une barre de menus façon Sage 100c
+## Architecture : 3 logiciels avec une barre de menus façon Sage 100
 
 Chaque module est un **logiciel à part entière**, avec sa fenêtre, sa couleur et sa propre **barre de menus**,
 organisée comme Sage 100c :
 
 ```
-Fichier · Structure · Traitement · État · Fenêtre · ?
+Fichier · Édition · Structure · Traitement · Etat · Fenêtre · ?
    └─ commandes, séparateurs, sous-menus en cascade ▸
 ```
+
+Sous la barre de menus se trouvent une **barre d'outils** et une **barre verticale** de navigation (Fenêtre ›
+Barre verticale). Le menu **Édition** est actif dans la version web : Couper, Copier, Coller, Effacer,
+Sélectionner tout, Ajouter, Voir/Modifier et Rechercher.
+
+**Conformité Sage 100 V12.** Chaque entrée de menu porte un niveau de preuve, selon le skill
+`sage-100-gescom-v12-ui` installé dans `.claude/skills/` :
+- `DOC-V12` : cité dans le découpage officiel V12.10 ;
+- `ERG-CLASSIQUE` : ergonomie Sage classique, à vérifier ;
+- `INDICATIF` : proposition non vérifiée ;
+- `AJOUT-ERP` : propre à l'ERP OHADA.
+
+La matrice de traçabilité est générée par `python manage.py audit_navigation --sortie docs/AUDIT_SAGE_V12_GESCOM.md`.
+Les points à confirmer sur une installation V12 réelle sont listés dans `docs/SAGE_V12_POINTS_A_VERIFIER.md`.
 
 | Logiciel | Barre de menus |
 |---|---|
@@ -69,7 +83,17 @@ Autres fonctions :
 - **Recherche de documents :** par entêtes ou par lignes, avec filtres domaine, type, statut, dépôt, dates, tiers, n° de pièce et article.
 - **Gestion des comptes :** clients et fournisseurs avec solde comptable et reste dû, interrogation des articles.
 - **Gestion des livraisons clients et des réceptions fournisseurs :** commandes en attente.
-- **Etat :** analyse et statistiques clients et fournisseurs, statistiques articles avec marge au CMUP, mouvements de stock, inventaire (état préparatoire et livre d'inventaire à date, par dépôt).
+- **Etat** (découpage V12.10, pages 13 et 14) :
+  - analyse clients : activité mensuelle, rentabilité au CMUP, risque (encours, échu, dépassement du plafond) ;
+  - statistiques clients et fournisseurs par familles et par articles ;
+  - palmarès des clients et des ventes ;
+  - analyse fournisseurs ;
+  - mouvements de stock ;
+  - inventaire : état préparatoire et livre d'inventaire ;
+  - relevés de factures et d'échéances ;
+  - listes des documents, des clients, des fournisseurs et des articles.
+
+  Tous ces états s'impriment et s'exportent en CSV.
 - **Règlements :** espèces, chèque, virement, Mobile Money, avec imputation automatique sur les factures.
 - **Impression :** tous les documents s'impriment en A4.
 

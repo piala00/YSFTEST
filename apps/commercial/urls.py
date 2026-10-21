@@ -14,6 +14,7 @@ urlpatterns = [
     path("etats/ventes/", reporting_views.ventes, name="etat_ventes"),
     path("etats/balance-agee/", reporting_views.balance_agee, name="etat_balance_agee"),
     path("etats/achats/", reporting_views.achats, name="etat_achats"),
+    path("etats/<str:code>/", reporting_views.statistique, name="statistique"),
     path("recherche/entetes/", views.recherche_entetes, name="recherche_entetes"),
     path("recherche/lignes/", views.recherche_lignes, name="recherche_lignes"),
     path("stock/mouvements/", views.MouvementListView.as_view(), name="mouvements"),

@@ -350,6 +350,7 @@ class ModuleApp(ctk.CTk):
     def _barre_navigation(self, parent):
         cadre = ctk.CTkFrame(parent, fg_color="white", corner_radius=0, width=280)
         cadre.pack(side="left", fill="y")
+        self.cadre_navigation = cadre
         cadre.pack_propagate(False)
         menus = [o["titre"] for o in self.navigation["onglets"] if o["code"] != "aide"]
         self.choix_menu = ctk.CTkOptionMenu(cadre, values=menus, command=self.choisir_onglet, fg_color=self.couleur,
@@ -363,8 +364,13 @@ class ModuleApp(ctk.CTk):
         self.arbre.bind("<Double-1>", self._double_clic)
 
     # --- Navigation ------------------------------------------------------
+    # Commandes d'interface disponibles dans le client bureau (les autres sont grisées)
+    ACTIONS_BUREAU = {"imprimer", "fermer", "quitter", "actualiser", "copier", "rechercher", "ajouter", "barre_verticale"}
+
     def element_disponible(self, el):
-        return bool(el["url"] or el["action"] or el["code"] in self.ecrans)
+        if el["action"]:
+            return el["action"] in self.ACTIONS_BUREAU
+        return bool(el["url"] or el["code"] in self.ecrans)
 
     def choisir_onglet(self, titre):
         onglet = next(o for o in self.navigation["onglets"] if o["titre"] == titre)
@@ -437,6 +443,30 @@ class ModuleApp(ctk.CTk):
             return
         if action == "fermer":
             self.destroy()
+            return
+        if action == "barre_verticale":
+            if self.cadre_navigation.winfo_ismapped():
+                self.cadre_navigation.pack_forget()
+            else:
+                self.cadre_navigation.pack(side="left", fill="y", before=self.contenu)
+            return
+        if action == "copier":
+            ligne = getattr(getattr(self.page_courante, "tableau", None), "selection", lambda: None)()
+            if ligne:
+                tableau = self.page_courante.tableau
+                self.clipboard_clear()
+                self.clipboard_append("\t".join(str(ligne.get(c[0], "")) for c in tableau.colonnes))
+                self.statut("Ligne copiée dans le presse-papiers")
+            return
+        if action == "rechercher":
+            champ = getattr(self.page_courante, "recherche", None)
+            if champ is not None:
+                champ.focus_set()
+            return
+        if action == "ajouter":
+            creer = getattr(self.page_courante, "nouvelle_facture", None)
+            if creer and self.page_courante.domaine != "stocks":
+                creer()
             return
         if action == "actualiser":
             if self.page_courante is not None:

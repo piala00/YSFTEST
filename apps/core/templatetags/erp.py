@@ -31,3 +31,26 @@ def absolu(value):
         return abs(value)
     except TypeError:
         return value
+
+
+@register.filter
+def cellule(ligne, colonne):
+    """Valeur formatée d'une colonne d'état : colonne = (clé, libellé, genre)."""
+    cle, _, genre = colonne
+    valeur = ligne.get(cle) if isinstance(ligne, dict) else None
+    if valeur is None or valeur == "":
+        return ""
+    if genre == "montant":
+        return montant(valeur)
+    if genre == "quantite":
+        return f"{Decimal(valeur).normalize():f}".replace(".", ",")
+    if genre == "pourcent":
+        return f"{Decimal(valeur):.1f} %".replace(".", ",")
+    if genre == "date":
+        return valeur.strftime("%d/%m/%Y")
+    return valeur
+
+
+@register.filter
+def valeur(dictionnaire, cle):
+    return dictionnaire.get(cle) if isinstance(dictionnaire, dict) else None

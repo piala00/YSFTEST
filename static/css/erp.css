@@ -34,7 +34,7 @@ body { background: #f4f6f9; font-size: .92rem; }
 .bi-blank::before { content: ""; display: inline-block; width: 1em; }
 
 /* Arborescence des éléments */
-.espace { min-height: calc(100vh - 88px); }
+.espace { min-height: calc(100vh - 118px); }
 .arbre { width: 260px; flex-shrink: 0; background: #fff; border-right: 1px solid #dde3ea; padding: .75rem 0; }
 .arbre-choix { margin: 0 .75rem .6rem; width: calc(100% - 1.5rem); }
 .arbre .noeud.desactive { color: #a3abb4; }
@@ -80,3 +80,12 @@ tr.sous-total td { font-weight: 600; background: #f7f9fb; }
 .espace .btn-primary:hover { filter: brightness(.88); }
 .espace .btn-outline-primary { --bs-btn-color: var(--module); --bs-btn-border-color: var(--module); --bs-btn-hover-bg: var(--module);
   --bs-btn-hover-border-color: var(--module); --bs-btn-active-bg: var(--module); }
+
+/* Barre d'outils (sous la barre de menus) */
+.barre-outils { display: flex; align-items: center; gap: .1rem; background: #f8fafc; border-bottom: 1px solid #d5dce4; padding: .15rem .5rem; }
+.barre-outils button, .barre-outils a { background: none; border: 1px solid transparent; border-radius: 3px; padding: .15rem .45rem; color: #3b4a5c; line-height: 1.2; }
+.barre-outils button:hover, .barre-outils a:hover { border-color: #c9d2dc; background: #fff; color: var(--module); }
+.barre-outils .sep { width: 1px; height: 1.1rem; background: #d5dce4; margin: 0 .3rem; }
+body.sans-barre-verticale .arbre { display: none; }
+.toast-erp { position: fixed; right: 1rem; bottom: 1rem; z-index: 2000; background: #1e2a3a; color: #fff; padding: .55rem .9rem; border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25); font-size: .85rem; }

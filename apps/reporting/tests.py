@@ -80,12 +80,56 @@ class PagesEtApiTests(TestCase):
     def test_menus_comme_sage(self):
         from apps.core.navigation import MODULES
 
-        for module in MODULES:
-            titres = [o.titre for o in module.onglets]
-            self.assertEqual(titres[0], "Fichier")
-            self.assertEqual(titres[-2:], ["Fenêtre", "?"])
-        compta = [o.titre for o in MODULES[1].onglets]
-        self.assertEqual(compta, ["Fichier", "Structure", "Traitement", "Etat", "Fenêtre", "?"])
+        attendu = ["Fichier", "Édition", "Structure", "Traitement", "Etat", "Fenêtre", "?"]
+        for module in MODULES[:2]:
+            self.assertEqual([o.titre for o in module.onglets], attendu)
+        self.assertEqual([o.titre for o in MODULES[2].onglets], ["Fichier", "Édition", "Etat", "Fenêtre", "?"])
+
+    def test_preuves_et_matrice_d_audit(self):
+        import io
+
+        from django.core.management import call_command
+
+        from apps.core.navigation import PREUVES, GESTION_COMMERCIALE, structure_module
+
+        def parcourir(noeuds):
+            for n in noeuds:
+                if not n["separateur"]:
+                    yield n
+                    yield from parcourir(n["enfants"])
+
+        onglets, _ = structure_module(GESTION_COMMERCIALE)
+        for n in (n for o in onglets for n in parcourir(o["elements"])):
+            self.assertIn(n["preuve"], PREUVES, n["code"])
+        edition = next(o for o in onglets if o["code"] == "edition")
+        self.assertTrue(all(n["preuve"] == "ERG-CLASSIQUE" for n in parcourir(edition["elements"])))
+        sortie = io.StringIO()
+        call_command("audit_navigation", stdout=sortie)
+        self.assertIn("| Traitement › Documents des ventes | Facture d'avoir | DOC-V12 | ✅ Réalisé |", sortie.getvalue())
+
+    def test_etats_statistiques_coherents(self):
+        import datetime
+
+        from apps.reporting import services, statistiques
+
+        debut, fin = datetime.date(2026, 1, 1), datetime.date(2026, 12, 31)
+        ca = services.chiffre_affaires(debut, fin)
+        for code in ("palmares_clients", "activite_clients", "rentabilite_clients", "ventes_familles", "palmares_ventes"):
+            etat = statistiques.calculer(code, debut, fin)
+            cle = {"palmares_clients": "montant", "activite_clients": "total", "rentabilite_clients": "ca",
+                   "ventes_familles": "montant", "palmares_ventes": "montant"}[code]
+            self.assertEqual(etat["totaux"][cle], ca, code)
+        rentabilite = statistiques.calculer("rentabilite_clients", debut, fin)
+        for ligne in rentabilite["lignes"]:
+            self.assertEqual(ligne["marge"], ligne["ca"] - ligne["cout"])
+        palmares = statistiques.calculer("palmares_clients", debut, fin)["lignes"]
+        self.assertEqual([l["rang"] for l in palmares], list(range(1, len(palmares) + 1)))
+        self.assertAlmostEqual(float(palmares[-1]["cumul"]), 100.0)
+        for code in statistiques.ETATS:
+            with self.subTest(etat=code):
+                self.assertEqual(self.client.get(reverse("commercial:statistique", args=[code])).status_code, 200)
+                self.assertEqual(self.client.get(reverse("commercial:statistique", args=[code]) + "?export=csv").status_code, 200)
+        self.assertEqual(self.client.get(reverse("commercial:statistique", args=["inexistant"])).status_code, 404)
 
     def test_saisie_facture_par_formulaire(self):
         tiers = Tiers.objects.filter(type_tiers=Tiers.CLIENT).first()

@@ -58,3 +58,21 @@ def achats(request):
                            [[l["tiers"].code, l["tiers"].nom, l["nb"], l["ca_ht"], l["ttc"], l["encours"]] for l in lignes])
     return render(request, "reporting/achats.html", {"form": form, "lignes": lignes, "p": p,
                                                      "total": sum(l["ca_ht"] for l in lignes)})
+
+
+@login_required
+def statistique(request, code):
+    """Etat de la Gestion commerciale (Etat › Analyse, Statistiques, Relevés, Listes)."""
+    from django.http import Http404
+
+    from . import statistiques
+
+    if code not in statistiques.ETATS:
+        raise Http404
+    form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
+    etat = statistiques.calculer(code, p["date_debut"], p["date_fin"])
+    if request.GET.get("export") == "csv":
+        cles = [c for c in etat["colonnes"]]
+        from apps.core.templatetags.erp import cellule
+        return _export_csv(code, [c[1] for c in cles], [[cellule(l, c) for c in cles] for l in etat["lignes"]])
+    return render(request, "reporting/statistique.html", {"form": form, "p": p, "etat": etat, "code": code})

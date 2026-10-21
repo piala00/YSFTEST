@@ -2,7 +2,7 @@
 
 Chaque module est un logiciel à part entière doté d'une barre de menus :
 
-    Fichier · Structure · Traitement · Etat · Fenêtre · ?
+    Fichier · Édition · Structure · Traitement · Etat · Fenêtre · ?
 
 La Gestion commerciale reprend le « Découpage fonctionnel détaillé Sage 100 Gestion
 commerciale V11 » (menus et sous-menus dans le même ordre).
@@ -38,8 +38,9 @@ class Element:
     icone: str = ""
     enfants: list = field(default_factory=list)
     enfants_dynamiques: Optional[Callable] = None
-    action: str = ""                   # imprimer | fermer | quitter
+    action: str = ""                   # imprimer | fermer | quitter | actualiser | couper | copier…
     separateur: bool = False
+    preuve: str = ""                   # DOC-V12 | ERG-CLASSIQUE | INDICATIF | AJOUT-ERP (voir PREUVES)
 
     def lien(self):
         if not self.url:
@@ -72,8 +73,17 @@ class Module:
     onglets: list
 
 
-def E(code, titre, url="", *args, icone="", enfants=None, dyn=None, action="", **query):
-    return Element(code, titre, url, args, query, icone, enfants or [], dyn, action)
+def E(code, titre, url="", *args, icone="", enfants=None, dyn=None, action="", preuve="", **query):
+    return Element(code, titre, url, args, query, icone, enfants or [], dyn, action, preuve=preuve)
+
+
+# Niveaux de preuve (skill « sage-100-gescom-v12-ui ») : origine de chaque entrée de menu
+PREUVES = {
+    "DOC-V12": "Cité dans le découpage officiel Sage 100 Gestion commerciale V12.10",
+    "ERG-CLASSIQUE": "Ergonomie Sage classique, à vérifier sur une installation V12",
+    "INDICATIF": "Proposition fonctionnelle, non vérifiée sur une capture V12",
+    "AJOUT-ERP": "Ajout propre à l'ERP OHADA (absent de Sage)",
+}
 
 
 _compteur = itertools.count()
@@ -103,6 +113,35 @@ def menu_fichier(module, societe_url, fermer=True):
     ])
 
 
+def menu_edition():
+    """Menu Édition : non détaillé par le découpage V12.10, repris de l'ergonomie Sage classique."""
+    P = "ERG-CLASSIQUE"
+    return Onglet("edition", "Édition", "bi-pencil", [
+        E("edition.annuler", "Annuler", icone="bi-arrow-counterclockwise", action="annuler", preuve=P),
+        SEP(),
+        E("edition.couper", "Couper", icone="bi-scissors", action="couper", preuve=P),
+        E("edition.copier", "Copier", icone="bi-files", action="copier", preuve=P),
+        E("edition.coller", "Coller", icone="bi-clipboard", action="coller", preuve=P),
+        E("edition.effacer", "Effacer", icone="bi-eraser", action="effacer", preuve=P),
+        E("edition.selectionner_tout", "Sélectionner tout", action="selectionner_tout", preuve=P),
+        SEP(),
+        E("edition.ajouter", "Ajouter", icone="bi-plus-square", action="ajouter", preuve=P),
+        E("edition.modifier", "Voir/Modifier", icone="bi-pencil-square", action="modifier", preuve=P),
+        E("edition.supprimer", "Supprimer", icone="bi-trash", preuve=P),
+        E("edition.dupliquer", "Dupliquer", icone="bi-copy", preuve=P),
+        SEP(),
+        E("edition.precedent", "Précédent", icone="bi-chevron-left", preuve=P),
+        E("edition.suivant", "Suivant", icone="bi-chevron-right", preuve=P),
+        SEP(),
+        E("edition.rechercher", "Rechercher", icone="bi-search", action="rechercher", preuve=P),
+        E("edition.atteindre", "Atteindre", preuve=P),
+        SEP(),
+        E("edition.inverseur", "Inverseur", preuve=P),
+        E("edition.calculette", "Calculette Sage", icone="bi-calculator", preuve=P),
+        E("edition.journal", "Journal de traitement", preuve=P),
+    ])
+
+
 def menu_fenetre(module):
     return Onglet("fenetre", "Fenêtre", "bi-window-stack", [
         E("fenetre.reorganiser", "Réorganiser"),
@@ -113,20 +152,20 @@ def menu_fenetre(module):
         E("fenetre.ajustement", "Ajustement automatique des colonnes"),
         SEP(),
         E("fenetre.preferences", "Préférences"),
-        E("fenetre.barre_verticale", "Barre verticale"),
+        E("fenetre.barre_verticale", "Barre verticale", icone="bi-layout-sidebar", action="barre_verticale"),
         E("fenetre.mode_assistant", "Mode assistant"),
         E("fenetre.mode_personnalise", "Mode personnalisé"),
         SEP(),
-        E("fenetre.accueil", "Page d'accueil", MODULES_ACCUEIL[module], icone="bi-house"),
-        E("fenetre.portail", "Portail ERP OHADA", "core:portail", icone="bi-grid-3x3-gap"),
-        *[E(f"fenetre.{code}", titre, accueil, icone=icone)
+        E("fenetre.accueil", "Page d'accueil", MODULES_ACCUEIL[module], icone="bi-house", preuve="AJOUT-ERP"),
+        E("fenetre.portail", "Portail ERP OHADA", "core:portail", icone="bi-grid-3x3-gap", preuve="AJOUT-ERP"),
+        *[E(f"fenetre.{code}", titre, accueil, icone=icone, preuve="AJOUT-ERP")
           for code, titre, accueil, icone in AUTRES_LOGICIELS if code != module],
     ])
 
 
 def menu_aide(module):
     return Onglet("aide", "?", "bi-question-circle", [
-        E("aide.a_propos", "À propos de l'ERP OHADA", f"{module}:a_propos", icone="bi-info-circle"),
+        E("aide.a_propos", "À propos de l'ERP OHADA", f"{module}:a_propos", icone="bi-info-circle", preuve="ERG-CLASSIQUE"),
     ])
 
 
@@ -214,13 +253,14 @@ GESTION_COMMERCIALE = Module(
             E("fichier.paiement_ligne", "Paiement en ligne"),
             SEP(),
             E("fichier.mise_en_page", "Mise en page"),
-            E("fichier.imprimer", "Imprimer…", icone="bi-printer", action="imprimer"),
+            E("fichier.imprimer", "Imprimer…", icone="bi-printer", action="imprimer", preuve="ERG-CLASSIQUE"),
             E("fichier.format_impression", "Format d'impression"),
             E("fichier.impression_differee", "Impression différée"),
             SEP(),
             E("fichier.outils", "Outils"),
-            E("fichier.quitter", "Quitter", icone="bi-power", action="quitter"),
+            E("fichier.quitter", "Quitter", icone="bi-power", action="quitter", preuve="ERG-CLASSIQUE"),
         ]),
+        menu_edition(),
         Onglet("structure", "Structure", "bi-diagram-3", [
             E("articles.familles", "Familles", "commercial:familles", icone="bi-tags"),
             E("articles.liste", "Articles", "commercial:articles", icone="bi-box-seam"),
@@ -261,12 +301,12 @@ GESTION_COMMERCIALE = Module(
         ]),
         Onglet("traitement", "Traitement", "bi-gear-wide-connected", [
             E("ventes.documents", "Documents des ventes", icone="bi-receipt", enfants=[
-                E("ventes.tous", "Tous les documents des ventes", "commercial:documents", "ventes"),
+                E("ventes.tous", "Tous les documents des ventes", "commercial:documents", "ventes", preuve="AJOUT-ERP"),
                 SEP(),
                 *_documents("ventes", TYPES_VENTE),
             ]),
             E("achats.documents", "Documents des achats", icone="bi-cart", enfants=[
-                E("achats.tous", "Tous les documents des achats", "commercial:documents", "achats"),
+                E("achats.tous", "Tous les documents des achats", "commercial:documents", "achats", preuve="AJOUT-ERP"),
                 SEP(),
                 *_documents("achats", TYPES_ACHAT),
                 SEP(),
@@ -274,7 +314,7 @@ GESTION_COMMERCIALE = Module(
                 E("achats.bon_a_payer", "Gestion du Bon à payer"),
             ]),
             E("stocks.documents", "Documents des stocks", icone="bi-boxes", enfants=[
-                E("stocks.tous", "Tous les documents des stocks", "commercial:documents", "stocks"),
+                E("stocks.tous", "Tous les documents des stocks", "commercial:documents", "stocks", preuve="AJOUT-ERP"),
                 SEP(),
                 *_documents("stocks", TYPES_STOCK),
                 E("stocks.depreciation", "Dépréciation de stock"),
@@ -331,7 +371,7 @@ GESTION_COMMERCIALE = Module(
                 E("maj_compta.factures_ventes", "Factures de ventes (journal VT)", "comptabilite:ecritures", journal="VT"),
                 E("maj_compta.factures_achats", "Factures d'achats (journal AC)", "comptabilite:ecritures", journal="AC"),
                 E("maj_compta.reglements", "Règlements achats/ ventes", "comptabilite:journal"),
-                E("maj_compta.variation_stock", "Variation de stock (inventaire permanent)", "commercial:stock", vue="variation"),
+                E("maj_compta.variation_stock", "Variation de stock (inventaire permanent)", "commercial:stock", vue="variation", preuve="AJOUT-ERP"),
                 E("maj_compta.engagements", "Engagements achats/ ventes"),
             ]),
             E("traitement.archivage", "Archivage"),
@@ -341,17 +381,35 @@ GESTION_COMMERCIALE = Module(
         Onglet("etat", "Etat", "bi-printer", [
             E("etats.personnalises", "Etats personnalisés"),
             SEP(),
-            E("etats.analyse_clients", "Analyse clients", "commercial:etat_balance_agee", type="CLIENT"),
+            E("etats.analyse_clients", "Analyse clients", icone="bi-person-check", enfants=[
+                E("etats.clients.activite", "Activité clients", "commercial:statistique", "activite_clients"),
+                E("etats.clients.rentabilite", "Rentabilité clients", "commercial:statistique", "rentabilite_clients"),
+                E("etats.clients.risque", "Risque clients", "commercial:statistique", "risque_clients"),
+            ]),
             E("etats.cadencier_clients", "Cadencier clients"),
-            E("etats.ventes.clients", "Statistiques clients", "commercial:etat_ventes", vue="clients"),
-            E("etats.mouvement_clients", "Mouvement clients", "comptabilite:grand_livre", compte_debut="411", compte_fin="411"),
+            E("etats.statistiques_clients", "Statistiques clients", icone="bi-graph-up", enfants=[
+                E("etats.clients.familles", "Statistiques par familles d'articles", "commercial:statistique", "ventes_familles"),
+                E("etats.clients.articles", "Statistiques par articles", "commercial:statistique", "ventes_articles"),
+                E("etats.clients.palmares", "Palmarès des clients", "commercial:statistique", "palmares_clients"),
+            ]),
+            E("etats.mouvement_clients", "Mouvements clients", "comptabilite:grand_livre", compte_debut="411", compte_fin="411"),
             SEP(),
-            E("etats.analyse_fournisseurs", "Analyse fournisseurs", "commercial:etat_balance_agee", type="FOURNISSEUR"),
+            E("etats.analyse_fournisseurs", "Analyse fournisseurs", icone="bi-truck", enfants=[
+                E("etats.fournisseurs.activite", "Activité fournisseurs", "commercial:statistique", "activite_fournisseurs"),
+                E("etats.fournisseurs.ca", "Chiffre d'affaires fournisseurs", "commercial:statistique", "ca_fournisseurs"),
+            ]),
             E("etats.cadencier_fournisseurs", "Cadencier fournisseurs"),
-            E("etats.stats_fournisseurs", "Statistiques fournisseurs", "commercial:etat_achats"),
-            E("etats.mouvement_fournisseurs", "Mouvement fournisseurs", "comptabilite:grand_livre", compte_debut="401", compte_fin="401"),
+            E("etats.statistiques_fournisseurs", "Statistiques fournisseurs", icone="bi-graph-down", enfants=[
+                E("etats.fournisseurs.familles", "Statistiques par familles d'articles", "commercial:statistique", "achats_familles"),
+                E("etats.fournisseurs.articles", "Statistiques par articles", "commercial:statistique", "achats_articles"),
+            ]),
+            E("etats.mouvement_fournisseurs", "Mouvements fournisseurs", "comptabilite:grand_livre", compte_debut="401", compte_fin="401"),
             SEP(),
-            E("etats.ventes.articles", "Statistiques articles", "commercial:etat_ventes", vue="articles"),
+            E("etats.statistiques_articles", "Statistiques articles", icone="bi-box-seam", enfants=[
+                E("etats.articles.articles", "Statistiques articles", "commercial:statistique", "articles"),
+                E("etats.articles.familles", "Statistiques familles", "commercial:statistique", "familles"),
+                E("etats.articles.palmares", "Palmarès des ventes", "commercial:statistique", "palmares_ventes"),
+            ]),
             E("etats.mouvements", "Mouvements de stock", "commercial:mouvements", icone="bi-arrow-left-right", vue="etat"),
             E("etats.inventaire", "Inventaire", icone="bi-clipboard-data", enfants=[
                 E("etats.inventaire.preparatoire", "Etat préparatoire", "commercial:etat_inventaire", vue="preparatoire"),
@@ -359,13 +417,37 @@ GESTION_COMMERCIALE = Module(
             ]),
             E("etats.cadencier_livraison", "Cadencier de livraison"),
             SEP(),
-            E("etats.stats_ressources", "Statistiques ressources"),
             E("etats.stats_collaborateurs", "Statistiques collaborateurs"),
+            E("etats.stats_ressources", "Statistiques ressources"),
             E("etats.commissions", "Commissions représentants"),
             SEP(),
             E("etats.tableaux_bord", "Tableaux de bord", "reporting:dashboard", icone="bi-speedometer2"),
             E("etats.journaux_comptables", "Journaux comptables", "comptabilite:journal"),
             E("etats.libres", "Etats libres"),
+            SEP(),
+            E("etats.colisage", "Étiquettes de colisage"),
+            E("etats.releves_factures", "Relevés de factures", icone="bi-receipt", enfants=[
+                E("etats.releves_factures.clients", "Clients", "commercial:statistique", "releve_factures_clients"),
+                E("etats.releves_factures.fournisseurs", "Fournisseurs", "commercial:statistique", "releve_factures_fournisseurs"),
+            ]),
+            E("etats.listes_documents", "Listes des documents", icone="bi-list-ul", enfants=[
+                E("etats.listes_documents.ventes", "Documents de vente", "commercial:statistique", "liste_documents_ventes"),
+                E("etats.listes_documents.achats", "Documents d'achat", "commercial:statistique", "liste_documents_achats"),
+            ]),
+            E("etats.releves_echeances", "Relevés d'échéances", icone="bi-hourglass-split", enfants=[
+                E("etats.echeances.clients", "Clients", "commercial:statistique", "echeances_clients"),
+                E("etats.echeances.fournisseurs", "Fournisseurs", "commercial:statistique", "echeances_fournisseurs"),
+            ]),
+            E("etats.etiquettes", "Étiquettes et mailing", enfants=[
+                E("etats.etiquettes.clients", "Clients"),
+                E("etats.etiquettes.fournisseurs", "Fournisseurs"),
+                E("etats.etiquettes.articles", "Étiquettes articles"),
+            ]),
+            E("etats.listes", "Listes", icone="bi-card-list", enfants=[
+                E("etats.listes.clients", "Liste des clients", "commercial:statistique", "liste_clients"),
+                E("etats.listes.fournisseurs", "Liste des fournisseurs", "commercial:statistique", "liste_fournisseurs"),
+                E("etats.listes.articles", "Liste des articles", "commercial:statistique", "liste_articles"),
+            ]),
         ]),
         menu_fenetre("commercial"),
         menu_aide("commercial"),
@@ -385,6 +467,7 @@ COMPTABILITE = Module(
     accueil="comptabilite:accueil",
     onglets=[
         menu_fichier("comptabilite", "comptabilite:societe"),
+        menu_edition(),
         Onglet("structure", "Structure", "bi-diagram-3", [
             E("structure.plan", "Plan comptable", "comptabilite:comptes", icone="bi-list-ol"),
             E("structure.plan_tiers", "Plan tiers", icone="bi-people", enfants=[
@@ -476,6 +559,7 @@ REPORTING = Module(
     accueil="reporting:dashboard",
     onglets=[
         menu_fichier("reporting", "commercial:societe"),
+        menu_edition(),
         Onglet("etat", "Etat", "bi-printer", [
             E("synthese.dashboard", "Tableau de bord", "reporting:dashboard", icone="bi-speedometer2"),
             SEP(),
@@ -539,14 +623,15 @@ def _arbre(module, elements, chemin, parametres, meilleur):
     noeuds = []
     for el in elements:
         if el.separateur:
-            noeuds.append({"code": el.code, "separateur": True, "titre": "", "enfants": [], "url": None,
+            noeuds.append({"code": el.code, "separateur": True, "titre": "", "enfants": [], "url": None, "preuve": "",
                            "actif": False, "ouvert": False, "disponible": False, "action": "", "module": ""})
             continue
         enfants = _arbre(module, el.tous_enfants(), chemin, parametres, meilleur)
         lien = el.lien()
         cible = _module_cible(module, lien)
+        preuve = el.preuve or ("DOC-V12" if module.code == "commercial" else "")
         noeud = {"code": el.code, "titre": el.titre, "icone": el.icone, "url": lien, "enfants": enfants,
-                 "action": el.action, "module": cible, "separateur": False,
+                 "action": el.action, "module": cible, "separateur": False, "preuve": preuve,
                  "disponible": bool(lien or enfants or el.action), "actif": False, "ouvert": False}
         score = _score(el, chemin, parametres) if not cible else None
         if score is not None and (meilleur["score"] is None or score > meilleur["score"]):
