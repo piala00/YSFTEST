@@ -7,15 +7,15 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 
 | État | Commandes |
 |---|---|
-| ✅ Réalisé | 54 |
+| ✅ Réalisé | 55 |
 | ✅ Commande d'interface | 14 |
 | ↗ Autre logiciel de l'ERP | 6 |
 | ⬜ Grisé (non développé) | 51 |
-| **Total des commandes** | **125** |
+| **Total des commandes** | **126** |
 
 | Niveau de preuve | Commandes | Signification |
 |---|---|---|
-| AJOUT-ERP | 6 | Ajout propre à l'ERP OHADA (absent de Sage) |
+| AJOUT-ERP | 7 | Ajout propre à l'ERP OHADA (absent de Sage) |
 | DOC-TIERS | 2 | Cité par une source tierce (partenaire, formation), à confirmer sur Sage |
 | ERG-CLASSIQUE | 99 | Ergonomie Sage classique, à vérifier sur une installation V12 |
 | INDICATIF | 18 | Proposition fonctionnelle, non vérifiée sur une capture V12 |
@@ -40,6 +40,7 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Fichier › À propos de votre société | Éditions | INDICATIF | ⬜ Grisé (non développé) |  |
 | Fichier | Lire les informations | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
 | Fichier | Autorisations d'accès | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/autorisations/` |
+| Fichier | Journal des événements | AJOUT-ERP | ✅ Réalisé | `/comptabilite/journal-evenements/` |
 | Fichier | Importer | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
 | Fichier | Exporter | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
 | Fichier | Format import/export paramétrable | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |

@@ -136,3 +136,30 @@ class DroitAcces(models.Model):
 
     def __str__(self):
         return f"{self.groupe} · {self.module} · {self.code} : {self.get_niveau_display()}"
+
+
+class JournalEvenement(models.Model):
+    """Journal des événements : trace de chaque création, modification, validation, suppression et connexion."""
+
+    ACTIONS = [
+        ("CREATION", "Création"), ("MODIFICATION", "Modification"), ("VALIDATION", "Validation"),
+        ("ANNULATION", "Annulation"), ("SUPPRESSION", "Suppression"), ("CLOTURE", "Clôture"),
+        ("CONNEXION", "Connexion"), ("ECHEC_CONNEXION", "Échec de connexion"),
+    ]
+
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+    utilisateur = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    logiciel = models.CharField(max_length=30, blank=True)
+    action = models.CharField(max_length=20, choices=ACTIONS, db_index=True)
+    objet_type = models.CharField("Type", max_length=60, blank=True, db_index=True)
+    objet_id = models.CharField(max_length=40, blank=True)
+    objet_libelle = models.CharField("Objet", max_length=200, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+        verbose_name = "Événement"
+        verbose_name_plural = "Journal des événements"
+
+    def __str__(self):
+        return f"{self.date:%d/%m/%Y %H:%M} {self.get_action_display()} {self.objet_type} {self.objet_libelle}"

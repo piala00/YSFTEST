@@ -82,6 +82,9 @@ il suffit de lui associer une page. La même définition alimente :
   suppression*, *Interdire l'écriture* (consultation seule), *Tout interdire*. Un élément sans réglage hérite de son
   menu parent ; un utilisateur sans profil et l'administrateur ont tous les droits. Les commandes interdites sont
   grisées avec un cadenas, et le contrôle est fait par le serveur (pages web et API du client bureau).
+- **Fichier › Journal des événements** (administrateur) : chaque création, modification (champs avant / après),
+  validation, annulation, suppression et connexion, avec l'utilisateur, la date et l'origine (web, client bureau,
+  serveur). Filtres par période, utilisateur, action, type et objet.
 
 ## Modules
 

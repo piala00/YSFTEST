@@ -73,6 +73,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "apps.core.middleware.AutorisationsMiddleware",      # Fichier › Autorisations d'accès
+    "apps.core.journal.RequeteCouranteMiddleware",       # utilisateur du journal des événements
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

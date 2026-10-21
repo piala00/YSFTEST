@@ -160,3 +160,40 @@ def autorisations(request, module):
         "profils": Group.objects.order_by("name"), "profil": profil, "logiciel": logiciel, "logiciels": MODULES_PAR_CODE.values(),
         "utilisateurs": User.objects.order_by("username").prefetch_related("groups"), "lignes": lignes, "niveaux": d.NIVEAUX,
     })
+
+
+@login_required
+def journal_evenements(request, module):
+    """Fichier › Journal des événements (administrateur) : qui a fait quoi, quand, avec le détail des champs."""
+    from django.contrib.auth import get_user_model
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+
+    from . import droits as d
+    from .models import JournalEvenement
+
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {
+            "chemin": "Fichier › Journal des événements", "operation": "consulter le journal",
+            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    g = request.GET
+    qs = JournalEvenement.objects.select_related("utilisateur")
+    if g.get("du"):
+        qs = qs.filter(date__date__gte=g["du"])
+    if g.get("au"):
+        qs = qs.filter(date__date__lte=g["au"])
+    if g.get("utilisateur"):
+        qs = qs.filter(utilisateur__username=g["utilisateur"])
+    if g.get("action"):
+        qs = qs.filter(action=g["action"])
+    if g.get("type"):
+        qs = qs.filter(objet_type=g["type"])
+    if g.get("q"):
+        qs = qs.filter(Q(objet_libelle__icontains=g["q"]) | Q(objet_id=g["q"]))
+    page = Paginator(qs, 100).get_page(g.get("page"))
+    return render(request, "core/journal_evenements.html", {
+        "page": page, "actions": JournalEvenement.ACTIONS,
+        "types": JournalEvenement.objects.order_by("objet_type").values_list("objet_type", flat=True).distinct(),
+        "utilisateurs": get_user_model().objects.order_by("username").values_list("username", flat=True),
+        "filtres": g.urlencode().replace("page=", "_="),
+    })
