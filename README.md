@@ -137,16 +137,18 @@ Autres fonctions :
 - **Règlements :** espèces, chèque, virement, Mobile Money, avec imputation automatique sur les factures.
 - **Impression :** tous les documents s'impriment en A4.
 
-### Régime de TVA de la société
-Fichier › À propos de votre société › **Régime de TVA** :
-- **Assujettie** : TVA facturée aux clients (4431) et TVA des achats déductible (4452) ; stock valorisé HT.
-- **Non assujettie** : ventes facturées sans TVA (« TVA non applicable » sur la facture). La TVA payée aux
-  fournisseurs n'est pas récupérable : elle entre dans le coût d'achat (charge 60x TTC, CMUP TTC).
-- **À paramétrer** (nouvelle société) : traitée comme assujettie, avec un bandeau d'alerte sur toutes les pages
-  tant que le régime n'est pas choisi. À l'installation : `python manage.py init_erp --regime-tva non-assujettie`.
+### TVA : rien n'est imposé
+Fichier › À propos de votre société › **Configuration de la TVA** :
+- **Configuration automatique** : les taux du Cameroun sont créés (19,25 % = 17,5 % + CAC ; 11 % ; 0 % export) et
+  19,25 % est proposé sur les nouveaux articles. Les factures détaillent la TVA en principal + CAC.
+- **Configuration manuelle** : aucune TVA n'est paramétrée ; chacun saisit ses taux s'il le souhaite
+  (Structure › Taux de taxes, fiche article, ligne de document).
+- **Société non assujettie** : ventes sans TVA, TVA des achats incluse dans le coût (60x TTC, CMUP TTC).
+- **Non précisée** (installations existantes) : comportement inchangé, aucun avertissement.
 
-Le régime en vigueur s'applique au moment de la validation des documents. Les clients exonérés et les
-fournisseurs non assujettis se règlent sur leur fiche tiers (case « Assujetti à la TVA »).
+NIU, RCCM, pays et régime d'imposition sont facultatifs. Le contrôle des mentions légales des factures
+(CGI art. 150-5) ne s'affiche que si la société l'active dans sa fiche. À l'installation :
+`python manage.py init_erp --regime-tva automatique` (ou `manuelle`, `non-assujettie`).
 
 ### Reprise d'un dossier Sage 100
 `python manage.py reprise_sage --dossier exports --date-bascule AAAA-MM-JJ [--appliquer]` reprend dépôts,

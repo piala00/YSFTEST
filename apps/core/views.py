@@ -52,8 +52,18 @@ class SocieteUpdateView(LoginRequiredMixin, UpdateView):
         return Societe.get()
 
     def form_valid(self, form):
+        reponse = super().form_valid(form)
+        if "regime_tva" in form.changed_data:
+            from apps.comptabilite import services
+
+            if self.object.regime_tva == Societe.TVA_AUTOMATIQUE:
+                services.configurer_tva_automatique()
+                messages.info(self.request, "TVA configurée automatiquement : 19,25 %, 11 % et 0 % (Structure › Taux de taxes).")
+            elif self.object.regime_tva == Societe.TVA_MANUELLE:
+                services.configurer_tva_manuelle()
+                messages.info(self.request, "Configuration manuelle : aucune TVA n'est proposée sur les nouveaux articles.")
         messages.success(self.request, "Paramètres enregistrés.")
-        return super().form_valid(form)
+        return reponse
 
 
 class ExerciceListView(LoginRequiredMixin, ListView):

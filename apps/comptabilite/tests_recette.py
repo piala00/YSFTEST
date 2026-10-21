@@ -21,7 +21,7 @@ from .models import Banque, Compte, Ecriture, Journal, LigneEcriture, SectionAna
 class BaseCompta(TestCase):
     @classmethod
     def setUpTestData(cls):
-        call_command("init_erp", verbosity=0)
+        call_command("init_erp", verbosity=0, regime_tva="automatique")
         cls.exercice = Exercice.objects.first()
         cls.date = cls.exercice.date_debut + datetime.timedelta(days=10)
         cls.client_ = Tiers.objects.create(code="CRECETTE", nom="Client recette")

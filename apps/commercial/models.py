@@ -473,9 +473,9 @@ class Document(models.Model):
 
     def mentions_manquantes(self):
         """Mentions de la facture exigées par le CGI 2026, art. 150-5, absentes des fiches (liste vide si complet)."""
-        if not (self.est_vente and self.est_facturation):
-            return []
         societe = Societe.get()
+        if not (societe.controle_mentions_facture and self.est_vente and self.est_facturation):
+            return []                  # contrôle facultatif, activé dans la fiche société
         manque = []
         if not societe.niu:
             manque.append("NIU de la société")

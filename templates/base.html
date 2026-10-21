@@ -87,9 +87,6 @@
     {% endif %}
     {% if fil_ariane %}<nav class="fil-ariane d-print-none"><span>{{ onglet_actif.titre }}</span>{% for n in fil_ariane %} <i class="bi bi-chevron-right"></i> <span>{{ n.titre }}</span>{% endfor %}</nav>{% endif %}
     {% include "core/_messages.html" %}
-    {% if societe.tva_a_parametrer and user.is_authenticated %}<div class="alert alert-warning d-print-none py-2 small" id="alerte-tva">
-      <i class="bi bi-exclamation-triangle"></i> <strong>Régime de TVA non paramétré.</strong> Les documents sont calculés comme pour une société assujettie (TVA {{ societe.taux_tva_defaut }} %).
-      Si votre société n'est pas assujettie, indiquez-le dans <a href="{% url 'commercial:societe' %}">Fichier › À propos de votre société</a>.</div>{% endif %}
     {% block content %}{% endblock %}
     {% if module %}</div></section>{% endif %}
   </main>

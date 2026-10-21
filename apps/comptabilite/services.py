@@ -544,3 +544,34 @@ def statistiques_tiers(date_debut, date_fin, type_tiers):
             "taux_recouvrement": (regle / facture * 100) if facture else None,
         })
     return sorted(resultats, key=lambda r: -abs(r["solde"]))
+
+
+# ---------------------------------------------------------------------------
+# Configuration de la TVA à la création de la société
+# ---------------------------------------------------------------------------
+def configurer_tva_automatique():
+    """Crée les taux de TVA du Cameroun (s'ils n'existent pas) et propose 19,25 % sur les nouveaux articles."""
+    from apps.core.models import Societe
+
+    from .models import Taxe
+    from .plan_syscohada import TAXES
+
+    for code, intitule, sens, taux, compte in TAXES:
+        numero = Compte.objects.filter(numero=compte).first()
+        if numero:
+            Taxe.objects.get_or_create(code=code, defaults={"intitule": intitule, "sens": sens, "taux": Decimal(taux),
+                                                           "compte": numero})
+    societe = Societe.get()
+    if not societe.taux_tva_defaut:
+        societe.taux_tva_defaut = Decimal("19.25")
+        societe.save(update_fields=["taux_tva_defaut"])
+
+
+def configurer_tva_manuelle():
+    """Aucune TVA paramétrée : les nouveaux articles sont proposés à 0 %, l'utilisateur saisit ses taux s'il le souhaite."""
+    from apps.core.models import Societe
+
+    societe = Societe.get()
+    if societe.taux_tva_defaut:
+        societe.taux_tva_defaut = ZERO
+        societe.save(update_fields=["taux_tva_defaut"])

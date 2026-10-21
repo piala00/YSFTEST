@@ -37,9 +37,9 @@ class RegimeTvaTests(TestCase):
         article.refresh_from_db()
         return article, achat, vente
 
-    def test_nouvelle_societe_a_parametrer_se_comporte_comme_assujettie(self):
+    def test_configuration_non_precisee_garde_le_comportement_historique(self):
         societe = Societe.get()
-        self.assertTrue(societe.tva_a_parametrer)
+        self.assertEqual(societe.regime_tva, Societe.TVA_NON_PRECISEE)
         self.assertTrue(societe.assujettie_tva)
         article, achat, vente = self.achat_puis_vente()
         self.assertEqual(vente.total_tva, Decimal("1925"))
@@ -93,16 +93,30 @@ class RegimeTvaTests(TestCase):
         societe.save()
         self.assertEqual(Article.objects.create(reference="A4", designation="Exonéré").taux_tva, 0)
 
-    def test_alerte_et_impression(self):
+    def test_aucun_bandeau_et_impression(self):
         user = get_user_model().objects.create_superuser("tva", "", "x")
         self.client.force_login(user)
-        self.assertContains(self.client.get("/commercial/"), "Régime de TVA non paramétré")
+        self.assertNotContains(self.client.get("/commercial/"), "Régime de TVA")     # rien n'est imposé
         self.regime(Societe.TVA_NON_ASSUJETTIE)
-        self.assertNotContains(self.client.get("/commercial/"), "Régime de TVA non paramétré")
         article = Article.objects.create(reference="A5", designation="Article", prix_vente=1000, suivi_stock=False)
         vente = self.document(Document.FACTURE, self.client_, article, 1, 1000).valider()
         self.assertContains(self.client.get(reverse("commercial:document_print", args=[vente.pk])), "TVA non applicable")
         self.assertContains(self.client.get("/comptabilite/tva/"), "non assujettie")
+
+    def test_configuration_automatique_ou_manuelle(self):
+        from apps.comptabilite.models import Taxe
+
+        self.assertFalse(Taxe.objects.exists())                                    # non précisée : aucun taux créé
+        user = get_user_model().objects.create_superuser("conf", "", "x")
+        self.client.force_login(user)
+        donnees = {"raison_sociale": "Test", "devise": "XAF", "taux_tva_defaut": "19.25", "regime_tva": "MANUELLE"}
+        self.client.post(reverse("commercial:societe"), donnees)
+        self.assertEqual(Societe.get().taux_tva_defaut, 0)
+        self.assertFalse(Taxe.objects.exists())
+        self.assertEqual(Article.objects.create(reference="M1", designation="Sans TVA").taux_tva, 0)
+        self.client.post(reverse("commercial:societe"), {**donnees, "taux_tva_defaut": "0", "regime_tva": "AUTOMATIQUE"})
+        self.assertEqual(Societe.get().taux_tva_defaut, Decimal("19.25"))
+        self.assertEqual(set(Taxe.objects.values_list("code", flat=True)), {"C19", "D19", "C11", "C0"})
 
     def test_init_erp_option_regime(self):
         call_command("init_erp", verbosity=0, regime_tva="non-assujettie")
@@ -129,7 +143,11 @@ class FiscaliteCamerounTests(TestCase):
         self.assertEqual(v["tva"], Decimal("19250"))
         self.assertEqual((v["principal"], v["cac"]), (Decimal("17500"), Decimal("1750")))
 
-    def test_mentions_obligatoires(self):
+    def test_mentions_obligatoires_seulement_si_le_controle_est_active(self):
+        self.assertEqual(self.facture().mentions_manquantes(), [])                 # facultatif par défaut
+        societe = Societe.get()
+        societe.controle_mentions_facture = True
+        societe.save()
         doc = self.facture()
         manque = doc.mentions_manquantes()
         self.assertIn("NIU de la société", manque)

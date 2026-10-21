@@ -5,6 +5,6 @@ set -euo pipefail
 
 python manage.py migrate --noinput
 # Société de démonstration (ignorée si des tiers existent déjà), régime de TVA explicite
-python manage.py init_erp --demo --regime-tva assujettie ${DEMO_ADMIN_PASSWORD:+--admin "$DEMO_ADMIN_PASSWORD"}
+python manage.py init_erp --demo --regime-tva automatique ${DEMO_ADMIN_PASSWORD:+--admin "$DEMO_ADMIN_PASSWORD"}
 
 exec gunicorn erp.wsgi:application --bind "0.0.0.0:${PORT:-8000}" --workers 2 --timeout 120

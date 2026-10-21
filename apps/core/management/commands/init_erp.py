@@ -17,8 +17,9 @@ class Command(BaseCommand):
         parser.add_argument("--demo", action="store_true", help="Crée des tiers, articles et documents de démonstration")
         parser.add_argument("--sahel", action="store_true",
                             help="Crée la société fictive SAHEL DISTRIBUTION des exercices du formateur Sage 100")
-        parser.add_argument("--regime-tva", choices=["assujettie", "non-assujettie"],
-                            help="Régime de TVA de la société (sinon : à paramétrer dans la fiche société)")
+        parser.add_argument("--regime-tva", choices=["automatique", "manuelle", "non-assujettie", "assujettie"],
+                            help="Configuration de la TVA (automatique = taux du Cameroun ; manuelle = aucune TVA ; "
+                                 "« assujettie » = ancien nom d'« automatique »)")
         parser.add_argument("--admin", metavar="MOT_DE_PASSE", help="Crée le super-utilisateur « admin » (ou lui redonne ce mot de passe)")
 
     def log(self, message):
@@ -30,7 +31,8 @@ class Command(BaseCommand):
         self.verbosity = options["verbosity"]
         societe = Societe.get()
         if options.get("regime_tva"):
-            societe.regime_tva = {"assujettie": Societe.TVA_ASSUJETTIE, "non-assujettie": Societe.TVA_NON_ASSUJETTIE}[options["regime_tva"]]
+            societe.regime_tva = {"automatique": Societe.TVA_AUTOMATIQUE, "assujettie": Societe.TVA_AUTOMATIQUE,
+                                  "manuelle": Societe.TVA_MANUELLE, "non-assujettie": Societe.TVA_NON_ASSUJETTIE}[options["regime_tva"]]
             societe.save(update_fields=["regime_tva"])
             self.log(f"Régime de TVA : {societe.get_regime_tva_display()}.")
         crees = 0
@@ -52,13 +54,10 @@ class Command(BaseCommand):
             )
         self.log(f"Journaux : {Journal.objects.count()}.")
 
-        for code, intitule, sens, taux, compte in TAXES:
-            Taxe.objects.get_or_create(code=code, defaults={
-                "intitule": intitule, "sens": sens, "taux": Decimal(taux), "compte": Compte.objects.get(numero=compte)})
         Banque.objects.get_or_create(code="BQ1", defaults={"intitule": "Banque principale", "journal": Journal.objects.get(code="BQ")})
         for code, intitule in (("SIEGE", "Siège"), ("AGENCE1", "Agence 1")):
             SectionAnalytique.objects.get_or_create(code=code, defaults={"plan": "Agences", "intitule": intitule})
-        self.log(f"Taxes : {Taxe.objects.count()} · banques : {Banque.objects.count()} · sections : {SectionAnalytique.objects.count()}.")
+        self.log(f"Banques : {Banque.objects.count()} · sections : {SectionAnalytique.objects.count()}.")
 
         from apps.commercial.models import Depot
 
@@ -87,6 +86,18 @@ class Command(BaseCommand):
             self._demo()
         if options["sahel"]:
             self._sahel()
+        # TVA : rien n'est imposé ; les taux du Cameroun ne sont créés qu'en configuration automatique
+        societe.refresh_from_db()
+        if societe.regime_tva == Societe.TVA_AUTOMATIQUE:
+            from apps.comptabilite.services import configurer_tva_automatique
+
+            configurer_tva_automatique()
+            self.log(f"TVA configurée automatiquement ({Taxe.objects.count()} taux).")
+        elif societe.regime_tva == Societe.TVA_MANUELLE:
+            from apps.comptabilite.services import configurer_tva_manuelle
+
+            configurer_tva_manuelle()
+            self.log("TVA en configuration manuelle : aucun taux créé.")
         self.log(self.style.SUCCESS("Initialisation terminée."))
 
     def _sahel(self):
@@ -98,7 +109,7 @@ class Command(BaseCommand):
             return
         societe = Societe.get()
         societe.raison_sociale, societe.forme_juridique, societe.ville = "SAHEL DISTRIBUTION (fictive)", "SARL", "Cameroun"
-        societe.regime_tva = Societe.TVA_ASSUJETTIE
+        societe.regime_tva = Societe.TVA_AUTOMATIQUE
         societe.save()
         donnees = sahel.creer_societe()
         sahel.saisir_stocks_initiaux(donnees, Exercice.objects.first().date_debut)
@@ -113,7 +124,7 @@ class Command(BaseCommand):
         societe = Societe.get()
         societe.raison_sociale = "GTC SARL (démo)"
         societe.ville = "Bertoua"
-        societe.regime_tva = Societe.TVA_ASSUJETTIE
+        societe.regime_tva = Societe.TVA_AUTOMATIQUE
         societe.save()
 
         clients = [

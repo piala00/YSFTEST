@@ -7,13 +7,17 @@ from django.db import models, transaction
 class Societe(models.Model):
     """Fiche unique de l'entreprise utilisatrice de l'ERP."""
 
-    TVA_A_PARAMETRER = ""
-    TVA_ASSUJETTIE = "ASSUJETTIE"
+    # Configuration de la TVA choisie à la création de la société (rien n'est imposé)
+    TVA_NON_PRECISEE = ""
+    TVA_AUTOMATIQUE = "AUTOMATIQUE"
+    TVA_MANUELLE = "MANUELLE"
     TVA_NON_ASSUJETTIE = "NON_ASSUJETTIE"
+    TVA_ASSUJETTIE = TVA_AUTOMATIQUE          # ancien nom
     REGIMES_TVA = [
-        (TVA_A_PARAMETRER, "À paramétrer"),
-        (TVA_ASSUJETTIE, "Assujettie à la TVA"),
-        (TVA_NON_ASSUJETTIE, "Non assujettie à la TVA"),
+        (TVA_NON_PRECISEE, "Non précisée"),
+        (TVA_AUTOMATIQUE, "Configuration automatique (TVA du Cameroun)"),
+        (TVA_MANUELLE, "Configuration manuelle (aucune TVA paramétrée)"),
+        (TVA_NON_ASSUJETTIE, "Société non assujettie à la TVA"),
     ]
 
     raison_sociale = models.CharField(max_length=150, default="Ma Société")
@@ -23,17 +27,17 @@ class Societe(models.Model):
     rccm = models.CharField("RCCM", max_length=50, blank=True)
     adresse = models.CharField(max_length=200, blank=True)
     ville = models.CharField(max_length=80, blank=True)
-    pays = models.CharField(max_length=80, default="Cameroun")
+    pays = models.CharField(max_length=80, blank=True, default="Cameroun")
     telephone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
     devise = models.CharField(max_length=10, default="XAF")
     regime_tva = models.CharField(
-        "Régime de TVA", max_length=20, choices=REGIMES_TVA, blank=True, default=TVA_A_PARAMETRER,
-        help_text="Non assujettie : les ventes sont facturées sans TVA et la TVA payée aux fournisseurs entre dans "
-                  "le coût d'achat (pas de TVA déductible). Confirmez votre régime auprès de votre centre des impôts. "
-                  "Le changement s'applique aux documents validés ensuite.")
+        "Configuration de la TVA", max_length=20, choices=REGIMES_TVA, blank=True, default=TVA_NON_PRECISEE,
+        help_text="Automatique : taux du Cameroun créés (19,25 % ; 11 % ; 0 % export) et proposés sur les articles. "
+                  "Manuelle : aucune TVA paramétrée, vous la saisissez vous-même si besoin (Structure › Taux de taxes, "
+                  "fiche article). Non assujettie : ventes sans TVA, TVA des achats incluse dans le coût.")
     REGIMES_FISCAUX = [
-        ("", "À paramétrer"),
+        ("", "Non précisé"),
         ("REEL", "Régime du réel"),
         ("IGS", "Impôt général synthétique (IGS)"),
         ("OBNL", "Organisme à but non lucratif"),
@@ -47,6 +51,9 @@ class Societe(models.Model):
         "Autoriser le stock négatif", default=False,
         help_text="Si décoché, une sortie de stock supérieure au stock disponible du dépôt est refusée")
     pied_facture = models.TextField(blank=True, help_text="Mentions affichées en bas des factures")
+    controle_mentions_facture = models.BooleanField(
+        "Signaler les mentions légales manquantes des factures", default=False,
+        help_text="Facultatif : avertit à la validation d'une facture s'il manque le NIU, le RCCM ou une adresse")
 
     class Meta:
         verbose_name = "Société"
@@ -57,12 +64,8 @@ class Societe(models.Model):
 
     @property
     def assujettie_tva(self):
-        """Tant que le régime n'est pas paramétré, la société est traitée comme assujettie (comportement historique)."""
+        """Seule l'option « non assujettie » supprime la TVA : sinon les taux saisis sur les articles et lignes s'appliquent."""
         return self.regime_tva != self.TVA_NON_ASSUJETTIE
-
-    @property
-    def tva_a_parametrer(self):
-        return self.regime_tva == self.TVA_A_PARAMETRER
 
     @classmethod
     def get(cls):
