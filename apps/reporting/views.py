@@ -47,3 +47,14 @@ def balance_agee(request):
     type_tiers = request.GET.get("type", Tiers.CLIENT)
     data = services.balance_agee(type_tiers)
     return render(request, "reporting/balance_agee.html", {"data": data, "type_tiers": type_tiers})
+
+
+@login_required
+def achats(request):
+    form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
+    lignes = services.achats_par_fournisseur(p["date_debut"], p["date_fin"])
+    if request.GET.get("export") == "csv":
+        return _export_csv("achats_fournisseurs", ["Code", "Fournisseur", "Nb factures", "Achats HT", "TTC", "Reste à payer"],
+                           [[l["tiers"].code, l["tiers"].nom, l["nb"], l["ca_ht"], l["ttc"], l["encours"]] for l in lignes])
+    return render(request, "reporting/achats.html", {"form": form, "lignes": lignes, "p": p,
+                                                     "total": sum(l["ca_ht"] for l in lignes)})

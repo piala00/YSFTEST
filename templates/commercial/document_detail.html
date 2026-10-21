@@ -2,7 +2,7 @@
 {% block title %}{{ object.numero_affiche }}{% endblock %}
 {% block content %}
 <div class="page-title">
-  <h1>{{ object.get_type_document_display }} {{ object.numero_affiche }} <span class="badge badge-{{ object.statut }} fs-6 align-middle">{{ object.get_statut_display }}</span></h1>
+  <h1>{{ object.get_type_document_display }} {{ object.numero_affiche }} <span class="fs-6 align-middle">{% include "commercial/_statut.html" with doc=object %}</span></h1>
   <div class="d-flex gap-2 flex-wrap">
     {% if object.modifiable %}
       <a class="btn btn-outline-secondary btn-sm" href="{% url 'commercial:document_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier</a>
@@ -17,16 +17,20 @@
       <a class="btn btn-primary btn-sm" href="{% url 'commercial:reglement_create' %}?document={{ object.pk }}"><i class="bi bi-cash"></i> Saisir un règlement</a>
     {% endif %}
     <a class="btn btn-outline-dark btn-sm" target="_blank" href="{% url 'commercial:document_print' object.pk %}"><i class="bi bi-printer"></i> Imprimer</a>
-    {% if object.statut != 'ANNULE' and not object.est_facturation or object.statut == 'BROUILLON' %}
+    {% if object.statut == 'BROUILLON' or object.statut == 'VALIDE' and not object.est_facturation %}
       <form method="post" action="{% url 'commercial:document_annuler' object.pk %}" onsubmit="return confirm('Annuler ce document ?')">{% csrf_token %}
         <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle"></i> Annuler</button></form>
     {% endif %}
   </div>
 </div>
 <div class="row g-3 mb-3">
-  <div class="col-md-4"><div class="card p-3"><div class="text-muted small">{{ object.est_vente|yesno:"Client,Fournisseur" }}</div>
+  <div class="col-md-4"><div class="card p-3">
+    {% if object.tiers %}<div class="text-muted small">{{ object.est_vente|yesno:"Client,Fournisseur" }}</div>
     <a class="fw-semibold" href="{% url 'commercial:tiers_detail' object.tiers.pk %}">{{ object.tiers.nom }}</a>
-    <div class="small">{{ object.tiers.adresse }} {{ object.tiers.ville }}</div></div></div>
+    <div class="small">{{ object.tiers.adresse }} {{ object.tiers.ville }}</div>{% endif %}
+    {% if object.depot %}<div class="small mt-1"><i class="bi bi-house-gear"></i> Dépôt : <strong>{{ object.depot }}</strong>{% if object.depot_destination %} <i class="bi bi-arrow-right"></i> <strong>{{ object.depot_destination }}</strong>{% endif %}</div>{% endif %}
+    {% if object.est_stock %}<div class="small text-muted mt-1">{% if object.mouvemente_stock %}Mouvemente le stock à la validation{% endif %}</div>{% endif %}
+  </div></div>
   <div class="col-md-4"><div class="card p-3 small">
     Date : <strong>{{ object.date|date:"d/m/Y" }}</strong><br>
     {% if object.date_echeance %}Échéance : <strong>{{ object.date_echeance|date:"d/m/Y" }}</strong><br>{% endif %}
@@ -34,23 +38,33 @@
     {% if object.origine %}Issu de : <a href="{% url 'commercial:document_detail' object.origine.pk %}">{{ object.origine.numero_affiche }}</a><br>{% endif %}
     {% for g in object.documents_generes.all %}Transformé en : <a href="{% url 'commercial:document_detail' g.pk %}">{{ g.get_type_document_display }} {{ g.numero_affiche }}</a><br>{% endfor %}
   </div></div>
-  <div class="col-md-4"><div class="card p-3 small">
+  {% if object.ecriture or object.est_facturation %}<div class="col-md-4"><div class="card p-3 small">
     {% if object.ecriture %}Écriture comptable : <a href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}">{{ object.ecriture.numero }}</a><br>{% endif %}
     {% if object.est_facturation and not object.est_avoir %}
       Réglé : <strong>{{ object.montant_regle|montant }}</strong><br>
       Reste à payer : <strong class="{% if object.reste_a_payer > 0 %}text-danger{% else %}text-success{% endif %}">{{ object.reste_a_payer|montant }}</strong>
     {% endif %}
-  </div></div>
+  </div></div>{% endif %}
 </div>
 <div class="card mb-3"><table class="table table-sm mb-0">
-<thead class="table-light"><tr><th>Article</th><th>Désignation</th><th class="num">Qté</th><th class="num">P.U. HT</th><th class="num">Remise</th><th class="num">TVA</th><th class="num">Montant HT</th></tr></thead><tbody>
-{% for l in object.lignes.all %}<tr><td>{{ l.article.reference|default:"" }}</td><td>{{ l.designation }}</td><td class="num">{{ l.quantite|floatformat:"-3" }}</td>
+{% with suivi=object.transformations_possibles %}
+<thead class="table-light"><tr><th>Article</th><th>Désignation</th><th class="num">Qté</th>{% if suivi %}<th class="num" title="Quantité non encore reprise dans un document suivant">Reste à transformer</th>{% endif %}<th class="num">{% if object.est_stock %}Coût unitaire{% else %}P.U. HT{% endif %}</th><th class="num">Remise</th><th class="num">TVA</th><th class="num">Montant HT</th></tr></thead><tbody>
+{% for l in object.lignes.all %}<tr><td>{{ l.article.reference|default:"" }}</td><td>{{ l.designation }}</td><td class="num">{{ l.quantite|floatformat:"-3" }}</td>{% if suivi %}<td class="num {% if l.reste_a_transformer > 0 %}text-primary fw-semibold{% else %}text-muted{% endif %}">{{ l.reste_a_transformer|floatformat:"-3" }}</td>{% endif %}
 <td class="num">{{ l.prix_unitaire|montant }}</td><td class="num">{% if l.remise %}{{ l.remise }} %{% endif %}</td><td class="num">{{ l.taux_tva }} %</td><td class="num">{{ l.montant_ht|montant }}</td></tr>{% endfor %}
 </tbody><tfoot>
-<tr><td colspan="6" class="text-end">Total HT</td><td class="num">{{ object.total_ht|montant }}</td></tr>
-{% for v in object.ventilation_tva %}<tr><td colspan="6" class="text-end small text-muted">TVA {{ v.taux }} % sur {{ v.base|montant }}</td><td class="num">{{ v.tva|montant }}</td></tr>{% endfor %}
-<tr class="total"><td colspan="6" class="text-end">Total TTC</td><td class="num">{{ object.total_ttc|montant }} {{ societe.devise }}</td></tr>
-</tfoot></table></div>
+{% if object.est_stock %}
+<tr class="total"><td colspan="{{ suivi|yesno:'7,6' }}" class="text-end">Valeur du mouvement</td><td class="num">{{ object.total_ht|montant }} {{ societe.devise }}</td></tr>
+{% else %}
+<tr><td colspan="{{ suivi|yesno:'7,6' }}" class="text-end">Total HT</td><td class="num">{{ object.total_ht|montant }}</td></tr>
+{% for v in object.ventilation_tva %}<tr><td colspan="{{ suivi|yesno:'7,6' }}" class="text-end small text-muted">TVA {{ v.taux }} % sur {{ v.base|montant }}</td><td class="num">{{ v.tva|montant }}</td></tr>{% endfor %}
+<tr class="total"><td colspan="{{ suivi|yesno:'7,6' }}" class="text-end">Total TTC</td><td class="num">{{ object.total_ttc|montant }} {{ societe.devise }}</td></tr>
+{% endif %}
+</tfoot>{% endwith %}</table></div>
+{% if object.mouvements_stock.exists %}
+<div class="card mb-3"><div class="card-header bg-white fw-semibold">Mouvements de stock générés</div><table class="table table-sm mb-0"><tbody>
+{% for m in object.mouvements_stock.all %}<tr><td>{{ m.article.reference }}</td><td>{{ m.article.designation }}</td><td>{{ m.depot }}</td>
+<td class="num {% if m.quantite < 0 %}text-danger{% else %}text-success{% endif %}">{{ m.quantite|floatformat:"-3" }}</td><td class="num text-muted">{{ m.cout_unitaire|floatformat:2 }}</td></tr>{% endfor %}
+</tbody></table></div>{% endif %}
 {% if object.imputations.exists %}
 <div class="card"><div class="card-header bg-white fw-semibold">Règlements imputés</div><table class="table table-sm mb-0"><tbody>
 {% for i in object.imputations.all %}<tr><td><a href="{% url 'commercial:reglement_detail' i.reglement.pk %}">{{ i.reglement.numero }}</a></td><td>{{ i.reglement.date|date:"d/m/Y" }}</td><td>{{ i.reglement.get_mode_display }}</td><td class="num">{{ i.montant|montant }}</td></tr>{% endfor %}

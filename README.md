@@ -40,15 +40,38 @@ il suffit de lui associer une page. La même définition alimente :
 
 ## Modules
 
-### Gestion commerciale
-- **Tiers** : clients et fournisseurs (NIU, RCCM, délai de paiement, plafond d'encours, assujettissement TVA).
-- **Articles** : marchandises / produits finis / services, familles, prix d'achat et de vente, TVA, stock d'alerte.
-- **Cycle des ventes** : Devis → Bon de commande → Bon de livraison → Facture → Avoir.
-- **Cycle des achats** : Commande fournisseur → Bon de réception → Facture fournisseur → Avoir fournisseur.
-- Transformation d'un document en un autre en un clic, numérotation automatique par année (`FA2026-00001`…).
-- **Stock** : mouvements automatiques (BL, BR, factures non issues d'un BL/BR, avoirs), alertes, valorisation, et passage de la variation de stock en comptabilité (311 / 6031).
-- **Règlements** : espèces, chèque, virement, Mobile Money ; imputation automatique sur les factures les plus anciennes.
-- Impression des factures (format A4).
+### Gestion commerciale (découpage Sage 100 Gestion commerciale V11)
+
+Les menus Fichier, Structure, Traitement et Etat reprennent l'ordre et les libellés du *Découpage fonctionnel détaillé
+Sage 100 Gestion commerciale V11*.
+
+**Documents des ventes :** Devis, Bon de commande, Préparation de livraison, Bon de livraison, Bon de retour,
+Bon d'avoir financier, Facture, Facture de retour, Facture d'avoir.
+
+**Documents des achats :** Demande d'achat, Préparation de commande, Bon de commande, Bon de livraison, Bon de retour,
+Bon d'avoir financier, Facture, Facture de retour, Facture d'avoir.
+
+**Documents des stocks :** Mouvement d'entrée, Mouvement de sortie, Mouvement de transfert (de dépôt à dépôt).
+
+| Règle | Comportement (comme Sage 100) |
+|---|---|
+| Transformation | Devis → Commande → Préparation → BL → Facture ; BL → Bon de retour → Facture de retour ; Bon d'avoir financier → Facture d'avoir (idem achats) |
+| Livraisons partielles | Une commande peut être livrée en plusieurs fois : la colonne « Reste à transformer » suit le reliquat ligne par ligne, et le document reste « Partiellement transformé » jusqu'à reprise complète |
+| Stock | Sortie : BL, facture (non issue d'un BL), bon de retour fournisseur, mouvement de sortie. Entrée : BL fournisseur, facture fournisseur (non issue d'un BL), bon de retour client, facture de retour, mouvement d'entrée |
+| Avoirs | La facture d'avoir est financière (pas de mouvement de stock) ; la facture de retour remet la marchandise en stock |
+| Dépôts | Stock tenu par dépôt (multi-agences) ; chaque document précise son dépôt ; transfert entre dépôts |
+| Valorisation | CMUP (coût moyen unitaire pondéré), recalculé à chaque entrée valorisée (achats, mouvements d'entrée) |
+| Stock négatif | Refusé par défaut, contrôle par dépôt ; autorisable dans Fichier › Paramètres société › Logistique |
+| Inventaire | Traitement › Saisie d'inventaire : état préparatoire, saisie des quantités comptées, puis génération automatique des mouvements d'entrée et de sortie de régularisation |
+| Annulation | Un BL validé peut être annulé : le stock est rétabli et le reliquat de la commande d'origine aussi |
+
+Autres fonctions :
+- **Recherche de documents :** par entêtes ou par lignes, avec filtres domaine, type, statut, dépôt, dates, tiers, n° de pièce et article.
+- **Gestion des comptes :** clients et fournisseurs avec solde comptable et reste dû, interrogation des articles.
+- **Gestion des livraisons clients et des réceptions fournisseurs :** commandes en attente.
+- **Etat :** analyse et statistiques clients et fournisseurs, statistiques articles avec marge au CMUP, mouvements de stock, inventaire (état préparatoire et livre d'inventaire à date, par dépôt).
+- **Règlements :** espèces, chèque, virement, Mobile Money, avec imputation automatique sur les factures.
+- **Impression :** tous les documents s'impriment en A4.
 
 ### Comptabilité OHADA (SYSCOHADA révisé)
 - Plan comptable SYSCOHADA (classes 1 à 9) pré-chargé et modifiable.
@@ -57,9 +80,9 @@ il suffit de lui associer une page. La même définition alimente :
   | Opération | Écriture |
   |---|---|
   | Facture client | D 4111 TTC / C 70x HT / C 4431 TVA |
+| Facture de retour / facture d'avoir | Écriture inverse de la facture |
   | Facture fournisseur | D 60x HT / D 4452 TVA / C 4011 TTC |
-  | Avoirs | Écriture inverse |
-  | Encaissement client | D 52x / 57x / 55x / C 4111 |
+    | Encaissement client | D 52x / 57x / 55x / C 4111 |
   | Paiement fournisseur | D 4011 / C 52x / 57x / 55x |
   | Variation de stock | D 311 / C 6031 (ou inverse) |
 - Saisie manuelle d'écritures (brouillard → validation, contrôle d'équilibre).

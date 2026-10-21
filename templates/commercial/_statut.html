@@ -1,0 +1,1 @@
+{% if doc.partiellement_transforme %}<span class="badge text-bg-info" title="Une partie des quantités a déjà été reprise">Partiellement transformé</span>{% else %}<span class="badge badge-{{ doc.statut }}">{{ doc.get_statut_display }}</span>{% endif %}

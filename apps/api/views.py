@@ -62,7 +62,7 @@ class DocumentViewSet(RechercheMixin, viewsets.ModelViewSet):
     champs_recherche = ("numero", "tiers__nom", "reference_externe")
 
     def get_queryset(self):
-        qs = Document.objects.select_related("tiers").prefetch_related("lignes")
+        qs = Document.objects.select_related("tiers", "depot").prefetch_related("lignes")
         p = self.request.query_params
         if p.get("type"):
             qs = qs.filter(type_document=p["type"])
@@ -70,6 +70,8 @@ class DocumentViewSet(RechercheMixin, viewsets.ModelViewSet):
             qs = qs.filter(type_document__in=Document.TYPES_VENTE)
         elif p.get("domaine") == "achats":
             qs = qs.filter(type_document__in=Document.TYPES_ACHAT)
+        elif p.get("domaine") == "stocks":
+            qs = qs.filter(type_document__in=Document.TYPES_STOCK)
         if p.get("statut"):
             qs = qs.filter(statut=p["statut"])
         if p.get("tiers"):

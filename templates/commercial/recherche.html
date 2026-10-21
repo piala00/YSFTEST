@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Recherche de documents{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Recherche de documents — {% if mode == "lignes" %}lignes{% else %}entêtes{% endif %}</h1></div>
+<form class="card card-body mb-3"><div class="row g-2 align-items-end">
+  <div class="col-md-2"><label class="form-label small mb-0">Domaine</label><select name="domaine" class="form-select form-select-sm"><option value="">Tous</option>
+    <option value="ventes" {% if request.GET.domaine == "ventes" %}selected{% endif %}>Ventes</option>
+    <option value="achats" {% if request.GET.domaine == "achats" %}selected{% endif %}>Achats</option>
+    <option value="stocks" {% if request.GET.domaine == "stocks" %}selected{% endif %}>Stocks</option></select></div>
+  <div class="col-md-2"><label class="form-label small mb-0">Type</label><select name="type" class="form-select form-select-sm"><option value="">Tous</option>
+    {% for code, lib in types %}<option value="{{ code }}" {% if request.GET.type == code %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label small mb-0">Statut</label><select name="statut" class="form-select form-select-sm"><option value="">Tous</option>
+    {% for code, lib in statuts %}<option value="{{ code }}" {% if request.GET.statut == code %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label small mb-0">Dépôt</label><select name="depot" class="form-select form-select-sm"><option value="">Tous</option>
+    {% for d in depots %}<option value="{{ d.pk }}" {% if request.GET.depot == d.pk|stringformat:"s" %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label small mb-0">Du</label><input type="date" name="du" value="{{ request.GET.du }}" class="form-control form-control-sm"></div>
+  <div class="col-md-2"><label class="form-label small mb-0">Au</label><input type="date" name="au" value="{{ request.GET.au }}" class="form-control form-control-sm"></div>
+  <div class="col-md-3"><label class="form-label small mb-0">Tiers (code ou nom)</label><input name="tiers" value="{{ request.GET.tiers }}" class="form-control form-control-sm"></div>
+  <div class="col-md-3"><label class="form-label small mb-0">N° de pièce ou référence</label><input name="numero" value="{{ request.GET.numero }}" class="form-control form-control-sm"></div>
+  {% if mode == "lignes" %}<div class="col-md-3"><label class="form-label small mb-0">Article (référence ou désignation)</label><input name="article" value="{{ request.GET.article }}" class="form-control form-control-sm"></div>{% endif %}
+  <div class="col-md-auto"><input type="hidden" name="r" value="1"><button class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Rechercher</button></div>
+</div></form>
+{% if request.GET %}
+<div class="card"><table class="table table-sm table-hover mb-0">
+{% if mode == "lignes" %}
+<thead><tr><th>N° pièce</th><th>Type</th><th>Date</th><th>Tiers</th><th>Article</th><th>Désignation</th><th class="num">Qté</th><th class="num">P.U. HT</th><th class="num">Montant HT</th></tr></thead><tbody>
+{% for l in lignes %}<tr><td><a href="{% url 'commercial:document_detail' l.document.pk %}">{{ l.document.numero_affiche }}</a></td><td class="small">{{ l.document.get_type_document_display }}</td>
+<td>{{ l.document.date|date:"d/m/Y" }}</td><td>{{ l.document.tiers.nom|default:"" }}</td><td>{{ l.article.reference|default:"" }}</td><td>{{ l.designation }}</td>
+<td class="num">{{ l.quantite|floatformat:"-3" }}</td><td class="num">{{ l.prix_unitaire|montant }}</td><td class="num">{{ l.montant_ht|montant }}</td></tr>
+{% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucune ligne trouvée.</td></tr>{% endfor %}
+{% else %}
+<thead><tr><th>N° pièce</th><th>Type</th><th>Date</th><th>Tiers</th><th>Dépôt</th><th>Référence</th><th class="num">HT</th><th class="num">TTC</th><th>Statut</th></tr></thead><tbody>
+{% for d in documents %}<tr><td><a href="{% url 'commercial:document_detail' d.pk %}">{{ d.numero_affiche }}</a></td><td class="small">{{ d.get_type_document_display }}</td>
+<td>{{ d.date|date:"d/m/Y" }}</td><td>{{ d.tiers.nom|default:"" }}</td><td class="small">{{ d.depot|default:"" }}</td><td>{{ d.reference_externe }}</td>
+<td class="num">{{ d.total_ht|montant }}</td><td class="num">{{ d.total_ttc|montant }}</td><td>{% include "commercial/_statut.html" with doc=d %}</td></tr>
+{% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucun document trouvé.</td></tr>{% endfor %}
+{% endif %}
+</tbody></table></div>
+{% endif %}
+{% endblock %}

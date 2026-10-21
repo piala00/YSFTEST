@@ -29,11 +29,11 @@ def _factures(types, debut, fin):
 def chiffre_affaires(debut, fin):
     """CA HT net des avoirs."""
     factures = _factures([Document.FACTURE], debut, fin).aggregate(s=Sum("total_ht"))["s"] or ZERO
-    avoirs = _factures([Document.AVOIR], debut, fin).aggregate(s=Sum("total_ht"))["s"] or ZERO
+    avoirs = _factures([Document.AVOIR, Document.FACTURE_RETOUR], debut, fin).aggregate(s=Sum("total_ht"))["s"] or ZERO
     return factures - avoirs
 
 
-def ca_mensuel(debut, fin, types_plus=(Document.FACTURE,), types_moins=(Document.AVOIR,)):
+def ca_mensuel(debut, fin, types_plus=(Document.FACTURE,), types_moins=(Document.AVOIR, Document.FACTURE_RETOUR)):
     valeurs = {}
     for signe, types in ((1, types_plus), (-1, types_moins)):
         rows = (_factures(types, debut, fin).annotate(mois=TruncMonth("date"))
@@ -59,11 +59,11 @@ def ventes_par_article(debut, fin, limite=None):
     qs = (LigneDocument.objects.filter(document__type_document=Document.FACTURE,
                                        document__statut__in=[Document.VALIDE, Document.TRANSFORME],
                                        document__date__gte=debut, document__date__lte=fin, article__isnull=False)
-          .values("article__id", "article__reference", "article__designation", "article__prix_achat")
+          .values("article__id", "article__reference", "article__designation", "article__cmup", "article__prix_achat")
           .annotate(quantite=Sum("quantite"), total=Sum("montant_ht")).order_by("-total"))
     resultat = []
     for r in qs[:limite] if limite else qs:
-        cout = (r["quantite"] or ZERO) * (r["article__prix_achat"] or ZERO)
+        cout = (r["quantite"] or ZERO) * (r["article__cmup"] or r["article__prix_achat"] or ZERO)
         r["marge"] = r["total"] - cout
         r["taux_marge"] = (r["marge"] / r["total"] * 100) if r["total"] else ZERO
         resultat.append(r)
@@ -76,11 +76,25 @@ def ventes_par_client(debut, fin):
         docs = Document.objects.filter(tiers=t, statut__in=[Document.VALIDE, Document.TRANSFORME],
                                        date__gte=debut, date__lte=fin)
         fa = docs.filter(type_document=Document.FACTURE).aggregate(ht=Sum("total_ht"), ttc=Sum("total_ttc"))
-        av = docs.filter(type_document=Document.AVOIR).aggregate(ht=Sum("total_ht"))
+        av = docs.filter(type_document__in=(Document.AVOIR, Document.FACTURE_RETOUR)).aggregate(ht=Sum("total_ht"))
         ca = (fa["ht"] or ZERO) - (av["ht"] or ZERO)
         if ca:
             lignes.append({"tiers": t, "nb": docs.filter(type_document=Document.FACTURE).count(),
                            "ca_ht": ca, "ttc": fa["ttc"] or ZERO, "encours": t.encours()})
+    return sorted(lignes, key=lambda l: -l["ca_ht"])
+
+
+def achats_par_fournisseur(debut, fin):
+    lignes = []
+    for t in Tiers.objects.filter(type_tiers=Tiers.FOURNISSEUR):
+        docs = Document.objects.filter(tiers=t, statut__in=[Document.VALIDE, Document.TRANSFORME],
+                                       date__gte=debut, date__lte=fin)
+        fa = docs.filter(type_document=Document.ACHAT_FACTURE).aggregate(ht=Sum("total_ht"), ttc=Sum("total_ttc"))
+        av = docs.filter(type_document__in=(Document.ACHAT_AVOIR, Document.ACHAT_FACTURE_RETOUR)).aggregate(ht=Sum("total_ht"))
+        montant = (fa["ht"] or ZERO) - (av["ht"] or ZERO)
+        if montant:
+            lignes.append({"tiers": t, "nb": docs.filter(type_document=Document.ACHAT_FACTURE).count(),
+                           "ca_ht": montant, "ttc": fa["ttc"] or ZERO, "encours": t.encours()})
     return sorted(lignes, key=lambda l: -l["ca_ht"])
 
 
@@ -125,7 +139,7 @@ def tableau_de_bord(exercice=None):
         "ca_exercice": chiffre_affaires(debut, fin),
         "ca_mois": chiffre_affaires(mois_debut, today),
         "achats_exercice": (_factures([Document.ACHAT_FACTURE], debut, fin).aggregate(s=Sum("total_ht"))["s"] or ZERO)
-        - (_factures([Document.ACHAT_AVOIR], debut, fin).aggregate(s=Sum("total_ht"))["s"] or ZERO),
+        - (_factures([Document.ACHAT_AVOIR, Document.ACHAT_FACTURE_RETOUR], debut, fin).aggregate(s=Sum("total_ht"))["s"] or ZERO),
         "creances_clients": creances,
         "dettes_fournisseurs": dettes,
         "tresorerie": tresorerie(fin_effective),
@@ -134,7 +148,7 @@ def tableau_de_bord(exercice=None):
         "valeur_stock": sum((a.valeur_stock for a in Article.objects.filter(suivi_stock=True)), ZERO),
         "alertes_stock": [a for a in Article.objects.filter(suivi_stock=True, actif=True) if a.en_alerte],
         "ca_mensuel": ca_mensuel(debut, fin),
-        "achats_mensuels": ca_mensuel(debut, fin, (Document.ACHAT_FACTURE,), (Document.ACHAT_AVOIR,)),
+        "achats_mensuels": ca_mensuel(debut, fin, (Document.ACHAT_FACTURE,), (Document.ACHAT_AVOIR, Document.ACHAT_FACTURE_RETOUR)),
         "top_clients": top_clients(debut, fin),
         "top_articles": ventes_par_article(debut, fin, limite=5),
         "devis_en_cours": Document.objects.filter(type_document=Document.DEVIS, statut=Document.VALIDE).count(),

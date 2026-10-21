@@ -72,6 +72,38 @@ class Tiers(models.Model):
             type_document__in=Document.TYPES_FACTURATION, statut=Document.VALIDE)), ZERO)
 
 
+class Depot(models.Model):
+    """Dépôt de stockage (magasin, agence, entrepôt)."""
+
+    code = models.CharField(max_length=10, unique=True)
+    intitule = models.CharField(max_length=100)
+    adresse = models.CharField(max_length=200, blank=True)
+    ville = models.CharField(max_length=80, blank=True)
+    responsable = models.CharField(max_length=100, blank=True)
+    principal = models.BooleanField("Dépôt principal", default=False)
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-principal", "intitule"]
+        verbose_name = "Dépôt de stockage"
+        verbose_name_plural = "Dépôts de stockage"
+
+    def __str__(self):
+        return self.intitule
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.principal:
+            Depot.objects.exclude(pk=self.pk).filter(principal=True).update(principal=False)
+
+    @classmethod
+    def par_defaut(cls):
+        depot = cls.objects.filter(principal=True).first() or cls.objects.filter(actif=True).first()
+        if depot is None:
+            depot = cls.objects.create(code="DP", intitule="Dépôt principal", principal=True)
+        return depot
+
+
 class FamilleArticle(models.Model):
     code = models.CharField(max_length=20, unique=True)
     libelle = models.CharField(max_length=100)
@@ -104,7 +136,9 @@ class Article(models.Model):
     prix_vente = models.DecimalField("Prix de vente HT", max_digits=18, decimal_places=2, default=ZERO)
     taux_tva = models.DecimalField("TVA (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
     suivi_stock = models.BooleanField(default=True)
-    stock = models.DecimalField(max_digits=18, decimal_places=3, default=ZERO)
+    stock = models.DecimalField("Stock total", max_digits=18, decimal_places=3, default=ZERO)
+    cmup = models.DecimalField("CMUP", max_digits=18, decimal_places=4, default=ZERO,
+                               help_text="Coût moyen unitaire pondéré, recalculé à chaque entrée en stock")
     stock_minimum = models.DecimalField("Stock d'alerte", max_digits=18, decimal_places=3, default=ZERO)
     compte_vente = models.ForeignKey("comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     compte_achat = models.ForeignKey("comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
@@ -121,8 +155,25 @@ class Article(models.Model):
         return self.suivi_stock and self.stock <= self.stock_minimum
 
     @property
+    def cout_unitaire(self):
+        """Coût de valorisation du stock : CMUP, à défaut prix d'achat."""
+        return self.cmup or self.prix_achat
+
+    @property
     def valeur_stock(self):
-        return self.stock * self.prix_achat
+        return arrondi(self.stock * self.cout_unitaire)
+
+    def recalculer_cmup(self, quantite, cout):
+        """CMUP = (stock × CMUP + quantité entrée × coût d'entrée) / (stock + quantité entrée)."""
+        stock = max(self.stock, ZERO)
+        total = stock + quantite
+        nouveau = ((stock * self.cout_unitaire + quantite * Decimal(cout)) / total) if total > 0 else Decimal(cout)
+        self.cmup = nouveau.quantize(Decimal("0.0001"))
+        Article.objects.filter(pk=self.pk).update(cmup=self.cmup)
+
+    def stock_depot(self, depot):
+        ligne = self.stocks_depots.filter(depot=depot).first()
+        return ligne.quantite if ligne else ZERO
 
     def get_compte_vente(self):
         from apps.comptabilite.models import Compte
@@ -144,49 +195,96 @@ class Article(models.Model):
 
 
 class Document(models.Model):
-    """Pièce commerciale : devis, commande, livraison, facture, avoir (ventes et achats)."""
+    """Pièce commerciale : documents des ventes, des achats et des stocks (comme dans Sage 100c)."""
 
-    # Ventes
+    # Ventes (Sage 100 : Traitement › Documents des ventes)
     DEVIS = "DEVIS"
     COMMANDE = "COMMANDE"
+    PREPARATION = "PREPARATION"
     LIVRAISON = "LIVRAISON"
+    RETOUR = "RETOUR"
+    AVOIR_FINANCIER = "AVOIR_FINANCIER"
     FACTURE = "FACTURE"
+    FACTURE_RETOUR = "FACTURE_RETOUR"
     AVOIR = "AVOIR"
-    # Achats
+    # Achats (Traitement › Documents des achats)
+    ACHAT_DEMANDE = "ACHAT_DEMANDE"
+    ACHAT_PREPARATION = "ACHAT_PREPARATION"
     ACHAT_COMMANDE = "ACHAT_COMMANDE"
     ACHAT_RECEPTION = "ACHAT_RECEPTION"
+    ACHAT_RETOUR = "ACHAT_RETOUR"
+    ACHAT_AVOIR_FINANCIER = "ACHAT_AVOIR_FINANCIER"
     ACHAT_FACTURE = "ACHAT_FACTURE"
+    ACHAT_FACTURE_RETOUR = "ACHAT_FACTURE_RETOUR"
     ACHAT_AVOIR = "ACHAT_AVOIR"
+    # Stocks (Traitement › Documents des stocks)
+    STOCK_ENTREE = "STOCK_ENTREE"
+    STOCK_SORTIE = "STOCK_SORTIE"
+    STOCK_VIREMENT = "STOCK_VIREMENT"
 
     TYPES = [
         (DEVIS, "Devis"),
-        (COMMANDE, "Bon de commande client"),
+        (COMMANDE, "Bon de commande"),
+        (PREPARATION, "Préparation de livraison"),
         (LIVRAISON, "Bon de livraison"),
-        (FACTURE, "Facture client"),
-        (AVOIR, "Avoir client"),
+        (RETOUR, "Bon de retour"),
+        (AVOIR_FINANCIER, "Bon d'avoir financier"),
+        (FACTURE, "Facture"),
+        (FACTURE_RETOUR, "Facture de retour"),
+        (AVOIR, "Facture d'avoir"),
+        (ACHAT_DEMANDE, "Demande d'achat"),
+        (ACHAT_PREPARATION, "Préparation de commande"),
         (ACHAT_COMMANDE, "Bon de commande fournisseur"),
-        (ACHAT_RECEPTION, "Bon de réception"),
+        (ACHAT_RECEPTION, "Bon de livraison fournisseur"),
+        (ACHAT_RETOUR, "Bon de retour fournisseur"),
+        (ACHAT_AVOIR_FINANCIER, "Bon d'avoir financier fournisseur"),
         (ACHAT_FACTURE, "Facture fournisseur"),
-        (ACHAT_AVOIR, "Avoir fournisseur"),
+        (ACHAT_FACTURE_RETOUR, "Facture de retour fournisseur"),
+        (ACHAT_AVOIR, "Facture d'avoir fournisseur"),
+        (STOCK_ENTREE, "Mouvement d'entrée"),
+        (STOCK_SORTIE, "Mouvement de sortie"),
+        (STOCK_VIREMENT, "Mouvement de transfert"),
     ]
     PREFIXES = {
-        DEVIS: "DV", COMMANDE: "BC", LIVRAISON: "BL", FACTURE: "FA", AVOIR: "AV",
-        ACHAT_COMMANDE: "CF", ACHAT_RECEPTION: "BR", ACHAT_FACTURE: "FF", ACHAT_AVOIR: "AF",
+        DEVIS: "DE", COMMANDE: "BC", PREPARATION: "PL", LIVRAISON: "BL", RETOUR: "BR", AVOIR_FINANCIER: "BA",
+        FACTURE: "FA", FACTURE_RETOUR: "FR", AVOIR: "AV",
+        ACHAT_DEMANDE: "DA", ACHAT_PREPARATION: "PC", ACHAT_COMMANDE: "CF", ACHAT_RECEPTION: "LF", ACHAT_RETOUR: "RT",
+        ACHAT_AVOIR_FINANCIER: "AA", ACHAT_FACTURE: "FF", ACHAT_FACTURE_RETOUR: "FT", ACHAT_AVOIR: "AF",
+        STOCK_ENTREE: "ME", STOCK_SORTIE: "MS", STOCK_VIREMENT: "MT",
     }
-    TYPES_VENTE = (DEVIS, COMMANDE, LIVRAISON, FACTURE, AVOIR)
-    TYPES_ACHAT = (ACHAT_COMMANDE, ACHAT_RECEPTION, ACHAT_FACTURE, ACHAT_AVOIR)
-    TYPES_FACTURATION = (FACTURE, AVOIR, ACHAT_FACTURE, ACHAT_AVOIR)
-    TYPES_AVOIR = (AVOIR, ACHAT_AVOIR)
-    TYPES_LOGISTIQUES = (LIVRAISON, ACHAT_RECEPTION)
-    # Enchaînement autorisé des transformations
+    TYPES_VENTE = (DEVIS, COMMANDE, PREPARATION, LIVRAISON, RETOUR, AVOIR_FINANCIER, FACTURE, FACTURE_RETOUR, AVOIR)
+    TYPES_ACHAT = (ACHAT_DEMANDE, ACHAT_PREPARATION, ACHAT_COMMANDE, ACHAT_RECEPTION, ACHAT_RETOUR,
+                   ACHAT_AVOIR_FINANCIER, ACHAT_FACTURE, ACHAT_FACTURE_RETOUR, ACHAT_AVOIR)
+    TYPES_STOCK = (STOCK_ENTREE, STOCK_SORTIE, STOCK_VIREMENT)
+    # Documents comptabilisés (journal des ventes / des achats)
+    TYPES_FACTURATION = (FACTURE, FACTURE_RETOUR, AVOIR, ACHAT_FACTURE, ACHAT_FACTURE_RETOUR, ACHAT_AVOIR)
+    TYPES_AVOIR = (FACTURE_RETOUR, AVOIR, ACHAT_FACTURE_RETOUR, ACHAT_AVOIR)
+    # Documents sans mouvement de stock ni écriture, sauf indication contraire
+    TYPES_SANS_DEPOT = (DEVIS, COMMANDE, AVOIR_FINANCIER, AVOIR, ACHAT_DEMANDE, ACHAT_PREPARATION, ACHAT_COMMANDE,
+                        ACHAT_AVOIR_FINANCIER, ACHAT_AVOIR)
+    TYPES_LIVRAISON = (LIVRAISON, ACHAT_RECEPTION)
+    TYPES_RETOUR = (RETOUR, ACHAT_RETOUR)
+    # Sens du mouvement de stock
+    TYPES_ENTREE = (ACHAT_RECEPTION, ACHAT_FACTURE, RETOUR, FACTURE_RETOUR, STOCK_ENTREE)
+    TYPES_SORTIE = (LIVRAISON, FACTURE, ACHAT_RETOUR, ACHAT_FACTURE_RETOUR, STOCK_SORTIE)
+    # Entrées qui fixent un nouveau coût d'achat (recalcul du CMUP)
+    TYPES_ENTREE_VALORISEE = (ACHAT_RECEPTION, ACHAT_FACTURE, STOCK_ENTREE)
+    # Enchaînement des transformations (comme dans Sage 100)
     TRANSFORMATIONS = {
-        DEVIS: (COMMANDE, FACTURE),
-        COMMANDE: (LIVRAISON, FACTURE),
-        LIVRAISON: (FACTURE,),
-        FACTURE: (AVOIR,),
+        DEVIS: (COMMANDE, PREPARATION, LIVRAISON, FACTURE),
+        COMMANDE: (PREPARATION, LIVRAISON, FACTURE),
+        PREPARATION: (LIVRAISON, FACTURE),
+        LIVRAISON: (FACTURE, RETOUR),
+        RETOUR: (FACTURE_RETOUR,),
+        AVOIR_FINANCIER: (AVOIR,),
+        FACTURE: (AVOIR, FACTURE_RETOUR),
+        ACHAT_DEMANDE: (ACHAT_PREPARATION, ACHAT_COMMANDE),
+        ACHAT_PREPARATION: (ACHAT_COMMANDE,),
         ACHAT_COMMANDE: (ACHAT_RECEPTION, ACHAT_FACTURE),
-        ACHAT_RECEPTION: (ACHAT_FACTURE,),
-        ACHAT_FACTURE: (ACHAT_AVOIR,),
+        ACHAT_RECEPTION: (ACHAT_FACTURE, ACHAT_RETOUR),
+        ACHAT_RETOUR: (ACHAT_FACTURE_RETOUR,),
+        ACHAT_AVOIR_FINANCIER: (ACHAT_AVOIR,),
+        ACHAT_FACTURE: (ACHAT_AVOIR, ACHAT_FACTURE_RETOUR),
     }
 
     BROUILLON = "BROUILLON"
@@ -195,12 +293,16 @@ class Document(models.Model):
     ANNULE = "ANNULE"
     STATUTS = [(BROUILLON, "Brouillon"), (VALIDE, "Validé"), (TRANSFORME, "Transformé"), (ANNULE, "Annulé")]
 
-    type_document = models.CharField("Type", max_length=20, choices=TYPES)
+    type_document = models.CharField("Type", max_length=30, choices=TYPES)
     numero = models.CharField(max_length=30, unique=True, blank=True)
     date = models.DateField(default=timezone.localdate)
     date_echeance = models.DateField("Échéance", null=True, blank=True)
-    tiers = models.ForeignKey(Tiers, on_delete=models.PROTECT, related_name="documents")
-    reference_externe = models.CharField("Réf. externe", max_length=50, blank=True)
+    tiers = models.ForeignKey(Tiers, null=True, blank=True, on_delete=models.PROTECT, related_name="documents")
+    depot = models.ForeignKey(Depot, null=True, blank=True, on_delete=models.PROTECT, related_name="documents",
+                              verbose_name="Dépôt")
+    depot_destination = models.ForeignKey(Depot, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+                                          verbose_name="Dépôt de destination")
+    reference_externe = models.CharField("Référence", max_length=50, blank=True)
     statut = models.CharField(max_length=12, choices=STATUTS, default=BROUILLON)
     origine = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="documents_generes")
     notes = models.TextField(blank=True)
@@ -215,12 +317,26 @@ class Document(models.Model):
         ordering = ["-date", "-numero"]
 
     def __str__(self):
-        return f"{self.numero_affiche} - {self.tiers.nom}"
+        return f"{self.numero_affiche} - {self.tiers.nom if self.tiers_id else self.get_type_document_display()}"
 
     # --- Propriétés -----------------------------------------------------
     @property
+    def domaine(self):
+        if self.type_document in self.TYPES_VENTE:
+            return "ventes"
+        return "achats" if self.type_document in self.TYPES_ACHAT else "stocks"
+
+    @property
     def est_vente(self):
         return self.type_document in self.TYPES_VENTE
+
+    @property
+    def est_stock(self):
+        return self.type_document in self.TYPES_STOCK
+
+    @property
+    def est_virement(self):
+        return self.type_document == self.STOCK_VIREMENT
 
     @property
     def est_facturation(self):
@@ -236,10 +352,15 @@ class Document(models.Model):
 
     @property
     def transformations_possibles(self):
-        if self.statut not in (self.VALIDE, self.TRANSFORME):
+        if self.statut != self.VALIDE:
             return []
         libelles = dict(self.TYPES)
         return [(t, libelles[t]) for t in self.TRANSFORMATIONS.get(self.type_document, ())]
+
+    @property
+    def partiellement_transforme(self):
+        """Document validé dont une partie seulement a été reprise (reliquat)."""
+        return self.statut == self.VALIDE and any(l.quantite_transformee > 0 for l in self.lignes.all())
 
     @property
     def montant_regle(self):
@@ -251,21 +372,26 @@ class Document(models.Model):
             return ZERO
         return self.total_ttc - self.montant_regle
 
-    @property
-    def mouvemente_stock(self):
-        """Une facture ne mouvemente le stock que si elle n'est pas issue d'un BL / BR."""
-        if self.type_document in self.TYPES_LOGISTIQUES or self.est_avoir:
-            return True
-        if self.type_document in (self.FACTURE, self.ACHAT_FACTURE):
-            return not self._issue_d_un_document_logistique()
-        return False
-
-    def _issue_d_un_document_logistique(self):
+    def _chaine_contient(self, types):
         doc = self.origine
         while doc is not None:
-            if doc.type_document in self.TYPES_LOGISTIQUES:
+            if doc.type_document in types:
                 return True
             doc = doc.origine
+        return False
+
+    @property
+    def mouvemente_stock(self):
+        """Règles Sage 100 : les factures d'avoir et bons d'avoir financiers ne touchent pas le stock ;
+        une facture issue d'un bon de livraison, ou une facture de retour issue d'un bon de retour,
+        ne mouvemente pas une seconde fois le stock."""
+        t = self.type_document
+        if t in self.TYPES_STOCK or t in self.TYPES_LIVRAISON or t in self.TYPES_RETOUR:
+            return True
+        if t in (self.FACTURE, self.ACHAT_FACTURE):
+            return not self._chaine_contient(self.TYPES_LIVRAISON)
+        if t in (self.FACTURE_RETOUR, self.ACHAT_FACTURE_RETOUR):
+            return not self._chaine_contient(self.TYPES_RETOUR)
         return False
 
     # --- Calculs --------------------------------------------------------
@@ -297,16 +423,26 @@ class Document(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero:
             self.numero = f"BROU-{uuid.uuid4().hex[:12].upper()}"
+        if not self.depot_id and self.type_document not in self.TYPES_SANS_DEPOT:
+            self.depot = Depot.par_defaut()
         if not self.date_echeance and self.est_facturation and self.tiers_id:
             self.date_echeance = self.date + timezone.timedelta(days=self.tiers.delai_paiement)
         super().save(*args, **kwargs)
 
     # --- Cycle de vie ---------------------------------------------------
     def clean(self):
-        if self.tiers_id:
-            attendu = Tiers.CLIENT if self.type_document in self.TYPES_VENTE else Tiers.FOURNISSEUR
-            if self.tiers.type_tiers != attendu:
-                raise ValidationError({"tiers": f"Ce type de document requiert un tiers de type « {attendu.lower()} »."})
+        if self.est_stock:
+            if self.est_virement:
+                if not self.depot_destination_id:
+                    raise ValidationError({"depot_destination": "Indiquez le dépôt de destination."})
+                if self.depot_destination_id == self.depot_id:
+                    raise ValidationError({"depot_destination": "Le dépôt de destination doit être différent du dépôt d'origine."})
+            return
+        if not self.tiers_id:
+            raise ValidationError({"tiers": "Ce document requiert un tiers."})
+        attendu = Tiers.CLIENT if self.type_document in self.TYPES_VENTE else Tiers.FOURNISSEUR
+        if self.tiers.type_tiers != attendu:
+            raise ValidationError({"tiers": f"Ce type de document requiert un tiers de type « {attendu.lower()} »."})
 
     @transaction.atomic
     def valider(self):
@@ -316,6 +452,7 @@ class Document(models.Model):
             raise ValidationError("Seul un document en brouillon peut être validé.")
         if not self.lignes.exists():
             raise ValidationError("Le document ne contient aucune ligne.")
+        self.clean()
         self.recalculer(save=False)
         if self.est_brouillon_numero:
             self.numero = Sequence.suivant(self.PREFIXES[self.type_document], self.date.year)
@@ -325,37 +462,79 @@ class Document(models.Model):
             self._mouvementer_stock()
         if self.est_facturation:
             comptabiliser_document(self)
-        if self.origine and self.origine.statut == self.VALIDE:
-            self.origine.statut = self.TRANSFORME
-            self.origine.save(update_fields=["statut"])
+        if self.origine_id:
+            self.origine.mettre_a_jour_statut()
         return self
 
+    def mettre_a_jour_statut(self):
+        """Transformé quand toutes les lignes ont été reprises ; sinon reste validé (reliquat)."""
+        if self.statut not in (self.VALIDE, self.TRANSFORME):
+            return
+        complet = all(l.reste_a_transformer <= 0 for l in self.lignes.all())
+        statut = self.TRANSFORME if complet else self.VALIDE
+        if statut != self.statut:
+            self.statut = statut
+            self.save(update_fields=["statut"])
+
     def _mouvementer_stock(self):
-        entree = (self.type_document in (self.ACHAT_RECEPTION, self.ACHAT_FACTURE, self.AVOIR))
-        for ligne in self.lignes.select_related("article"):
-            article = ligne.article
-            if article is None or not article.suivi_stock:
-                continue
-            quantite = ligne.quantite if entree else -ligne.quantite
-            MouvementStock.objects.create(
-                article=article, date=self.date, quantite=quantite, document=self,
-                libelle=f"{self.get_type_document_display()} {self.numero}",
-            )
-            Article.objects.filter(pk=article.pk).update(stock=models.F("stock") + quantite)
+        from apps.core.models import Societe
+
+        libelle = f"{self.get_type_document_display()} {self.numero}"
+        lignes = [l for l in self.lignes.select_related("article") if l.article_id and l.article.suivi_stock]
+        mouvements = []  # (article, depot, quantité signée, coût unitaire, ligne)
+        for ligne in lignes:
+            article = Article.objects.select_for_update().get(pk=ligne.article_id)
+            if self.est_virement:
+                mouvements.append((article, self.depot, -ligne.quantite, article.cout_unitaire))
+                mouvements.append((article, self.depot_destination, ligne.quantite, article.cout_unitaire))
+            elif self.type_document in self.TYPES_ENTREE:
+                cout = ligne.prix_net if self.type_document in self.TYPES_ENTREE_VALORISEE else article.cout_unitaire
+                mouvements.append((article, self.depot, ligne.quantite, cout))
+            else:
+                mouvements.append((article, self.depot, -ligne.quantite, article.cout_unitaire))
+
+        if not Societe.get().stock_negatif_autorise:
+            besoins = {}
+            for article, depot, quantite, _ in mouvements:
+                if quantite < 0:
+                    cle = (article.pk, depot.pk)
+                    besoins[cle] = besoins.get(cle, ZERO) - quantite
+            for (article_pk, depot_pk), besoin in besoins.items():
+                stock = StockDepot.quantite_de(article_pk, depot_pk)
+                if stock < besoin:
+                    article = Article.objects.get(pk=article_pk)
+                    depot = Depot.objects.get(pk=depot_pk)
+                    raise ValidationError(
+                        f"Stock insuffisant pour « {article.designation} » dans le dépôt {depot} : "
+                        f"disponible {stock.normalize():f}, demandé {besoin.normalize():f}.")
+
+        for article, depot, quantite, cout in mouvements:
+            if quantite > 0 and self.type_document in self.TYPES_ENTREE_VALORISEE:
+                article.recalculer_cmup(quantite, cout)
+            MouvementStock.objects.create(article=article, depot=depot, date=self.date, quantite=quantite,
+                                          cout_unitaire=cout, document=self, libelle=libelle)
+            StockDepot.ajouter(article, depot, quantite)
 
     @transaction.atomic
     def transformer(self, type_cible, utilisateur=None):
         if type_cible not in self.TRANSFORMATIONS.get(self.type_document, ()):
             raise ValidationError("Transformation non autorisée pour ce document.")
-        if self.statut not in (self.VALIDE, self.TRANSFORME):
-            raise ValidationError("Le document doit être validé avant d'être transformé.")
+        if self.statut != self.VALIDE:
+            raise ValidationError("Seul un document validé et non entièrement transformé peut être transformé.")
+        lignes = [l for l in self.lignes.all() if l.reste_a_transformer > 0]
+        if not lignes:
+            raise ValidationError("Toutes les lignes de ce document ont déjà été transformées.")
         nouveau = Document.objects.create(
-            type_document=type_cible, tiers=self.tiers, origine=self, date=timezone.localdate(),
+            type_document=type_cible, tiers=self.tiers, origine=self, date=timezone.localdate(), depot=self.depot,
             reference_externe=self.reference_externe, notes=self.notes, cree_par=utilisateur,
         )
-        for ligne in self.lignes.all():
+        for ligne in lignes:
+            reste = ligne.reste_a_transformer
+            ligne_origine = ligne.pk
             ligne.pk = None
             ligne.document = nouveau
+            ligne.quantite = reste
+            ligne.ligne_origine_id = ligne_origine
             ligne.save()
         nouveau.recalculer()
         return nouveau
@@ -367,13 +546,17 @@ class Document(models.Model):
             self.save(update_fields=["statut"])
             return
         if self.est_facturation:
-            raise ValidationError("Une facture validée ne s'annule pas : établissez un avoir.")
-        if self.mouvemente_stock and self.statut == self.VALIDE:
-            for mvt in self.mouvements_stock.all():
-                Article.objects.filter(pk=mvt.article_id).update(stock=models.F("stock") - mvt.quantite)
+            raise ValidationError("Une facture validée ne s'annule pas : établissez une facture d'avoir.")
+        if self.documents_generes.exclude(statut__in=(self.BROUILLON, self.ANNULE)).exists():
+            raise ValidationError("Ce document a déjà été transformé : annulez d'abord les documents qui en sont issus.")
+        if self.statut == self.VALIDE:
+            for mvt in self.mouvements_stock.select_related("article", "depot"):
+                StockDepot.ajouter(mvt.article, mvt.depot, -mvt.quantite)
             self.mouvements_stock.all().delete()
         self.statut = self.ANNULE
         self.save(update_fields=["statut"])
+        if self.origine_id:
+            self.origine.mettre_a_jour_statut()
 
 
 class LigneDocument(models.Model):
@@ -386,6 +569,7 @@ class LigneDocument(models.Model):
     taux_tva = models.DecimalField("TVA (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
     montant_ht = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     montant_tva = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
+    ligne_origine = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="lignes_generees")
 
     class Meta:
         ordering = ["id"]
@@ -398,6 +582,20 @@ class LigneDocument(models.Model):
     def montant_ttc(self):
         return self.montant_ht + self.montant_tva
 
+    @property
+    def prix_net(self):
+        """Prix unitaire HT après remise."""
+        return (self.montant_ht / self.quantite) if self.quantite else self.prix_unitaire
+
+    @property
+    def quantite_transformee(self):
+        return self.lignes_generees.filter(
+            document__statut__in=(Document.VALIDE, Document.TRANSFORME)).aggregate(s=Sum("quantite"))["s"] or ZERO
+
+    @property
+    def reste_a_transformer(self):
+        return self.quantite - self.quantite_transformee
+
     def calculer(self):
         brut = Decimal(self.quantite) * Decimal(self.prix_unitaire)
         self.montant_ht = arrondi(brut * (1 - Decimal(self.remise) / 100))
@@ -406,8 +604,16 @@ class LigneDocument(models.Model):
     def save(self, *args, **kwargs):
         if self.article_id and not self.designation:
             self.designation = self.article.designation
-        if self.document_id and not self.document.tiers.assujetti_tva and self.document.est_vente:
-            self.taux_tva = ZERO
+        if self.document_id:
+            doc = self.document
+            if doc.est_stock:
+                # Documents des stocks : valorisés au coût, sans TVA
+                self.taux_tva = ZERO
+                self.remise = ZERO
+                if not self.prix_unitaire and self.article_id:
+                    self.prix_unitaire = arrondi(self.article.cout_unitaire, 2)
+            elif doc.est_vente and doc.tiers_id and not doc.tiers.assujetti_tva:
+                self.taux_tva = ZERO
         self.calculer()
         super().save(*args, **kwargs)
 
@@ -492,10 +698,35 @@ class Imputation(models.Model):
         verbose_name = "Imputation de règlement"
 
 
+class StockDepot(models.Model):
+    """Quantité en stock d'un article dans un dépôt."""
+
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="stocks_depots")
+    depot = models.ForeignKey(Depot, on_delete=models.PROTECT, related_name="stocks")
+    quantite = models.DecimalField(max_digits=18, decimal_places=3, default=ZERO)
+
+    class Meta:
+        unique_together = ("article", "depot")
+        ordering = ["depot__intitule"]
+        verbose_name = "Stock par dépôt"
+
+    @classmethod
+    def quantite_de(cls, article_id, depot_id):
+        return cls.objects.filter(article_id=article_id, depot_id=depot_id).values_list("quantite", flat=True).first() or ZERO
+
+    @classmethod
+    def ajouter(cls, article, depot, quantite):
+        ligne, _ = cls.objects.select_for_update().get_or_create(article=article, depot=depot)
+        cls.objects.filter(pk=ligne.pk).update(quantite=models.F("quantite") + quantite)
+        Article.objects.filter(pk=article.pk).update(stock=models.F("stock") + quantite)
+
+
 class MouvementStock(models.Model):
     article = models.ForeignKey(Article, on_delete=models.PROTECT, related_name="mouvements")
+    depot = models.ForeignKey(Depot, null=True, on_delete=models.PROTECT, related_name="mouvements")
     date = models.DateField()
     quantite = models.DecimalField(max_digits=18, decimal_places=3, help_text="Positif = entrée, négatif = sortie")
+    cout_unitaire = models.DecimalField(max_digits=18, decimal_places=4, default=ZERO)
     document = models.ForeignKey(Document, null=True, blank=True, on_delete=models.SET_NULL, related_name="mouvements_stock")
     libelle = models.CharField(max_length=200)
     cree_le = models.DateTimeField(auto_now_add=True)
@@ -503,3 +734,98 @@ class MouvementStock(models.Model):
     class Meta:
         ordering = ["-date", "-id"]
         verbose_name = "Mouvement de stock"
+
+    @property
+    def valeur(self):
+        return arrondi(self.quantite * self.cout_unitaire)
+
+
+class Inventaire(models.Model):
+    """Saisie d'inventaire physique d'un dépôt : les écarts génèrent des mouvements d'entrée / de sortie."""
+
+    BROUILLON = "BROUILLON"
+    VALIDE = "VALIDE"
+    STATUTS = [(BROUILLON, "En cours de saisie"), (VALIDE, "Validé")]
+
+    numero = models.CharField(max_length=30, unique=True)
+    date = models.DateField(default=timezone.localdate)
+    depot = models.ForeignKey(Depot, on_delete=models.PROTECT, related_name="inventaires")
+    famille = models.ForeignKey(FamilleArticle, null=True, blank=True, on_delete=models.SET_NULL,
+                                help_text="Limiter l'inventaire à une famille (facultatif)")
+    statut = models.CharField(max_length=10, choices=STATUTS, default=BROUILLON)
+    notes = models.TextField(blank=True)
+    mouvement_entree = models.ForeignKey(Document, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    mouvement_sortie = models.ForeignKey(Document, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-numero"]
+
+    def __str__(self):
+        return f"{self.numero} - {self.depot}"
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            self.numero = Sequence.suivant("INV", self.date.year)
+        super().save(*args, **kwargs)
+
+    def initialiser_lignes(self):
+        articles = Article.objects.filter(suivi_stock=True, actif=True)
+        if self.famille_id:
+            articles = articles.filter(famille=self.famille)
+        LigneInventaire.objects.bulk_create([
+            LigneInventaire(inventaire=self, article=a, stock_theorique=a.stock_depot(self.depot),
+                            stock_reel=a.stock_depot(self.depot), cout_unitaire=a.cout_unitaire)
+            for a in articles
+        ])
+
+    @property
+    def ecart_valeur(self):
+        return sum((l.ecart_valeur for l in self.lignes.all()), ZERO)
+
+    @transaction.atomic
+    def valider(self):
+        if self.statut != self.BROUILLON:
+            raise ValidationError("Cet inventaire est déjà validé.")
+        entrees, sorties = [], []
+        for ligne in self.lignes.select_related("article"):
+            # Écart calculé sur le stock au moment de la validation
+            theorique = ligne.article.stock_depot(self.depot)
+            ecart = ligne.stock_reel - theorique
+            if ecart > 0:
+                entrees.append((ligne.article, ecart))
+            elif ecart < 0:
+                sorties.append((ligne.article, -ecart))
+        for type_document, lignes, champ in ((Document.STOCK_ENTREE, entrees, "mouvement_entree"),
+                                             (Document.STOCK_SORTIE, sorties, "mouvement_sortie")):
+            if not lignes:
+                continue
+            doc = Document.objects.create(type_document=type_document, depot=self.depot, date=self.date,
+                                          reference_externe=self.numero, notes=f"Régularisation d'inventaire {self.numero}")
+            for article, quantite in lignes:
+                LigneDocument.objects.create(document=doc, article=article, quantite=quantite,
+                                             prix_unitaire=arrondi(article.cout_unitaire, 2))
+            doc.recalculer()
+            doc.valider()
+            setattr(self, champ, doc)
+        self.statut = self.VALIDE
+        self.save()
+
+
+class LigneInventaire(models.Model):
+    inventaire = models.ForeignKey(Inventaire, on_delete=models.CASCADE, related_name="lignes")
+    article = models.ForeignKey(Article, on_delete=models.PROTECT)
+    stock_theorique = models.DecimalField(max_digits=18, decimal_places=3, default=ZERO)
+    stock_reel = models.DecimalField("Stock compté", max_digits=18, decimal_places=3, default=ZERO)
+    cout_unitaire = models.DecimalField(max_digits=18, decimal_places=4, default=ZERO)
+
+    class Meta:
+        ordering = ["article__reference"]
+
+    @property
+    def ecart(self):
+        return self.stock_reel - self.stock_theorique
+
+    @property
+    def ecart_valeur(self):
+        return arrondi(self.ecart * self.cout_unitaire)

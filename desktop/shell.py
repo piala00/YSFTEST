@@ -438,6 +438,10 @@ class ModuleApp(ctk.CTk):
         if action == "fermer":
             self.destroy()
             return
+        if action == "actualiser":
+            if self.page_courante is not None:
+                self.page_courante.rafraichir()
+            return
         if action == "imprimer":
             page = self.page_courante
             if isinstance(page, PageWeb):

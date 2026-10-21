@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% load erp l10n %}
+{% block title %}Inventaire {{ inventaire.numero }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Inventaire {{ inventaire.numero }} <small class="text-muted fs-6">{{ inventaire.depot }} · {{ inventaire.date|date:"d/m/Y" }}{% if inventaire.famille %} · {{ inventaire.famille }}{% endif %}</small></h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'commercial:etat_inventaire' %}?vue=preparatoire&depot={{ inventaire.depot.pk }}" target="_blank"><i class="bi bi-printer"></i> État préparatoire</a>
+  </div></div>
+{% if inventaire.statut == "VALIDE" %}
+<div class="alert alert-success">Inventaire validé.
+  {% if inventaire.mouvement_entree %}Entrées : <a href="{% url 'commercial:document_detail' inventaire.mouvement_entree.pk %}">{{ inventaire.mouvement_entree.numero }}</a>.{% endif %}
+  {% if inventaire.mouvement_sortie %}Sorties : <a href="{% url 'commercial:document_detail' inventaire.mouvement_sortie.pk %}">{{ inventaire.mouvement_sortie.numero }}</a>.{% endif %}
+  {% if not inventaire.mouvement_entree and not inventaire.mouvement_sortie %}Aucun écart constaté.{% endif %}</div>
+{% else %}
+<div class="alert alert-info small">Saisissez les quantités comptées. À la validation, les écarts génèrent un <strong>mouvement d'entrée</strong> et/ou un <strong>mouvement de sortie</strong> dans le dépôt, valorisés au CMUP.</div>
+{% endif %}
+<form method="post">{% csrf_token %}{{ formset.management_form }}
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead class="table-light"><tr><th>Réf.</th><th>Désignation</th><th>Famille</th><th class="num">Stock théorique</th><th class="num" style="width:150px">Stock compté</th><th class="num">Écart</th><th class="num">CMUP</th><th class="num">Écart valorisé</th></tr></thead><tbody>
+{% for ligne, form in lignes %}<tr data-theo="{{ ligne.stock_theorique|unlocalize }}" data-cout="{{ ligne.cout_unitaire|unlocalize }}">
+<td>{{ ligne.article.reference }}</td><td>{{ ligne.article.designation }}</td><td class="small text-muted">{{ ligne.article.famille|default:"" }}</td>
+<td class="num">{{ ligne.stock_theorique|floatformat:"-3" }}</td>
+<td>{% if inventaire.statut == "VALIDE" %}<div class="num">{{ ligne.stock_reel|floatformat:"-3" }}</div>{% else %}{{ form.id }}{{ form.stock_reel }}{% endif %}</td>
+<td class="num ecart">{{ ligne.ecart|floatformat:"-3" }}</td><td class="num text-muted">{{ ligne.cout_unitaire|montant:2 }}</td><td class="num ecart-valeur">{{ ligne.ecart_valeur|montant }}</td></tr>
+{% empty %}<tr><td colspan="8" class="text-muted text-center p-4">Aucun article suivi en stock.</td></tr>{% endfor %}
+</tbody><tfoot><tr class="total"><td colspan="7" class="text-end">Écart total valorisé</td><td class="num" id="total-ecart">{{ inventaire.ecart_valeur|montant }}</td></tr></tfoot></table></div>
+{% if inventaire.statut != "VALIDE" %}
+<div class="mt-3 d-flex gap-2">
+  <button class="btn btn-outline-primary"><i class="bi bi-save"></i> Enregistrer les quantités</button>
+  <button class="btn btn-success" name="valider" onclick="return confirm('Valider l\'inventaire et générer les mouvements de régularisation ?')"><i class="bi bi-check2-circle"></i> Valider l'inventaire</button>
+</div>{% endif %}
+</form>
+{% endblock %}
+{% block scripts %}<script>
+const fmt = n => Math.round(n).toLocaleString('fr-FR');
+function recalc() {
+  let total = 0;
+  document.querySelectorAll('tr[data-theo]').forEach(tr => {
+    const input = tr.querySelector('.saisie-reel'); if (!input) return;
+    const ecart = (parseFloat(input.value.replace(',', '.')) || 0) - parseFloat(tr.dataset.theo);
+    const valeur = ecart * parseFloat(tr.dataset.cout);
+    tr.querySelector('.ecart').textContent = ecart.toLocaleString('fr-FR');
+    tr.querySelector('.ecart').className = 'num ecart ' + (ecart < 0 ? 'text-danger' : ecart > 0 ? 'text-success' : '');
+    tr.querySelector('.ecart-valeur').textContent = fmt(valeur);
+    total += valeur;
+  });
+  const t = document.getElementById('total-ecart'); if (document.querySelector('.saisie-reel')) t.textContent = fmt(total);
+}
+document.querySelectorAll('.saisie-reel').forEach(i => i.addEventListener('input', recalc));
+</script>{% endblock %}

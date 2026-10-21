@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from .models import Article, Document, FamilleArticle, Imputation, LigneDocument, MouvementStock, Reglement, Tiers
+from .models import (Article, Depot, Document, FamilleArticle, Imputation, Inventaire, LigneDocument, MouvementStock,
+                     Reglement, StockDepot, Tiers)
 
 
 @admin.register(Tiers)
@@ -34,3 +35,6 @@ admin.site.register(FamilleArticle)
 admin.site.register(Reglement)
 admin.site.register(Imputation)
 admin.site.register(MouvementStock)
+admin.site.register(Depot)
+admin.site.register(StockDepot)
+admin.site.register(Inventaire)

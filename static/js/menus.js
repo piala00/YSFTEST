@@ -23,6 +23,7 @@
   document.querySelectorAll('[data-action]').forEach(el => el.addEventListener('click', e => {
     e.preventDefault();
     if (el.dataset.action === 'imprimer') window.print();
+    if (el.dataset.action === 'actualiser') window.location.reload();
     if (el.dataset.action === 'fermer') { window.close(); window.location.href = '/'; }
   }));
 

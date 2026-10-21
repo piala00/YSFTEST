@@ -85,7 +85,7 @@ class PagesEtApiTests(TestCase):
             self.assertEqual(titres[0], "Fichier")
             self.assertEqual(titres[-2:], ["Fenêtre", "?"])
         compta = [o.titre for o in MODULES[1].onglets]
-        self.assertEqual(compta, ["Fichier", "Structure", "Traitement", "État", "Fenêtre", "?"])
+        self.assertEqual(compta, ["Fichier", "Structure", "Traitement", "Etat", "Fenêtre", "?"])
 
     def test_saisie_facture_par_formulaire(self):
         tiers = Tiers.objects.filter(type_tiers=Tiers.CLIENT).first()
@@ -101,6 +101,52 @@ class PagesEtApiTests(TestCase):
         doc = Document.objects.latest("id")
         self.assertEqual(doc.statut, Document.VALIDE)
         self.assertEqual(doc.total_ttc, 2385)
+
+    def test_documents_des_stocks_et_inventaire_par_le_web(self):
+        from apps.commercial.models import Depot, Inventaire, StockDepot
+
+        article = Article.objects.get(reference="CIM50")
+        principal, abong = Depot.objects.get(code="DP"), Depot.objects.get(code="AM")
+        avant = StockDepot.quantite_de(article.pk, abong.pk)
+        data = {
+            "date": "2026-03-01", "depot": principal.pk, "depot_destination": abong.pk, "reference_externe": "", "notes": "",
+            "lignes-TOTAL_FORMS": "1", "lignes-INITIAL_FORMS": "0", "lignes-MIN_NUM_FORMS": "1", "lignes-MAX_NUM_FORMS": "1000",
+            "lignes-0-article": article.pk, "lignes-0-designation": "", "lignes-0-quantite": "10",
+            "lignes-0-prix_unitaire": "0", "lignes-0-remise": "0", "lignes-0-taux_tva": "0", "valider": "1",
+        }
+        response = self.client.post(reverse("commercial:document_create", args=["STOCK_VIREMENT"]), data)
+        self.assertEqual(response.status_code, 302)
+        doc = Document.objects.latest("id")
+        self.assertEqual((doc.type_document, doc.statut), ("STOCK_VIREMENT", "VALIDE"))
+        self.assertEqual(StockDepot.quantite_de(article.pk, abong.pk), avant + 10)
+        # Transfert vers le même dépôt : refusé par le formulaire
+        data["depot_destination"] = principal.pk
+        response = self.client.post(reverse("commercial:document_create", args=["STOCK_VIREMENT"]), data)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(reverse("commercial:inventaire_create"), {"date": "2026-03-02", "depot": abong.pk, "notes": ""})
+        inventaire = Inventaire.objects.latest("id")
+        self.assertRedirects(response, reverse("commercial:inventaire_detail", args=[inventaire.pk]))
+        lignes = list(inventaire.lignes.all())
+        donnees = {"form-TOTAL_FORMS": len(lignes), "form-INITIAL_FORMS": len(lignes), "valider": "1"}
+        for i, l in enumerate(lignes):
+            donnees[f"form-{i}-id"] = l.pk
+            donnees[f"form-{i}-stock_reel"] = str(l.stock_theorique - 1 if l.article_id == article.pk else l.stock_theorique)
+        self.client.post(reverse("commercial:inventaire_detail", args=[inventaire.pk]), donnees)
+        inventaire.refresh_from_db()
+        self.assertEqual(inventaire.statut, "VALIDE")
+        self.assertEqual(StockDepot.quantite_de(article.pk, abong.pk), avant + 9)
+
+        for url in (reverse("commercial:inventaire_detail", args=[inventaire.pk]), reverse("commercial:inventaires"),
+                    reverse("commercial:depots"), reverse("commercial:depot_create"),
+                    reverse("commercial:stock") + f"?depot={abong.pk}", reverse("commercial:mouvements") + f"?depot={abong.pk}",
+                    reverse("commercial:recherche_entetes") + "?domaine=stocks&tiers=&numero=",
+                    reverse("commercial:recherche_lignes") + "?article=ciment&domaine=ventes",
+                    reverse("commercial:etat_inventaire") + f"?vue=livre&date=2026-06-30&depot={principal.pk}",
+                    reverse("commercial:document_detail", args=[doc.pk]), reverse("commercial:document_print", args=[doc.pk]),
+                    reverse("commercial:documents", args=["stocks"]), reverse("commercial:clients") + "?vue=comptes"):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
 
     def test_connexion_requise(self):
         self.client.logout()

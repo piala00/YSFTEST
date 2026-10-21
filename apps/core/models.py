@@ -19,6 +19,9 @@ class Societe(models.Model):
     email = models.EmailField(blank=True)
     devise = models.CharField(max_length=10, default="XAF")
     taux_tva_defaut = models.DecimalField("Taux TVA par défaut (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
+    stock_negatif_autorise = models.BooleanField(
+        "Autoriser le stock négatif", default=False,
+        help_text="Si décoché, une sortie de stock supérieure au stock disponible du dépôt est refusée")
     pied_facture = models.TextField(blank=True, help_text="Mentions affichées en bas des factures")
 
     class Meta:

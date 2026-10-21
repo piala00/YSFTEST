@@ -5,14 +5,16 @@
   <a class="btn btn-outline-secondary btn-sm" href="{% url 'commercial:article_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier</a></div>
 <div class="row g-3 mb-3">
   <div class="col-md-3"><div class="card kpi p-3"><div class="label">Stock</div><div class="value {% if object.en_alerte %}text-danger{% endif %}">{{ object.stock|floatformat:"-3" }} {{ object.unite }}</div><div class="small text-muted">Alerte : {{ object.stock_minimum|floatformat:"-3" }}</div></div></div>
-  <div class="col-md-3"><div class="card kpi p-3"><div class="label">Valeur du stock</div><div class="value">{{ object.valeur_stock|montant }}</div></div></div>
+  <div class="col-md-3"><div class="card kpi p-3"><div class="label">Valeur du stock (CMUP)</div><div class="value">{{ object.valeur_stock|montant }}</div><div class="small text-muted">CMUP : {{ object.cout_unitaire|montant:2 }}</div></div></div>
   <div class="col-md-3"><div class="card kpi p-3"><div class="label">Prix de vente HT</div><div class="value">{{ object.prix_vente|montant }}</div><div class="small text-muted">Achat : {{ object.prix_achat|montant }}</div></div></div>
   <div class="col-md-3"><div class="card p-3 small">Compte de vente : {{ object.get_compte_vente }}<br>Compte d'achat : {{ object.get_compte_achat }}</div></div>
 </div>
+{% if stocks_depots %}<div class="card mb-3"><div class="card-header bg-white fw-semibold">Stock par dépôt</div>
+<table class="table table-sm mb-0"><tbody>{% for s in stocks_depots %}<tr><td>{{ s.depot }}</td><td class="num fw-semibold">{{ s.quantite|floatformat:"-3" }} {{ object.unite }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
 <div class="card"><div class="card-header bg-white fw-semibold">Mouvements de stock</div>
-<table class="table table-sm mb-0"><thead><tr><th>Date</th><th>Libellé</th><th class="num">Entrée</th><th class="num">Sortie</th></tr></thead><tbody>
-{% for m in mouvements %}<tr><td>{{ m.date|date:"d/m/Y" }}</td><td>{% if m.document %}<a href="{% url 'commercial:document_detail' m.document.pk %}">{{ m.libelle }}</a>{% else %}{{ m.libelle }}{% endif %}</td>
-<td class="num">{% if m.quantite > 0 %}{{ m.quantite|floatformat:"-3" }}{% endif %}</td><td class="num">{% if m.quantite < 0 %}{{ m.quantite|absolu|floatformat:"-3" }}{% endif %}</td></tr>
-{% empty %}<tr><td colspan="4" class="text-muted text-center">Aucun mouvement.</td></tr>{% endfor %}
+<table class="table table-sm mb-0"><thead><tr><th>Date</th><th>Dépôt</th><th>Libellé</th><th class="num">Entrée</th><th class="num">Sortie</th><th class="num">Coût unitaire</th></tr></thead><tbody>
+{% for m in mouvements %}<tr><td>{{ m.date|date:"d/m/Y" }}</td><td class="small">{{ m.depot|default:"" }}</td><td>{% if m.document %}<a href="{% url 'commercial:document_detail' m.document.pk %}">{{ m.libelle }}</a>{% else %}{{ m.libelle }}{% endif %}</td>
+<td class="num">{% if m.quantite > 0 %}{{ m.quantite|floatformat:"-3" }}{% endif %}</td><td class="num">{% if m.quantite < 0 %}{{ m.quantite|absolu|floatformat:"-3" }}{% endif %}</td><td class="num text-muted">{{ m.cout_unitaire|montant:2 }}</td></tr>
+{% empty %}<tr><td colspan="6" class="text-muted text-center">Aucun mouvement.</td></tr>{% endfor %}
 </tbody></table></div>
 {% endblock %}

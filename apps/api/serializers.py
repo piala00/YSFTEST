@@ -14,12 +14,13 @@ class TiersSerializer(serializers.ModelSerializer):
 class ArticleSerializer(serializers.ModelSerializer):
     famille = serializers.StringRelatedField()
     en_alerte = serializers.BooleanField(read_only=True)
+    valeur_stock = serializers.DecimalField(max_digits=18, decimal_places=0, read_only=True)
 
     class Meta:
         model = Article
         fields = ["id", "reference", "designation", "nature", "famille", "unite", "prix_achat", "prix_vente",
-                  "taux_tva", "suivi_stock", "stock", "stock_minimum", "en_alerte", "actif"]
-        read_only_fields = ["stock"]
+                  "taux_tva", "suivi_stock", "stock", "cmup", "valeur_stock", "stock_minimum", "en_alerte", "actif"]
+        read_only_fields = ["stock", "cmup"]
 
 
 class LigneDocumentSerializer(serializers.ModelSerializer):
@@ -32,19 +33,27 @@ class LigneDocumentSerializer(serializers.ModelSerializer):
 
 class DocumentSerializer(serializers.ModelSerializer):
     lignes = LigneDocumentSerializer(many=True)
-    tiers_nom = serializers.CharField(source="tiers.nom", read_only=True)
+    tiers_nom = serializers.CharField(source="tiers.nom", read_only=True, default="")
+    depot_nom = serializers.CharField(source="depot.intitule", read_only=True, default="")
     type_libelle = serializers.CharField(source="get_type_document_display", read_only=True)
     reste_a_payer = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
 
     class Meta:
         model = Document
         fields = ["id", "type_document", "type_libelle", "numero", "date", "date_echeance", "tiers", "tiers_nom",
+                  "depot", "depot_nom", "depot_destination",
                   "reference_externe", "statut", "notes", "total_ht", "total_tva", "total_ttc", "reste_a_payer", "lignes"]
         read_only_fields = ["numero", "statut", "total_ht", "total_tva", "total_ttc"]
 
     def validate(self, attrs):
-        Document(type_document=attrs.get("type_document", getattr(self.instance, "type_document", None)),
-                 tiers=attrs.get("tiers", getattr(self.instance, "tiers", None))).clean()
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        doc = Document(**{k: attrs.get(k, getattr(self.instance, k, None))
+                          for k in ("type_document", "tiers", "depot", "depot_destination")})
+        try:
+            doc.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict if hasattr(exc, "error_dict") else exc.messages)
         return attrs
 
     def create(self, validated_data):

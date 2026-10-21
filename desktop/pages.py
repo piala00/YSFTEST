@@ -68,9 +68,9 @@ class PageTiers(PageListe):
 
 
 class PageArticles(PageListe):
-    colonnes = [("reference", "Réf.", 90, "w"), ("designation", "Désignation", 280, "w"), ("unite", "Unité", 70, "w"),
-                ("prix_achat_f", "P.A. HT", 100, "e"), ("prix_vente_f", "P.V. HT", 100, "e"), ("stock", "Stock", 90, "e"),
-                ("stock_minimum", "Alerte", 80, "e")]
+    colonnes = [("reference", "Réf.", 90, "w"), ("designation", "Désignation", 260, "w"), ("unite", "Unité", 70, "w"),
+                ("prix_achat_f", "P.A. HT", 95, "e"), ("prix_vente_f", "P.V. HT", 95, "e"), ("stock", "Stock", 85, "e"),
+                ("stock_minimum", "Alerte", 75, "e"), ("cmup_f", "CMUP", 90, "e"), ("valeur_f", "Valeur", 110, "e")]
 
     def __init__(self, app, titre, alerte_seulement=False):
         self.alerte_seulement = alerte_seulement
@@ -82,19 +82,21 @@ class PageArticles(PageListe):
                 articles = [a for a in articles if a["en_alerte"]]
             for a in articles:
                 a["prix_achat_f"], a["prix_vente_f"] = montant(a["prix_achat"]), montant(a["prix_vente"])
+                a["cmup_f"], a["valeur_f"] = montant(a["cmup"]), montant(a["valeur_stock"])
             self.tableau.remplir(articles, tags=lambda a: "alerte" if a["en_alerte"] else "")
         self.charger(lambda: self.api.articles(self.recherche.get()), remplir)
 
 
 class PageDocuments(PageListe):
     colonnes = [("numero", "N°", 140, "w"), ("type_libelle", "Type", 170, "w"), ("date", "Date", 100, "w"),
-                ("tiers_nom", "Tiers", 230, "w"), ("ht", "HT", 110, "e"), ("ttc", "TTC", 110, "e"),
+                ("tiers_nom", "Tiers", 210, "w"), ("depot_nom", "Dépôt", 140, "w"), ("ht", "HT", 110, "e"), ("ttc", "TTC", 110, "e"),
                 ("reste", "Reste dû", 110, "e"), ("statut", "Statut", 100, "w")]
 
     def __init__(self, app, titre, domaine, type_document="", statut=""):
         self.domaine, self.type_document, self.filtre_statut = domaine, type_document, statut
         super().__init__(app, titre)
-        self.bouton("Nouvelle facture", self.nouvelle_facture)
+        if domaine != "stocks":
+            self.bouton("Nouvelle facture", self.nouvelle_facture)
 
     def rafraichir(self):
         def remplir(docs):
@@ -400,35 +402,26 @@ class FenetreSaisieFacture(ctk.CTkToplevel):
 # ---------------------------------------------------------------------------
 # Correspondance élément de navigation → écran natif
 # ---------------------------------------------------------------------------
-def _saisie_facture(type_document, domaine):
-    """Action : ouvre la fenêtre de saisie depuis la liste du domaine (créée si besoin)."""
-    def action(app, element):
-        cle = f"{domaine}.tous"
-        if cle not in app.pages:
-            app.pages[cle] = PageDocuments(app, "Tous les documents", domaine)
-        FenetreSaisieFacture(app.pages[cle], type_document)
-        return None
-    return action
-
-
-TYPES_VENTE = ["DEVIS", "COMMANDE", "LIVRAISON", "FACTURE", "AVOIR"]
-TYPES_ACHAT = ["ACHAT_COMMANDE", "ACHAT_RECEPTION", "ACHAT_FACTURE", "ACHAT_AVOIR"]
+TYPES_VENTE = ["DEVIS", "COMMANDE", "PREPARATION", "LIVRAISON", "RETOUR", "AVOIR_FINANCIER", "FACTURE", "FACTURE_RETOUR", "AVOIR"]
+TYPES_ACHAT = ["ACHAT_DEMANDE", "ACHAT_PREPARATION", "ACHAT_COMMANDE", "ACHAT_RECEPTION", "ACHAT_RETOUR",
+               "ACHAT_AVOIR_FINANCIER", "ACHAT_FACTURE", "ACHAT_FACTURE_RETOUR", "ACHAT_AVOIR"]
+TYPES_STOCK = ["STOCK_ENTREE", "STOCK_SORTIE", "STOCK_VIREMENT"]
 
 ECRANS_COMMERCIAL = {
     "tiers.clients": lambda app, el: PageTiers(app, el["titre"], "CLIENT"),
     "tiers.fournisseurs": lambda app, el: PageTiers(app, el["titre"], "FOURNISSEUR"),
+    "comptes.clients": lambda app, el: PageTiers(app, el["titre"], "CLIENT"),
+    "comptes.fournisseurs": lambda app, el: PageTiers(app, el["titre"], "FOURNISSEUR"),
     "articles.liste": lambda app, el: PageArticles(app, el["titre"]),
-    "stock.reappro": lambda app, el: PageArticles(app, el["titre"], alerte_seulement=True),
+    "comptes.articles": lambda app, el: PageArticles(app, el["titre"]),
+    "traitement.besoins": lambda app, el: PageArticles(app, el["titre"], alerte_seulement=True),
     "ventes.tous": lambda app, el: PageDocuments(app, el["titre"], "ventes"),
     "achats.tous": lambda app, el: PageDocuments(app, el["titre"], "achats"),
-    "traitement.interrogation.brouillons_ventes": lambda app, el: PageDocuments(app, el["titre"], "ventes", statut="BROUILLON"),
-    "traitement.interrogation.brouillons_achats": lambda app, el: PageDocuments(app, el["titre"], "achats", statut="BROUILLON"),
-    "ventes.nouveau.facture": _saisie_facture("FACTURE", "ventes"),
-    "achats.nouveau.achat_facture": _saisie_facture("ACHAT_FACTURE", "achats"),
-    "etats.balance_agee_clients": lambda app, el: PageBalanceAgee(app, el["titre"], "CLIENT"),
-    "etats.balance_agee_fournisseurs": lambda app, el: PageBalanceAgee(app, el["titre"], "FOURNISSEUR"),
+    "stocks.tous": lambda app, el: PageDocuments(app, el["titre"], "stocks"),
+    "etats.analyse_clients": lambda app, el: PageBalanceAgee(app, el["titre"], "CLIENT"),
+    "etats.analyse_fournisseurs": lambda app, el: PageBalanceAgee(app, el["titre"], "FOURNISSEUR"),
 }
-for _domaine, _types in (("ventes", TYPES_VENTE), ("achats", TYPES_ACHAT)):
+for _domaine, _types in (("ventes", TYPES_VENTE), ("achats", TYPES_ACHAT), ("stocks", TYPES_STOCK)):
     for _type in _types:
         ECRANS_COMMERCIAL[f"{_domaine}.{_type.lower()}"] = (
             lambda app, el, d=_domaine, t=_type: PageDocuments(app, el["titre"], d, t))

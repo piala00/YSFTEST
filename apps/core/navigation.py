@@ -2,7 +2,10 @@
 
 Chaque module est un logiciel à part entière doté d'une barre de menus :
 
-    Fichier · Structure · Traitement · État · Fenêtre · ?
+    Fichier · Structure · Traitement · Etat · Fenêtre · ?
+
+La Gestion commerciale reprend le « Découpage fonctionnel détaillé Sage 100 Gestion
+commerciale V11 » (menus et sous-menus dans le même ordre).
 
 Chaque menu contient des éléments, qui peuvent ouvrir des sous-menus en cascade.
 Comme dans Sage, les commandes non encore disponibles restent visibles mais grisées.
@@ -102,8 +105,19 @@ def menu_fichier(module, societe_url, fermer=True):
 
 def menu_fenetre(module):
     return Onglet("fenetre", "Fenêtre", "bi-window-stack", [
-        E("fenetre.accueil", "Page d'accueil", MODULES_ACCUEIL[module], icone="bi-house"),
+        E("fenetre.reorganiser", "Réorganiser"),
+        E("fenetre.actualiser", "Actualiser", icone="bi-arrow-clockwise", action="actualiser"),
+        E("fenetre.personnaliser", "Personnaliser"),
+        E("fenetre.personnaliser_ecrans", "Personnaliser les écrans"),
+        E("fenetre.personnaliser_liste", "Personnaliser la liste"),
+        E("fenetre.ajustement", "Ajustement automatique des colonnes"),
         SEP(),
+        E("fenetre.preferences", "Préférences"),
+        E("fenetre.barre_verticale", "Barre verticale"),
+        E("fenetre.mode_assistant", "Mode assistant"),
+        E("fenetre.mode_personnalise", "Mode personnalisé"),
+        SEP(),
+        E("fenetre.accueil", "Page d'accueil", MODULES_ACCUEIL[module], icone="bi-house"),
         E("fenetre.portail", "Portail ERP OHADA", "core:portail", icone="bi-grid-3x3-gap"),
         *[E(f"fenetre.{code}", titre, accueil, icone=icone)
           for code, titre, accueil, icone in AUTRES_LOGICIELS if code != module],
@@ -139,18 +153,15 @@ def _documents(domaine, types):
     return [E(f"{domaine}.{code.lower()}", titre, "commercial:documents", domaine, type=code) for code, titre in types]
 
 
-def _nouveaux(domaine, types):
-    return [E(f"{domaine}.nouveau.{code.lower()}", titre, "commercial:document_create", code) for code, titre in types]
-
-
-TYPES_VENTE = [("DEVIS", "Devis"), ("COMMANDE", "Bons de commande"), ("LIVRAISON", "Bons de livraison"),
-               ("FACTURE", "Factures"), ("AVOIR", "Factures d'avoir")]
-TYPES_ACHAT = [("ACHAT_COMMANDE", "Bons de commande"), ("ACHAT_RECEPTION", "Bons de réception"),
-               ("ACHAT_FACTURE", "Factures"), ("ACHAT_AVOIR", "Factures d'avoir")]
-NOUVEAUX_VENTE = [("DEVIS", "Devis"), ("COMMANDE", "Bon de commande"), ("LIVRAISON", "Bon de livraison"),
-                  ("FACTURE", "Facture"), ("AVOIR", "Facture d'avoir")]
-NOUVEAUX_ACHAT = [("ACHAT_COMMANDE", "Bon de commande"), ("ACHAT_RECEPTION", "Bon de réception"),
-                  ("ACHAT_FACTURE", "Facture"), ("ACHAT_AVOIR", "Facture d'avoir")]
+TYPES_VENTE = [("DEVIS", "Devis"), ("COMMANDE", "Bon de commande"), ("PREPARATION", "Préparation de livraison"),
+               ("LIVRAISON", "Bon de livraison"), ("RETOUR", "Bon de retour"), ("AVOIR_FINANCIER", "Bon d'avoir financier"),
+               ("FACTURE", "Facture"), ("FACTURE_RETOUR", "Facture de retour"), ("AVOIR", "Facture d'avoir")]
+TYPES_ACHAT = [("ACHAT_DEMANDE", "Demande d'achat"), ("ACHAT_PREPARATION", "Préparation de commande"),
+               ("ACHAT_COMMANDE", "Bon de commande"), ("ACHAT_RECEPTION", "Bon de livraison"), ("ACHAT_RETOUR", "Bon de retour"),
+               ("ACHAT_AVOIR_FINANCIER", "Bon d'avoir financier"), ("ACHAT_FACTURE", "Facture"),
+               ("ACHAT_FACTURE_RETOUR", "Facture de retour"), ("ACHAT_AVOIR", "Facture d'avoir")]
+TYPES_STOCK = [("STOCK_ENTREE", "Mouvement d'entrée"), ("STOCK_SORTIE", "Mouvement de sortie"),
+               ("STOCK_VIREMENT", "Mouvement de transfert")]
 
 
 # ---------------------------------------------------------------------------
@@ -159,93 +170,202 @@ NOUVEAUX_ACHAT = [("ACHAT_COMMANDE", "Bon de commande"), ("ACHAT_RECEPTION", "Bo
 GESTION_COMMERCIALE = Module(
     code="commercial",
     titre="Gestion commerciale",
-    description="Tiers, articles, ventes, achats, stock et règlements",
+    description="Tiers, articles, documents des ventes, des achats et des stocks, règlements",
     icone="bi-shop",
     couleur="#1565c0",
     prefixe="/commercial/",
     accueil="commercial:accueil",
     onglets=[
-        menu_fichier("commercial", "commercial:societe"),
-        Onglet("structure", "Structure", "bi-diagram-3", [
-            E("tiers.clients", "Clients", "commercial:clients", icone="bi-people"),
-            E("tiers.fournisseurs", "Fournisseurs", "commercial:fournisseurs", icone="bi-truck"),
-            E("structure.collaborateurs", "Collaborateurs", icone="bi-person-badge"),
+        Onglet("fichier", "Fichier", "bi-folder2", [
+            E("fichier.nouveau", "Nouveau"),
+            E("fichier.ouvrir", "Ouvrir"),
+            E("fichier.favoris", "Favoris"),
+            E("fichier.fermer", "Fermer", icone="bi-x-square", action="fermer"),
             SEP(),
+            E("fichier.parametres", "Paramètres société", icone="bi-building", enfants=[
+                E("fichier.parametres.identification", "Identification", "commercial:societe"),
+                E("fichier.parametres.contacts", "Vos contacts"),
+                E("fichier.parametres.securite", "Sécurité"),
+                E("fichier.parametres.articles", "Articles"),
+                E("fichier.parametres.comptes", "Comptes généraux"),
+                E("fichier.parametres.tiers", "Tiers"),
+                E("fichier.parametres.ressources", "Ressources"),
+                E("fichier.parametres.analytique", "Analytique"),
+                E("fichier.parametres.tva", "Tva et taxes"),
+                E("fichier.parametres.contacts_types", "Contacts"),
+                E("fichier.parametres.international", "International"),
+                E("fichier.parametres.banques", "Banques"),
+                E("fichier.parametres.documents", "Documents"),
+                E("fichier.parametres.logistique", "Logistique", "commercial:societe", section="logistique"),
+                E("fichier.parametres.comptabilisation", "Comptabilisation"),
+                E("fichier.parametres.echanges", "Echanges de données"),
+                E("fichier.parametres.agenda", "Agenda"),
+                E("fichier.parametres.efacture", "Factures électroniques"),
+                E("fichier.parametres.colonnage", "Colonnage"),
+            ]),
+            E("fichier.lire_infos", "Lire les informations"),
+            E("fichier.configuration", "Configuration système et partage"),
+            E("fichier.autorisations", "Autorisations d'accès", "admin:auth_user_changelist", icone="bi-shield-lock"),
+            SEP(),
+            E("fichier.importer", "Importer", icone="bi-box-arrow-in-down"),
+            E("fichier.exporter", "Exporter", icone="bi-box-arrow-up"),
+            E("fichier.format_import", "Format import/export paramétrable"),
+            E("fichier.site_a_site", "Communication site à site"),
+            E("fichier.paiement_ligne", "Paiement en ligne"),
+            SEP(),
+            E("fichier.mise_en_page", "Mise en page"),
+            E("fichier.imprimer", "Imprimer…", icone="bi-printer", action="imprimer"),
+            E("fichier.format_impression", "Format d'impression"),
+            E("fichier.impression_differee", "Impression différée"),
+            SEP(),
+            E("fichier.outils", "Outils"),
+            E("fichier.quitter", "Quitter", icone="bi-power", action="quitter"),
+        ]),
+        Onglet("structure", "Structure", "bi-diagram-3", [
             E("articles.familles", "Familles", "commercial:familles", icone="bi-tags"),
             E("articles.liste", "Articles", "commercial:articles", icone="bi-box-seam"),
-            E("structure.gammes", "Gammes"),
-            E("structure.conditionnements", "Conditionnements"),
-            E("structure.glossaires", "Glossaires"),
-            SEP(),
-            E("structure.depots", "Dépôts de stockage", icone="bi-house-gear"),
-            E("structure.baremes", "Barèmes", icone="bi-percent", enfants=[
-                E("structure.baremes.remises", "Rabais, remises et ristournes"),
-                E("structure.baremes.commissions", "Commissions"),
-                E("structure.baremes.promotions", "Soldes et promotions"),
+            E("structure.nomenclatures", "Nomenclatures"),
+            E("structure.comptabilite", "Comptabilité", icone="bi-calculator", enfants=[
+                E("structure.plan_comptable", "Plan comptable", "comptabilite:comptes"),
+                E("structure.plan_analytique", "Plan analytique"),
+                E("structure.taux_taxes", "Taux de taxes", enfants=[
+                    E("structure.taux_taxes.tva_debit", "TVA/ débit - Vente de biens"),
+                    E("structure.taux_taxes.tva_encaissement", "TVA/ encaissement - Prestation de services"),
+                    E("structure.taux_taxes.tp_ht", "TP/ HT"),
+                    E("structure.taux_taxes.tp_ttc", "TP/ TTC"),
+                    E("structure.taux_taxes.tp_poids", "TP/ poids"),
+                    E("structure.taux_taxes.surtaxe", "Surtaxe"),
+                ]),
+                E("structure.codes_journaux", "Codes journaux", "comptabilite:journaux"),
+                E("structure.banques", "Banques"),
+                E("structure.modele_reglement", "Modèle de règlement"),
+                E("structure.modele_grille", "Modèle de grille"),
             ]),
+            E("structure.codes_affaires", "Codes affaires"),
             SEP(),
-            E("structure.plan_comptable", "Plan comptable", "comptabilite:comptes", icone="bi-list-ol"),
-            E("structure.taux_taxes", "Taux de taxes"),
-            E("structure.codes_journaux", "Codes journaux", "comptabilite:journaux"),
-            E("structure.banques", "Banques"),
-            E("structure.modeles_reglement", "Modèles de règlement"),
+            E("tiers.clients", "Clients", "commercial:clients", icone="bi-people"),
+            E("tiers.fournisseurs", "Fournisseurs", "commercial:fournisseurs", icone="bi-truck"),
+            E("structure.baremes", "Barèmes", icone="bi-percent", enfants=[
+                E("structure.baremes.commissions", "Commissions représentants"),
+                E("structure.baremes.rrr_clients", "Rabais, remises et ristournes clients"),
+                E("structure.baremes.rrr_fournisseurs", "Rabais, remises et ristournes fournisseurs"),
+                E("structure.baremes.promos_clients", "Soldes et promotions clients"),
+                E("structure.baremes.promos_fournisseurs", "Soldes et promotions fournisseurs"),
+            ]),
+            E("structure.glossaires", "Glossaires"),
+            E("structure.modeles_enregistrement", "Modèles enregistrement"),
+            E("structure.ressources", "Ressources"),
+            E("structure.centre_charges", "Centre de charges"),
+            E("structure.collaborateurs", "Collaborateurs", icone="bi-person-badge"),
+            E("structure.depots", "Dépôts de stockage", "commercial:depots", icone="bi-house-gear"),
         ]),
         Onglet("traitement", "Traitement", "bi-gear-wide-connected", [
             E("ventes.documents", "Documents des ventes", icone="bi-receipt", enfants=[
-                E("ventes.tous", "Tous les documents", "commercial:documents", "ventes"),
+                E("ventes.tous", "Tous les documents des ventes", "commercial:documents", "ventes"),
                 SEP(),
                 *_documents("ventes", TYPES_VENTE),
-                SEP(),
-                E("ventes.nouveau", "Nouveau", enfants=_nouveaux("ventes", NOUVEAUX_VENTE)),
             ]),
             E("achats.documents", "Documents des achats", icone="bi-cart", enfants=[
-                E("achats.tous", "Tous les documents", "commercial:documents", "achats"),
+                E("achats.tous", "Tous les documents des achats", "commercial:documents", "achats"),
                 SEP(),
                 *_documents("achats", TYPES_ACHAT),
                 SEP(),
-                E("achats.nouveau", "Nouveau", enfants=_nouveaux("achats", NOUVEAUX_ACHAT)),
+                E("achats.acheteur", "Gestion acheteur entête et ligne de document"),
+                E("achats.bon_a_payer", "Gestion du Bon à payer"),
             ]),
-            E("stock.documents", "Documents des stocks", "commercial:mouvements", icone="bi-arrow-left-right"),
+            E("stocks.documents", "Documents des stocks", icone="bi-boxes", enfants=[
+                E("stocks.tous", "Tous les documents des stocks", "commercial:documents", "stocks"),
+                SEP(),
+                *_documents("stocks", TYPES_STOCK),
+                E("stocks.depreciation", "Dépréciation de stock"),
+                SEP(),
+                E("stocks.preparation_fabrication", "Préparation de fabrication"),
+                E("stocks.ordre_fabrication", "Ordre de fabrication"),
+                E("stocks.bon_fabrication", "Bon de fabrication"),
+            ]),
             E("traitement.documents_internes", "Documents internes"),
-            SEP(),
-            E("stock.inventaire", "Saisie des inventaires", "commercial:stock", icone="bi-clipboard-data"),
-            E("stock.reappro", "Gestion des réapprovisionnements", "commercial:articles", icone="bi-exclamation-triangle", alerte=1),
-            SEP(),
-            E("reglements.clients", "Règlements clients", "commercial:reglements", icone="bi-cash-coin", sens="E"),
-            E("reglements.fournisseurs", "Règlements fournisseurs", "commercial:reglements", icone="bi-cash-stack", sens="D"),
-            E("reglements.nouveau", "Saisie d'un règlement", "commercial:reglement_create"),
-            SEP(),
-            E("traitement.encours", "Contrôle de l'encours client", "commercial:documents", "ventes", icone="bi-shield-exclamation", impayees=1),
-            E("traitement.interrogation", "Interrogation commerciale", icone="bi-search", enfants=[
-                E("traitement.interrogation.articles", "Articles", "commercial:stock", vue="interrogation"),
-                E("traitement.interrogation.achats_a_payer", "Factures fournisseurs à payer", "commercial:documents", "achats", impayees=1),
-                E("traitement.interrogation.brouillons_ventes", "Ventes en brouillon", "commercial:documents", "ventes", statut="BROUILLON"),
-                E("traitement.interrogation.brouillons_achats", "Achats en brouillon", "commercial:documents", "achats", statut="BROUILLON"),
+            E("traitement.sage_connect", "Sage Connect", enfants=[
+                E("traitement.sage_connect.societe", "Accéder à la société"),
+                E("traitement.sage_connect.transmission", "Transmission des factures clients"),
+                E("traitement.sage_connect.reception", "Réception des factures fournisseurs"),
             ]),
-            E("traitement.maj_comptable", "Mise à jour comptable", icone="bi-journal-arrow-up", enfants=[
-                E("traitement.maj_comptable.ventes", "Écritures du journal des ventes", "comptabilite:ecritures", journal="VT"),
-                E("traitement.maj_comptable.achats", "Écritures du journal des achats", "comptabilite:ecritures", journal="AC"),
+            E("traitement.efacture", "Facture électronique"),
+            SEP(),
+            E("traitement.affaires", "Gestion des affaires"),
+            E("traitement.fabrications", "Gestion des fabrications"),
+            E("traitement.livraisons", "Gestion des livraisons clients", "commercial:documents", "ventes", type="COMMANDE", statut="VALIDE"),
+            E("traitement.receptions", "Gestion des réceptions fournisseurs", "commercial:documents", "achats", type="ACHAT_COMMANDE", statut="VALIDE"),
+            E("traitement.controle_qualite", "Contrôle qualité"),
+            E("traitement.par_lot", "Traitement par lot"),
+            E("traitement.planning", "Gestion du planning des ressources"),
+            E("traitement.bon_a_payer", "Gestion du bon à payer"),
+            E("reglements", "Gestion des règlements", icone="bi-cash-coin", enfants=[
+                E("reglements.clients", "Gestion des règlements clients", "commercial:reglements", sens="E"),
+                E("reglements.fournisseurs", "Gestion des règlements fournisseurs", "commercial:reglements", sens="D"),
+                E("reglements.generation", "Génération des règlements"),
+                E("reglements.paiements_ligne", "Intégration des paiements en ligne"),
             ]),
+            E("traitement.modeles_prestations", "Modèles et prestations types"),
+            E("traitement.abonnements", "Abonnements"),
+            E("traitement.contremarque", "Contremarque"),
+            SEP(),
+            E("comptes", "Gestion des comptes", icone="bi-person-lines-fill", enfants=[
+                E("comptes.clients", "Gestion des clients", "commercial:clients", vue="comptes"),
+                E("comptes.fournisseurs", "Gestion des fournisseurs", "commercial:fournisseurs", vue="comptes"),
+                E("comptes.articles", "Gestion des articles", "commercial:stock", vue="comptes"),
+                E("comptes.affaires", "Gestion des affaires"),
+                E("comptes.collaborateurs", "Gestion des collaborateurs"),
+                E("comptes.ressources", "Gestion des ressources"),
+                E("comptes.tracabilite", "Suivi traçabilité série/ lot"),
+            ]),
+            E("traitement.besoins", "Gestion des besoins", "commercial:articles", icone="bi-exclamation-triangle", alerte=1),
+            E("traitement.tracabilite_documents", "Traçabilité des documents"),
+            E("recherche", "Recherche de documents", icone="bi-search", enfants=[
+                E("recherche.entetes", "Entêtes de documents", "commercial:recherche_entetes"),
+                E("recherche.lignes", "Lignes de documents", "commercial:recherche_lignes"),
+            ]),
+            E("traitement.inventaire", "Saisie d'inventaire", "commercial:inventaires", icone="bi-clipboard-check"),
+            E("traitement.agenda", "Evénements agenda"),
+            SEP(),
+            E("maj_compta", "Mise à jour de la comptabilité", icone="bi-journal-arrow-up", enfants=[
+                E("maj_compta.factures_ventes", "Factures de ventes (journal VT)", "comptabilite:ecritures", journal="VT"),
+                E("maj_compta.factures_achats", "Factures d'achats (journal AC)", "comptabilite:ecritures", journal="AC"),
+                E("maj_compta.reglements", "Règlements achats/ ventes", "comptabilite:journal"),
+                E("maj_compta.variation_stock", "Variation de stock (inventaire permanent)", "commercial:stock", vue="variation"),
+                E("maj_compta.engagements", "Engagements achats/ ventes"),
+            ]),
+            E("traitement.archivage", "Archivage"),
+            E("traitement.cloture_periode", "Clôture période"),
+            E("traitement.sauvegarde_fiscale", "Sauvegarde fiscale des données"),
         ]),
-        Onglet("etat", "État", "bi-printer", [
-            E("etats.statistiques", "Statistiques", icone="bi-graph-up", enfants=[
-                E("etats.ventes.clients", "Statistiques clients", "commercial:etat_ventes", vue="clients"),
-                E("etats.ventes.articles", "Statistiques articles", "commercial:etat_ventes", vue="articles"),
-                E("etats.stats_fournisseurs", "Statistiques fournisseurs"),
-                E("etats.stats_collaborateurs", "Statistiques collaborateurs"),
-            ]),
-            E("etats.palmares", "Palmarès", icone="bi-trophy", enfants=[
-                E("etats.palmares.clients", "Palmarès clients", "commercial:etat_ventes", vue="clients", tri="ca"),
-                E("etats.palmares.articles", "Palmarès articles", "commercial:etat_ventes", vue="articles", tri="ca"),
-            ]),
+        Onglet("etat", "Etat", "bi-printer", [
+            E("etats.personnalises", "Etats personnalisés"),
             SEP(),
-            E("etats.inventaire", "Inventaire", "commercial:stock", icone="bi-clipboard-check", vue="inventaire"),
+            E("etats.analyse_clients", "Analyse clients", "commercial:etat_balance_agee", type="CLIENT"),
+            E("etats.cadencier_clients", "Cadencier clients"),
+            E("etats.ventes.clients", "Statistiques clients", "commercial:etat_ventes", vue="clients"),
+            E("etats.mouvement_clients", "Mouvement clients", "comptabilite:grand_livre", compte_debut="411", compte_fin="411"),
+            SEP(),
+            E("etats.analyse_fournisseurs", "Analyse fournisseurs", "commercial:etat_balance_agee", type="FOURNISSEUR"),
+            E("etats.cadencier_fournisseurs", "Cadencier fournisseurs"),
+            E("etats.stats_fournisseurs", "Statistiques fournisseurs", "commercial:etat_achats"),
+            E("etats.mouvement_fournisseurs", "Mouvement fournisseurs", "comptabilite:grand_livre", compte_debut="401", compte_fin="401"),
+            SEP(),
+            E("etats.ventes.articles", "Statistiques articles", "commercial:etat_ventes", vue="articles"),
             E("etats.mouvements", "Mouvements de stock", "commercial:mouvements", icone="bi-arrow-left-right", vue="etat"),
-            SEP(),
-            E("etats.echeancier", "Échéancier", icone="bi-hourglass-split", enfants=[
-                E("etats.balance_agee_clients", "Échéancier clients", "commercial:etat_balance_agee", type="CLIENT"),
-                E("etats.balance_agee_fournisseurs", "Échéancier fournisseurs", "commercial:etat_balance_agee", type="FOURNISSEUR"),
+            E("etats.inventaire", "Inventaire", icone="bi-clipboard-data", enfants=[
+                E("etats.inventaire.preparatoire", "Etat préparatoire", "commercial:etat_inventaire", vue="preparatoire"),
+                E("etats.inventaire.livre", "Livre d'inventaire", "commercial:etat_inventaire", vue="livre"),
             ]),
+            E("etats.cadencier_livraison", "Cadencier de livraison"),
+            SEP(),
+            E("etats.stats_ressources", "Statistiques ressources"),
+            E("etats.stats_collaborateurs", "Statistiques collaborateurs"),
+            E("etats.commissions", "Commissions représentants"),
+            SEP(),
+            E("etats.tableaux_bord", "Tableaux de bord", "reporting:dashboard", icone="bi-speedometer2"),
+            E("etats.journaux_comptables", "Journaux comptables", "comptabilite:journal"),
+            E("etats.libres", "Etats libres"),
         ]),
         menu_fenetre("commercial"),
         menu_aide("commercial"),
@@ -309,7 +429,7 @@ COMPTABILITE = Module(
                 E("traitement.fin_exercice.journaux", "Clôture des journaux"),
             ]),
         ]),
-        Onglet("etat", "État", "bi-printer", [
+        Onglet("etat", "Etat", "bi-printer", [
             E("etats.journaux", "Journaux", icone="bi-journals", enfants=[
                 E("etats.journal_general", "Journal général", "comptabilite:journal"),
                 E("etats.journal.liste", "Journaux auxiliaires", dyn=_journaux("comptabilite:journal", "etats.journal")),
@@ -356,7 +476,7 @@ REPORTING = Module(
     accueil="reporting:dashboard",
     onglets=[
         menu_fichier("reporting", "commercial:societe"),
-        Onglet("etat", "État", "bi-printer", [
+        Onglet("etat", "Etat", "bi-printer", [
             E("synthese.dashboard", "Tableau de bord", "reporting:dashboard", icone="bi-speedometer2"),
             SEP(),
             E("ventes.analyses", "Statistiques des ventes", icone="bi-graph-up", enfants=[

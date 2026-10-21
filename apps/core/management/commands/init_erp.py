@@ -44,6 +44,11 @@ class Command(BaseCommand):
             )
         self.log(f"Journaux : {Journal.objects.count()}.")
 
+        from apps.commercial.models import Depot
+
+        Depot.par_defaut()
+        self.log(f"Dépôts : {Depot.objects.count()}.")
+
         annee = datetime.date.today().year
         Exercice.objects.get_or_create(
             code=str(annee),
@@ -62,7 +67,7 @@ class Command(BaseCommand):
         self.log(self.style.SUCCESS("Initialisation terminée."))
 
     def _demo(self):
-        from apps.commercial.models import Article, Document, FamilleArticle, LigneDocument, Reglement, Tiers
+        from apps.commercial.models import Article, Depot, Document, FamilleArticle, LigneDocument, Reglement, Tiers
 
         if Tiers.objects.exists():
             self.log("Données de démo déjà présentes, ignorées.")
@@ -96,9 +101,15 @@ class Command(BaseCommand):
         today = datetime.date.today()
         debut = datetime.date(today.year, 1, 1)
 
-        def doc(type_document, tiers, jours, lignes, valider=True):
+        principal = Depot.par_defaut()
+        principal.intitule, principal.ville = "Dépôt Bertoua", "Bertoua"
+        principal.save()
+        abong = Depot.objects.create(code="AM", intitule="Dépôt Abong-Mbang", ville="Abong-Mbang")
+        Depot.objects.create(code="GB", intitule="Dépôt Garoua-Boulaï", ville="Garoua-Boulaï")
+
+        def doc(type_document, tiers, jours, lignes, valider=True, **champs):
             date = min(debut + datetime.timedelta(days=jours), today)
-            d = Document.objects.create(type_document=type_document, tiers=tiers, date=date)
+            d = Document.objects.create(type_document=type_document, tiers=tiers, date=date, **champs)
             for article, qte, prix in lignes:
                 LigneDocument.objects.create(document=d, article=article, quantite=qte, prix_unitaire=prix,
                                              taux_tva=article.taux_tva)
@@ -127,6 +138,16 @@ class Command(BaseCommand):
                     (a[3], 1, a[3].prix_vente),
                 ])
         doc(Document.DEVIS, clients[0], jours, [(a[2], 40, a[2].prix_vente)])
+        # Transfert vers l'agence d'Abong-Mbang, commande client en partie livrée (reliquat)
+        doc(Document.STOCK_VIREMENT, None, 20, [(a[0], 100, a[0].cmup or a[0].prix_achat), (a[2], 30, a[2].prix_achat)],
+            depot=principal, depot_destination=abong)
+        commande = doc(Document.COMMANDE, clients[1], jours, [(a[2], 40, a[2].prix_vente), (a[1], 20, a[1].prix_vente)])
+        livraison = commande.transformer(Document.LIVRAISON)
+        ligne = livraison.lignes.get(article=a[2])
+        ligne.quantite = 25
+        ligne.save()
+        livraison.recalculer()
+        livraison.valider()
 
         from apps.comptabilite.services import constater_variation_stock
 

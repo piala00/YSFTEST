@@ -13,8 +13,9 @@
     {% if object.date_echeance %}<div>Échéance : {{ object.date_echeance|date:"d/m/Y" }}</div>{% endif %}</div>
 </div>
 <div class="border rounded p-3 mb-4 ms-auto" style="width:45%">
-  <strong>{{ object.tiers.nom }}</strong><br>{{ object.tiers.adresse }}<br>{{ object.tiers.ville }}
-  {% if object.tiers.niu %}<br>NIU : {{ object.tiers.niu }}{% endif %}</div>
+  {% if object.tiers %}<strong>{{ object.tiers.nom }}</strong><br>{{ object.tiers.adresse }}<br>{{ object.tiers.ville }}
+  {% if object.tiers.niu %}<br>NIU : {{ object.tiers.niu }}{% endif %}{% endif %}
+  {% if object.depot %}<div class="small mt-1">Dépôt : {{ object.depot }}{% if object.depot_destination %} → {{ object.depot_destination }}{% endif %}</div>{% endif %}</div>
 <table class="table table-bordered table-sm">
 <thead class="table-light"><tr><th>Désignation</th><th class="num">Qté</th><th class="num">P.U. HT</th><th class="num">Rem.</th><th class="num">TVA</th><th class="num">Montant HT</th></tr></thead>
 <tbody>{% for l in object.lignes.all %}<tr><td>{{ l.designation }}</td><td class="num">{{ l.quantite|floatformat:"-3" }}</td><td class="num">{{ l.prix_unitaire|montant }}</td>
@@ -22,7 +23,7 @@
 <table class="table table-sm ms-auto" style="width:45%">
 <tr><td>Total HT</td><td class="num">{{ object.total_ht|montant }}</td></tr>
 {% for v in object.ventilation_tva %}<tr><td>TVA {{ v.taux }} %</td><td class="num">{{ v.tva|montant }}</td></tr>{% endfor %}
-<tr class="fw-bold"><td>Net à payer TTC</td><td class="num">{{ object.total_ttc|montant }} {{ societe.devise }}</td></tr></table>
+<tr class="fw-bold"><td>{% if object.est_stock %}Valeur{% else %}Net à payer TTC{% endif %}</td><td class="num">{{ object.total_ttc|montant }} {{ societe.devise }}</td></tr></table>
 {% if object.notes %}<p class="small">{{ object.notes|linebreaksbr }}</p>{% endif %}
 {% if societe.pied_facture %}<hr><p class="small text-center text-muted">{{ societe.pied_facture|linebreaksbr }}</p>{% endif %}
 </body></html>
