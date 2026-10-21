@@ -1,0 +1,93 @@
+from decimal import Decimal
+
+from django.core.exceptions import ValidationError
+from django.db import models, transaction
+
+
+class Societe(models.Model):
+    """Fiche unique de l'entreprise utilisatrice de l'ERP."""
+
+    raison_sociale = models.CharField(max_length=150, default="Ma Société")
+    sigle = models.CharField(max_length=30, blank=True)
+    forme_juridique = models.CharField(max_length=30, blank=True, help_text="SARL, SA, SAS, ETS...")
+    niu = models.CharField("N° contribuable (NIU)", max_length=30, blank=True)
+    rccm = models.CharField("RCCM", max_length=50, blank=True)
+    adresse = models.CharField(max_length=200, blank=True)
+    ville = models.CharField(max_length=80, blank=True)
+    pays = models.CharField(max_length=80, default="Cameroun")
+    telephone = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    devise = models.CharField(max_length=10, default="XAF")
+    taux_tva_defaut = models.DecimalField("Taux TVA par défaut (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
+    pied_facture = models.TextField(blank=True, help_text="Mentions affichées en bas des factures")
+
+    class Meta:
+        verbose_name = "Société"
+        verbose_name_plural = "Société"
+
+    def __str__(self):
+        return self.raison_sociale
+
+    @classmethod
+    def get(cls):
+        obj = cls.objects.order_by("pk").first()
+        if obj is None:
+            obj = cls.objects.create()
+        return obj
+
+
+class Exercice(models.Model):
+    code = models.CharField(max_length=20, unique=True)
+    date_debut = models.DateField()
+    date_fin = models.DateField()
+    cloture = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-date_debut"]
+        verbose_name = "Exercice comptable"
+        verbose_name_plural = "Exercices comptables"
+
+    def __str__(self):
+        return self.code
+
+    def clean(self):
+        if self.date_debut and self.date_fin and self.date_debut > self.date_fin:
+            raise ValidationError("La date de début doit précéder la date de fin.")
+
+    @classmethod
+    def pour_date(cls, date):
+        exercice = cls.objects.filter(date_debut__lte=date, date_fin__gte=date).first()
+        if exercice is None:
+            raise ValidationError(f"Aucun exercice comptable ne couvre la date du {date:%d/%m/%Y}.")
+        if exercice.cloture:
+            raise ValidationError(f"L'exercice {exercice.code} est clôturé.")
+        return exercice
+
+    @classmethod
+    def courant(cls):
+        from django.utils import timezone
+
+        today = timezone.localdate()
+        return cls.objects.filter(date_debut__lte=today, date_fin__gte=today).first() or cls.objects.first()
+
+
+class Sequence(models.Model):
+    """Compteur de numérotation (factures, pièces comptables...) par code et par année."""
+
+    code = models.CharField(max_length=20)
+    annee = models.PositiveIntegerField()
+    dernier_numero = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("code", "annee")
+
+    def __str__(self):
+        return f"{self.code}{self.annee} → {self.dernier_numero}"
+
+    @classmethod
+    def suivant(cls, code, annee, largeur=5):
+        with transaction.atomic():
+            seq, _ = cls.objects.select_for_update().get_or_create(code=code, annee=annee)
+            seq.dernier_numero += 1
+            seq.save(update_fields=["dernier_numero"])
+        return f"{code}{annee}-{seq.dernier_numero:0{largeur}d}"

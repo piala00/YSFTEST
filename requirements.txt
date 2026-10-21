@@ -1,0 +1,6 @@
+Django>=5.1,<6.2
+djangorestframework>=3.15
+# PostgreSQL (DB_ENGINE=postgresql)
+psycopg[binary]>=3.1
+# SQL Server (DB_ENGINE=mssql) — nécessite le pilote "ODBC Driver 18 for SQL Server"
+# mssql-django>=1.5

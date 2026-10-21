@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Exercices{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Exercices comptables</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'core:exercice_create' %}"><i class="bi bi-plus"></i> Nouvel exercice</a></div>
+<div class="card"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>Code</th><th>Début</th><th>Fin</th><th>Statut</th></tr></thead>
+  <tbody>{% for e in object_list %}
+    <tr><td><a href="{% url 'core:exercice_update' e.pk %}">{{ e.code }}</a></td><td>{{ e.date_debut|date:"d/m/Y" }}</td>
+    <td>{{ e.date_fin|date:"d/m/Y" }}</td><td>{% if e.cloture %}<span class="badge bg-secondary">Clôturé</span>{% else %}<span class="badge bg-success">Ouvert</span>{% endif %}</td></tr>
+  {% endfor %}</tbody></table></div>
+{% endblock %}

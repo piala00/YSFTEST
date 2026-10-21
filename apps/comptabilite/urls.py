@@ -1,0 +1,29 @@
+from django.urls import path
+
+from . import views
+
+app_name = "comptabilite"
+
+urlpatterns = [
+    path("plan/", views.CompteListView.as_view(), name="comptes"),
+    path("plan/nouveau/", views.CompteCreateView.as_view(), name="compte_create"),
+    path("plan/<int:pk>/", views.CompteUpdateView.as_view(), name="compte_update"),
+    path("journaux/", views.JournalListView.as_view(), name="journaux"),
+    path("journaux/nouveau/", views.JournalCreateView.as_view(), name="journal_create"),
+    path("journaux/<int:pk>/", views.JournalUpdateView.as_view(), name="journal_update"),
+
+    path("ecritures/", views.EcritureListView.as_view(), name="ecritures"),
+    path("ecritures/saisie/", views.ecriture_create, name="ecriture_create"),
+    path("ecritures/<int:pk>/", views.EcritureDetailView.as_view(), name="ecriture_detail"),
+    path("ecritures/<int:pk>/modifier/", views.ecriture_update, name="ecriture_update"),
+    path("ecritures/<int:pk>/valider/", views.ecriture_valider, name="ecriture_valider"),
+    path("ecritures/<int:pk>/supprimer/", views.ecriture_supprimer, name="ecriture_supprimer"),
+
+    path("journal/", views.journal_view, name="journal"),
+    path("grand-livre/", views.grand_livre_view, name="grand_livre"),
+    path("balance/", views.balance_view, name="balance"),
+    path("bilan/", views.bilan_view, name="bilan"),
+    path("compte-de-resultat/", views.compte_resultat_view, name="compte_resultat"),
+    path("tva/", views.tva_view, name="tva"),
+    path("lettrage/", views.lettrage_view, name="lettrage"),
+]

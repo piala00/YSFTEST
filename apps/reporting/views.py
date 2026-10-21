@@ -1,0 +1,49 @@
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+
+from apps.commercial.models import Tiers
+from apps.comptabilite.forms import PeriodeForm
+from apps.comptabilite.views import _export_csv
+
+from . import services
+
+
+@login_required
+def dashboard(request):
+    data = services.tableau_de_bord()
+    graph = {
+        "labels": [m["mois"] for m in data["ca_mensuel"]],
+        "ventes": [float(m["montant"]) for m in data["ca_mensuel"]],
+        "achats": [float(m["montant"]) for m in data["achats_mensuels"]],
+        "clients": [c["tiers__nom"] for c in data["top_clients"]],
+        "clients_ca": [float(c["total"]) for c in data["top_clients"]],
+    }
+    return render(request, "reporting/dashboard.html", {"d": data, "graph_json": graph})
+
+
+@login_required
+def ventes(request):
+    form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
+    par_client = services.ventes_par_client(p["date_debut"], p["date_fin"])
+    par_article = services.ventes_par_article(p["date_debut"], p["date_fin"])
+    export = request.GET.get("export")
+    if export == "clients":
+        return _export_csv("ventes_clients", ["Code", "Client", "Nb factures", "CA HT", "TTC", "Encours"],
+                           [[l["tiers"].code, l["tiers"].nom, l["nb"], l["ca_ht"], l["ttc"], l["encours"]] for l in par_client])
+    if export == "articles":
+        return _export_csv("ventes_articles", ["Référence", "Désignation", "Quantité", "CA HT", "Marge", "Taux marge %"],
+                           [[a["article__reference"], a["article__designation"], a["quantite"], a["total"],
+                             a["marge"], round(a["taux_marge"], 2)] for a in par_article])
+    return render(request, "reporting/ventes.html", {
+        "form": form, "par_client": par_client, "par_article": par_article, "p": p,
+        "total_ca": sum(l["ca_ht"] for l in par_client),
+        "serie_json": [{"mois": m["mois"], "montant": float(m["montant"])}
+                                  for m in services.ca_mensuel(p["date_debut"], p["date_fin"])],
+    })
+
+
+@login_required
+def balance_agee(request):
+    type_tiers = request.GET.get("type", Tiers.CLIENT)
+    data = services.balance_agee(type_tiers)
+    return render(request, "reporting/balance_agee.html", {"data": data, "type_tiers": type_tiers})

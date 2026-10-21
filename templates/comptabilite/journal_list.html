@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Journaux{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Paramétrage des journaux</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'comptabilite:journal_create' %}"><i class="bi bi-plus"></i> Nouveau journal</a></div>
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead><tr><th>Code</th><th>Intitulé</th><th>Type</th><th>Compte de trésorerie</th></tr></thead><tbody>
+{% for j in object_list %}<tr><td><a href="{% url 'comptabilite:journal_update' j.pk %}">{{ j.code }}</a></td><td>{{ j.intitule }}</td><td>{{ j.get_type_journal_display }}</td><td>{{ j.compte_tresorerie|default:"" }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

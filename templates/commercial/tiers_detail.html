@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}{{ object.nom }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>{{ object.nom }} <small class="text-muted fs-6">{{ object.code }} · {{ object.get_type_tiers_display }}</small></h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'commercial:tiers_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'comptabilite:grand_livre' %}?tiers={{ object.pk }}"><i class="bi bi-book"></i> Relevé de compte</a>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'commercial:reglement_create' %}?tiers={{ object.pk }}"><i class="bi bi-cash"></i> Règlement</a>
+    <a class="btn btn-primary btn-sm" href="{% url 'commercial:document_create' object.est_client|yesno:'FACTURE,ACHAT_FACTURE' %}?tiers={{ object.pk }}"><i class="bi bi-plus"></i> Facture</a>
+  </div></div>
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="card kpi p-3"><div class="label">Solde comptable</div><div class="value">{{ solde|montant }}</div><div class="small text-muted">{% if solde > 0 %}Débiteur{% elif solde < 0 %}Créditeur{% else %}Soldé{% endif %}</div></div></div>
+  <div class="col-md-4"><div class="card kpi p-3"><div class="label">Factures non réglées</div><div class="value">{{ encours|montant }}</div></div></div>
+  <div class="col-md-4"><div class="card p-3 small">
+    {% if object.adresse %}{{ object.adresse }}<br>{% endif %}{{ object.ville }}<br>
+    {% if object.telephone %}<i class="bi bi-telephone"></i> {{ object.telephone }}<br>{% endif %}
+    {% if object.email %}<i class="bi bi-envelope"></i> {{ object.email }}<br>{% endif %}
+    NIU : {{ object.niu|default:"—" }} · RCCM : {{ object.rccm|default:"—" }}<br>
+    Compte : {{ object.get_compte_collectif.numero }}</div></div>
+</div>
+<div class="row g-3">
+<div class="col-lg-7"><div class="card"><div class="card-header bg-white fw-semibold">Documents</div>
+  <table class="table table-sm table-hover mb-0"><thead><tr><th>N°</th><th>Type</th><th>Date</th><th class="num">TTC</th><th class="num">Reste</th><th>Statut</th></tr></thead><tbody>
+  {% for d in documents %}<tr><td><a href="{% url 'commercial:document_detail' d.pk %}">{{ d.numero_affiche }}</a></td><td>{{ d.get_type_document_display }}</td>
+  <td>{{ d.date|date:"d/m/Y" }}</td><td class="num">{{ d.total_ttc|montant }}</td><td class="num">{{ d.reste_a_payer|montant_ou_vide }}</td>
+  <td><span class="badge badge-{{ d.statut }}">{{ d.get_statut_display }}</span></td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center">Aucun document.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+<div class="col-lg-5"><div class="card"><div class="card-header bg-white fw-semibold">Règlements</div>
+  <table class="table table-sm mb-0"><thead><tr><th>N°</th><th>Date</th><th>Mode</th><th class="num">Montant</th></tr></thead><tbody>
+  {% for r in reglements %}<tr><td><a href="{% url 'commercial:reglement_detail' r.pk %}">{{ r.numero }}</a></td><td>{{ r.date|date:"d/m/Y" }}</td><td>{{ r.get_mode_display }}</td><td class="num">{{ r.montant|montant }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="text-muted text-center">Aucun règlement.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+</div>
+{% endblock %}

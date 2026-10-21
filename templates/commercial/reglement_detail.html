@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}{{ object.numero }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Règlement {{ object.numero }}</h1></div>
+<div class="row g-3">
+<div class="col-md-5"><div class="card p-3">
+  <dl class="row mb-0 small">
+    <dt class="col-5">Tiers</dt><dd class="col-7"><a href="{% url 'commercial:tiers_detail' object.tiers.pk %}">{{ object.tiers.nom }}</a></dd>
+    <dt class="col-5">Date</dt><dd class="col-7">{{ object.date|date:"d/m/Y" }}</dd>
+    <dt class="col-5">Sens</dt><dd class="col-7">{{ object.est_encaissement|yesno:"Encaissement,Décaissement" }}</dd>
+    <dt class="col-5">Mode</dt><dd class="col-7">{{ object.get_mode_display }}</dd>
+    <dt class="col-5">Journal</dt><dd class="col-7">{{ object.journal }}</dd>
+    <dt class="col-5">Référence</dt><dd class="col-7">{{ object.reference|default:"—" }}</dd>
+    <dt class="col-5">Montant</dt><dd class="col-7 fw-bold">{{ object.montant|montant }}</dd>
+    <dt class="col-5">Non imputé</dt><dd class="col-7">{{ object.montant_non_impute|montant }}</dd>
+    {% if object.ecriture %}<dt class="col-5">Écriture</dt><dd class="col-7"><a href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}">{{ object.ecriture.numero }}</a></dd>{% endif %}
+  </dl></div></div>
+<div class="col-md-7"><div class="card"><div class="card-header bg-white fw-semibold">Factures réglées</div>
+<table class="table table-sm mb-0"><tbody>
+{% for i in object.imputations.all %}<tr><td><a href="{% url 'commercial:document_detail' i.document.pk %}">{{ i.document.numero }}</a></td><td>{{ i.document.date|date:"d/m/Y" }}</td>
+<td class="num">{{ i.document.total_ttc|montant }}</td><td class="num fw-semibold">{{ i.montant|montant }}</td></tr>
+{% empty %}<tr><td class="text-muted">Aucune imputation (acompte / avance).</td></tr>{% endfor %}
+</tbody></table></div></div>
+</div>
+{% endblock %}

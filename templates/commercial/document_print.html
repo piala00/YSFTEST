@@ -1,0 +1,28 @@
+{% load static erp %}<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>{{ object.numero }}</title>
+<link href="{% static 'vendor/bootstrap.min.css' %}" rel="stylesheet">
+<style>body{font-size:11pt;padding:2rem}.num{text-align:right;white-space:nowrap}@media print{body{padding:0}.no-print{display:none}}</style></head>
+<body onload="window.print()">
+<div class="d-flex justify-content-between mb-4">
+  <div><h4 class="mb-0">{{ societe.raison_sociale }}</h4>
+    <div class="small">{{ societe.forme_juridique }} {% if societe.adresse %}· {{ societe.adresse }}{% endif %} · {{ societe.ville }}<br>
+    {% if societe.telephone %}Tél : {{ societe.telephone }} · {% endif %}{% if societe.email %}{{ societe.email }}{% endif %}<br>
+    NIU : {{ societe.niu|default:"—" }} · RCCM : {{ societe.rccm|default:"—" }}</div></div>
+  <div class="text-end"><h3 class="mb-0 text-uppercase">{{ object.get_type_document_display }}</h3>
+    <div>N° <strong>{{ object.numero_affiche }}</strong></div><div>Date : {{ object.date|date:"d/m/Y" }}</div>
+    {% if object.date_echeance %}<div>Échéance : {{ object.date_echeance|date:"d/m/Y" }}</div>{% endif %}</div>
+</div>
+<div class="border rounded p-3 mb-4 ms-auto" style="width:45%">
+  <strong>{{ object.tiers.nom }}</strong><br>{{ object.tiers.adresse }}<br>{{ object.tiers.ville }}
+  {% if object.tiers.niu %}<br>NIU : {{ object.tiers.niu }}{% endif %}</div>
+<table class="table table-bordered table-sm">
+<thead class="table-light"><tr><th>Désignation</th><th class="num">Qté</th><th class="num">P.U. HT</th><th class="num">Rem.</th><th class="num">TVA</th><th class="num">Montant HT</th></tr></thead>
+<tbody>{% for l in object.lignes.all %}<tr><td>{{ l.designation }}</td><td class="num">{{ l.quantite|floatformat:"-3" }}</td><td class="num">{{ l.prix_unitaire|montant }}</td>
+<td class="num">{% if l.remise %}{{ l.remise }}%{% endif %}</td><td class="num">{{ l.taux_tva }}%</td><td class="num">{{ l.montant_ht|montant }}</td></tr>{% endfor %}</tbody></table>
+<table class="table table-sm ms-auto" style="width:45%">
+<tr><td>Total HT</td><td class="num">{{ object.total_ht|montant }}</td></tr>
+{% for v in object.ventilation_tva %}<tr><td>TVA {{ v.taux }} %</td><td class="num">{{ v.tva|montant }}</td></tr>{% endfor %}
+<tr class="fw-bold"><td>Net à payer TTC</td><td class="num">{{ object.total_ttc|montant }} {{ societe.devise }}</td></tr></table>
+{% if object.notes %}<p class="small">{{ object.notes|linebreaksbr }}</p>{% endif %}
+{% if societe.pied_facture %}<hr><p class="small text-center text-muted">{{ societe.pied_facture|linebreaksbr }}</p>{% endif %}
+</body></html>

@@ -1,0 +1,24 @@
+body { background: #f4f6f9; font-size: .92rem; }
+.sidebar { width: 240px; min-height: 100vh; background: #1e2a3a; color: #fff; padding-bottom: 2rem; flex-shrink: 0; }
+.sidebar .brand { display: block; padding: 1rem; font-weight: 700; font-size: 1.1rem; color: #fff; text-decoration: none; }
+.sidebar a:not(.brand) { display: block; padding: .35rem 1rem; color: #c8d1dc; text-decoration: none; }
+.sidebar a:not(.brand):hover { background: #2c3e55; color: #fff; }
+.sidebar .nav-section { padding: .9rem 1rem .25rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #7f8fa4; }
+.main { min-width: 0; }
+.card { border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.kpi .value { font-size: 1.45rem; font-weight: 700; }
+.kpi .label { color: #6c757d; font-size: .8rem; text-transform: uppercase; }
+.table-sm td, .table-sm th { vertical-align: middle; }
+.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+tr.total td, tr.total th { font-weight: 700; background: #eef2f7; }
+tr.sous-total td { font-weight: 600; background: #f7f9fb; }
+.page-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem; }
+.page-title h1 { font-size: 1.4rem; margin: 0; }
+.badge-BROUILLON { background: #6c757d; } .badge-VALIDE { background: #198754; }
+.badge-TRANSFORME { background: #0d6efd; } .badge-ANNULE { background: #dc3545; }
+.badge-BROUILLARD { background: #fd7e14; } .badge-VALIDEE { background: #198754; }
+@media print {
+  body { background: #fff; font-size: 11pt; }
+  .main { padding: 0 !important; }
+  .card { box-shadow: none; }
+}

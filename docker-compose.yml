@@ -1,0 +1,30 @@
+# Démarrage rapide avec PostgreSQL : docker compose up -d
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: erp
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: erp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  web:
+    build: .
+    command: sh -c "python manage.py migrate && python manage.py init_erp && python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DB_ENGINE: postgresql
+      DB_NAME: erp
+      DB_USER: erp
+      DB_PASSWORD: erp
+      DB_HOST: db
+      ALLOWED_HOSTS: "*"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

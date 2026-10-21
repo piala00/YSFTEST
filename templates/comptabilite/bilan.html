@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Bilan{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Bilan SYSCOHADA au {{ p.date_fin|date:"d/m/Y" }}</h1>
+  {% if bilan.equilibre %}<span class="badge bg-success">Bilan équilibré</span>{% else %}<span class="badge bg-danger">Bilan déséquilibré</span>{% endif %}</div>
+{% include "comptabilite/_periode.html" %}
+<div class="row g-3">
+<div class="col-xl-6"><div class="card"><div class="card-header bg-white fw-bold">ACTIF</div>
+<table class="table table-sm mb-0"><thead class="table-light"><tr><th>Réf</th><th>Actif</th><th class="num">Brut</th><th class="num">Amort./Dépréc.</th><th class="num">Net</th></tr></thead><tbody>
+{% for l in bilan.actif %}<tr class="{% if l.total %}sous-total{% endif %}"><td>{{ l.ref }}</td><td>{{ l.libelle }}</td><td class="num">{{ l.brut|montant_ou_vide }}</td><td class="num">{{ l.amort|montant_ou_vide }}</td><td class="num">{{ l.net|montant_ou_vide }}</td></tr>{% endfor %}
+</tbody><tfoot><tr class="total"><td>BZ</td><td>TOTAL GÉNÉRAL</td><td class="num">{{ bilan.total_actif.brut|montant }}</td><td class="num">{{ bilan.total_actif.amort|montant_ou_vide }}</td><td class="num">{{ bilan.total_actif.net|montant }}</td></tr></tfoot></table></div></div>
+<div class="col-xl-6"><div class="card"><div class="card-header bg-white fw-bold">PASSIF</div>
+<table class="table table-sm mb-0"><thead class="table-light"><tr><th>Réf</th><th>Passif</th><th class="num">Net</th></tr></thead><tbody>
+{% for l in bilan.passif %}<tr class="{% if l.total %}sous-total{% endif %}"><td>{{ l.ref }}</td><td>{{ l.libelle }}</td><td class="num">{{ l.montant|montant_ou_vide }}</td></tr>{% endfor %}
+</tbody><tfoot><tr class="total"><td>DZ</td><td>TOTAL GÉNÉRAL</td><td class="num">{{ bilan.total_passif|montant }}</td></tr></tfoot></table></div></div>
+</div>
+{% if bilan.non_classes %}<div class="alert alert-warning mt-3">Comptes non classés : {% for n, s in bilan.non_classes %}{{ n }} ({{ s|montant }}) {% endfor %}</div>{% endif %}
+<p class="small text-muted mt-2">Le résultat de l'exercice ({{ bilan.resultat|montant }}) est intégré en CJ tant que les comptes de gestion ne sont pas soldés.</p>
+{% endblock %}

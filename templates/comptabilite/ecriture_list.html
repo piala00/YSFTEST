@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Écritures{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Écritures comptables</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'comptabilite:ecriture_create' %}"><i class="bi bi-plus"></i> Saisie d'écriture</a></div>
+<form class="row g-2 mb-3">
+  <div class="col-md-2"><select name="journal" class="form-select form-select-sm"><option value="">Tous journaux</option>
+    {% for j in journaux %}<option value="{{ j.code }}" {% if request.GET.journal == j.code %}selected{% endif %}>{{ j.code }} - {{ j.intitule }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select name="statut" class="form-select form-select-sm"><option value="">Tous statuts</option>
+    <option value="BROUILLARD" {% if request.GET.statut == 'BROUILLARD' %}selected{% endif %}>Brouillard</option>
+    <option value="VALIDEE" {% if request.GET.statut == 'VALIDEE' %}selected{% endif %}>Validée</option></select></div>
+  <div class="col-md-2"><input type="date" name="du" value="{{ request.GET.du }}" class="form-control form-control-sm"></div>
+  <div class="col-md-2"><input type="date" name="au" value="{{ request.GET.au }}" class="form-control form-control-sm"></div>
+  <div class="col-md-3"><input name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="N°, libellé, référence"></div>
+  <div class="col-md-1"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel"></i></button></div>
+</form>
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead><tr><th>N° pièce</th><th>Date</th><th>Journal</th><th>Libellé</th><th>Référence</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>
+{% for e in object_list %}<tr><td><a href="{% url 'comptabilite:ecriture_detail' e.pk %}">{{ e.numero }}</a></td><td>{{ e.date|date:"d/m/Y" }}</td><td>{{ e.journal.code }}</td>
+<td>{{ e.libelle }}</td><td>{{ e.reference }}</td><td class="num">{{ e.total|montant }}</td><td><span class="badge badge-{{ e.statut }}">{{ e.get_statut_display }}</span></td></tr>
+{% empty %}<tr><td colspan="7" class="text-muted text-center p-4">Aucune écriture.</td></tr>{% endfor %}
+</tbody></table></div>
+{% include "pagination.html" %}
+{% endblock %}
