@@ -22,6 +22,10 @@ def societe(request):
         # Par défaut, comme dans Sage, on présente le menu Traitement (ou État pour le Reporting)
         actif = next((o for o in onglets if o["code"] in ("traitement", "etat")), onglets[0])
     request.session[cle_session] = actif["code"]
-    contexte.update(module=module, onglets=onglets, onglet_actif=actif, element_actif=element_actif,
+    arbre = actif
+    if actif["code"] in ("edition", "fenetre", "aide"):
+        # Commandes d'interface (page d'accueil, à propos…) : la barre verticale présente les menus de travail
+        arbre = next((o for o in onglets if o["code"] in ("traitement", "etat")), actif)
+    contexte.update(module=module, onglets=onglets, onglet_actif=actif, onglet_arbre=arbre, element_actif=element_actif,
                     fil_ariane=chemin_vers_actif(actif["elements"]))
     return contexte

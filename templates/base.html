@@ -60,10 +60,10 @@
   <div class="d-flex espace">
     <aside class="arbre d-print-none">
       <select class="form-select form-select-sm arbre-choix" id="arbre-choix" aria-label="Barre de navigation">
-        {% for o in onglets %}{% if o.code != "aide" %}<option value="{{ o.code }}" {% if o.code == onglet_actif.code %}selected{% endif %}>{{ o.titre }}</option>{% endif %}{% endfor %}
+        {% for o in onglets %}{% if o.code != "aide" %}<option value="{{ o.code }}" {% if o.code == onglet_arbre.code %}selected{% endif %}>{{ o.titre }}</option>{% endif %}{% endfor %}
       </select>
       {% for o in onglets %}{% if o.code != "aide" %}
-        <div class="arbre-menu" data-menu="{{ o.code }}" {% if o.code != onglet_actif.code %}hidden{% endif %}>
+        <div class="arbre-menu" data-menu="{{ o.code }}" {% if o.code != onglet_arbre.code %}hidden{% endif %}>
           {% include "core/_arbre.html" with noeuds=o.elements niveau=0 prefixe=o.code %}
         </div>
       {% endif %}{% endfor %}

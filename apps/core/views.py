@@ -26,8 +26,10 @@ def a_propos(request):
 
 @login_required
 def accueil_module(request, module):
-    """Page d'accueil d'un module : vue d'ensemble de ses onglets et éléments."""
-    return render(request, "core/module_accueil.html", {"module_def": MODULES_PAR_CODE[module]})
+    """Page d'accueil d'un logiciel : raccourcis, indicateurs et dernières pièces (les menus restent en haut)."""
+    from .accueil import PAGES
+
+    return render(request, "core/module_accueil.html", {"module_def": MODULES_PAR_CODE[module], **PAGES[module]()})
 
 
 class SocieteUpdateView(LoginRequiredMixin, UpdateView):
