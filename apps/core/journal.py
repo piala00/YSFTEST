@@ -72,13 +72,17 @@ def enregistrer(action, objet=None, details=None, libelle=""):
         objet_libelle=(libelle or (str(objet) if objet is not None else ""))[:200], details=details or {})
 
 
-def _avant(sender, instance, **kwargs):
+def _avant(sender, instance, raw=False, **kwargs):
+    if raw:                                  # chargement d'une sauvegarde : pas une action d'utilisateur
+        return
     if instance.pk:
         ancien = sender.objects.filter(pk=instance.pk).first()
         instance._journal_avant = _photo(ancien) if ancien else None
 
 
-def _apres(sender, instance, created, **kwargs):
+def _apres(sender, instance, created, raw=False, **kwargs):
+    if raw:
+        return
     if created:
         enregistrer("CREATION", instance)
         return

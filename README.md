@@ -85,6 +85,9 @@ il suffit de lui associer une page. La même définition alimente :
 - **Fichier › Journal des événements** (administrateur) : chaque création, modification (champs avant / après),
   validation, annulation, suppression et connexion, avec l'utilisateur, la date et l'origine (web, client bureau,
   serveur). Filtres par période, utilisateur, action, type et objet.
+- **Fichier › Sauvegarde et restauration** (administrateur) : téléchargement de toutes les données dans un fichier
+  JSON, et restauration (remplace tout, en une seule transaction : un fichier refusé ne modifie rien). Utile pour
+  garder ses saisies sur la version en ligne de test, qui repart des données de démonstration à chaque mise à jour.
 
 ## Modules
 

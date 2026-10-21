@@ -7,15 +7,15 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 
 | État | Commandes |
 |---|---|
-| ✅ Réalisé | 73 |
+| ✅ Réalisé | 74 |
 | ✅ Commande d'interface | 14 |
 | ↗ Autre logiciel de l'ERP | 14 |
 | ⬜ Grisé (non développé) | 110 |
-| **Total des commandes** | **211** |
+| **Total des commandes** | **212** |
 
 | Niveau de preuve | Commandes | Signification |
 |---|---|---|
-| AJOUT-ERP | 9 | Ajout propre à l'ERP OHADA (absent de Sage) |
+| AJOUT-ERP | 10 | Ajout propre à l'ERP OHADA (absent de Sage) |
 | DOC-V12 | 182 | Cité dans le découpage officiel Sage 100 Gestion commerciale V12.10 |
 | ERG-CLASSIQUE | 20 | Ergonomie Sage classique, à vérifier sur une installation V12 |
 
@@ -53,6 +53,7 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Fichier | Configuration système et partage | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier | Autorisations d'accès | DOC-V12 | ✅ Réalisé | `/commercial/autorisations/` |
 | Fichier | Journal des événements | AJOUT-ERP | ✅ Réalisé | `/commercial/journal-evenements/` |
+| Fichier | Sauvegarde et restauration | AJOUT-ERP | ✅ Réalisé | `/commercial/sauvegarde/` |
 | Fichier | Importer | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier | Exporter | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Fichier | Format import/export paramétrable | DOC-V12 | ⬜ Grisé (non développé) |  |

@@ -11,6 +11,7 @@ urlpatterns = [
     path("a-propos/", core_views.a_propos, name="a_propos"),
     path("autorisations/", core_views.autorisations, {"module": "reporting"}, name="autorisations"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "reporting"}, name="journal_evenements"),
+    path("sauvegarde/", core_views.sauvegarde, {"module": "reporting"}, name="sauvegarde"),
     path("", views.dashboard, name="dashboard"),
     path("ventes/", views.ventes, name="ventes"),
     path("balance-agee/", views.balance_agee, name="balance_agee"),

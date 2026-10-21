@@ -145,6 +145,7 @@ class JournalEvenement(models.Model):
         ("CREATION", "Création"), ("MODIFICATION", "Modification"), ("VALIDATION", "Validation"),
         ("ANNULATION", "Annulation"), ("SUPPRESSION", "Suppression"), ("CLOTURE", "Clôture"),
         ("CONNEXION", "Connexion"), ("ECHEC_CONNEXION", "Échec de connexion"),
+        ("SAUVEGARDE", "Sauvegarde"), ("RESTAURATION", "Restauration"),
     ]
 
     date = models.DateTimeField(auto_now_add=True, db_index=True)

@@ -197,3 +197,42 @@ def journal_evenements(request, module):
         "utilisateurs": get_user_model().objects.order_by("username").values_list("username", flat=True),
         "filtres": g.urlencode().replace("page=", "_="),
     })
+
+
+@login_required
+def sauvegarde(request, module):
+    """Fichier › Sauvegarde et restauration (administrateur)."""
+    from django.http import HttpResponse
+    from django.shortcuts import redirect
+    from django.utils import timezone
+
+    from . import droits as d, journal
+    from . import sauvegarde as s
+
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {
+            "chemin": "Fichier › Sauvegarde et restauration", "operation": "sauvegarder ou restaurer",
+            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    if request.method == "POST" and request.POST.get("action") == "sauvegarder":
+        contenu = s.sauvegarder()
+        journal.enregistrer("SAUVEGARDE", libelle=f"{len(contenu) // 1024} Ko")
+        reponse = HttpResponse(contenu, content_type="application/json; charset=utf-8")
+        reponse["Content-Disposition"] = f'attachment; filename="erp-sauvegarde-{timezone.localtime():%Y%m%d-%H%M}.json"'
+        return reponse
+    if request.method == "POST" and request.POST.get("action") == "restaurer":
+        fichier = request.FILES.get("fichier")
+        if not fichier or request.POST.get("confirmation") != "RESTAURER":
+            messages.error(request, "Choisissez le fichier et tapez RESTAURER pour confirmer.")
+        else:
+            try:
+                entete = s.restaurer(fichier.read().decode("utf-8"))
+            except (ValueError, UnicodeDecodeError) as exc:
+                messages.error(request, str(exc))
+            except Exception as exc:          # fichier incohérent : la transaction a tout annulé
+                messages.error(request, f"Restauration impossible, aucune donnée modifiée : {exc}")
+            else:
+                journal.enregistrer("RESTAURATION", libelle=f"sauvegarde du {entete.get('date', '')[:16]}")
+                messages.success(request, f"Données restaurées ({entete['objets']} enregistrements). "
+                                          "Reconnectez-vous si besoin.")
+        return redirect(request.path)
+    return render(request, "core/sauvegarde.html")

@@ -34,4 +34,6 @@ L'adresse est du type `https://erp-ohada-test.onrender.com`. Chaque envoi sur la
 - Sans `DATABASE_URL`, la base est **remise à la démonstration** à chaque redéploiement ou réveil : idéal pour tester,
   pas pour garder des saisies. Pour les conserver, créer une base PostgreSQL (Render, Neon, Supabase…) et coller son URL
   dans une variable `DATABASE_URL` à ajouter (Render › service › Environment).
+- Pour garder vos saisies sans base PostgreSQL : **Fichier › Sauvegarde et restauration** avant une mise à jour,
+  puis restauration du fichier ensuite.
 - C'est un site de test public : **n'y mettez pas les données réelles d'une société**.

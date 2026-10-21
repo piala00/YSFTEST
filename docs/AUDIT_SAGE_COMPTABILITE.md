@@ -7,10 +7,10 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 
 | État | Commandes |
 |---|---|
-| ✅ Réalisé | 55 |
+| ✅ Réalisé | 56 |
 | ✅ Commande d'interface | 14 |
 | ↗ Autre logiciel de l'ERP | 6 |
-| ⬜ Grisé (non développé) | 51 |
+| ⬜ Grisé (non développé) | 50 |
 | **Total des commandes** | **126** |
 
 | Niveau de preuve | Commandes | Signification |
@@ -49,7 +49,7 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Fichier | Impression différée | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
 | Fichier | **Outils** | ERG-CLASSIQUE | ▸ Sous-menu |  |
 | Fichier › Outils | Maintenance | INDICATIF | ⬜ Grisé (non développé) |  |
-| Fichier › Outils | Sauvegarde | INDICATIF | ⬜ Grisé (non développé) |  |
+| Fichier › Outils | Sauvegarde | INDICATIF | ✅ Réalisé | `/comptabilite/sauvegarde/` |
 | Fichier | Quitter | ERG-CLASSIQUE | ✅ Commande d'interface | `action « quitter »` |
 | **Édition** | | | | |
 | Édition | Annuler | ERG-CLASSIQUE | ✅ Commande d'interface | `action « annuler »` |
