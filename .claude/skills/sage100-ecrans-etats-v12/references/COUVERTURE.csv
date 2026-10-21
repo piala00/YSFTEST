@@ -1,0 +1,25 @@
+recherche;objet;statut;sources_principales;inconnues
+R9;Article;PARTIEL;"G02-G07 ; T01";U02
+R9;Client;PARTIEL;G01/G02/G06/H13;U03
+R9;Fournisseur;PARTIEL;G02/G06;U03
+R9;Documents vente;PARTIEL;H01-H04/H15;U08
+R9;Documents achat;NON_RELEVE;M02 (processus uniquement);U04
+R9;Documents stock;NON_RELEVE;Cahier (périmètre uniquement);U05
+R9;Famille;NON_RELEVE;G02 (héritage uniquement);U06
+R9;Dépôt;NON_RELEVE;G03 (mini/maxi article par dépôt);U06
+R9;Catégorie tarifaire;PARTIEL;H12/G05;U08
+R9;Règlement;PARTIEL;H04/H07;U08
+R9;Paramètres société;PARTIEL;G01-G06/H07/H12;U07
+R9;Matrice transformations;PARTIEL;M02/H01/H03;U01/U16
+R10;Compte général;PARTIEL;H05/H06/H19;U09
+R10;Compte tiers;PARTIEL;H09/H19;U09
+R10;Code journal;PARTIEL;H08;U09
+R10;Saisie journaux;PARTIEL;H09;U11
+R10;Saisie par pièce;PARTIEL;H10;U11
+R10;Interrogation / lettrage;PARTIEL;H18/H19;U11
+R10;Rapprochement;PARTIEL_HISTORIQUE;H20/M01;U12
+R10;Banque;PARTIEL_TEMOIN;M03;U09
+R10;Taxe;PARTIEL;G02;U09
+R10;Exercices;PARTIEL;H11;U09
+R11;Etats Gescom;PARTIEL;H14/G03/T01;U13
+R11;Etats Comptabilité;PARTIEL_HISTORIQUE;M01;U14

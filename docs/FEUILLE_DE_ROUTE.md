@@ -14,6 +14,7 @@ qui ne sert pas.
 | Autorisations d'accès | 🟡 fonctionnelles ; libellés V12 à confirmer | GPT R3 / captures Sage |
 | Espace de travail (fenêtres, barre verticale, accueil) | 🟡 fait ; détails V12 à confirmer | GPT R4 |
 | Fenêtres de sélection des états | 🟡 fait pour tous les états ; critères exacts et formats de sélection à faire | GPT R14 / captures Sage |
+| Transformations et règles de saisie | 🟡 règles officielles V12.20 appliquées (encours, compte bloqué, achats) | GPT lot 3 (suite) |
 | Listes, fiches, saisie, raccourcis, messages | 🔴 à aligner | GPT R9, R10, R14 |
 | Fiscalité Cameroun / SYSCOHADA | 🟡 TVA facultative, CAC, régimes ; plan complet et AIR / précompte à venir | GPT lot 2 (suite) |
 | Reprise des données Sage | ✅ outil en lecture seule | GPT R12 pour confirmer les colonnes |

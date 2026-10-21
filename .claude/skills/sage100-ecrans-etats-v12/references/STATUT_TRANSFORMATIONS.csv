@@ -1,0 +1,155 @@
+ligne_csv;domaine;type_origine;type_cible;version_documentee;preuve;canal
+2;VENTE;Devis;Devis;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+3;VENTE;Devis;Bon de commande;V12.20 (OM);DOC-OFFICIEL;OM
+4;VENTE;Devis;Préparation de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+5;VENTE;Devis;Bon de livraison;V12.20 (OM);DOC-OFFICIEL;OM
+6;VENTE;Devis;Facture;V12.20 (OM);DOC-OFFICIEL;OM
+7;VENTE;Devis;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+8;VENTE;Devis;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+9;VENTE;Devis;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+10;VENTE;Devis;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+11;VENTE;Bon de commande;Devis;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+12;VENTE;Bon de commande;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+13;VENTE;Bon de commande;Préparation de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+14;VENTE;Bon de commande;Bon de livraison;V12.20 (OM);DOC-OFFICIEL;OM
+15;VENTE;Bon de commande;Facture;V12.20 (OM);DOC-OFFICIEL;OM
+16;VENTE;Bon de commande;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+17;VENTE;Bon de commande;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+18;VENTE;Bon de commande;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+19;VENTE;Bon de commande;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+20;VENTE;Préparation de livraison;Devis;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+21;VENTE;Préparation de livraison;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+22;VENTE;Préparation de livraison;Préparation de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+23;VENTE;Préparation de livraison;Bon de livraison;V12.20 (OM);DOC-OFFICIEL;OM
+24;VENTE;Préparation de livraison;Facture;V12.20 (OM);DOC-OFFICIEL;OM
+25;VENTE;Préparation de livraison;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+26;VENTE;Préparation de livraison;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+27;VENTE;Préparation de livraison;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+28;VENTE;Préparation de livraison;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+29;VENTE;Bon de livraison;Devis;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+30;VENTE;Bon de livraison;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+31;VENTE;Bon de livraison;Préparation de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+32;VENTE;Bon de livraison;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+33;VENTE;Bon de livraison;Facture;V12.20 (OM);DOC-OFFICIEL;OM
+34;VENTE;Bon de livraison;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+35;VENTE;Bon de livraison;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+36;VENTE;Bon de livraison;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+37;VENTE;Bon de livraison;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+38;VENTE;Facture;Devis;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+39;VENTE;Facture;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+40;VENTE;Facture;Préparation de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+41;VENTE;Facture;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+42;VENTE;Facture;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+43;VENTE;Facture;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+44;VENTE;Facture;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+45;VENTE;Facture;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+46;VENTE;Facture;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+47;VENTE;Bon de retour;Devis;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+48;VENTE;Bon de retour;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+49;VENTE;Bon de retour;Préparation de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+50;VENTE;Bon de retour;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+51;VENTE;Bon de retour;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+52;VENTE;Bon de retour;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+53;VENTE;Bon de retour;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+54;VENTE;Bon de retour;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+55;VENTE;Bon de retour;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+56;VENTE;Bon d’avoir financier;Devis;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+57;VENTE;Bon d’avoir financier;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+58;VENTE;Bon d’avoir financier;Préparation de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+59;VENTE;Bon d’avoir financier;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+60;VENTE;Bon d’avoir financier;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+61;VENTE;Bon d’avoir financier;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+62;VENTE;Bon d’avoir financier;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+63;VENTE;Bon d’avoir financier;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+64;VENTE;Bon d’avoir financier;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+65;VENTE;Facture de retour;Devis;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+66;VENTE;Facture de retour;Bon de commande;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+67;VENTE;Facture de retour;Préparation de livraison;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+68;VENTE;Facture de retour;Bon de livraison;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+69;VENTE;Facture de retour;Facture;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+70;VENTE;Facture de retour;Bon de retour;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+71;VENTE;Facture de retour;Bon d’avoir financier;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+72;VENTE;Facture de retour;Facture de retour;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+73;VENTE;Facture de retour;Facture d’avoir;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+74;VENTE;Facture d’avoir;Devis;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+75;VENTE;Facture d’avoir;Bon de commande;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+76;VENTE;Facture d’avoir;Préparation de livraison;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+77;VENTE;Facture d’avoir;Bon de livraison;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+78;VENTE;Facture d’avoir;Facture;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+79;VENTE;Facture d’avoir;Bon de retour;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+80;VENTE;Facture d’avoir;Bon d’avoir financier;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+81;VENTE;Facture d’avoir;Facture de retour;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+82;VENTE;Facture d’avoir;Facture d’avoir;"Sage 100 ; version exacte non précisée";DOC-OFFICIEL;UI
+83;ACHAT;Préparation de commande;Préparation de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+84;ACHAT;Préparation de commande;Bon de commande;V12.20 (OM);DOC-OFFICIEL;OM
+85;ACHAT;Préparation de commande;Bon de livraison;V12.20 (OM);DOC-OFFICIEL;OM
+86;ACHAT;Préparation de commande;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+87;ACHAT;Préparation de commande;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+88;ACHAT;Préparation de commande;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+89;ACHAT;Préparation de commande;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+90;ACHAT;Préparation de commande;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+91;ACHAT;Bon de commande;Préparation de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+92;ACHAT;Bon de commande;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+93;ACHAT;Bon de commande;Bon de livraison;V12.20 (OM);DOC-OFFICIEL;OM
+94;ACHAT;Bon de commande;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+95;ACHAT;Bon de commande;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+96;ACHAT;Bon de commande;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+97;ACHAT;Bon de commande;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+98;ACHAT;Bon de commande;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+99;ACHAT;Bon de livraison;Préparation de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+100;ACHAT;Bon de livraison;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+101;ACHAT;Bon de livraison;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+102;ACHAT;Bon de livraison;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+103;ACHAT;Bon de livraison;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+104;ACHAT;Bon de livraison;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+105;ACHAT;Bon de livraison;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+106;ACHAT;Bon de livraison;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+107;ACHAT;Facture;Préparation de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+108;ACHAT;Facture;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+109;ACHAT;Facture;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+110;ACHAT;Facture;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+111;ACHAT;Facture;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+112;ACHAT;Facture;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+113;ACHAT;Facture;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+114;ACHAT;Facture;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+115;ACHAT;Bon de retour;Préparation de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+116;ACHAT;Bon de retour;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+117;ACHAT;Bon de retour;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+118;ACHAT;Bon de retour;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+119;ACHAT;Bon de retour;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+120;ACHAT;Bon de retour;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+121;ACHAT;Bon de retour;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+122;ACHAT;Bon de retour;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+123;ACHAT;Bon d’avoir financier;Préparation de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+124;ACHAT;Bon d’avoir financier;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+125;ACHAT;Bon d’avoir financier;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+126;ACHAT;Bon d’avoir financier;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+127;ACHAT;Bon d’avoir financier;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+128;ACHAT;Bon d’avoir financier;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+129;ACHAT;Bon d’avoir financier;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+130;ACHAT;Bon d’avoir financier;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+131;ACHAT;Facture de retour;Préparation de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+132;ACHAT;Facture de retour;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+133;ACHAT;Facture de retour;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+134;ACHAT;Facture de retour;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+135;ACHAT;Facture de retour;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+136;ACHAT;Facture de retour;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+137;ACHAT;Facture de retour;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+138;ACHAT;Facture de retour;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+139;ACHAT;Facture d’avoir;Préparation de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+140;ACHAT;Facture d’avoir;Bon de commande;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+141;ACHAT;Facture d’avoir;Bon de livraison;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+142;ACHAT;Facture d’avoir;Facture;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+143;ACHAT;Facture d’avoir;Bon de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+144;ACHAT;Facture d’avoir;Bon d’avoir financier;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+145;ACHAT;Facture d’avoir;Facture de retour;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+146;ACHAT;Facture d’avoir;Facture d’avoir;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+147;STOCK;Mouvement d’entrée;Mouvement d’entrée;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+148;STOCK;Mouvement d’entrée;Mouvement de sortie;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+149;STOCK;Mouvement d’entrée;Virement de dépôt à dépôt;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+150;STOCK;Mouvement de sortie;Mouvement d’entrée;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+151;STOCK;Mouvement de sortie;Mouvement de sortie;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+152;STOCK;Mouvement de sortie;Virement de dépôt à dépôt;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+153;STOCK;Virement de dépôt à dépôt;Mouvement d’entrée;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+154;STOCK;Virement de dépôt à dépôt;Mouvement de sortie;NON_ETABLIE;A-CONFIRMER;NON_ETABLI
+155;STOCK;Virement de dépôt à dépôt;Virement de dépôt à dépôt;NON_ETABLIE;A-CONFIRMER;NON_ETABLI

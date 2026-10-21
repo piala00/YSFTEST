@@ -1,0 +1,19 @@
+sujet;question;pistes;impact
+U01 Matrice complète;"Confirmer toutes les paires UI V12, dont retours/avoirs, achats vers facture, préparations et stock ; le cahier annonce 9 types achat mais seulement 8 sont ici identifiés sans en inventer un neuvième.";"Test V12 avec version/édition et aide intégrale ; M02 liste des méthodes à rapprocher du descriptif";Pas de matrice exhaustive certifiée
+U02 Article;Tous les onglets, champs exacts, longueurs, valeurs et défauts de la fiche article V12.;Capture T01 p.13 et aide V12 de la même fonction;"Extrait utilisable pour revue ; pas de génération automatique complète"
+U03 Tiers;Fiches client/fournisseur exhaustives : Identification, Contacts, banques, conditions de paiement, écrans fiscaux export.;Aide de chaque produit et captures V12 anonymisées;Ne pas reproduire une fiche fournisseur à partir du seul client
+U04 Achats;En-tête, grille, pied, conditions des documents achats V12.;Manuel fonctionnel et dossier de démonstration V12;Pas de copie automatique de tous les champs vente
+U05 Stock;Écrans entrée/sortie/transfert, dépôt départ/arrivée et champs conditionnels V12.;Manuel Sage Gestion commerciale V12;Les trois types du cahier ne constituent pas un inventaire complet Sage
+U06 Famille et dépôt;Onglets et champs complets des familles et dépôts V12.;Aide Structure et fiches V12;"Héritage comptable documenté ; maquettes non complètes"
+U07 Paramètres société;Tous les boutons/volets/onglets et ordre selon produit et édition V12.;V01 ne prouve que le découpage fonctionnel;Catalogue des paramètres partiel
+U08 Contraintes UI;Ordre écran, longueur, obligation, type et défaut de chaque contrôle non renseigné.;Vérification champ par champ dans V12;NON_ETABLI ne signifie pas facultatif, illimité, vide ou zéro
+U09 Comptes et journaux;Fiches complètes compte général, tiers, taxe, journal et banque V12.;Articles H05-H08/H19 et captures V12;"Présence générale documentée ; version écran non certifiée"
+U10 Acheteur;Confirmer sur le build V12 les contrôles documentés par H21 : Acheteur et transmission de l’autorisation.;"H21 établit les chemins et libellés dans une aide Sage 100 sans build ; H07 décrit les paramètres globaux";"Ne pas confondre paramètres société et fiche fournisseur ; version écran à confirmer"
+U11 Saisie et lettrage;Bandeau et grille par défaut V12, écrans multi-échéances, lettrage manuel/auto.;H09/H10/H18/H19 et contrôles dans V12;Relevé de zones et comportements seulement
+U12 Rapprochement;Grille et sélection exhaustives V12 manuel/automatique.;M01 historique, H20 et aide actuelle;Longueur 17 connue uniquement dans M01
+U13 Etats Gescom;Options et colonnes : ventes/achats, stock, inventaire, échéancier, versions/éditions V12.;Modèles standards livrés V12 + aide;R11 reste très partiel sur Gestion commerciale
+U14 Etats comptables;Journal, grand-livre, balance, balance âgée, échéancier, états tiers : sélections et colonnes V12.;"M01 est 8.50 ; modèles d’impression V12 à obtenir";R11 ne constitue pas une maquette V12 complète
+U15 Témoins SQL/import;Les limites des formats d’import ou des colonnes SQL correspondent-elles aux contrôles UI V12 ?;"Vérifier chaque couche indépendamment ; étape 4 pour le SQL";Aucune longueur UI déduite du SQL ou du format V5
+U16 Etat du manuel OM;Le descriptif IPMDocTransformer parle de cinq processus alors que les interfaces listent aussi Préparer et Facturer achat.;M02 p.297,437-438 et annexes nouveautés;"Existence des méthodes confirmée ; pas toutes leurs origines"
+U17 Conservation historique;La destruction/régénération des pièces décrite par H03 s’applique-t-elle sans nuance à V12 et aux factures validées ?;"Vérifier paramétrage et statut ; ne pas supprimer de données pour tester";Aucune suppression prescrite par ce skill
+U18 Editions;Quelles options/champs dépendent de Standard/Premium/Cloud et de la localisation ?;Captures même build/édition et matrice V01;Ne pas assimiler silence sur édition et disponibilité universelle

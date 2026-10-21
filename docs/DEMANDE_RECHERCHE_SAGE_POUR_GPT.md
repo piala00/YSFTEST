@@ -362,3 +362,20 @@ fiches de la base de connaissances, vidéos officielles), en séparant V12 et ve
 (`produit;etat;chemin_menu;critere;type;valeur_defaut;onglet;source;preuve`), `LISTES.csv`, `FICHES.csv`,
 `SAISIE_DOCUMENTS.md`, `SAISIE_COMPTABLE.md`, `RACCOURCIS.csv`, `MESSAGES.csv`, `ACCUEIL_ASSISTANTS.md`,
 `SOURCES.csv`, `INCONNUES.csv`.
+
+
+## Suite — retour sur la livraison 3 (lot « écrans et états », reçue le 21/10/2026)
+
+**Intégré** (skill `sage100-ecrans-etats-v12` installé) : transformation d'achat Préparation de commande → Bon de
+livraison (V12.20) ; code risque « Blocage » qui laisse saisir devis et commandes avec un message (C01) ; nouveau
+« Compte bloqué » sur la fiche tiers (aucun document). Matrice des transformations conservée : aucune paire INCONNU
+n'a été retirée ni ajoutée.
+
+**Demande suivante pour ce lot (priorité aux points qui changent les écrans) :**
+1. **U13 / U14 et R14-1 : fenêtres de sélection** des états Gescom et Comptabilité V12 (critères, valeurs par défaut),
+   en commençant par : balance âgée, échéancier, grand-livre des tiers, mouvements de stock, inventaire, statistiques
+   clients / articles.
+2. **U02 / U03 : fiches article et client / fournisseur V12** complètes (onglets, champs, ordre).
+3. **U04 / U05 : en-tête, grille et pied** des documents d'achat et de stock V12.
+4. **U01 : le neuvième type de document d'achat** (s'il existe en V12) et les transformations depuis bon de retour,
+   bon d'avoir financier et demande d'achat.

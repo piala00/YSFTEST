@@ -67,6 +67,10 @@ class Tiers(models.Model):
                                    help_text="Réaction quand l'encours dépasse le plafond (clients)")
     categorie_tarifaire = models.ForeignKey(CategorieTarifaire, null=True, blank=True, on_delete=models.SET_NULL,
                                             related_name="clients", verbose_name="Catégorie tarifaire")
+    compte_bloque = models.BooleanField(
+        "Compte bloqué", default=False,
+        help_text="Aucun document ne peut être saisi pour ce tiers (différent du code risque « Blocage », "
+                  "qui laisse saisir devis et commandes avec un message)")
     assujetti_tva = models.BooleanField("Assujetti à la TVA", default=True)
     regime_fiscal = models.CharField("Régime d'imposition", max_length=20, choices=Societe.REGIMES_FISCAUX, blank=True,
                                      help_text="Utile pour l'AIR et le précompte (taux selon le régime)")
@@ -329,7 +333,7 @@ class Document(models.Model):
         AVOIR_FINANCIER: (AVOIR,),
         FACTURE: (AVOIR, FACTURE_RETOUR),
         ACHAT_DEMANDE: (ACHAT_PREPARATION, ACHAT_COMMANDE),
-        ACHAT_PREPARATION: (ACHAT_COMMANDE,),
+        ACHAT_PREPARATION: (ACHAT_COMMANDE, ACHAT_RECEPTION),
         ACHAT_COMMANDE: (ACHAT_RECEPTION, ACHAT_FACTURE),
         ACHAT_RECEPTION: (ACHAT_FACTURE, ACHAT_RETOUR),
         ACHAT_RETOUR: (ACHAT_FACTURE_RETOUR,),
@@ -520,9 +524,13 @@ class Document(models.Model):
         attendu = Tiers.CLIENT if self.type_document in self.TYPES_VENTE else Tiers.FOURNISSEUR
         if self.tiers.type_tiers != attendu:
             raise ValidationError({"tiers": f"Ce type de document requiert un tiers de type « {attendu.lower()} »."})
+        if self.tiers.compte_bloque:
+            raise ValidationError({"tiers": f"Le compte de {self.tiers.nom} est bloqué : aucun document ne peut être saisi."})
 
     # Pièces de vente soumises au contrôle d'encours (plafond et code risque du client)
     TYPES_CONTROLE_ENCOURS = (COMMANDE, PREPARATION, LIVRAISON, FACTURE)
+    # Avec le code risque « Blocage », Sage laisse saisir devis et commandes avec un message (aide Sage « encours client »)
+    TYPES_RISQUE_MESSAGE = (DEVIS, COMMANDE)
 
     def controler_encours(self):
         """Bloque (ValidationError) ou renvoie un avertissement si la pièce fait dépasser le plafond."""
@@ -537,7 +545,7 @@ class Document(models.Model):
             return None
         message = (f"Encours de {tiers.nom} : {tiers.encours() + self.total_ttc:,.0f} pour un plafond de "
                    f"{tiers.plafond_credit:,.0f} (dépassement de {depassement:,.0f}).").replace(",", " ")
-        if tiers.code_risque == Tiers.RISQUE_BLOQUER:
+        if tiers.code_risque == Tiers.RISQUE_BLOQUER and self.type_document not in self.TYPES_RISQUE_MESSAGE:
             raise ValidationError(f"Validation refusée. {message}")
         return message
 

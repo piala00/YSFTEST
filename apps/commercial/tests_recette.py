@@ -182,12 +182,16 @@ class CasPratiquesTests(SahelDistribution):
         self.assertEqual(self.solde(self.cli_detail), D("0"))
 
     def test_cas_12_depassement_du_plafond_d_encours(self):
-        # CLI-ENC-01 : plafond 100 000, code risque « blocage »
-        commande = self.piece(Document.COMMANDE, self.cli_enc, [(self.riz, 10)])     # 160 000 HT
+        # CLI-ENC-01 : plafond 100 000, code risque « blocage ». Comme dans Sage (aide « encours client »), devis et
+        # commandes restent possibles avec un message ; la livraison et la facture sont refusées.
+        livraison = self.piece(Document.LIVRAISON, self.cli_enc, [(self.riz, 10)])    # 160 000 HT
         with self.assertRaises(ValidationError):
-            commande.valider()
-        commande.refresh_from_db()
-        self.assertEqual(commande.statut, Document.BROUILLON)
+            livraison.valider()
+        livraison.refresh_from_db()
+        self.assertEqual(livraison.statut, Document.BROUILLON)
+        commande_message = self.piece(Document.COMMANDE, self.cli_enc, [(self.riz, 10)]).valider()
+        self.assertIn("dépassement", commande_message.avertissement)
+        commande = self.piece(Document.FACTURE, self.cli_enc, [(self.riz, 10)])
         # En dessous du plafond, la pièce passe
         petite = self.piece(Document.COMMANDE, self.cli_enc, [(self.eau, 10)]).valider()
         self.assertIsNone(petite.avertissement)
@@ -286,7 +290,7 @@ class AteliersTests(SahelDistribution):
         fiche = self.client.get(reverse("commercial:article_detail", args=[self.riz.pk])).content.decode()
         self.assertIn(f'name="tarif_{self.gros.pk}" value="15000.00"', fiche)
         # Encours : la validation bloquée est expliquée à l'utilisateur
-        commande_bloquee = self.piece(Document.COMMANDE, self.cli_enc, [(self.riz, 10)])
+        commande_bloquee = self.piece(Document.FACTURE, self.cli_enc, [(self.riz, 10)])
         reponse = self.client.post(reverse("commercial:document_valider", args=[commande_bloquee.pk]), follow=True)
         self.assertContains(reponse, "Validation refusée")
         for url in (reverse("commercial:categories"), reverse("commercial:categorie_create"),
@@ -294,3 +298,28 @@ class AteliersTests(SahelDistribution):
                     reverse("commercial:document_create", args=["DEVIS"])):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+
+
+class EcransEtatsV12Tests(TestCase):
+    """Skill GPT sage100-ecrans-etats-v12 : compte bloqué et transformation d'achat documentée V12.20."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        cls.client_ = Tiers.objects.create(code="CBLOQ", nom="Client bloqué", compte_bloque=True)
+        cls.fournisseur = Tiers.objects.create(code="FPREP", nom="Fournisseur", type_tiers=Tiers.FOURNISSEUR)
+        cls.article = Article.objects.create(reference="ABLOQ", designation="Article", prix_vente=1000, prix_achat=500)
+
+    def test_compte_bloque_aucun_document(self):
+        for type_document in (Document.DEVIS, Document.COMMANDE):
+            doc = Document(type_document=type_document, tiers=self.client_)
+            with self.assertRaises(ValidationError):
+                doc.clean()
+
+    def test_preparation_de_commande_vers_bon_de_livraison(self):
+        prep = Document.objects.create(type_document=Document.ACHAT_PREPARATION, tiers=self.fournisseur)
+        LigneDocument.objects.create(document=prep, article=self.article, quantite=5, prix_unitaire=500)
+        prep.recalculer()
+        prep.valider()
+        reception = prep.transformer(Document.ACHAT_RECEPTION, None)
+        self.assertEqual(reception.type_document, Document.ACHAT_RECEPTION)

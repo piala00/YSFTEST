@@ -1,0 +1,31 @@
+ligne_csv;produit;etat;type;libelle;version_documentee;preuve_v12;limite
+2;COMPTABILITE;Brouillard;OPTION;Code journal;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+3;COMPTABILITE;Brouillard;OPTION;Date de saisie de/à;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+4;COMPTABILITE;Brouillard;OPTION;Date d’écriture de/à;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+5;COMPTABILITE;Brouillard;OPTION;Numéro de pièce de/à;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+6;COMPTABILITE;Brouillard de base;COLONNE;Jour;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+7;COMPTABILITE;Brouillard de base;COLONNE;Numéro de pièce;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+8;COMPTABILITE;Brouillard de base;COLONNE;Numéro de compte général;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+9;COMPTABILITE;Brouillard de base;COLONNE;Numéro de compte tiers;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+10;COMPTABILITE;Brouillard de base;COLONNE;Libellé écriture;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+11;COMPTABILITE;Brouillard de base;COLONNE;Mouvement débit;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+12;COMPTABILITE;Brouillard de base;COLONNE;Mouvement crédit;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+13;COMPTABILITE;Balance de base;COLONNE;Numéro de compte;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+14;COMPTABILITE;Balance de base;COLONNE;Intitulé des comptes;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+15;COMPTABILITE;Balance de base;COLONNE;Mouvements débit;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+16;COMPTABILITE;Balance de base;COLONNE;Mouvements crédit;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+17;COMPTABILITE;Balance de base;COLONNE;Soldes débiteurs;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+18;COMPTABILITE;Balance de base;COLONNE;Soldes créditeurs;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+19;COMPTABILITE;Balance des comptes;OPTION;Type de balance;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+20;COMPTABILITE;Balance âgée;OPTION;Date de situation;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+21;COMPTABILITE;Balance âgée;OPTION;1er délai;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+22;COMPTABILITE;Balance âgée;OPTION;2ème délai;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+23;COMPTABILITE;Balance âgée;OPTION;3ème délai;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+24;COMPTABILITE;Balance âgée;OPTION;Imputation Règlements / Avoirs;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+25;COMPTABILITE;Grand-livre des comptes;OPTION;Type d’état;"8.50 ; juillet 2016";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+26;GESCOM;Liste des factures;OPTION;Documents;"Sage 100 ; version exacte non précisée";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+27;GESCOM;Réapprovisionnement (état/proposition);OPTION;Méthode de réapprovisionnement;"Sage 100 ; version exacte non précisée";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+28;GESCOM;Réapprovisionnement (état/proposition);OPTION;Qtés à réapprovisionner;"Sage 100 ; version exacte non précisée";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+29;GESCOM;Réapprovisionnement (état/proposition);OPTION;Ajustement quantité;"Sage 100 ; version exacte non précisée";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+30;GESCOM;Statistiques clients;VARIANTE;Statistiques clients;"Couverture 2026-09-02 V1.1 ; copyright 2018 ; version logiciel non établie";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12
+31;GESCOM;Statistiques collaborateurs;VARIANTE;Statistiques collaborateurs;"Couverture 2026-09-02 V1.1 ; copyright 2018 ; version logiciel non établie";A-CONFIRMER;Ordre des colonnes imprimées non certifié pour V12

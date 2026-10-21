@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sage 100 — écrans et états"
+  short_description: "Champs, transformations et états avec preuves versionnées"
+  default_prompt: "Utilise $sage100-ecrans-etats-v12 pour vérifier les écrans et transformations Sage 100 avant leur intégration dans un ERP."
