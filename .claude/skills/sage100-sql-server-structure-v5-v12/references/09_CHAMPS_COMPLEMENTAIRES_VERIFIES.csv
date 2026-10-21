@@ -1,0 +1,135 @@
+﻿id,table,champ,description_synthetique,version,page_pdf_index_zero,page_imprimee,type_preuve,validation_installation,url_source
+CX001,F_FAMILLE,FA_Intitule,Intitulé famille,12.20,195,194,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=196
+CX002,F_FAMILLE,FA_UniteVen,Unité vente,12.20,195,194,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=196
+CX003,F_FAMILLE,FA_Coef,Coefficient famille,12.20,195,194,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=196
+CX004,F_FAMILLE,FA_SuiviStock,Mode de suivi stock de la famille,12.20,195,194,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=196
+CX005,F_FAMILLE,FA_Central,Code famille centralisatrice,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX006,F_FAMILLE,FA_CodeFiscal,Code fiscal,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX007,F_FAMILLE,FA_Pays,Pays origine,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX008,F_FAMILLE,FA_UnitePoids,Unité poids,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX009,F_FAMILLE,FA_Escompte,Escompte autorisé,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX010,F_FAMILLE,FA_Delai,Délai livraison,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX011,F_FAMILLE,FA_HorsStat,Exclusion des statistiques,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX012,F_FAMILLE,FA_VteDebit,Vente au débit,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX013,F_FAMILLE,FA_NotImp,Option impression,12.20,196,195,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=197
+CX014,F_ARTICLE,AR_UniteVen,Unité de vente,12.20,210,209,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=211
+CX015,F_ARTICLE,AR_SuiviStock,Mode suivi stock,12.20,210,209,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=211
+CX016,F_ARTICLE,AR_Gamme1,Gamme principale,12.20,210,209,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=211
+CX017,F_ARTICLE,AR_Gamme2,Deuxième gamme,12.20,211,210,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=212
+CX018,F_ARTICLE,AR_Condition,Conditionnement,12.20,211,210,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=212
+CX019,F_ARTICLE,AR_Type,Type d'article,12.20,210,209,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=211
+CX020,F_ARTICLE,AR_PUNet,Prix unitaire net,12.20,210,209,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=211
+CX021,F_ARTICLE,AR_Coef,Coefficient tarifaire,12.20,211,210,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=212
+CX022,F_ARTICLE,AR_FactPoids,Option facturation au poids,12.20,211,210,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=212
+CX023,F_ARTICLE,AR_Contremarque,Option contremarque,12.20,211,210,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=212
+CX024,F_ARTICLE,AR_Publie,Publication article,12.20,211,210,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=212
+CX025,F_ARTICLE,AR_Exclure,Exclure du réapprovisionnement,12.20,209,208,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=210
+CX026,F_ARTGAMME,AR_Ref,Référence article liée,12.20,211,210,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=212
+CX027,F_ARTGAMME,AG_No,Identifiant de gamme,12.20,211,210,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=212
+CX028,F_ARTGAMME,EG_Enumere,Libellé élément gamme,12.20,212,211,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=213
+CX029,F_ARTGAMME,AG_Type,Type gamme 1 ou 2,12.20,212,211,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=213
+CX030,F_ARTSTOCK,AS_QteMini,Quantité minimale,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX031,F_ARTSTOCK,AS_QteMaxi,Quantité maximale,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX032,F_ARTSTOCK,AS_QteSto,Quantité en stock,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX033,F_ARTSTOCK,AS_MontSto,Montant valorisé stock,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX034,F_ARTSTOCK,AS_QteRes,Quantité réservée,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX035,F_ARTSTOCK,AS_QteCom,Quantité commandée,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX036,F_ARTSTOCK,AS_Principal,Dépôt principal,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX037,F_ARTSTOCK,AS_QteResCM,Réservations contremarque,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX038,F_ARTSTOCK,AS_QteComCM,Commandes contremarque,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX039,F_ARTSTOCK,AS_QtePrepa,Quantités préparées,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX040,F_ARTSTOCK,DP_NoPrincipal,Emplacement principal,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX041,F_ARTSTOCK,DP_NoControle,Emplacement contrôle,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX042,F_ARTSTOCK,AS_QteAControler,Quantité en contrôle,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX043,F_ARTSTOCK,AS_Mouvemente,Stock mouvementé,12.20,220,219,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=221
+CX044,F_ARTSTOCKEMPL,AR_Ref,Article par emplacement,12.20,221,220,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=222
+CX045,F_ARTSTOCKEMPL,DE_No,Dépôt lié,12.20,221,220,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=222
+CX046,F_ARTSTOCKEMPL,DP_No,Emplacement,12.20,221,220,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=222
+CX047,F_ARTSTOCKEMPL,AE_QteSto,Quantité stock par emplacement,12.20,221,220,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=222
+CX048,F_ARTSTOCKEMPL,AE_QtePrepa,Quantité préparée emplacement,12.20,221,220,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=222
+CX049,F_ARTSTOCKEMPL,AE_QteAControler,Quantité à contrôler emplacement,12.20,221,220,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=222
+CX050,F_GAMSTOCK,GS_QteSto,Stock gamme,12.20,222,221,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=223
+CX051,F_GAMSTOCK,GS_QteRes,Réservations gamme,12.20,222,221,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=223
+CX052,F_GAMSTOCK,GS_QteCom,Commandes gamme,12.20,222,221,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=223
+CX053,F_GAMSTOCK,GS_QteResCM,Réservation contremarque gamme,12.20,222,221,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=223
+CX054,F_GAMSTOCK,GS_QteComCM,Commande contremarque gamme,12.20,222,221,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=223
+CX055,F_GAMSTOCK,GS_QteMini,Minimum gamme,12.20,222,221,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=223
+CX056,F_GAMSTOCK,GS_QteMaxi,Maximum gamme,12.20,222,221,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=223
+CX057,F_GAMSTOCK,GS_QtePrepa,Préparations gamme,12.20,222,221,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=223
+CX058,F_CONDITION,AR_Ref,Article principal conditionnement,12.20,224,223,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=225
+CX059,F_CONDITION,CO_No,Identifiant conditionnement,12.20,224,223,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=225
+CX060,F_CONDITION,EC_Enumere,Libellé conditionnement,12.20,225,224,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=226
+CX061,F_CONDITION,EC_Quantite,Quantité par conditionnement,12.20,225,224,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=226
+CX062,F_CONDITION,CO_Ref,Référence conditionnement,12.20,225,224,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=226
+CX063,F_CONDITION,CO_CodeBarre,Code-barres conditionnement,12.20,225,224,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=226
+CX064,F_CONDITION,CO_Principal,Conditionnement principal,12.20,225,224,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=226
+CX065,F_CONDITION,CO_EdiCode,Code EDI conditionnement,12.20,225,224,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=226
+CX066,F_TARIFCOND,AR_Ref,Article du tarif conditionné,12.20,226,225,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=227
+CX067,F_TARIFCOND,TC_RefCF,Client ou catégorie tarifaire,12.20,226,225,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=227
+CX068,F_TARIFCOND,CO_No,Conditionnement tarifié,12.20,226,225,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=227
+CX069,F_TARIFCOND,TC_Prix,Prix conditionnement,12.20,226,225,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=227
+CX070,F_TARIFCOND,TC_PrixNouv,Nouveau prix conditionnement,12.20,226,225,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=227
+CX071,F_DEPOT,DE_Intitule,Intitulé dépôt,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX072,F_DEPOT,DE_Adresse,Adresse,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX073,F_DEPOT,DE_Complement,Complément adresse,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX074,F_DEPOT,DE_CodePostal,Code postal,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX075,F_DEPOT,DE_Ville,Ville,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX076,F_DEPOT,DE_Contact,Contact,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX077,F_DEPOT,DE_Principal,Dépôt principal,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX078,F_DEPOT,DE_CatCompta,Catégorie comptable dépôt,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX079,F_DEPOT,DE_Region,Région,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX080,F_DEPOT,DE_Pays,Pays,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX081,F_DEPOT,DE_Email,Adresse email,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX082,F_DEPOT,DE_Code,Code dépôt,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX083,F_DEPOT,DE_Telephone,Téléphone,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX084,F_DEPOT,DE_Telecopie,Télécopie,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX085,F_DEPOT,DP_NoDefaut,Emplacement par défaut,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX086,F_DEPOT,DE_Exclure,Exclusion dépôt,12.20,233,232,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=234
+CX087,F_DEPOT,DE_Souche01,Souche vente,12.20,234,233,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=235
+CX088,F_DEPOT,DE_Souche02,Souche achat,12.20,234,233,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=235
+CX089,F_DEPOT,DE_Souche03,Souche document interne,12.20,234,233,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=235
+CX090,F_DEPOTCONTACT,DE_No,Dépôt contact,12.20,234,233,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=235
+CX091,F_DEPOTCONTACT,DC_Nom,Nom du contact,12.20,234,233,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=235
+CX092,F_DEPOTCONTACT,DC_Prenom,Prénom du contact,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX093,F_DEPOTCONTACT,N_Service,Service,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX094,F_DEPOTCONTACT,DC_Fonction,Fonction,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX095,F_DEPOTCONTACT,DC_Telephone,Téléphone,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX096,F_DEPOTCONTACT,DC_TelPortable,Téléphone portable,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX097,F_DEPOTCONTACT,DC_Telecopie,Télécopie,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX098,F_DEPOTCONTACT,DC_EMail,Email du contact,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX099,F_DEPOTCONTACT,DC_Civilite,Civilité contact,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX100,F_DEPOTCONTACT,N_Contact,Type de contact,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX101,F_DEPOTCONTACT,DC_No,Identifiant contact,12.20,235,234,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=236
+CX102,F_DOCLIGNE,DL_Taxe3,Taux taxe 3,12.20,259,258,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=260
+CX103,F_DOCLIGNE,DL_Valorise,Ligne valorisée,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX104,F_DOCLIGNE,DL_NonLivre,Article non livré,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX105,F_DOCLIGNE,AC_RefClient,Référence article client,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX106,F_DOCLIGNE,DL_FactPoids,Facturation au poids,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX107,F_DOCLIGNE,DL_Escompte,Traitement escompte ligne,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX108,F_DOCLIGNE,DL_PiecePL,Référence préparation livraison,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX109,F_DOCLIGNE,DL_DatePL,Date préparation livraison,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX110,F_DOCLIGNE,DL_QtePL,Quantités livrées / PL selon Sage,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX111,F_DOCLIGNE,DL_NoColis,Numéro colis,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX112,F_DOCLIGNE,DL_NoLink,Identifiant de lien contrôle,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX113,F_DOCLIGNE,DL_QteRessource,Quantité ressources,12.20,260,259,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=261
+CX114,F_DOCLIGNE,DL_CodeTaxe1,Code taxe 1,12.20,261,260,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=262
+CX115,F_DOCLIGNE,DL_CodeTaxe2,Code taxe 2,12.20,261,260,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=262
+CX116,F_DOCLIGNE,DL_CodeTaxe3,Code taxe 3,12.20,261,260,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=262
+CX117,F_DOCLIGNE,DL_PieceDE,Référence devis,12.20,261,260,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=262
+CX118,F_DOCLIGNE,DL_DateDE,Date devis,12.20,261,260,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=262
+CX119,F_DOCLIGNE,DL_QteDE,Quantité devis,12.20,261,260,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=262
+CX120,F_DOCLIGNE,DL_RefExterne,Référence externe ligne,12.20,261,260,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=262
+CX121,F_DOCREGL,DR_Libelle,Libellé échéance,12.20,275,274,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=276
+CX122,F_DOCREGL,DR_Pourcent,Pourcentage paiement,12.20,275,274,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=276
+CX123,F_DOCREGL,DR_MontantDev,Montant devise,12.20,275,274,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=276
+CX124,F_DOCREGL,DR_Equil,Ligne équilibrage,12.20,275,274,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=276
+CX125,F_DOCREGL,DR_Regle,État du règlement,12.20,275,274,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=276
+CX126,F_DOCREGL,N_Reglement,Mode règlement,12.20,275,274,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=276
+CX127,F_DOCREGL,DO_PieceAcompte,Référence facture acompte,12.20,275,274,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=276
+CX128,F_DOCENTETE,DO_Transfere,Document transféré,12.20,244,243,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=245
+CX129,F_DOCENTETE,DO_TypeFrais,Type de frais,12.20,244,243,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=245
+CX130,F_DOCENTETE,DO_ValFrais,Valeur frais,12.20,244,243,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=245
+CX131,F_DOCENTETE,DO_TypeLigneFrais,Assiette frais HT/TTC,12.20,244,243,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=245
+CX132,F_DOCENTETE,DO_TypeFranco,Type franco de port,12.20,244,243,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=245
+CX133,F_DOCENTETE,DO_ValFranco,Valeur seuil franco,12.20,244,243,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=245
+CX134,F_DOCENTETE,DO_Heure,Heure document,12.20,244,243,TABLEAU_CHAMPS_MANUEL,NON_TESTE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=245

@@ -27,7 +27,8 @@ Sélectionner tout, Ajouter, Voir/Modifier et Rechercher.
 - `AJOUT-ERP` : propre à l'ERP OHADA.
 
 La bibliothèque Sage V5–V12 / X3 est aussi installée dans `.claude/skills/` : orchestrateur ERP, Comptabilité,
-Gestion commerciale, Objets Métiers, BI Reporting et X3. Ses outils Windows (`resources/outils/`) ne font que lire
+Gestion commerciale, Objets Métiers, BI Reporting et X3, ainsi que le dictionnaire SQL Sage 100
+(`sage100-sql-server-structure-v5-v12`). Ses outils Windows (`resources/outils/`) ne font que lire
 (interface, métadonnées SQL, registre COM) : ne jamais les lancer avec un compte qui peut écrire dans une base Sage.
 
 La matrice de traçabilité est générée par `python manage.py audit_navigation --sortie docs/AUDIT_SAGE_V12_GESCOM.md`.
@@ -130,6 +131,12 @@ Fichier › À propos de votre société › **Régime de TVA** :
 
 Le régime en vigueur s'applique au moment de la validation des documents. Les clients exonérés et les
 fournisseurs non assujettis se règlent sur leur fiche tiers (case « Assujetti à la TVA »).
+
+### Reprise d'un dossier Sage 100
+`python manage.py reprise_sage --dossier exports --date-bascule AAAA-MM-JJ [--appliquer]` reprend dépôts,
+familles, plan comptable, tiers, articles, stock d'ouverture par dépôt et soldes d'ouverture, à partir des CSV
+produits par des requêtes **SELECT uniquement** (`--sql`). Simulation par défaut, rapport de rapprochement
+(stock, balance), import rejouable. Procédure et correspondance des colonnes : `docs/REPRISE_SAGE100.md`.
 
 ### Comptabilité OHADA (SYSCOHADA révisé)
 - Plan comptable SYSCOHADA (classes 1 à 9) pré-chargé et modifiable.
@@ -236,6 +243,7 @@ python manage.py test                                # toute la suite
 python manage.py test apps.commercial.tests_recette  # cahier de recette SAHEL DISTRIBUTION
 python manage.py test apps.comptabilite.tests_recette  # comptabilité et scénarios inter-modules
 python manage.py test apps.commercial.tests_tva        # régime de TVA de la société
+python manage.py test apps.core.tests_reprise_sage    # reprise d'un dossier Sage 100
 ```
 
 La **recette Comptabilité** suit le skill `sage100-comptabilite-v5-v12-expert` et les scénarios de la

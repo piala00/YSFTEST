@@ -1,0 +1,11 @@
+﻿id,domaine,limite,action,statut
+B01,V12.25,Dernier manuel V12.25 référencé non téléchargé,Obtenir PDF officiel et comparer aux 12.20,BLOQUANT_DIFF_1225
+B02,V5-V11,Schémas de chaque build non comparés,Exports sys.* lecture seule par base démo,A_VERIFIER_INSTALLATIONS
+B03,GESCOM,Fonctions de colonnes libres et personnalisation variables,Recenser colonnes physiques ET paramètres utilisateur,A_VERIFIER_INSTALLATIONS
+B04,GESCOM,Chiffre d affaires ne se déduit pas de DO_Type seul,"Valider provenance, valorisation, acompte, comptabilisation et retours",VALIDATION_METIER
+B05,GESCOM,Stocks multi-dépôts et suivi par gamme/lot,"Tester stock disponible, réel, réservé et transferts",VALIDATION_METIER
+B06,COMPTA,Mapping entre facture et écriture en base liée,Vérifier F_ECDOCDN et contexte .GCM/.MAE sur installation,VALIDATION_BASES
+B07,COMPTA,Lettrage et mouvements à nouveaux,Vérifier colonnes et calculs par exercice,VALIDATION_METIER
+B08,SECURITE,Permissions d un compte SQL dédié,"Test login lecture seule, refus d écriture sur base démo",VALIDATION_TECHNIQUE
+B09,SYNC,Détection fiable changements et suppressions,"Définir curseurs transactionnels, réconciliation et idempotence",ETAPE_12
+B10,CONFORMITE,LAF France et traitements Afrique OHADA,Distinguer exigences éditeur et réglementations locales,VALIDATION_JURIDIQUE

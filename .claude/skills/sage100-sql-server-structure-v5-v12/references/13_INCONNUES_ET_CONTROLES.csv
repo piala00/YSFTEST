@@ -1,0 +1,13 @@
+﻿id,objet,limite,attitude,statut
+INC001,V5-V11,Schémas historiques non comparés,Aucune présence/absence des tables et colonnes V5-V11 ne peut être affirmée,EXPORT_SQL_LOCAL,OUVERT
+INC002,V12.25,Document annoncé non ouvert,Ne pas présenter V12.25 comme vérifié,DOC_A_OBTENIR,OUVERT
+INC003,FK,Relations documentaires != FK,Sys.foreign_keys peut être vide alors que la logique métier existe,AUDIT_SYS,OUVERT
+INC004,INDEX,Index du manuel != index physique,Rechercher sys.indexes et colonnes dans base cible,AUDIT_SYS,OUVERT
+INC005,DRIVER,Possibilité d’écriture du driver != autorisation écriture SQL directe,Ne jamais muter des tables Sage en SQL,INTERDIT,OUVERT
+INC006,STOCK,Stock disponible non dérivé automatiquement,Éviter formule fixe physique - réservé sans règles dépôt/lots,TEST_SAGE,OUVERT
+INC007,FACTURATION,Doublons commandes BL factures,Définir grain documentaire et statut / provenance,RECONCILIATION,OUVERT
+INC008,TIERS,Plusieurs catégories comptables,Vérifier source réelle du compte général article/famille,PROCEDURE,OUVERT
+INC009,PARAM,Informations libres évolutives,Dictionnaire peut inclure des colonnes utilisateurs personnalisées,EXPORT_SQL_LOCAL,OUVERT
+INC010,SECURITE,Permissions métadonnées,Une liste incomplète peut refléter permissions de lecture,TEST_SQL,OUVERT
+INC011,VITESSE,Locking / performance,Aucun SELECT de données volumineuses ni de scan table par défaut,GUARDRAIL,OUVERT
+INC012,ISO,Données entreprise,Aucune donnée commerciale ou chaîne de connexion réelle dans Skills,PRIVACY,OUVERT

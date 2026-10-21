@@ -1,0 +1,4 @@
+﻿id,organisme,document,version_date,statut,url,perimetre
+S06-01,Sage,Sage 100 V12.20 Structure des bases,2026-07,OUVERT_PDF_447_PAGES,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937,"Pages index PDF 4-12, 195-276, 405-419"
+MS-01,Microsoft Learn,Object catalog views,2026,PAGE_LUE,https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/object-catalog-views-transact-sql?view=sql-server-ver16,"Tables sys.indexes, sys.foreign_keys, sys.columns, sys.tables"
+MS-02,Microsoft Learn,Metadata visibility,2026,PAGE_LUE,https://learn.microsoft.com/en-us/sql/relational-databases/security/metadata-visibility-configuration?view=sql-server-ver16,Droits influencent visibilité
