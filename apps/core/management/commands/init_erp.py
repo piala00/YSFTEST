@@ -17,6 +17,8 @@ class Command(BaseCommand):
         parser.add_argument("--demo", action="store_true", help="Crée des tiers, articles et documents de démonstration")
         parser.add_argument("--sahel", action="store_true",
                             help="Crée la société fictive SAHEL DISTRIBUTION des exercices du formateur Sage 100")
+        parser.add_argument("--regime-tva", choices=["assujettie", "non-assujettie"],
+                            help="Régime de TVA de la société (sinon : à paramétrer dans la fiche société)")
         parser.add_argument("--admin", metavar="MOT_DE_PASSE", help="Crée le super-utilisateur « admin » avec ce mot de passe")
 
     def log(self, message):
@@ -26,7 +28,11 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         self.verbosity = options["verbosity"]
-        Societe.get()
+        societe = Societe.get()
+        if options.get("regime_tva"):
+            societe.regime_tva = {"assujettie": Societe.TVA_ASSUJETTIE, "non-assujettie": Societe.TVA_NON_ASSUJETTIE}[options["regime_tva"]]
+            societe.save(update_fields=["regime_tva"])
+            self.log(f"Régime de TVA : {societe.get_regime_tva_display()}.")
         crees = 0
         for numero, intitule in PLAN:
             _, created = Compte.objects.get_or_create(
@@ -87,6 +93,7 @@ class Command(BaseCommand):
             return
         societe = Societe.get()
         societe.raison_sociale, societe.forme_juridique, societe.ville = "SAHEL DISTRIBUTION (fictive)", "SARL", "Cameroun"
+        societe.regime_tva = Societe.TVA_ASSUJETTIE
         societe.save()
         donnees = sahel.creer_societe()
         sahel.saisir_stocks_initiaux(donnees, Exercice.objects.first().date_debut)
@@ -101,6 +108,7 @@ class Command(BaseCommand):
         societe = Societe.get()
         societe.raison_sociale = "GTC SARL (démo)"
         societe.ville = "Bertoua"
+        societe.regime_tva = Societe.TVA_ASSUJETTIE
         societe.save()
 
         clients = [

@@ -7,6 +7,15 @@ from django.db import models, transaction
 class Societe(models.Model):
     """Fiche unique de l'entreprise utilisatrice de l'ERP."""
 
+    TVA_A_PARAMETRER = ""
+    TVA_ASSUJETTIE = "ASSUJETTIE"
+    TVA_NON_ASSUJETTIE = "NON_ASSUJETTIE"
+    REGIMES_TVA = [
+        (TVA_A_PARAMETRER, "À paramétrer"),
+        (TVA_ASSUJETTIE, "Assujettie à la TVA"),
+        (TVA_NON_ASSUJETTIE, "Non assujettie à la TVA"),
+    ]
+
     raison_sociale = models.CharField(max_length=150, default="Ma Société")
     sigle = models.CharField(max_length=30, blank=True)
     forme_juridique = models.CharField(max_length=30, blank=True, help_text="SARL, SA, SAS, ETS...")
@@ -18,6 +27,11 @@ class Societe(models.Model):
     telephone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
     devise = models.CharField(max_length=10, default="XAF")
+    regime_tva = models.CharField(
+        "Régime de TVA", max_length=20, choices=REGIMES_TVA, blank=True, default=TVA_A_PARAMETRER,
+        help_text="Non assujettie : les ventes sont facturées sans TVA et la TVA payée aux fournisseurs entre dans "
+                  "le coût d'achat (pas de TVA déductible). Confirmez votre régime auprès de votre centre des impôts. "
+                  "Le changement s'applique aux documents validés ensuite.")
     taux_tva_defaut = models.DecimalField("Taux TVA par défaut (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
     stock_negatif_autorise = models.BooleanField(
         "Autoriser le stock négatif", default=False,
@@ -30,6 +44,15 @@ class Societe(models.Model):
 
     def __str__(self):
         return self.raison_sociale
+
+    @property
+    def assujettie_tva(self):
+        """Tant que le régime n'est pas paramétré, la société est traitée comme assujettie (comportement historique)."""
+        return self.regime_tva != self.TVA_NON_ASSUJETTIE
+
+    @property
+    def tva_a_parametrer(self):
+        return self.regime_tva == self.TVA_A_PARAMETRER
 
     @classmethod
     def get(cls):

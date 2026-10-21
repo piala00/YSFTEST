@@ -76,6 +76,7 @@ def comptabiliser_document(document):
 
     Facture client      : D 411 (TTC)  / C 70x (HT) / C 4431 (TVA)
     Facture fournisseur : D 60x (HT) / D 4452 (TVA) / C 401 (TTC)
+                          société non assujettie : D 60x (TTC) / C 401 (TTC)
     Les avoirs sont passés en sens inverse.
     """
     if document.ecriture_id:
@@ -95,12 +96,18 @@ def comptabiliser_document(document):
             lignes.append({"compte": compte, "credit": sens * ligne.montant_ht})
             lignes.append({"compte": tva, "credit": sens * ligne.montant_tva})
     else:
+        from apps.core.models import Societe
+
         journal = _journal("AC")
         tva = Compte.par_numero(COMPTE_TVA_DEDUCTIBLE)
+        recuperable = Societe.get().assujettie_tva
         for ligne in document.lignes.select_related("article"):
             compte = ligne.article.get_compte_achat() if ligne.article else Compte.par_numero("605")
-            lignes.append({"compte": compte, "debit": sens * ligne.montant_ht})
-            lignes.append({"compte": tva, "debit": sens * ligne.montant_tva})
+            if recuperable:
+                lignes.append({"compte": compte, "debit": sens * ligne.montant_ht})
+                lignes.append({"compte": tva, "debit": sens * ligne.montant_tva})
+            else:   # TVA non récupérable : elle fait partie de la charge
+                lignes.append({"compte": compte, "debit": sens * (ligne.montant_ht + ligne.montant_tva)})
         lignes.append({"compte": compte_tiers, "tiers": tiers, "credit": sens * document.total_ttc})
 
     ecriture = creer_ecriture(

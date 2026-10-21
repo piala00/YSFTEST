@@ -22,7 +22,7 @@
 <td class="num">{% if l.remise %}{{ l.remise }}%{% endif %}</td><td class="num">{{ l.taux_tva }}%</td><td class="num">{{ l.montant_ht|montant }}</td></tr>{% endfor %}</tbody></table>
 <table class="table table-sm ms-auto" style="width:45%">
 <tr><td>Total HT</td><td class="num">{{ object.total_ht|montant }}</td></tr>
-{% for v in object.ventilation_tva %}<tr><td>TVA {{ v.taux }} %</td><td class="num">{{ v.tva|montant }}</td></tr>{% endfor %}
+{% if object.est_vente and not societe.assujettie_tva %}<tr><td colspan="2" class="small">TVA non applicable : société non assujettie à la TVA</td></tr>{% else %}{% for v in object.ventilation_tva %}<tr><td>TVA {{ v.taux }} %</td><td class="num">{{ v.tva|montant }}</td></tr>{% endfor %}{% endif %}
 <tr class="fw-bold"><td>{% if object.est_stock %}Valeur{% else %}Net à payer TTC{% endif %}</td><td class="num">{{ object.total_ttc|montant }} {{ societe.devise }}</td></tr></table>
 {% if object.notes %}<p class="small">{{ object.notes|linebreaksbr }}</p>{% endif %}
 {% if societe.pied_facture %}<hr><p class="small text-center text-muted">{{ societe.pied_facture|linebreaksbr }}</p>{% endif %}

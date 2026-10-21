@@ -7,9 +7,14 @@ from django.db import models, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from apps.core.models import Sequence
+from apps.core.models import Sequence, Societe
 
 ZERO = Decimal("0")
+
+
+def taux_tva_defaut():
+    """Taux proposé à la création d'un article : celui de la fiche société."""
+    return Societe.get().taux_tva_defaut
 
 
 def arrondi(valeur, decimales=0):
@@ -165,7 +170,8 @@ class Article(models.Model):
     unite = models.CharField(max_length=20, default="U")
     prix_achat = models.DecimalField("Prix d'achat HT", max_digits=18, decimal_places=2, default=ZERO)
     prix_vente = models.DecimalField("Prix de vente HT", max_digits=18, decimal_places=2, default=ZERO)
-    taux_tva = models.DecimalField("TVA (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
+    taux_tva = models.DecimalField("TVA (%)", max_digits=5, decimal_places=2, default=taux_tva_defaut,
+                                   help_text="Taux légal du produit, appliqué aux achats et, si la société est assujettie, aux ventes")
     suivi_stock = models.BooleanField(default=True)
     stock = models.DecimalField("Stock total", max_digits=18, decimal_places=3, default=ZERO)
     cmup = models.DecimalField("CMUP", max_digits=18, decimal_places=4, default=ZERO,
@@ -515,6 +521,8 @@ class Document(models.Model):
         if not self.lignes.exists():
             raise ValidationError("Le document ne contient aucune ligne.")
         self.clean()
+        for ligne in self.lignes.all():
+            ligne.save()            # réapplique le régime de TVA en vigueur à la validation
         self.recalculer(save=False)
         self.avertissement = self.controler_encours()
         if self.est_brouillon_numero:
@@ -551,7 +559,7 @@ class Document(models.Model):
                 mouvements.append((article, self.depot, -ligne.quantite, article.cout_unitaire))
                 mouvements.append((article, self.depot_destination, ligne.quantite, article.cout_unitaire))
             elif self.type_document in self.TYPES_ENTREE:
-                cout = ligne.prix_net if self.type_document in self.TYPES_ENTREE_VALORISEE else article.cout_unitaire
+                cout = ligne.cout_entree if self.type_document in self.TYPES_ENTREE_VALORISEE else article.cout_unitaire
                 mouvements.append((article, self.depot, ligne.quantite, cout))
             else:
                 mouvements.append((article, self.depot, -ligne.quantite, article.cout_unitaire))
@@ -651,6 +659,13 @@ class LigneDocument(models.Model):
         return (self.montant_ht / self.quantite) if self.quantite else self.prix_unitaire
 
     @property
+    def cout_entree(self):
+        """Coût unitaire d'entrée en stock : HT, ou TTC si la société ne récupère pas la TVA."""
+        if self.document.est_stock or Societe.get().assujettie_tva or not self.quantite:
+            return self.prix_net
+        return (self.montant_ht + self.montant_tva) / self.quantite
+
+    @property
     def quantite_transformee(self):
         return self.lignes_generees.filter(
             document__statut__in=(Document.VALIDE, Document.TRANSFORME)).aggregate(s=Sum("quantite"))["s"] or ZERO
@@ -675,8 +690,10 @@ class LigneDocument(models.Model):
                 self.remise = ZERO
                 if not self.prix_unitaire and self.article_id:
                     self.prix_unitaire = arrondi(self.article.cout_unitaire, 2)
-            elif doc.est_vente and doc.tiers_id and not doc.tiers.assujetti_tva:
-                self.taux_tva = ZERO
+            elif doc.est_vente and not Societe.get().assujettie_tva:
+                self.taux_tva = ZERO        # société non assujettie : elle ne facture pas de TVA
+            elif doc.tiers_id and not doc.tiers.assujetti_tva:
+                self.taux_tva = ZERO        # client exonéré ou fournisseur non assujetti
         self.calculer()
         super().save(*args, **kwargs)
 

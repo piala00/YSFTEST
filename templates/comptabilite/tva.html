@@ -3,6 +3,7 @@
 {% block content %}
 <div class="page-title"><h1>Récapitulatif TVA</h1><span class="text-muted">du {{ p.date_debut|date:"d/m/Y" }} au {{ p.date_fin|date:"d/m/Y" }}</span></div>
 {% include "comptabilite/_periode.html" %}
+{% if not societe.assujettie_tva %}<div class="alert alert-info">La société est paramétrée comme <strong>non assujettie à la TVA</strong> : elle ne collecte pas de TVA et ne déduit pas celle de ses achats. Les montants ci-dessous ne concernent que les écritures saisies avant le changement de régime ou à la main.</div>{% endif %}
 <div class="card" style="max-width:600px"><table class="table mb-0">
 <tr><td>TVA collectée (443)</td><td class="num">{{ tva.collectee|montant }}</td></tr>
 <tr><td>TVA déductible (445)</td><td class="num">{{ tva.deductible|montant }}</td></tr>

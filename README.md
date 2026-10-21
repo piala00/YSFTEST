@@ -120,6 +120,17 @@ Autres fonctions :
 - **Règlements :** espèces, chèque, virement, Mobile Money, avec imputation automatique sur les factures.
 - **Impression :** tous les documents s'impriment en A4.
 
+### Régime de TVA de la société
+Fichier › À propos de votre société › **Régime de TVA** :
+- **Assujettie** : TVA facturée aux clients (4431) et TVA des achats déductible (4452) ; stock valorisé HT.
+- **Non assujettie** : ventes facturées sans TVA (« TVA non applicable » sur la facture). La TVA payée aux
+  fournisseurs n'est pas récupérable : elle entre dans le coût d'achat (charge 60x TTC, CMUP TTC).
+- **À paramétrer** (nouvelle société) : traitée comme assujettie, avec un bandeau d'alerte sur toutes les pages
+  tant que le régime n'est pas choisi. À l'installation : `python manage.py init_erp --regime-tva non-assujettie`.
+
+Le régime en vigueur s'applique au moment de la validation des documents. Les clients exonérés et les
+fournisseurs non assujettis se règlent sur leur fiche tiers (case « Assujetti à la TVA »).
+
 ### Comptabilité OHADA (SYSCOHADA révisé)
 - Plan comptable SYSCOHADA (classes 1 à 9) pré-chargé et modifiable.
 - Journaux : Ventes (VT), Achats (AC), Banque (BQ), Caisse (CA), Mobile Money (MM), OD, À-nouveaux (AN).
@@ -224,6 +235,7 @@ Authentification : `POST /api/token/` (`username`, `password`), puis en-tête `A
 python manage.py test                                # toute la suite
 python manage.py test apps.commercial.tests_recette  # cahier de recette SAHEL DISTRIBUTION
 python manage.py test apps.comptabilite.tests_recette  # comptabilité et scénarios inter-modules
+python manage.py test apps.commercial.tests_tva        # régime de TVA de la société
 ```
 
 La **recette Comptabilité** suit le skill `sage100-comptabilite-v5-v12-expert` et les scénarios de la
