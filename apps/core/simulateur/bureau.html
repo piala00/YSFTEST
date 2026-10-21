@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP OHADA — Simulateur bureau</title>
+<style>
+/* Reproduction du client bureau CustomTkinter (thème clair, Windows) */
+:root {
+  --module: #1565c0; --module-fonce: #11519a;
+  --bureau: #2b5d8a; --fenetre: #ebebeb; --fond: #f4f6f9; --blanc: #ffffff;
+  --texte: #1a1a1a; --gris: #6b6b6b; --gris-clair: #a3abb4; --trait: #c9ced4;
+  --entete-tableau: #dcdad5; --selection: #4a6984; --menu-survol: #cce8ff; --menu-bord: #99d1ff;
+  --police: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: radial-gradient(circle at 30% 20%, #3f7bb0, var(--bureau) 60%, #1d4466); font-family: var(--police); font-size: 13px; color: var(--texte); overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+.bureau { position: relative; height: 100%; display: flex; align-items: center; justify-content: center; padding: 14px; }
+.barre-taches { position: fixed; left: 0; right: 0; bottom: 0; height: 34px; background: rgba(20, 28, 40, .92); display: flex; align-items: center; gap: 6px; padding: 0 10px; color: #fff; z-index: 50; }
+.barre-taches .tache { padding: 4px 10px; border-radius: 4px; background: rgba(255,255,255,.12); font-size: 12px; cursor: pointer; border: 0; color: #fff; }
+.barre-taches .tache.active { background: rgba(255,255,255,.28); }
+.barre-taches .info { margin-left: auto; font-size: 11.5px; opacity: .8; }
+.barre-taches a { color: #9fd0ff; }
+
+/* Fenêtre Windows */
+.fenetre { background: var(--fenetre); border: 1px solid #6f8396; box-shadow: 0 18px 50px rgba(0,0,0,.45); display: flex; flex-direction: column; overflow: hidden; }
+.fenetre.principale { width: min(1320px, 100%); height: min(800px, calc(100vh - 62px)); margin-bottom: 30px; }
+.barre-titre { height: 31px; background: var(--blanc); display: flex; align-items: center; gap: 8px; padding-left: 10px; flex: none; user-select: none; }
+.barre-titre .ico { width: 16px; height: 16px; border-radius: 3px; background: var(--module); }
+.barre-titre .titre { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barre-titre .ctrl { width: 46px; height: 31px; border: 0; background: none; font-size: 13px; cursor: default; }
+.barre-titre .ctrl:hover { background: #e5e5e5; }
+.barre-titre .ctrl.fermer:hover { background: #e81123; color: #fff; }
+
+/* Barre de menus native */
+.menubar { background: var(--blanc); display: flex; flex: none; border-bottom: 1px solid #f0f0f0; padding-left: 2px; position: relative; overflow-x: auto; }
+.menubar > button { border: 1px solid transparent; background: none; padding: 2px 8px; margin: 1px 0; cursor: default; white-space: nowrap; }
+.menubar > button:hover, .menubar > button.ouvert { background: var(--menu-survol); border-color: var(--menu-bord); }
+.deroulant { position: fixed; z-index: 200; background: #f2f2f2; border: 1px solid #ccc; box-shadow: 2px 3px 6px rgba(0,0,0,.25); padding: 2px; min-width: 220px; max-height: 80vh; overflow-y: auto; }
+.deroulant .cmd { display: flex; align-items: center; width: 100%; border: 1px solid transparent; background: none; text-align: left; padding: 3px 26px 3px 26px; white-space: nowrap; cursor: default; position: relative; }
+.deroulant .cmd:hover:not(.grise), .deroulant .cmd.ouvert { background: var(--menu-survol); border-color: var(--menu-bord); }
+.deroulant .cmd.grise { color: #8d8d8d; }
+.deroulant .cmd .fleche { position: absolute; right: 8px; font-size: 10px; }
+.deroulant .sep { height: 1px; background: #d7d7d7; margin: 3px 2px 3px 26px; }
+
+/* Contenu CustomTkinter */
+.entete-module { height: 44px; background: var(--module); color: #fff; display: flex; align-items: center; padding: 0 16px; gap: 14px; flex: none; }
+.entete-module .nom { font-size: 17px; font-weight: 700; }
+.entete-module .statut, .entete-module .compte { color: #e0e0e0; }
+.entete-module .compte { margin-left: auto; }
+.corps { flex: 1; display: flex; min-height: 0; background: var(--fond); }
+.navigation { width: 280px; background: var(--blanc); display: flex; flex-direction: column; flex: none; }
+.navigation.masquee { display: none; }
+.option-menu { margin: 10px 10px 6px; display: flex; border-radius: 6px; overflow: hidden; background: var(--module); color: #fff; position: relative; }
+.option-menu select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: #fff; padding: 5px 34px 5px 10px; width: 100%; cursor: pointer; }
+.option-menu select option { color: #000; }
+.option-menu::after { content: "▾"; position: absolute; right: 0; top: 0; bottom: 0; width: 28px; display: grid; place-items: center; background: var(--module-fonce); pointer-events: none; }
+.arbre { flex: 1; overflow: auto; margin: 0 0 8px 6px; border: 1px solid #b9b9b9; background: #fff; }
+.arbre .ligne { display: flex; align-items: center; height: 28px; white-space: nowrap; cursor: default; padding-right: 8px; }
+.arbre .ligne .exp { width: 16px; text-align: center; font-size: 9px; color: #333; }
+.arbre .ligne.groupe { font-weight: 700; }
+.arbre .ligne.grise { color: var(--gris-clair); }
+.arbre .ligne.sel { background: #e3ebf6; color: var(--module); }
+.contenu { flex: 1; min-width: 0; padding: 14px 16px; display: flex; flex-direction: column; }
+.page-tete { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.page-tete h1 { font-size: 20px; margin: 0; font-weight: 700; flex: 1; min-width: 160px; }
+.ctk-btn { background: var(--module); color: #fff; border: 0; border-radius: 6px; padding: 5px 12px; min-width: 110px; cursor: pointer; }
+.ctk-btn:hover { background: var(--module-fonce); }
+.ctk-btn.gris { background: #455a64; } .ctk-btn.gris:hover { background: #37474f; }
+.ctk-btn.vert { background: #2e7d32; } .ctk-btn.vert:hover { background: #1b5e20; }
+.ctk-btn.neutre { background: #8a8a8a; }
+.ctk-entry { border: 2px solid #979da2; border-radius: 6px; background: #f9f9fa; padding: 3px 8px; min-width: 0; }
+.ctk-entry:focus { outline: none; border-color: var(--module); }
+.ctk-combo { border: 2px solid #979da2; border-radius: 6px; background: #f9f9fa; padding: 3px 6px; }
+
+/* Tableau ttk (thème clam) */
+.tableau { flex: 1; min-height: 0; overflow: auto; background: #fff; border: 1px solid #9b9b9b; }
+.tableau table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.tableau th { position: sticky; top: 0; background: var(--entete-tableau); font-weight: 700; border: 1px solid #b6b3ab; padding: 4px 6px; white-space: nowrap; }
+.tableau td { padding: 3px 6px; height: 26px; white-space: nowrap; }
+.tableau td.e { text-align: right; font-variant-numeric: tabular-nums; }
+.tableau tr.total td { font-weight: 700; background: #e8eef6; }
+.tableau tr.alerte td { color: #c62828; }
+.tableau tbody tr.sel td { background: var(--selection); color: #fff; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.kpi { background: #fff; border-radius: 10px; padding: 10px 14px; }
+.kpi .lib { color: gray; font-size: 11px; text-transform: uppercase; }
+.kpi .val { font-size: 20px; font-weight: 700; }
+.deux { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 0; }
+.deux > div { display: flex; flex-direction: column; min-height: 0; }
+.deux .lib { font-weight: 700; margin-bottom: 4px; }
+.page-web { background: #dbdbdb; border-radius: 10px; padding: 24px; text-align: center; margin-top: 20px; }
+.page-web .url { color: gray; margin: 6px 0 12px; word-break: break-all; }
+
+/* Fenêtres secondaires et boîtes de message */
+.voile { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.12); padding: 14px; }
+.fenetre.secondaire { width: min(860px, 100%); max-height: calc(100vh - 60px); }
+.fenetre.secondaire .interieur { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; overflow: auto; min-height: 0; flex: 1; }
+.fenetre.petite { width: min(400px, 100%); }
+.message { display: flex; gap: 14px; padding: 18px 18px 10px; background: #fff; }
+.message .icone { font-size: 30px; line-height: 1; }
+.message-pied { background: #f0f0f0; padding: 10px 14px; display: flex; justify-content: flex-end; gap: 8px; }
+.win-btn { min-width: 88px; padding: 4px 10px; background: #e1e1e1; border: 1px solid #adadad; cursor: default; }
+.win-btn:hover { background: #e5f1fb; border-color: #0078d7; }
+.ligne-saisie { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: #dbdbdb; border-radius: 6px; padding: 8px; }
+.lanceur { width: min(860px, 100%); }
+.lanceur .interieur { padding: 22px 20px 26px; text-align: center; }
+.lanceur h2 { font-size: 26px; margin: 0 0 2px; }
+.cartes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 18px; text-align: center; }
+.carte { background: #dbdbdb; border: 2px solid var(--c); border-radius: 12px; padding: 20px 12px 18px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.carte strong { color: var(--c); font-size: 17px; }
+.carte span { color: gray; min-height: 3em; }
+.carte .ctk-btn { background: var(--c); margin-top: 10px; }
+.connexion .interieur { padding: 20px 30px 24px; display: flex; flex-direction: column; gap: 9px; align-items: stretch; text-align: center; }
+.connexion h2 { margin: 0; font-size: 22px; color: var(--module); }
+@media (max-width: 760px) {
+  .navigation { width: 190px; } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .deux, .cartes { grid-template-columns: 1fr; }
+  body { overflow: auto; } .fenetre.principale { height: auto; min-height: calc(100vh - 62px); }
+}
+</style>
+</head>
+<body>
+<div class="bureau" id="bureau"></div>
+<div class="barre-taches" id="barre-taches"></div>
+<script id="sim-api" type="application/json">/*__API__*/</script>
+<script id="sim-ecrans" type="application/json">/*__ECRANS__*/</script>
+<script id="sim-contexte" type="application/json">/*__CONTEXTE__*/</script>
+<script>
+(function () {
+  "use strict";
+  const API = JSON.parse(document.getElementById("sim-api").textContent);
+  const ECRANS = JSON.parse(document.getElementById("sim-ecrans").textContent);
+  const CTX = JSON.parse(document.getElementById("sim-contexte").textContent);
+  const SERVEUR = "http://127.0.0.1:8000";
+  const MODULES = {
+    commercial: { titre: "Gestion commerciale", couleur: "#1565c0", description: "Tiers, articles, ventes, achats, stock, règlements" },
+    comptabilite: { titre: "Comptabilité OHADA", couleur: "#2e7d32", description: "Plan SYSCOHADA, saisie, grand livre, balance, états financiers" },
+    reporting: { titre: "Reporting", couleur: "#6a1b9a", description: "Tableaux de bord, analyses, balances âgées, synthèses" },
+  };
+  const ACTIONS_BUREAU = new Set(["imprimer", "fermer", "quitter", "actualiser", "copier", "rechercher", "ajouter", "barre_verticale"]);
+  const etat = { connecte: false, module: null, onglet: null, selection: null, pages: {}, page: null, simul: 0 };
+
+  // ------------------------------------------------------------ Utilitaires
+  const $ = id => document.getElementById(id);
+  function el(tag, attrs, ...enfants) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else if (k === "style") e.style.cssText = v;
+      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of enfants.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(c));
+    return e;
+  }
+  const montant = v => { const n = Number(v); return isFinite(n) && v !== null && v !== "" ? Math.round(n).toLocaleString("en-US").replace(/,/g, " ") : ""; };
+  const assombrir = (c, f = 0.8) => "#" + [1, 3, 5].map(i => Math.round(parseInt(c.slice(i, i + 2), 16) * f).toString(16).padStart(2, "0")).join("");
+  function couleur(code) {
+    const c = MODULES[code].couleur;
+    document.documentElement.style.setProperty("--module", c);
+    document.documentElement.style.setProperty("--module-fonce", assombrir(c));
+  }
+  const domaineDe = t => t.startsWith("ACHAT_") ? "achats" : t.startsWith("STOCK_") ? "stocks" : "ventes";
+
+  // ------------------------------------------------------------ Fenêtres
+  function fenetre(titre, classe, ...contenu) {
+    return el("div", { class: "fenetre " + classe, role: "dialog", "aria-label": titre },
+      el("div", { class: "barre-titre" }, el("span", { class: "ico" }), el("span", { class: "titre", text: titre }),
+        el("button", { class: "ctrl", "aria-label": "Réduire", text: "─" }), el("button", { class: "ctrl", "aria-label": "Agrandir", text: "☐" }),
+        el("button", { class: "ctrl fermer", "aria-label": "Fermer", text: "✕",
+          onclick: classe.includes("principale") ? fermerApplication : e => { const v = e.target.closest(".voile"); v ? v.remove() : afficherLanceur(); } })),
+      ...contenu);
+  }
+  function ouvrirFenetre(win) { fermerFenetre(); const voile = el("div", { class: "voile", id: "voile" }, win); document.body.append(voile); return win; }
+  function fermerFenetre() { $("voile")?.remove(); }
+  function messagebox(titre, texte, type = "info") {
+    const icone = { info: "ℹ️", warning: "⚠️", error: "⛔", question: "❓" }[type];
+    return new Promise(resolve => {
+      const win = fenetre(titre, "petite",
+        el("div", { class: "message" }, el("span", { class: "icone", text: icone }), el("div", { style: "white-space:pre-line" }, texte)),
+        el("div", { class: "message-pied" },
+          type === "question" ? el("button", { class: "win-btn", text: "Non", onclick: () => { fermerFenetre(); resolve(false); } }) : null,
+          el("button", { class: "win-btn", text: type === "question" ? "Oui" : "OK", onclick: () => { fermerFenetre(); resolve(true); } })));
+      const precedent = $("voile");
+      if (precedent) precedent.style.display = "none";
+      const voile = el("div", { class: "voile", id: "voile-message" }, win);
+      document.body.append(voile);
+      const fermer = () => { voile.remove(); if (precedent) precedent.style.display = ""; };
+      win.querySelectorAll(".win-btn").forEach(b => b.addEventListener("click", fermer));
+      win.querySelector(".ctrl.fermer").addEventListener("click", () => { if (precedent) precedent.style.display = ""; resolve(false); });
+      win.querySelector(".win-btn:last-child").focus();
+    });
+  }
+  function barreTaches() {
+    const zone = $("barre-taches"); zone.replaceChildren();
+    zone.append(el("button", { class: "tache" + (!etat.module ? " active" : ""), text: "ERP OHADA", onclick: afficherLanceur }));
+    if (etat.module) zone.append(el("button", { class: "tache active", text: MODULES[etat.module].titre }));
+    zone.append(el("span", { class: "info" }, "Simulation hors ligne · données de démonstration · rien n'est enregistré · ",
+      el("a", { href: "erp-simulateur-web.html", target: "_blank", text: "version web" })));
+  }
+
+  // ------------------------------------------------------------ Lanceur et connexion
+  function afficherLanceur() {
+    etat.module = null; document.title = "ERP OHADA — Simulateur bureau";
+    couleur("commercial");
+    const cartes = Object.entries(MODULES).map(([code, m]) => el("div", { class: "carte", style: `--c:${m.couleur}` },
+      el("strong", { text: m.titre }), el("span", { text: m.description }),
+      el("button", { class: "ctk-btn", text: "Ouvrir", onclick: () => lancer(code) })));
+    $("bureau").replaceChildren(fenetre("ERP OHADA", "lanceur",
+      el("div", { class: "interieur" }, el("h2", { text: "ERP OHADA" }), el("div", { style: "color:gray", text: "Choisissez une application" }),
+        el("div", { class: "cartes" }, cartes))));
+    barreTaches();
+  }
+  function lancer(code) {
+    couleur(code);
+    if (etat.connecte) return ouvrirModule(code);
+    const serveur = el("input", { class: "ctk-entry", value: SERVEUR, "aria-label": "Adresse du serveur" });
+    const utilisateur = el("input", { class: "ctk-entry", value: API.utilisateur, "aria-label": "Utilisateur" });
+    const mdp = el("input", { class: "ctk-entry", type: "password", placeholder: "Mot de passe (saisie libre)", "aria-label": "Mot de passe",
+      onkeydown: e => { if (e.key === "Enter") valider(); } });
+    const valider = () => { etat.connecte = true; ouvrirModule(code); };
+    $("bureau").replaceChildren(fenetre(`Connexion — ${MODULES[code].titre}`, "petite connexion",
+      el("div", { class: "interieur" }, el("h2", { text: MODULES[code].titre }), el("div", { style: "color:gray", text: "ERP OHADA" }),
+        serveur, utilisateur, mdp, el("button", { class: "ctk-btn", text: "Se connecter", onclick: valider }))));
+    mdp.focus();
+  }
+  function fermerApplication() { fermerMenus(); fermerFenetre(); afficherLanceur(); }
+
+  // ------------------------------------------------------------ Fenêtre principale d'un logiciel
+  function ouvrirModule(code) {
+    etat.module = code; etat.pages = {}; etat.page = null; etat.selection = null;
+    couleur(code);
+    const m = MODULES[code], nav = API.navigation[code];
+    document.title = `${m.titre} — ERP OHADA (simulation)`;
+    const menubar = el("div", { class: "menubar", role: "menubar" });
+    for (const onglet of nav.onglets) {
+      const b = el("button", { role: "menuitem", text: onglet.titre });
+      b.addEventListener("click", e => { e.stopPropagation(); b.classList.contains("ouvert") ? fermerMenus() : ouvrirMenu(b, onglet.elements); });
+      b.addEventListener("mouseenter", () => { if (menusOuverts.length && !b.classList.contains("ouvert")) ouvrirMenu(b, onglet.elements); });
+      menubar.append(b);
+    }
+    const choix = el("select", { "aria-label": "Barre de navigation", onchange: e => choisirOnglet(e.target.value) },
+      nav.onglets.filter(o => o.code !== "aide").map(o => el("option", { value: o.titre, text: o.titre })));
+    const navigation = el("div", { class: "navigation", id: "navigation" }, el("div", { class: "option-menu" }, choix), el("div", { class: "arbre", id: "arbre", role: "tree" }));
+    const contenu = el("div", { class: "contenu", id: "contenu" });
+    $("bureau").replaceChildren(fenetre(`${m.titre} — ERP OHADA`, "principale", menubar,
+      el("div", { class: "entete-module" }, el("span", { class: "nom", text: m.titre }), el("span", { class: "statut", id: "statut" }),
+        el("span", { class: "compte", text: `${API.utilisateur} · ${SERVEUR}` })),
+      el("div", { class: "corps" }, navigation, contenu)));
+    etat.choix = choix;
+    const defaut = nav.onglets.find(o => o.code === "traitement" || o.code === "etat") || nav.onglets[0];
+    choisirOnglet(defaut.titre);
+    barreTaches();
+  }
+  function disponible(n) {
+    if (n.action) return ACTIONS_BUREAU.has(n.action);
+    return Boolean(n.url || (ECRANS[etat.module] || {})[n.code]);
+  }
+  function choisirOnglet(titre) {
+    const onglet = API.navigation[etat.module].onglets.find(o => o.titre === titre);
+    etat.onglet = onglet.code; etat.choix.value = titre;
+    const arbre = $("arbre"); arbre.replaceChildren();
+    let premier = null;
+    (function inserer(noeuds, niveau) {
+      for (const n of noeuds) {
+        if (n.separateur) continue;
+        const groupe = n.enfants.length > 0;
+        const ligne = el("div", { class: "ligne" + (groupe ? " groupe" : "") + (!groupe && !disponible(n) ? " grise" : ""), role: "treeitem",
+          style: `padding-left:${4 + niveau * 20}px`, "data-code": n.code },
+          el("span", { class: "exp", text: groupe ? "▾" : "" }),
+          (groupe ? "  " : "  • ") + n.titre + (!groupe && n.module ? "  ↗" : ""));
+        ligne.addEventListener("click", () => { selectionnerLigne(ligne); if (!n.module && !n.action) ouvrirElement(n); });
+        ligne.addEventListener("dblclick", () => { if (n.module || n.action) ouvrirElement(n); else if (!ECRANS[etat.module][n.code] && n.url) ouvrirWeb(n.url); });
+        arbre.append(ligne);
+        if (!premier && !groupe && !n.module && !n.action && (n.url || ECRANS[etat.module][n.code])) premier = [ligne, n];
+        inserer(n.enfants, niveau + 1);
+      }
+    })(onglet.elements, 0);
+    if (premier) { selectionnerLigne(premier[0]); ouvrirElement(premier[1]); }
+  }
+  function selectionnerLigne(ligne) { $("arbre").querySelectorAll(".sel").forEach(l => l.classList.remove("sel")); ligne.classList.add("sel"); ligne.scrollIntoView({ block: "nearest" }); }
+  function contient(noeuds, code) { return noeuds.some(n => n.code === code || contient(n.enfants, code)); }
+  function ouvrirDepuisMenu(n) {
+    fermerMenus();
+    if (n.module || n.action) return ouvrirElement(n);
+    const onglet = API.navigation[etat.module].onglets.find(o => contient(o.elements, n.code));
+    if (onglet && onglet.code !== "aide" && onglet.code !== etat.onglet) choisirOnglet(onglet.titre);
+    const ligne = $("arbre").querySelector(`[data-code="${CSS.escape(n.code)}"]`);
+    if (ligne) selectionnerLigne(ligne);
+    ouvrirElement(n);
+  }
+  function ouvrirElement(n) {
+    const page = etat.page;
+    switch (n.action) {
+      case "quitter": etat.connecte = false; return fermerApplication();
+      case "fermer": return fermerApplication();
+      case "actualiser": return page && page.rafraichir();
+      case "barre_verticale": return $("navigation").classList.toggle("masquee");
+      case "copier": {
+        const ligne = page && page.tableau && page.tableau.selection();
+        if (ligne && navigator.clipboard) navigator.clipboard.writeText(page.tableau.colonnes.map(c => ligne[c[0]] ?? "").join("\t")).then(() => statut("Ligne copiée dans le presse-papiers"));
+        return;
+      }
+      case "rechercher": return page && page.recherche && page.recherche.focus();
+      case "ajouter": return page && page.nouvelleFacture && page.domaine !== "stocks" && page.nouvelleFacture();
+      case "imprimer": return page && (page.url ? ouvrirWeb(page.url) : page.tableau && page.tableau.exporter());
+    }
+    if (n.action) return;
+    if (n.module && MODULES[n.module]) return ouvrirModule(n.module);
+    if (n.module) return ouvrirWeb(n.url);
+    if (n.code === "aide.a_propos") return messagebox("À propos", `ERP OHADA — ${MODULES[etat.module].titre}\nServeur : ${SERVEUR}\nUtilisateur : ${API.utilisateur}`);
+    if (n.enfants.length) return;
+    let p = etat.pages[n.code];
+    if (!p) {
+      const def = ECRANS[etat.module][n.code];
+      if (def) p = creerPage(def, n);
+      else if (n.url) p = pageWeb(n.titre, n.url);
+      else return;
+      etat.pages[n.code] = p;
+    }
+    afficherPage(p);
+  }
+  function afficherPage(p) { etat.page = p; $("contenu").replaceChildren(p.racine); p.rafraichir(); }
+  function statut(texte) { const s = $("statut"); if (s) { s.textContent = texte; setTimeout(() => { if (s.textContent === texte) s.textContent = ""; }, 1800); } }
+  function ouvrirWeb(url) { window.open("erp-simulateur-web.html#" + url, "_blank"); }
+
+  // ------------------------------------------------------------ Barre de menus native
+  let menusOuverts = [];
+  function fermerMenus(depuis = 0) {
+    while (menusOuverts.length > depuis) menusOuverts.pop().remove();
+    if (depuis === 0) document.querySelectorAll(".menubar > button.ouvert").forEach(b => b.classList.remove("ouvert"));
+  }
+  function liste(noeuds, niveau) {
+    const ul = el("div", { class: "deroulant", role: "menu" });
+    for (const n of noeuds) {
+      if (n.separateur) { ul.append(el("div", { class: "sep" })); continue; }
+      const sous = n.enfants.length > 0, actif = sous || disponible(n);
+      const b = el("button", { class: "cmd" + (actif ? "" : " grise"), role: "menuitem", "aria-disabled": String(!actif) },
+        n.titre, sous ? el("span", { class: "fleche", text: "▶" }) : null);
+      if (sous) {
+        const ouvrir = () => {
+          fermerMenus(niveau + 1);
+          ul.querySelectorAll(".cmd.ouvert").forEach(x => x.classList.remove("ouvert")); b.classList.add("ouvert");
+          const r = b.getBoundingClientRect(); poser(liste(n.enfants, niveau + 1), r.right - 3, r.top - 3, r.left);
+        };
+        b.addEventListener("mouseenter", ouvrir); b.addEventListener("click", ouvrir);
+      } else {
+        b.addEventListener("mouseenter", () => { fermerMenus(niveau + 1); ul.querySelectorAll(".cmd.ouvert").forEach(x => x.classList.remove("ouvert")); });
+        if (actif) b.addEventListener("click", () => ouvrirDepuisMenu(n));
+      }
+      ul.append(b);
+    }
+    return ul;
+  }
+  function poser(ul, x, y, gauche) {
+    document.body.append(ul); menusOuverts.push(ul);
+    const r = ul.getBoundingClientRect();
+    if (x + r.width > innerWidth - 4) x = gauche !== undefined ? Math.max(4, gauche - r.width + 3) : innerWidth - r.width - 4;
+    if (y + r.height > innerHeight - 4) y = Math.max(4, innerHeight - r.height - 4);
+    ul.style.left = x + "px"; ul.style.top = y + "px";
+  }
+  function ouvrirMenu(bouton, noeuds) {
+    fermerMenus(); bouton.classList.add("ouvert");
+    const r = bouton.getBoundingClientRect(); poser(liste(noeuds, 0), r.left, r.bottom);
+  }
+  document.addEventListener("click", e => { if (!e.target.closest(".deroulant, .menubar")) fermerMenus(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { fermerMenus(); } });
+
+  // ------------------------------------------------------------ Tableau ttk
+  function Tableau(colonnes, { surDoubleClic } = {}) {
+    const t = { colonnes, lignes: [] };
+    const corps = el("tbody");
+    t.racine = el("div", { class: "tableau" }, el("table", {},
+      el("thead", {}, el("tr", {}, colonnes.map(([, titre, largeur, align]) => el("th", { style: `min-width:${largeur}px;text-align:center` }, titre)))), corps));
+    t.remplir = (lignes, tags) => {
+      t.lignes = lignes; corps.replaceChildren();
+      lignes.forEach((l, i) => {
+        const tr = el("tr", { class: tags ? tags(l) : "" }, colonnes.map(([cle, , , align]) => el("td", { class: align === "e" ? "e" : "" }, l[cle] ?? "")));
+        tr.addEventListener("click", () => { corps.querySelectorAll(".sel").forEach(x => x.classList.remove("sel")); tr.classList.add("sel"); t.index = i; });
+        if (surDoubleClic) tr.addEventListener("dblclick", () => surDoubleClic(l));
+        corps.append(tr);
+      });
+      t.index = null;
+    };
+    t.selection = () => (t.index == null ? null : t.lignes[t.index]);
+    t.exporter = () => {
+      const csv = [colonnes.map(c => c[1]).join(";"), ...t.lignes.map(l => colonnes.map(c => String(l[c[0]] ?? "").replace(/;/g, ",")).join(";"))].join("\r\n");
+      const a = el("a", { href: URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" })), download: "export.csv" });
+      document.body.append(a); a.click(); a.remove();
+      messagebox("Export", "Fichier enregistré :\nexport.csv");
+    };
+    return t;
+  }
+
+  // ------------------------------------------------------------ Écrans (desktop/pages.py)
+  function Page(titre, avecListe) {
+    const p = { titre };
+    p.barre = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" });
+    p.racine = el("div", { style: "display:flex;flex-direction:column;flex:1;min-height:0" },
+      el("div", { class: "page-tete" }, el("h1", { text: titre }), p.barre));
+    p.bouton = (texte, action, classe = "") => { const b = el("button", { class: "ctk-btn " + classe, text: texte, onclick: action }); p.barre.append(b); return b; };
+    p.rafraichir = () => {};
+    if (avecListe) {
+      p.recherche = el("input", { class: "ctk-entry", placeholder: "Rechercher…", style: "width:200px", onkeydown: e => { if (e.key === "Enter") p.rafraichir(); } });
+      p.barre.append(p.recherche);
+      p.bouton("Actualiser", () => p.rafraichir());
+      p.bouton("Export CSV", () => p.tableau.exporter(), "gris");
+    }
+    return p;
+  }
+  const filtrer = (lignes, q, cles) => !q ? lignes : lignes.filter(l => cles.some(c => String(l[c] ?? "").toLowerCase().includes(q.toLowerCase())));
+
+  const PAGES = {
+    PageTiers(titre, type) {
+      const p = Page(titre, true);
+      p.tableau = Tableau([["code", "Code", 90, "w"], ["nom", "Nom", 260, "w"], ["ville", "Ville", 140, "w"], ["telephone", "Téléphone", 140, "w"], ["niu", "NIU", 140, "w"], ["delai_paiement", "Délai (j)", 80, "e"]]);
+      p.racine.append(p.tableau.racine);
+      p.rafraichir = () => p.tableau.remplir(filtrer(API.tiers[type], p.recherche.value, ["code", "nom", "ville"]));
+      return p;
+    },
+    PageArticles(titre, opts = {}) {
+      const p = Page(titre, true);
+      p.tableau = Tableau([["reference", "Réf.", 90, "w"], ["designation", "Désignation", 260, "w"], ["unite", "Unité", 70, "w"], ["pa", "P.A. HT", 95, "e"], ["pv", "P.V. HT", 95, "e"],
+        ["stock", "Stock", 85, "e"], ["stock_minimum", "Alerte", 75, "e"], ["cmup_f", "CMUP", 90, "e"], ["valeur_f", "Valeur", 110, "e"]]);
+      p.racine.append(p.tableau.racine);
+      p.rafraichir = () => {
+        let a = API.articles.map(x => ({ ...x, pa: montant(x.prix_achat), pv: montant(x.prix_vente), cmup_f: montant(x.cmup), valeur_f: montant(x.valeur_stock) }));
+        if (opts.alerte_seulement) a = a.filter(x => x.en_alerte);
+        p.tableau.remplir(filtrer(a, p.recherche.value, ["reference", "designation"]), l => l.en_alerte ? "alerte" : "");
+      };
+      return p;
+    },
+    PageDocuments(titre, domaine, type = "", opts = {}) {
+      const p = Page(titre, true);
+      p.domaine = domaine;
+      p.tableau = Tableau([["numero", "N°", 140, "w"], ["type_libelle", "Type", 170, "w"], ["date", "Date", 100, "w"], ["tiers_nom", "Tiers", 210, "w"], ["depot_nom", "Dépôt", 140, "w"],
+        ["ht", "HT", 110, "e"], ["ttc", "TTC", 110, "e"], ["reste", "Reste dû", 110, "e"], ["statut", "Statut", 100, "w"]], { surDoubleClic: d => fenetreDocument(d, p) });
+      p.racine.append(p.tableau.racine);
+      if (domaine !== "stocks") { p.nouvelleFacture = () => saisieFacture(domaine === "ventes" ? "FACTURE" : "ACHAT_FACTURE", p); p.bouton("Nouvelle facture", p.nouvelleFacture); }
+      p.rafraichir = () => {
+        let docs = API.documents.filter(d => domaineDe(d.type_document) === domaine && (!type || d.type_document === type) && (!opts.statut || d.statut === opts.statut));
+        docs = docs.map(d => ({ ...d, numero: d.numero.startsWith("BROU-") ? "(brouillon)" : d.numero, ht: montant(d.total_ht), ttc: montant(d.total_ttc), reste: Number(d.reste_a_payer) ? montant(d.reste_a_payer) : "", _doc: d }));
+        p.tableau.remplir(filtrer(docs, p.recherche.value, ["numero", "tiers_nom", "reference_externe"]));
+      };
+      return p;
+    },
+    PageBalance(titre, cd = "", cf = "") {
+      const p = Page(titre, true);
+      const cles = ["mvt_d", "mvt_c", "solde_d", "solde_c"];
+      p.tableau = Tableau([["numero", "Compte", 90, "w"], ["intitule", "Intitulé", 280, "w"], ["mvt_d", "Mvt débit", 120, "e"], ["mvt_c", "Mvt crédit", 120, "e"], ["solde_d", "Solde débiteur", 120, "e"], ["solde_c", "Solde créditeur", 120, "e"]]);
+      p.racine.append(p.tableau.racine);
+      p.rafraichir = () => {
+        const data = cd ? API.balance_tiers : API.balance;
+        const lignes = filtrer(data.lignes, p.recherche.value, ["numero", "intitule"]).map(l => ({ ...l, ...Object.fromEntries(cles.map(k => [k, Number(l[k]) ? montant(l[k]) : ""])) }));
+        lignes.push({ numero: "", intitule: "TOTAUX", ...Object.fromEntries(cles.map(k => [k, montant(data.totaux[k])])), _total: true });
+        p.tableau.remplir(lignes, l => l._total ? "total" : "");
+      };
+      return p;
+    },
+    PageBilan(titre) {
+      const p = Page(titre, true);
+      p.tableau = Tableau([["ref", "Réf", 50, "w"], ["libelle", "Actif", 300, "w"], ["net", "Net", 130, "e"], ["ref_p", "Réf", 50, "w"], ["libelle_p", "Passif", 300, "w"], ["montant_p", "Net", 130, "e"]]);
+      p.racine.append(p.tableau.racine);
+      p.rafraichir = () => {
+        const b = API.bilan, n = Math.max(b.actif.length, b.passif.length), lignes = [];
+        for (let i = 0; i < n; i++) {
+          const a = b.actif[i] || {}, q = b.passif[i] || {};
+          lignes.push({ ref: a.ref || "", libelle: a.libelle || "", net: a.net && Number(a.net) ? montant(a.net) : "", ref_p: q.ref || "", libelle_p: q.libelle || "",
+            montant_p: q.montant && Number(q.montant) ? montant(q.montant) : "", _total: a.total || q.total });
+        }
+        lignes.push({ ref: "BZ", libelle: "TOTAL GÉNÉRAL", net: montant(b.total_actif.net), ref_p: "DZ", libelle_p: "TOTAL GÉNÉRAL", montant_p: montant(b.total_passif), _total: true });
+        p.tableau.remplir(lignes, l => l._total ? "total" : "");
+      };
+      return p;
+    },
+    PageCompteResultat(titre) {
+      const p = Page(titre, true);
+      p.tableau = Tableau([["ref", "Réf", 50, "w"], ["libelle", "Libellé", 420, "w"], ["montant", "Montant", 150, "e"]]);
+      p.racine.append(p.tableau.racine);
+      p.rafraichir = () => p.tableau.remplir(API.compte_resultat.lignes.map(l => ({ ...l, montant: montant(l.montant) })), l => l.total ? "total" : "");
+      return p;
+    },
+    PageBalanceAgee(titre, type) {
+      const p = Page(titre, true);
+      const cles = ["non_echu", "j30", "j60", "j90", "plus", "total"];
+      p.tableau = Tableau([["nom", "Tiers", 240, "w"], ["non_echu", "Non échu", 110, "e"], ["j30", "1-30 j", 110, "e"], ["j60", "31-60 j", 110, "e"], ["j90", "61-90 j", 110, "e"], ["plus", "> 90 j", 110, "e"], ["total", "Total", 120, "e"]]);
+      p.racine.append(p.tableau.racine);
+      p.rafraichir = () => {
+        const d = API.balance_agee[type];
+        const lignes = d.lignes.map(l => ({ nom: l.tiers.nom, ...Object.fromEntries(cles.map(k => [k, Number(l[k]) ? montant(l[k]) : ""])) }));
+        lignes.push({ nom: "TOTAL", ...Object.fromEntries(cles.map(k => [k, montant(d.totaux[k])])), _total: true });
+        p.tableau.remplir(lignes, l => l._total ? "total" : "");
+      };
+      return p;
+    },
+    PageDashboard(titre) {
+      const p = Page(titre, false);
+      p.bouton("Actualiser", () => p.rafraichir());
+      const indicateurs = [["ca_exercice", "CA HT exercice"], ["marge_commerciale", "Marge commerciale"], ["resultat", "Résultat net"], ["tresorerie", "Trésorerie nette"],
+        ["creances_clients", "Créances clients"], ["dettes_fournisseurs", "Dettes fournisseurs"], ["valeur_stock", "Valeur du stock"], ["ca_mois", "CA du mois"]];
+      const kpis = el("div", { class: "kpis" });
+      const valeurs = {};
+      for (const [cle, lib] of indicateurs) { valeurs[cle] = el("div", { class: "val", text: "—" }); kpis.append(el("div", { class: "kpi" }, el("div", { class: "lib", text: lib }), valeurs[cle])); }
+      const mensuel = Tableau([["mois", "Mois", 120, "w"], ["montant", "CA HT", 140, "e"]]);
+      const alertes = Tableau([["designation", "Article", 220, "w"], ["stock", "Stock", 90, "e"], ["stock_minimum", "Minimum", 90, "e"]]);
+      p.racine.append(kpis, el("div", { class: "deux" }, el("div", {}, el("div", { class: "lib", text: "CA mensuel (HT)" }), mensuel.racine),
+        el("div", {}, el("div", { class: "lib", text: "Alertes de stock" }), alertes.racine)));
+      p.tableau = mensuel;
+      p.rafraichir = () => {
+        const d = API.dashboard;
+        for (const [cle] of indicateurs) { const v = Number(d[cle] || 0); valeurs[cle].textContent = montant(v); valeurs[cle].style.color = v < 0 ? "#c62828" : ""; }
+        mensuel.remplir(d.ca_mensuel.map(m => ({ mois: m.mois, montant: montant(m.montant) })));
+        alertes.remplir(d.alertes_stock, () => "alerte");
+      };
+      return p;
+    },
+  };
+  function creerPage(def, n) {
+    const args = def.args.map(a => (a && a.titre_element ? n.titre : a));
+    const opts = Object.keys(def.kwargs).length ? def.kwargs : undefined;
+    const fabrique = PAGES[def.page];
+    if (!fabrique) return pageWeb(n.titre, n.url || "/");
+    return def.page === "PageArticles" ? fabrique(args[0], def.kwargs) : def.page === "PageDocuments" ? fabrique(args[0], args[1], args[2] || "", def.kwargs) : fabrique(...args);
+  }
+  function pageWeb(titre, url) {
+    const p = Page(titre, false);
+    p.url = url;
+    p.racine.append(el("div", { class: "page-web" }, el("div", { style: "font-size:14px", text: "Cet écran s'affiche dans le navigateur web." }),
+      el("div", { class: "url", text: SERVEUR + url }), el("button", { class: "ctk-btn", text: "Ouvrir dans le navigateur", onclick: () => ouvrirWeb(url) })));
+    return p;
+  }
+
+  // ------------------------------------------------------------ Fenêtre document, règlement, saisie de facture
+  function fenetreDocument(ligne, page) {
+    const d = ligne._doc, numero = d.numero.startsWith("BROU-") ? "(brouillon)" : d.numero;
+    const tableau = Tableau([["designation", "Désignation", 300, "w"], ["quantite", "Qté", 80, "e"], ["pu", "P.U. HT", 110, "e"], ["taux_tva", "TVA %", 70, "e"], ["ht", "Montant HT", 120, "e"]]);
+    tableau.remplir(d.lignes.map(l => ({ ...l, pu: montant(l.prix_unitaire), ht: montant(l.montant_ht) })));
+    const boutons = el("div", { style: "display:flex;gap:8px;align-items:center" });
+    if (d.statut === "BROUILLON") boutons.append(el("button", { class: "ctk-btn vert", text: "Valider", onclick: async () => {
+      if (await messagebox("Validation", "Valider définitivement ce document ?", "question"))
+        messagebox("Simulation", "Dans le logiciel réel, la validation numérote la pièce, mouvemente le stock et passe l'écriture comptable.\nIci, rien n'est enregistré.");
+    } }));
+    if (d.statut === "VALIDE" && Number(d.reste_a_payer) > 0) boutons.append(el("button", { class: "ctk-btn", text: "Saisir un règlement", onclick: () => reglement(d) }));
+    boutons.append(el("button", { class: "ctk-btn neutre", text: "Fermer", style: "margin-left:auto", onclick: fermerFenetre }));
+    ouvrirFenetre(fenetre(`${d.type_libelle} ${numero}`, "secondaire", el("div", { class: "interieur" },
+      el("div", { style: "font-size:18px;font-weight:700", text: `${d.type_libelle} ${numero} — ${d.statut}` }),
+      el("div", { style: "white-space:pre-wrap", text: `Tiers : ${d.tiers_nom || "—"}    Date : ${d.date}    Échéance : ${d.date_echeance || "—"}\nTotal HT : ${montant(d.total_ht)}    TVA : ${montant(d.total_tva)}    TTC : ${montant(d.total_ttc)}    Reste dû : ${montant(d.reste_a_payer)}` }),
+      el("div", { style: "height:300px;display:flex" }, tableau.racine), boutons)));
+  }
+  function reglement(d) {
+    const modes = { "Espèces": "CA", "Chèque": "BQ", "Virement": "BQ", "Mobile Money": "MM" };
+    const mode = el("select", { class: "ctk-combo" }, Object.keys(modes).map(m => el("option", { text: m })));
+    const montantSaisi = el("input", { class: "ctk-entry", value: String(Math.round(Number(d.reste_a_payer))) });
+    messageFenetre(`Règlement`, el("div", { style: "display:flex;flex-direction:column;gap:8px;padding:16px;align-items:center" },
+      el("div", { text: `Facture ${d.numero} — ${d.tiers_nom}` }), mode, montantSaisi, el("input", { class: "ctk-entry", placeholder: "Référence (chèque, transaction…)" }),
+      el("button", { class: "ctk-btn", text: "Enregistrer", onclick: () => messagebox("Règlement",
+        `Simulation : règlement de ${montant(montantSaisi.value)} en ${mode.value} (journal ${modes[mode.value]}).\nDans le logiciel réel, il est comptabilisé et imputé sur la facture.`) })));
+  }
+  function messageFenetre(titre, contenu) {
+    const voile = el("div", { class: "voile", id: "voile-message" });
+    const win = fenetre(titre, "petite", contenu);
+    voile.append(win); document.body.append(voile);
+  }
+  function saisieFacture(type, page) {
+    const vente = type === "FACTURE";
+    const tiers = API.tiers[vente ? "CLIENT" : "FOURNISSEUR"].filter(t => t.actif);
+    const articles = API.articles.filter(a => a.actif);
+    const lignes = [];
+    const choixTiers = el("select", { class: "ctk-combo", style: "width:340px" }, tiers.map(t => el("option", { value: t.id, text: `${t.code} - ${t.nom}` })));
+    const choixArticle = el("select", { class: "ctk-combo", style: "width:320px" }, el("option", { value: "", text: "" }), articles.map(a => el("option", { value: a.id, text: `${a.reference} - ${a.designation}` })));
+    const qte = el("input", { class: "ctk-entry", style: "width:70px", placeholder: "Qté" });
+    const prix = el("input", { class: "ctk-entry", style: "width:100px", placeholder: "P.U. HT" });
+    const tva = el("input", { class: "ctk-entry", style: "width:60px", placeholder: "TVA %" });
+    choixArticle.addEventListener("change", () => {
+      const a = articles.find(x => String(x.id) === choixArticle.value); if (!a) return;
+      qte.value = "1"; prix.value = vente ? a.prix_vente : a.prix_achat; tva.value = a.taux_tva;
+    });
+    const tableau = Tableau([["designation", "Désignation", 320, "w"], ["quantite", "Qté", 70, "e"], ["pu", "P.U. HT", 110, "e"], ["taux_tva", "TVA %", 70, "e"], ["ht", "Montant HT", 120, "e"]]);
+    const total = el("div", { style: "font-weight:700;text-align:right" });
+    const actualiser = () => {
+      let ht = 0, t = 0;
+      tableau.remplir(lignes.map(l => { const m = Math.round(l.quantite * l.prix_unitaire); ht += m; t += Math.round(m * l.taux_tva / 100); return { ...l, pu: montant(l.prix_unitaire), ht: montant(m), _source: l }; }));
+      total.textContent = `Total HT : ${montant(ht)}    TVA : ${montant(t)}    TTC : ${montant(ht + t)}`;
+    };
+    const ajouter = () => {
+      const a = articles.find(x => String(x.id) === choixArticle.value);
+      const q = parseFloat(qte.value.replace(",", ".")), pu = parseFloat(prix.value.replace(",", ".").replace(/\s/g, "")), tx = parseFloat((tva.value || "19.25").replace(",", "."));
+      if (!a) return messagebox("Saisie", "Choisissez un article.", "warning");
+      if ([q, pu, tx].some(isNaN)) return messagebox("Saisie", "Quantité, prix et TVA doivent être numériques.", "warning");
+      lignes.push({ designation: a.designation, quantite: q, prix_unitaire: pu, taux_tva: tx }); actualiser();
+    };
+    const enregistrer = valider => {
+      if (!lignes.length) return messagebox("Saisie", "Choisissez un tiers et ajoutez au moins une ligne.", "warning");
+      etat.simul += 1;
+      messagebox("Facture", `Simulation : facture ${valider ? "validée" : "enregistrée en brouillon"} (${lignes.length} ligne${lignes.length > 1 ? "s" : ""}).\nDans le logiciel réel, elle est numérotée, déstocke et passe l'écriture au journal des ${vente ? "ventes" : "achats"}.`)
+        .then(fermerFenetre);
+    };
+    ouvrirFenetre(fenetre(`Nouvelle facture ${vente ? "client" : "fournisseur"}`, "secondaire", el("div", { class: "interieur" },
+      el("div", { style: "display:flex;gap:8px;align-items:center" }, vente ? "Client :" : "Fournisseur :", choixTiers),
+      el("div", { class: "ligne-saisie" }, choixArticle, qte, prix, tva, el("button", { class: "ctk-btn", style: "min-width:80px", text: "Ajouter", onclick: ajouter })),
+      el("div", { style: "height:260px;display:flex" }, tableau.racine), total,
+      el("div", { style: "display:flex;gap:8px" },
+        el("button", { class: "ctk-btn neutre", text: "Retirer la ligne", onclick: () => { const l = tableau.selection(); if (l) { lignes.splice(lignes.indexOf(l._source), 1); actualiser(); } } }),
+        el("span", { style: "flex:1" }),
+        el("button", { class: "ctk-btn", text: "Enregistrer en brouillon", onclick: () => enregistrer(false) }),
+        el("button", { class: "ctk-btn vert", text: "Enregistrer et valider", onclick: () => enregistrer(true) })))));
+    actualiser();
+  }
+
+  afficherLanceur();
+})();
+</script>
+</body>
+</html>

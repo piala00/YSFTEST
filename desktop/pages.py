@@ -419,8 +419,8 @@ ECRANS_COMMERCIAL = {
     "ventes.tous": lambda app, el: PageDocuments(app, el["titre"], "ventes"),
     "achats.tous": lambda app, el: PageDocuments(app, el["titre"], "achats"),
     "stocks.tous": lambda app, el: PageDocuments(app, el["titre"], "stocks"),
-    "etats.analyse_clients": lambda app, el: PageBalanceAgee(app, el["titre"], "CLIENT"),
-    "etats.analyse_fournisseurs": lambda app, el: PageBalanceAgee(app, el["titre"], "FOURNISSEUR"),
+    "etats.echeances.clients": lambda app, el: PageBalanceAgee(app, "Relevé d'échéances clients", "CLIENT"),
+    "etats.echeances.fournisseurs": lambda app, el: PageBalanceAgee(app, "Relevé d'échéances fournisseurs", "FOURNISSEUR"),
 }
 for _domaine, _types in (("ventes", TYPES_VENTE), ("achats", TYPES_ACHAT), ("stocks", TYPES_STOCK)):
     for _type in _types:

@@ -492,7 +492,7 @@ class ModuleApp(ctk.CTk):
         if code in self.pages:
             self.afficher(self.pages[code])
             return
-        if code in self.ecrans:
+        if code in self.ecrans and not element["enfants"]:
             page = self.ecrans[code](self, element)
             if page is None:          # action (fenêtre de saisie…)
                 return

@@ -29,6 +29,16 @@ Sélectionner tout, Ajouter, Voir/Modifier et Rechercher.
 La matrice de traçabilité est générée par `python manage.py audit_navigation --sortie docs/AUDIT_SAGE_V12_GESCOM.md`.
 Les points à confirmer sur une installation V12 réelle sont listés dans `docs/SAGE_V12_POINTS_A_VERIFIER.md`.
 
+**Simulateurs à télécharger** (`docs/erp-simulateur-web.html` et `docs/erp-simulateur-bureau.html`). Ce sont deux
+fichiers autonomes, sans serveur ni Internet, pour naviguer dans le logiciel comme si l'on y était :
+- **version web :** les vrais écrans de l'ERP (546 pages capturées), avec les menus, la barre d'outils et la
+  barre de navigation ;
+- **version bureau :** le lanceur, la connexion, la barre de menus Windows, l'arborescence, les tableaux, les
+  fiches de document, la saisie de facture et l'export CSV.
+
+Les enregistrements sont simulés : rien n'est modifié. Gardez les deux fichiers dans le même dossier pour passer de
+l'un à l'autre. Pour les régénérer depuis une base de démonstration : `python manage.py simulateur`.
+
 **Explorateur des menus** (`docs/explorateur-menus-autonome.html`, à ouvrir dans un navigateur). Il reproduit
 les barres de menus des trois logiciels. Pour chaque commande, il indique son état dans l'ERP, son niveau de
 preuve et l'écran qu'elle ouvre, et permet de la noter « conforme » ou « à corriger », avec un commentaire.
