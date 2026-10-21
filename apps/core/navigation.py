@@ -79,7 +79,7 @@ def E(code, titre, url="", *args, icone="", enfants=None, dyn=None, action="", p
 
 # Niveaux de preuve (skill « sage-100-gescom-v12-ui ») : origine de chaque entrée de menu
 PREUVES = {
-    "DOC-V12": "Cité dans le découpage officiel Sage 100 Gestion commerciale V12.10",
+    "DOC-V12": "Cité dans le découpage fonctionnel officiel Sage 100 (V11/V12) du logiciel concerné",
     "ERG-CLASSIQUE": "Ergonomie Sage classique, à vérifier sur une installation V12",
     "INDICATIF": "Proposition fonctionnelle, non vérifiée sur une capture V12",
     "AJOUT-ERP": "Ajout propre à l'ERP OHADA (absent de Sage)",
@@ -536,9 +536,12 @@ COMPTABILITE = Module(
             E("structure.devises", "Devises", preuve="INDICATIF"),
             SEP(),
             E("structure.banques", "Banques", "comptabilite:structure", "banques", icone="bi-bank2"),
-            E("structure.modeles_saisie", "Modèles de saisie"),
-            E("structure.modeles_grille", "Modèles de grille"),
-            E("structure.modeles_reglement", "Modèles de règlement"),
+            # « Structure > Modèles > Modèles de saisie » : fiche Sage (version non précisée, skill sage100-menus-droits-v12, S10)
+            E("structure.modeles", "Modèles", icone="bi-files", enfants=[
+                E("structure.modeles_saisie", "Modèles de saisie"),
+                E("structure.modeles_grille", "Modèles de grille"),
+                E("structure.modeles_reglement", "Modèles de règlement"),
+            ]),
         ]),
         Onglet("traitement", "Traitement", "bi-gear-wide-connected", [
             E("traitement.saisie_journaux", "Saisie des journaux", icone="bi-journal-text", enfants=[
@@ -562,6 +565,12 @@ COMPTABILITE = Module(
             SEP(),
             E("traitement.tva", "Déclaration de taxes", "comptabilite:tva", icone="bi-percent"),
             E("traitement.revision", "Révision par cycle"),
+            # Fiche Sage « Gérer les bons à payer » (version 7.50, S07) : à confirmer en V12 ; droits BAP non codés (BAP-01)
+            E("traitement.bon_a_payer", "Gestion du bon à payer", icone="bi-check2-circle", enfants=[
+                E("traitement.bon_a_payer.acheteurs", "Affectation Bon à payer acheteurs"),
+                E("traitement.bon_a_payer.financiers", "Affectation Bon à payer responsables financiers"),
+                E("traitement.bon_a_payer.transmission", "Transmission des autorisations de bon à payer (E-Facture)"),
+            ]),
             E("traitement.abonnements", "Abonnements", preuve="INDICATIF"),
             SEP(),
             E("traitement.fin_exercice", "Fin d'exercice", icone="bi-calendar-check", enfants=[
@@ -571,34 +580,35 @@ COMPTABILITE = Module(
                 E("traitement.fin_exercice.archivage", "Archivage", preuve="INDICATIF"),
             ]),
         ]),
-        # Menu Etat de Sage 100 Comptabilité : états généraux, puis groupes « Etats tiers », « Etats analytiques »…
-        # (aide Sage « Etats > Etats tiers > Balance âgée », manuel pédagogique Sage 100 Comptabilité, leçon États tiers)
+        # Menu Etat de Sage 100 Comptabilité. Jusqu'au groupe « Etats tiers » : découpage fonctionnel officiel
+        # Comptabilité, PDF p. 8 (skill sage100-menus-droits-v12, source S02) ; rangs et séparateurs non relevés.
         Onglet("etat", "Etat", "bi-printer", [
             E("etats.brouillard", "Brouillard", "comptabilite:journal", icone="bi-hourglass", statut="BROUILLARD",
-              preuve="ERG-CLASSIQUE"),
-            E("etats.journaux", "Journaux", icone="bi-journals", preuve="ERG-CLASSIQUE", enfants=[
-                E("etats.journal_general", "Journal général", "comptabilite:journal", preuve="ERG-CLASSIQUE"),
-                E("etats.journal.liste", "Journaux auxiliaires", dyn=_journaux("comptabilite:journal", "etats.journal"),
-                  preuve="ERG-CLASSIQUE"),
+              preuve="DOC-V12"),
+            E("etats.journaux", "Journal", icone="bi-journals", preuve="DOC-V12", enfants=[
+                E("etats.journal.liste", "Journal", dyn=_journaux("comptabilite:journal", "etats.journal"), preuve="DOC-V12"),
+                E("etats.journal_centralise", "Journal centralisé", preuve="DOC-V12"),
+                E("etats.journal_general", "Journal général", "comptabilite:journal", preuve="DOC-V12"),
             ]),
-            E("etats.gl.general", "Grand-livre des comptes", "comptabilite:grand_livre", icone="bi-book", preuve="ERG-CLASSIQUE"),
-            E("etats.balance.generale", "Balance des comptes", "comptabilite:balance", icone="bi-table", preuve="ERG-CLASSIQUE"),
-            SEP(),
-            E("etats.tiers", "Etats tiers", icone="bi-people", preuve="ERG-CLASSIQUE", enfants=[
+            E("etats.gl.general", "Grand-livre des comptes", "comptabilite:grand_livre", icone="bi-book", preuve="DOC-V12"),
+            E("etats.balance.generale", "Balance des comptes", "comptabilite:balance", icone="bi-table", preuve="DOC-V12"),
+            E("etats.echeancier", "Echéancier", "comptabilite:balance_agee", icone="bi-calendar3", type="CLIENT",
+              vue="echeancier", preuve="DOC-V12"),
+            E("etats.balance.agee", "Balance âgée", "comptabilite:balance_agee", icone="bi-hourglass-split", type="CLIENT",
+              preuve="DOC-V12"),
+            E("etats.tiers", "Etats tiers", icone="bi-people", preuve="DOC-V12", enfants=[
                 E("etats.gl.tiers", "Grand-livre des tiers", "comptabilite:grand_livre", compte_debut="4", compte_fin="4",
-                  preuve="ERG-CLASSIQUE"),
+                  preuve="DOC-V12"),
                 E("etats.balance.tiers", "Balance des tiers", "comptabilite:balance", compte_debut="4", compte_fin="4",
-                  preuve="ERG-CLASSIQUE"),
-                E("etats.echeancier", "Echéancier", "comptabilite:balance_agee", type="CLIENT", vue="echeancier",
-                  preuve="ERG-CLASSIQUE"),
-                E("etats.balance.agee", "Balance âgée", "comptabilite:balance_agee", type="CLIENT", preuve="ERG-CLASSIQUE"),
-                SEP(),
+                  preuve="DOC-V12"),
                 E("etats.tiers.justificatif", "Justificatif de solde à date", "comptabilite:justificatif_solde", type="CLIENT",
-                  preuve="DOC-TIERS"),
+                  preuve="DOC-V12"),
+                E("etats.tiers.delais", "Rapport des délais de paiement", preuve="DOC-V12"),
                 E("etats.tiers.statistiques", "Statistiques tiers", "comptabilite:statistiques_tiers", type="CLIENT",
-                  preuve="DOC-TIERS"),
-                E("etats.tiers.rappels", "Historique des rappels", preuve="INDICATIF"),
+                  preuve="DOC-V12"),
+                E("etats.tiers.rappels", "Historique des rappels", preuve="DOC-V12"),
             ]),
+            SEP(),
             E("etats.analytique", "Etats analytiques", icone="bi-diagram-2", preuve="ERG-CLASSIQUE", enfants=[
                 E("etats.analytique.journal", "Journal analytique", preuve="ERG-CLASSIQUE"),
                 E("etats.analytique.grand_livre", "Grand-livre analytique", preuve="ERG-CLASSIQUE"),

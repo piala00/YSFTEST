@@ -1,0 +1,27 @@
+sujet;question;pistes;impact
+R1-FICHIER;Menu Fichier complet et commandes liées aux applications;S02 p. 1–5 et capture V12 non personnalisée;Impossible de certifier l’exhaustivité
+R1-PARAMETRES;Tous les onglets et champs de Paramètres société;S02 p. 1–4 puis ouverture de chaque rubrique V12;"Séparer écrans et sous-menus ; ne pas créer de fausses commandes"
+R1-STRUCTURE;Arbre complet Structure et variantes édition;S02 p. 5–7 et menus V12;Catalogage complet restant
+R1-TRAITEMENT;Arbre complet Traitement et sous-menus effectifs;S02 p. 7–8 et captures V12;Ne pas remplacer Journaux de saisie par Saisie des journaux sans preuve
+R1-ETAT;Suite du menu Etat, groupes et éditions;"S02 p. 8–9 ; catalogue ciblé seulement";Catalogue non exhaustif
+R1-ETATS-TIERS;Place des relevés et variantes de la balance âgée;Comparer menu Etat et traitements de rappel V12;Ne pas placer automatiquement tous les états sous Etats tiers
+R1-REVISION;Réimpressions, états de révision et contrôle par cycle;Installation V12 et options souscrites;Ne pas inventer une commande à partir d’un besoin
+R1-ORDRE;Rang exact de chaque commande dans son parent;Captures de chaque menu V12;Champ ordre laissé vide
+R1-SEPARATEURS;Position de chaque trait séparateur;Captures V12 non personnalisées;Aucun séparateur ajouté au CSV
+R1-RACCOURCIS;Raccourcis clavier par défaut;Configuration standard V12 et écran de personnalisation;Aucun raccourci deviné
+R1-EDITIONS;Matrice exhaustive Essentials Standard Premium et hébergement;"S02 et S03 ; vérifier colonne et ligne pour chaque fonction";"Valeur A-CONFIRMER dans edition ; aucune disponibilité universelle affirmée"
+R1-VERSION;Révision interne exacte des PDF courants;KB S01 et métadonnées des PDF;Nom de lien historique V10 différent de la note V11/V12
+R2-EDITION;Contenu complet et ordre Edition de Gescom V12;"S04 historique ; S11 et S12 ponctuels ; contrôle V12";Commandes historiques non certifiées V12
+R2-AIDE;Menu ? complet V12 et services propres à l’installation;S04 p. 95–97 puis capture V12;Ne pas reprendre les liens historiques comme actuels
+R2-FENETRE;Complétude UI et séparateurs de Fenêtre;S03 p. 14 puis capture V12;"Liste documentaire confirmée ; détails UI ouverts"
+R3-LIBELLES;Libellés complets des quatre niveaux dans chaque produit V12;"S04 historique et S05 ponctuel ; liste déroulante V12";Ne pas normaliser Tout interdire sans preuve
+R3-MATRICE;Consultation création modification suppression impression et export par niveau;Essais V12 sur données jetables pour chaque action;Matrice CRUD non certifiée
+R3-PROFILS;Fiche utilisateur profil superviseur et héritage V12;S04 historique et écrans V12;Ne pas confondre groupes et utilisateurs servant de profils
+R3-ARBRE;Boutons + et −, profondeur, propagation et exceptions;Captures V12 de l’arbre ouvert et essai de droit parent;Pas de propagation présumée
+R3-COMPORTEMENT;Commande interdite masquée ou grisée selon le cas V12;"S04 historique ; S06 commandes externes ; contrôle V12";Le comportement peut dépendre du contexte
+R3-PARTICULIERS;Droits exacts prix d’achat marges remises dépôts souches collaborateurs;Arbre Autorisations Gescom V12 et fiches officielles spécifiques;Aucun libellé inventé
+R3-JOURNAUX;Libellés exacts de protection par journal et type;S06 p. 45 puis arbre Comptabilité V12;"Effet documenté ; emplacement exact non établi"
+BAP-01;Sens de Affectation BAP tout acheteur;"S07 Étape 3 contradictoire ; confirmation éditeur ou essai V12";BLOQUANT pour le code de ce droit
+R4-FENETRES;Modes de Réorganiser et liste des fenêtres actives;Menu Fenêtre V12 et démonstration de deux fenêtres;Cascade et mosaïque non affirmées
+R4-ACCUEIL;Tuiles widgets indicateurs exacts et personnalisation V12;S08 et IntuiSage V12;Accueil historique non extrapolé
+R4-OUTILS;Boutons et ordre initial de chaque barre d’outils V12;Profil neuf non personnalisé;Ordre universel non établi

@@ -10,15 +10,15 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | ✅ Réalisé | 56 |
 | ✅ Commande d'interface | 14 |
 | ↗ Autre logiciel de l'ERP | 6 |
-| ⬜ Grisé (non développé) | 50 |
-| **Total des commandes** | **126** |
+| ⬜ Grisé (non développé) | 55 |
+| **Total des commandes** | **131** |
 
 | Niveau de preuve | Commandes | Signification |
 |---|---|---|
 | AJOUT-ERP | 7 | Ajout propre à l'ERP OHADA (absent de Sage) |
-| DOC-TIERS | 2 | Cité par une source tierce (partenaire, formation), à confirmer sur Sage |
-| ERG-CLASSIQUE | 99 | Ergonomie Sage classique, à vérifier sur une installation V12 |
-| INDICATIF | 18 | Proposition fonctionnelle, non vérifiée sur une capture V12 |
+| DOC-V12 | 13 | Cité dans le découpage fonctionnel officiel Sage 100 (V11/V12) du logiciel concerné |
+| ERG-CLASSIQUE | 94 | Ergonomie Sage classique, à vérifier sur une installation V12 |
+| INDICATIF | 17 | Proposition fonctionnelle, non vérifiée sur une capture V12 |
 
 ## Détail par menu
 
@@ -82,9 +82,10 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Structure | Postes budgétaires | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
 | Structure | Devises | INDICATIF | ⬜ Grisé (non développé) |  |
 | Structure | Banques | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/structure/banques/` |
-| Structure | Modèles de saisie | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
-| Structure | Modèles de grille | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
-| Structure | Modèles de règlement | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
+| Structure | **Modèles** | ERG-CLASSIQUE | ▸ Sous-menu |  |
+| Structure › Modèles | Modèles de saisie | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
+| Structure › Modèles | Modèles de grille | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
+| Structure › Modèles | Modèles de règlement | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
 | **Traitement** | | | | |
 | Traitement | **Saisie des journaux** | ERG-CLASSIQUE | ▸ Sous-menu |  |
 | Traitement › Saisie des journaux | Tous les journaux | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/ecritures/` |
@@ -110,6 +111,10 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Traitement | Rappel / relance clients | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/balance-agee/?type=CLIENT&vue=relance` |
 | Traitement | Déclaration de taxes | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/tva/` |
 | Traitement | Révision par cycle | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
+| Traitement | **Gestion du bon à payer** | ERG-CLASSIQUE | ▸ Sous-menu |  |
+| Traitement › Gestion du bon à payer | Affectation Bon à payer acheteurs | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
+| Traitement › Gestion du bon à payer | Affectation Bon à payer responsables financiers | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
+| Traitement › Gestion du bon à payer | Transmission des autorisations de bon à payer (E-Facture) | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
 | Traitement | Abonnements | INDICATIF | ⬜ Grisé (non développé) |  |
 | Traitement | **Fin d'exercice** | ERG-CLASSIQUE | ▸ Sous-menu |  |
 | Traitement › Fin d'exercice | Nouvel exercice | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/exercices/nouveau/` |
@@ -117,27 +122,29 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Traitement › Fin d'exercice | Clôture des journaux | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/cloture/journaux/` |
 | Traitement › Fin d'exercice | Archivage | INDICATIF | ⬜ Grisé (non développé) |  |
 | **Etat** | | | | |
-| Etat | Brouillard | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?statut=BROUILLARD` |
-| Etat | **Journaux** | ERG-CLASSIQUE | ▸ Sous-menu |  |
-| Etat › Journaux | Journal général | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/` |
-| Etat › Journaux | **Journaux auxiliaires** | ERG-CLASSIQUE | ▸ Sous-menu |  |
-| Etat › Journaux › Journaux auxiliaires | AC - Journal des achats | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=AC` |
-| Etat › Journaux › Journaux auxiliaires | AN - À-nouveaux | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=AN` |
-| Etat › Journaux › Journaux auxiliaires | BQ - Journal de banque | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=BQ` |
-| Etat › Journaux › Journaux auxiliaires | CA - Journal de caisse | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=CA` |
-| Etat › Journaux › Journaux auxiliaires | MM - Journal Mobile Money | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=MM` |
-| Etat › Journaux › Journaux auxiliaires | OD - Opérations diverses | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=OD` |
-| Etat › Journaux › Journaux auxiliaires | VT - Journal des ventes | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=VT` |
-| Etat | Grand-livre des comptes | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/grand-livre/` |
-| Etat | Balance des comptes | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/balance/` |
-| Etat | **Etats tiers** | ERG-CLASSIQUE | ▸ Sous-menu |  |
-| Etat › Etats tiers | Grand-livre des tiers | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/grand-livre/?compte_debut=4&compte_fin=4` |
-| Etat › Etats tiers | Balance des tiers | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/balance/?compte_debut=4&compte_fin=4` |
-| Etat › Etats tiers | Echéancier | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/balance-agee/?type=CLIENT&vue=echeancier` |
-| Etat › Etats tiers | Balance âgée | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/balance-agee/?type=CLIENT` |
-| Etat › Etats tiers | Justificatif de solde à date | DOC-TIERS | ✅ Réalisé | `/comptabilite/tiers/justificatif-solde/?type=CLIENT` |
-| Etat › Etats tiers | Statistiques tiers | DOC-TIERS | ✅ Réalisé | `/comptabilite/tiers/statistiques/?type=CLIENT` |
-| Etat › Etats tiers | Historique des rappels | INDICATIF | ⬜ Grisé (non développé) |  |
+| Etat | Brouillard | DOC-V12 | ✅ Réalisé | `/comptabilite/journal/?statut=BROUILLARD` |
+| Etat | **Journal** | DOC-V12 | ▸ Sous-menu |  |
+| Etat › Journal | **Journal** | DOC-V12 | ▸ Sous-menu |  |
+| Etat › Journal › Journal | AC - Journal des achats | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=AC` |
+| Etat › Journal › Journal | AN - À-nouveaux | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=AN` |
+| Etat › Journal › Journal | BQ - Journal de banque | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=BQ` |
+| Etat › Journal › Journal | CA - Journal de caisse | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=CA` |
+| Etat › Journal › Journal | MM - Journal Mobile Money | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=MM` |
+| Etat › Journal › Journal | OD - Opérations diverses | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=OD` |
+| Etat › Journal › Journal | VT - Journal des ventes | ERG-CLASSIQUE | ✅ Réalisé | `/comptabilite/journal/?journal=VT` |
+| Etat › Journal | Journal centralisé | DOC-V12 | ⬜ Grisé (non développé) |  |
+| Etat › Journal | Journal général | DOC-V12 | ✅ Réalisé | `/comptabilite/journal/` |
+| Etat | Grand-livre des comptes | DOC-V12 | ✅ Réalisé | `/comptabilite/grand-livre/` |
+| Etat | Balance des comptes | DOC-V12 | ✅ Réalisé | `/comptabilite/balance/` |
+| Etat | Echéancier | DOC-V12 | ✅ Réalisé | `/comptabilite/balance-agee/?type=CLIENT&vue=echeancier` |
+| Etat | Balance âgée | DOC-V12 | ✅ Réalisé | `/comptabilite/balance-agee/?type=CLIENT` |
+| Etat | **Etats tiers** | DOC-V12 | ▸ Sous-menu |  |
+| Etat › Etats tiers | Grand-livre des tiers | DOC-V12 | ✅ Réalisé | `/comptabilite/grand-livre/?compte_debut=4&compte_fin=4` |
+| Etat › Etats tiers | Balance des tiers | DOC-V12 | ✅ Réalisé | `/comptabilite/balance/?compte_debut=4&compte_fin=4` |
+| Etat › Etats tiers | Justificatif de solde à date | DOC-V12 | ✅ Réalisé | `/comptabilite/tiers/justificatif-solde/?type=CLIENT` |
+| Etat › Etats tiers | Rapport des délais de paiement | DOC-V12 | ⬜ Grisé (non développé) |  |
+| Etat › Etats tiers | Statistiques tiers | DOC-V12 | ✅ Réalisé | `/comptabilite/tiers/statistiques/?type=CLIENT` |
+| Etat › Etats tiers | Historique des rappels | DOC-V12 | ⬜ Grisé (non développé) |  |
 | Etat | **Etats analytiques** | ERG-CLASSIQUE | ▸ Sous-menu |  |
 | Etat › Etats analytiques | Journal analytique | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |
 | Etat › Etats analytiques | Grand-livre analytique | ERG-CLASSIQUE | ⬜ Grisé (non développé) |  |

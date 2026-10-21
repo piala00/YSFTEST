@@ -16,7 +16,7 @@ Méthode : skill `sage-100-gescom-v12-ui` (référence 10, phase D) — élémen
 | Niveau de preuve | Commandes | Signification |
 |---|---|---|
 | AJOUT-ERP | 10 | Ajout propre à l'ERP OHADA (absent de Sage) |
-| DOC-V12 | 182 | Cité dans le découpage officiel Sage 100 Gestion commerciale V12.10 |
+| DOC-V12 | 182 | Cité dans le découpage fonctionnel officiel Sage 100 (V11/V12) du logiciel concerné |
 | ERG-CLASSIQUE | 20 | Ergonomie Sage classique, à vérifier sur une installation V12 |
 
 ## Détail par menu

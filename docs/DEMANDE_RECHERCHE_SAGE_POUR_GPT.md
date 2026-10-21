@@ -287,3 +287,27 @@ dans l'ordre d'affichage.
 Les autres colonnes sont indiquées dans chaque recherche ci-dessus.
 
 Merci !
+
+
+---
+
+## Suite — retour sur la livraison 1 (lot « menus et droits », reçue le 21/10/2026)
+
+**Merci : la livraison est intégrée.** Le skill `sage100-menus-droits-v12` est installé. Appliqué dans l'ERP :
+menu Etat de la Comptabilité selon S02 p. 8 (Journal ▸ Journal / Journal centralisé / Journal général ; Echéancier
+et Balance âgée au premier niveau ; Etats tiers avec Rapport des délais de paiement), Structure ▸ Modèles,
+Traitement ▸ Gestion du bon à payer (grisé, droits BAP non codés à cause de BAP-01). Les libellés des niveaux de
+droits n'ont **pas** été renommés (attente de la preuve V12, comme vous le recommandez).
+
+**Demande suivante, même format, en priorité :**
+
+1. **R1 exhaustif à partir de S02** (Découpage fonctionnel détaillé Comptabilité, 9 pages) : transcrire **toutes**
+   les lignes de fonctions des pages 1 à 9, menu par menu (Fichier, Édition, Structure, Traitement, Etat, Fenêtre, ?),
+   avec le chemin complet et la colonne d'édition (Essentials, Standard, Premium…) telle qu'elle figure dans la
+   matrice. L'ordre de la matrice suffit pour `ordre` (en le signalant comme « ordre documentaire »).
+2. **Même transcription pour S03** (Gestion commerciale, 14 pages) : nous l'avons déjà en V11 ; signaler seulement
+   les **différences** entre S03 et la liste jointe dans notre fichier `docs/AUDIT_SAGE_V12_GESCOM.md`
+   (colonne « Élément »), notamment Édition, Fenêtre et ?.
+3. **Libellés V12 des niveaux de droits** : toute fiche Sage récente (V9 à V12) citant la liste déroulante des
+   autorisations (« Autoriser », « Tout autoriser », « Interdire la lecture et l'écriture », « Tout interdire »…).
+4. Puis les lots 2 (R5 à R8, fiscalité Cameroun et SYSCOHADA), 3 (R9 à R11, écrans) et 4 (R12, R13).
