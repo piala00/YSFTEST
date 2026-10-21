@@ -98,13 +98,16 @@ def achats_par_fournisseur(debut, fin):
     return sorted(lignes, key=lambda l: -l["ca_ht"])
 
 
-def balance_agee(type_tiers=Tiers.CLIENT, date_ref=None):
-    """Factures non soldées réparties par ancienneté de l'échéance."""
+def balance_agee(type_tiers=Tiers.CLIENT, date_ref=None, tiers=None):
+    """Factures non soldées, émises au plus tard à la date de situation, réparties par ancienneté de l'échéance."""
     date_ref = date_ref or datetime.date.today()
     type_facture = Document.FACTURE if type_tiers == Tiers.CLIENT else Document.ACHAT_FACTURE
     tranches = [("non_echu", "Non échu"), ("j30", "1-30 j"), ("j60", "31-60 j"), ("j90", "61-90 j"), ("plus", "> 90 j")]
     par_tiers = {}
-    for doc in Document.objects.filter(type_document=type_facture, statut=Document.VALIDE).select_related("tiers"):
+    factures = Document.objects.filter(type_document=type_facture, statut=Document.VALIDE, date__lte=date_ref)
+    if tiers:
+        factures = factures.filter(tiers_id=tiers)
+    for doc in factures.select_related("tiers"):
         reste = doc.reste_a_payer
         if reste <= 0:
             continue

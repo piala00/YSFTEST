@@ -44,9 +44,14 @@ def ventes(request):
 
 @login_required
 def balance_agee(request):
+    import datetime
+
+    from django.utils.dateparse import parse_date
+
     type_tiers = request.GET.get("type", Tiers.CLIENT)
-    data = services.balance_agee(type_tiers)
-    return render(request, "reporting/balance_agee.html", {"data": data, "type_tiers": type_tiers})
+    date = parse_date(request.GET.get("date") or "") or datetime.date.today()
+    data = services.balance_agee(type_tiers, date, tiers=request.GET.get("tiers") or None)
+    return render(request, "reporting/balance_agee.html", {"data": data, "type_tiers": type_tiers, "date": date})
 
 
 @login_required
@@ -70,7 +75,8 @@ def statistique(request, code):
     if code not in statistiques.ETATS:
         raise Http404
     form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
-    etat = statistiques.calculer(code, p["date_debut"], p["date_fin"])
+    etat = statistiques.calculer(code, p["date_debut"], p["date_fin"],
+                                 **{k: request.GET.get(k) for k in ("tiers", "depot", "famille", "article")})
     if request.GET.get("export") == "csv":
         cles = [c for c in etat["colonnes"]]
         from apps.core.templatetags.erp import cellule

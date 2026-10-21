@@ -10,7 +10,7 @@
   {% if module %}<style>:root { --module: {{ module.couleur }}; }</style>{% endif %}
   {% block head %}{% endblock %}
 </head>
-<body>
+<body{% if selection %} class="selection-validee"{% endif %}>
 {% if user.is_authenticated %}
   <form id="form-logout" method="post" action="{% url 'logout' %}" class="d-none">{% csrf_token %}</form>
   <header class="topbar d-print-none {% if not module %}topbar-portail{% endif %}">
@@ -87,6 +87,11 @@
     {% endif %}
     {% if fil_ariane %}<nav class="fil-ariane d-print-none"><span>{{ onglet_actif.titre }}</span>{% for n in fil_ariane %} <i class="bi bi-chevron-right"></i> <span>{{ n.titre }}</span>{% endfor %}</nav>{% endif %}
     {% include "core/_messages.html" %}
+    {% if selection %}<div class="barre-selection d-print-none"><i class="bi bi-funnel"></i> <span>{{ selection.texte|default:"Sélection" }}</span>
+      <span class="ms-auto d-flex gap-2"><a class="btn btn-sm btn-outline-secondary" href="{{ selection.modifier }}"><i class="bi bi-sliders"></i> Modifier la sélection</a>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+      {% if selection.export %}<a class="btn btn-sm btn-outline-success" href="{{ selection.export }}"><i class="bi bi-filetype-csv"></i> Exporter</a>{% endif %}</span></div>
+    <div class="d-none d-print-block small mb-2">Sélection : {{ selection.texte }}</div>{% endif %}
     {% block content %}{% endblock %}
     {% if module %}</div></section>{% endif %}
   </main>

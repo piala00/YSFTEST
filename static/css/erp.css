@@ -149,3 +149,9 @@ body.sans-barre-verticale .coche-barre { visibility: hidden; }
   .fenetre { border: 0; box-shadow: none; }
   .fenetre-contenu { padding: 0; }
 }
+
+/* Fenêtre de sélection des états (avant l'état) et bandeau de rappel (après) */
+.selection-dialogue { max-width: 520px; margin: 2rem auto; box-shadow: 0 6px 24px rgba(20, 30, 40, .12); }
+.barre-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; margin-bottom: 12px;
+  background: #f4f6f8; border: 1px solid #dde3ea; border-radius: 6px; font-size: .85rem; }
+body.selection-validee .filtres-etat { display: none !important; }

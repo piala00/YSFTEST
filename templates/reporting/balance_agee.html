@@ -2,7 +2,7 @@
 {% block title %}Balance âgée{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Balance âgée {% if type_tiers == 'CLIENT' %}clients{% else %}fournisseurs{% endif %}</h1>
-  <div class="btn-group btn-group-sm"><a class="btn btn-outline-primary {% if type_tiers == 'CLIENT' %}active{% endif %}" href="?type=CLIENT">Clients</a>
+  <div class="btn-group btn-group-sm filtres-etat"><a class="btn btn-outline-primary {% if type_tiers == 'CLIENT' %}active{% endif %}" href="?type=CLIENT">Clients</a>
   <a class="btn btn-outline-primary {% if type_tiers == 'FOURNISSEUR' %}active{% endif %}" href="?type=FOURNISSEUR">Fournisseurs</a></div></div>
 <div class="card"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>Tiers</th>
 {% for k, lib in data.tranches %}<th class="num">{{ lib }}</th>{% endfor %}<th class="num">Total</th></tr></thead><tbody>

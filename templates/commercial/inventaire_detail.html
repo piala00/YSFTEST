@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-title"><h1>Inventaire {{ inventaire.numero }} <small class="text-muted fs-6">{{ inventaire.depot }} · {{ inventaire.date|date:"d/m/Y" }}{% if inventaire.famille %} · {{ inventaire.famille }}{% endif %}</small></h1>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'commercial:etat_inventaire' %}?vue=preparatoire&depot={{ inventaire.depot.pk }}" target="_blank"><i class="bi bi-printer"></i> État préparatoire</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'commercial:etat_inventaire' %}?vue=preparatoire&depot={{ inventaire.depot.pk }}&ok=1" target="_blank"><i class="bi bi-printer"></i> État préparatoire</a>
   </div></div>
 {% if inventaire.statut == "VALIDE" %}
 <div class="alert alert-success">Inventaire validé.

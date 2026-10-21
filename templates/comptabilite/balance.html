@@ -6,7 +6,7 @@
 <div class="card"><table class="table table-sm table-hover mb-0">
 <thead class="table-light"><tr><th rowspan="2">Compte</th><th rowspan="2">Intitulé</th><th colspan="2" class="text-center">À-nouveaux</th><th colspan="2" class="text-center">Mouvements</th><th colspan="2" class="text-center">Soldes</th></tr>
 <tr><th class="num">Débit</th><th class="num">Crédit</th><th class="num">Débit</th><th class="num">Crédit</th><th class="num">Débiteur</th><th class="num">Créditeur</th></tr></thead><tbody>
-{% for l in lignes %}<tr><td><a href="{% url 'comptabilite:grand_livre' %}?date_debut={{ p.date_debut|date:'Y-m-d' }}&date_fin={{ p.date_fin|date:'Y-m-d' }}&compte_debut={{ l.compte.numero }}&compte_fin={{ l.compte.numero }}">{{ l.compte.numero }}</a></td><td>{{ l.compte.intitule }}</td>
+{% for l in lignes %}<tr><td><a href="{% url 'comptabilite:grand_livre' %}?date_debut={{ p.date_debut|date:'Y-m-d' }}&date_fin={{ p.date_fin|date:'Y-m-d' }}&compte_debut={{ l.compte.numero }}&compte_fin={{ l.compte.numero }}&ok=1">{{ l.compte.numero }}</a></td><td>{{ l.compte.intitule }}</td>
 <td class="num">{{ l.an_d|montant_ou_vide }}</td><td class="num">{{ l.an_c|montant_ou_vide }}</td><td class="num">{{ l.mvt_d|montant_ou_vide }}</td><td class="num">{{ l.mvt_c|montant_ou_vide }}</td>
 <td class="num">{{ l.solde_d|montant_ou_vide }}</td><td class="num">{{ l.solde_c|montant_ou_vide }}</td></tr>
 {% empty %}<tr><td colspan="8" class="text-muted text-center p-4">Aucun mouvement sur la période.</td></tr>{% endfor %}

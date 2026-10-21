@@ -2,9 +2,9 @@
 {% block title %}Statistiques tiers{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Statistiques {% if type_tiers == 'CLIENT' %}clients{% else %}fournisseurs{% endif %}</h1>
-  <div class="btn-group btn-group-sm"><a class="btn btn-outline-primary {% if type_tiers == 'CLIENT' %}active{% endif %}" href="?type=CLIENT">Clients</a>
+  <div class="btn-group btn-group-sm filtres-etat"><a class="btn btn-outline-primary {% if type_tiers == 'CLIENT' %}active{% endif %}" href="?type=CLIENT">Clients</a>
   <a class="btn btn-outline-primary {% if type_tiers == 'FOURNISSEUR' %}active{% endif %}" href="?type=FOURNISSEUR">Fournisseurs</a></div></div>
-<form class="card card-body d-print-none mb-3"><input type="hidden" name="type" value="{{ type_tiers }}"><div class="row g-2 align-items-end">
+<form class="card card-body d-print-none mb-3 filtres-etat"><input type="hidden" name="type" value="{{ type_tiers }}"><div class="row g-2 align-items-end">
   {% for field in form %}<div class="col-md-2"><label class="form-label small mb-0">{{ field.label }}</label>{{ field }}</div>{% endfor %}
   <div class="col-md-auto"><button class="btn btn-primary btn-sm">Afficher</button> <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i></button>
   <button class="btn btn-outline-success btn-sm" name="export" value="csv"><i class="bi bi-filetype-csv"></i> Export</button></div>

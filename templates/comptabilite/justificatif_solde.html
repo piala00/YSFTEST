@@ -2,9 +2,9 @@
 {% block title %}Justificatif de solde à date{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Justificatif de solde {% if type_tiers == 'CLIENT' %}clients{% else %}fournisseurs{% endif %} au {{ date|date:"d/m/Y" }}</h1>
-  <div class="btn-group btn-group-sm"><a class="btn btn-outline-primary {% if type_tiers == 'CLIENT' %}active{% endif %}" href="?type=CLIENT&date={{ date|date:'Y-m-d' }}">Clients</a>
+  <div class="btn-group btn-group-sm filtres-etat"><a class="btn btn-outline-primary {% if type_tiers == 'CLIENT' %}active{% endif %}" href="?type=CLIENT&date={{ date|date:'Y-m-d' }}">Clients</a>
   <a class="btn btn-outline-primary {% if type_tiers == 'FOURNISSEUR' %}active{% endif %}" href="?type=FOURNISSEUR&date={{ date|date:'Y-m-d' }}">Fournisseurs</a></div></div>
-<form class="card card-body d-print-none mb-3"><input type="hidden" name="type" value="{{ type_tiers }}"><div class="row g-2 align-items-end">
+<form class="card card-body d-print-none mb-3 filtres-etat"><input type="hidden" name="type" value="{{ type_tiers }}"><div class="row g-2 align-items-end">
   <div class="col-md-2"><label class="form-label small mb-0">Solde au</label><input type="date" name="date" value="{{ date|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
   <div class="col-md-auto"><button class="btn btn-primary btn-sm">Afficher</button> <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i></button></div>
 </div></form>

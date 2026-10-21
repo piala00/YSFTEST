@@ -4,7 +4,7 @@
 <div class="page-title"><h1>{{ etat.titre }}</h1>
   <span class="text-muted">{% if etat.periode %}du {{ p.date_debut|date:"d/m/Y" }} au {{ p.date_fin|date:"d/m/Y" }}{% else %}au {% now "d/m/Y" %}{% endif %} · {{ etat.lignes|length }} ligne{{ etat.lignes|length|pluralize }}</span></div>
 {% if etat.periode %}{% include "comptabilite/_periode.html" with export=1 %}
-{% else %}<div class="d-print-none mb-3 d-flex gap-2">
+{% else %}<div class="d-print-none mb-3 d-flex gap-2 filtres-etat">
   <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
   <a class="btn btn-outline-success btn-sm" href="?export=csv"><i class="bi bi-filetype-csv"></i> Export</a></div>{% endif %}
 <div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">

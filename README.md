@@ -74,6 +74,10 @@ il suffit de lui associer une page. La même définition alimente :
 - **le client bureau** : il construit une vraie barre de menus Windows à partir de `/api/navigation/?module=<code>`.
 
 ## Espace de travail et autorisations d'accès
+- **Fenêtre de sélection des états** : comme dans Sage, chaque état ouvert depuis les menus affiche d'abord une
+  fenêtre « Sélection » (période, date de situation, comptes, journal, clients / fournisseurs, tiers, dépôt, famille,
+  article selon l'état). « OK » affiche l'état avec un bandeau qui rappelle la sélection : Modifier la sélection,
+  Imprimer, Exporter. Les critères de chaque état sont déclarés dans `apps/core/selection.py`.
 - **Espace de travail** : menus en haut, barre verticale à gauche, et au centre la fenêtre de la commande ouverte
   (barre de titre, bouton de fermeture). Les fenêtres ouvertes restent en onglets au-dessus pour passer de l'une à
   l'autre. **Fenêtre › Barre verticale** (coché / décoché) affiche ou masque la barre de gauche.

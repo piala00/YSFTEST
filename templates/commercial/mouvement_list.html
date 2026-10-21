@@ -2,7 +2,7 @@
 {% block title %}Mouvements de stock{% endblock %}
 {% block content %}
 <div class="page-title"><h1>{{ element_actif.titre|default:"Mouvements de stock" }}</h1>
-  <form class="d-flex gap-2">{% if request.GET.vue %}<input type="hidden" name="vue" value="{{ request.GET.vue }}">{% endif %}
+  <form class="d-flex gap-2 filtres-etat">{% if request.GET.vue %}<input type="hidden" name="vue" value="{{ request.GET.vue }}">{% endif %}
   <select name="depot" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Tous les dépôts</option>
   {% for d in depots %}<option value="{{ d.pk }}" {% if request.GET.depot == d.pk|stringformat:"s" %}selected{% endif %}>{{ d }}</option>{% endfor %}</select>
   <input name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="Article, libellé…"></form></div>

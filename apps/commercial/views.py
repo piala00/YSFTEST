@@ -416,8 +416,17 @@ class MouvementListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         qs = MouvementStock.objects.select_related("article", "document", "depot")
-        if self.request.GET.get("depot"):
-            qs = qs.filter(depot_id=self.request.GET["depot"])
+        g = self.request.GET
+        if g.get("depot"):
+            qs = qs.filter(depot_id=g["depot"])
+        if g.get("date_debut"):
+            qs = qs.filter(date__gte=g["date_debut"])
+        if g.get("date_fin"):
+            qs = qs.filter(date__lte=g["date_fin"])
+        if g.get("famille"):
+            qs = qs.filter(article__famille_id=g["famille"])
+        if g.get("article"):
+            qs = qs.filter(article_id=g["article"])
         q = self.request.GET.get("q")
         if q:
             qs = qs.filter(Q(article__reference__icontains=q) | Q(article__designation__icontains=q) | Q(libelle__icontains=q))

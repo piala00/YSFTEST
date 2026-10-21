@@ -101,7 +101,7 @@ class RegimeTvaTests(TestCase):
         article = Article.objects.create(reference="A5", designation="Article", prix_vente=1000, suivi_stock=False)
         vente = self.document(Document.FACTURE, self.client_, article, 1, 1000).valider()
         self.assertContains(self.client.get(reverse("commercial:document_print", args=[vente.pk])), "TVA non applicable")
-        self.assertContains(self.client.get("/comptabilite/tva/"), "non assujettie")
+        self.assertContains(self.client.get("/comptabilite/tva/?ok=1"), "non assujettie")
 
     def test_configuration_automatique_ou_manuelle(self):
         from apps.comptabilite.models import Taxe

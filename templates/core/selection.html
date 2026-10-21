@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Sélection{% endblock %}
+{% block content %}
+<div class="selection-dialogue card" id="fenetre-selection">
+  <div class="card-header bg-white fw-semibold"><i class="bi bi-funnel" style="color:var(--module)"></i> Sélection{% if element_actif %} — {{ element_actif.titre }}{% endif %}</div>
+  <form method="get" class="card-body">
+    {% for k, v in caches %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input type="hidden" name="ok" value="1">
+    {% for c in champs %}
+      {% if c.critere == "periode" %}
+      <div class="row g-2 mb-2"><div class="col-6"><label class="form-label small mb-0">Du</label><input type="date" name="date_debut" value="{{ valeurs.date_debut }}" class="form-control form-control-sm" required></div>
+        <div class="col-6"><label class="form-label small mb-0">Au</label><input type="date" name="date_fin" value="{{ valeurs.date_fin }}" class="form-control form-control-sm" required></div></div>
+      {% elif c.critere == "date" %}
+      <div class="mb-2"><label class="form-label small mb-0">Date de situation</label><input type="date" name="date" value="{{ valeurs.date }}" class="form-control form-control-sm" required></div>
+      {% elif c.critere == "comptes" %}
+      <div class="row g-2 mb-2"><div class="col-6"><label class="form-label small mb-0">Compte de</label><input name="compte_debut" value="{{ valeurs.compte_debut|default:'' }}" class="form-control form-control-sm" placeholder="Premier"></div>
+        <div class="col-6"><label class="form-label small mb-0">à</label><input name="compte_fin" value="{{ valeurs.compte_fin|default:'' }}" class="form-control form-control-sm" placeholder="Dernier"></div></div>
+      {% elif c.critere == "type_tiers" %}
+      <div class="mb-2"><label class="form-label small mb-0 d-block">Type de tiers</label>
+        <div class="btn-group btn-group-sm" role="group">
+          <input type="radio" class="btn-check" name="type" id="sel-clients" value="CLIENT" {% if valeurs.type != "FOURNISSEUR" %}checked{% endif %}>
+          <label class="btn btn-outline-secondary" for="sel-clients">Clients</label>
+          <input type="radio" class="btn-check" name="type" id="sel-fournisseurs" value="FOURNISSEUR" {% if valeurs.type == "FOURNISSEUR" %}checked{% endif %}>
+          <label class="btn btn-outline-secondary" for="sel-fournisseurs">Fournisseurs</label></div></div>
+      {% else %}
+      <div class="mb-2"><label class="form-label small mb-0">{% if c.critere == "journal" %}Journal{% elif c.critere == "tiers" %}Tiers{% elif c.critere == "depot" %}Dépôt{% elif c.critere == "famille" %}Famille{% else %}Article{% endif %}</label>
+        <select name="{{ c.critere }}" class="form-select form-select-sm">
+          <option value="">{% if c.critere == "journal" %}Tous les journaux{% elif c.critere == "tiers" %}Tous{% elif c.critere == "depot" %}Tous les dépôts{% elif c.critere == "famille" %}Toutes les familles{% else %}Tous les articles{% endif %}</option>
+          {% for valeur, libelle, type_tiers in c.choix %}<option value="{{ valeur }}" {% if type_tiers %}data-type="{{ type_tiers }}"{% endif %} {% if valeurs|valeur:c.critere == valeur %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
+        </select></div>
+      {% endif %}
+    {% empty %}<p class="small text-muted">Aucun critère pour cet état.</p>{% endfor %}
+    <div class="d-flex gap-2 justify-content-end mt-3">
+      <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">Annuler</a>
+      <button class="btn btn-primary btn-sm px-4" autofocus>OK</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+(function () {
+  // Liste des tiers limitée au type choisi (clients / fournisseurs)
+  const form = document.querySelector('#fenetre-selection form'), liste = form.querySelector('select[name=tiers]');
+  if (!liste) return;
+  const filtrer = () => {
+    const type = (form.querySelector('input[name=type]:checked') || {}).value;
+    liste.querySelectorAll('option[data-type]').forEach(o => { o.hidden = type && o.dataset.type !== type; });
+    if (liste.selectedOptions[0] && liste.selectedOptions[0].hidden) liste.value = '';
+  };
+  form.querySelectorAll('input[name=type]').forEach(r => r.addEventListener('change', filtrer));
+  filtrer();
+})();
+</script>{% endblock %}

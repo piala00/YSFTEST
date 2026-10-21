@@ -4,6 +4,7 @@ Chaque état est déclaré dans ETATS : titre, besoin d'une période, colonnes e
 Types de colonnes : texte, date, entier, quantite, montant, pourcent.
 Les colonnes « quantite » et « montant » sont totalisées.
 """
+import contextvars
 import datetime
 from collections import OrderedDict, defaultdict
 from decimal import Decimal
@@ -18,11 +19,35 @@ VENTES_PLUS, VENTES_MOINS = (Document.FACTURE,), (Document.FACTURE_RETOUR, Docum
 ACHATS_PLUS, ACHATS_MOINS = (Document.ACHAT_FACTURE,), (Document.ACHAT_FACTURE_RETOUR, Document.ACHAT_AVOIR)
 
 
+# Critères de la fenêtre de sélection (tiers, dépôt, famille, article) de l'état en cours de calcul
+_criteres = contextvars.ContextVar("criteres_etat", default={})
+
+
+def _filtrer_documents(qs, prefixe=""):
+    c = _criteres.get()
+    if c.get("tiers"):
+        qs = qs.filter(**{f"{prefixe}tiers_id": c["tiers"]})
+    if c.get("depot"):
+        qs = qs.filter(**{f"{prefixe}depot_id": c["depot"]})
+    return qs
+
+
+def _filtrer_articles(qs, sur_lignes=False):
+    """Famille et article choisis : sur des lignes de documents (article__…) ou sur des articles."""
+    c = _criteres.get()
+    if c.get("famille"):
+        qs = qs.filter(**{"article__famille_id" if sur_lignes else "famille_id": c["famille"]})
+    if c.get("article"):
+        qs = qs.filter(**{"article_id" if sur_lignes else "pk": c["article"]})
+    return qs
+
+
 def _lignes(debut, fin, plus, moins):
     """Lignes de factures de la période, avec signe (+1 facture, -1 retour / avoir)."""
     qs = (LigneDocument.objects.filter(document__type_document__in=plus + moins, document__statut__in=VALIDES,
                                        document__date__gte=debut, document__date__lte=fin)
           .select_related("document", "document__tiers", "article", "article__famille"))
+    qs = _filtrer_articles(_filtrer_documents(qs, "document__"), sur_lignes=True)
     for ligne in qs:
         yield ligne, (-1 if ligne.document.type_document in moins else 1)
 
@@ -211,8 +236,8 @@ def ca_fournisseurs(debut, fin, **_):
 # ---------------------------------------------------------------------------
 def _releve_factures(debut, fin, types):
     lignes = []
-    docs = (Document.objects.filter(type_document__in=types, statut__in=VALIDES, date__gte=debut, date__lte=fin)
-            .select_related("tiers").order_by("tiers__nom", "date", "numero"))
+    docs = _filtrer_documents(Document.objects.filter(type_document__in=types, statut__in=VALIDES, date__gte=debut, date__lte=fin)
+                              .select_related("tiers").order_by("tiers__nom", "date", "numero"))
     for d in docs:
         signe = -1 if d.est_avoir else 1
         lignes.append({"tiers": d.tiers.nom, "numero": d.numero, "type": d.get_type_document_display(), "date": d.date,
@@ -232,8 +257,9 @@ def releve_factures_fournisseurs(debut, fin, **_):
 
 
 def _liste_documents(debut, fin, types):
-    docs = (Document.objects.filter(type_document__in=types, date__gte=debut, date__lte=fin)
-            .exclude(statut=Document.ANNULE).select_related("tiers", "depot").order_by("type_document", "date", "numero"))
+    docs = _filtrer_documents(Document.objects.filter(type_document__in=types, date__gte=debut, date__lte=fin)
+                              .exclude(statut=Document.ANNULE).select_related("tiers", "depot")
+                              .order_by("type_document", "date", "numero"))
     lignes = [{"numero": d.numero_affiche, "type": d.get_type_document_display(), "date": d.date,
                "tiers": d.tiers.nom if d.tiers_id else "", "depot": str(d.depot or ""), "ht": d.total_ht, "ttc": d.total_ttc,
                "statut": d.get_statut_display(), "lien": f"/commercial/document/{d.pk}/"} for d in docs]
@@ -253,8 +279,8 @@ def liste_documents_achats(debut, fin, **_):
 def _echeances(type_facture):
     today = datetime.date.today()
     lignes = []
-    for d in (Document.objects.filter(type_document=type_facture, statut=Document.VALIDE)
-              .select_related("tiers").order_by("date_echeance", "numero")):
+    for d in _filtrer_documents(Document.objects.filter(type_document=type_facture, statut=Document.VALIDE)
+                                .select_related("tiers").order_by("date_echeance", "numero")):
         reste = d.reste_a_payer
         if reste <= 0:
             continue
@@ -281,7 +307,8 @@ def _liste_tiers(type_tiers):
                 ("email", "E-mail", "texte"), ("niu", "NIU", "texte"), ("rccm", "RCCM", "texte"), ("delai", "Délai (j)", "entier")]
     lignes = [{"code": t.code, "nom": t.nom, "ville": t.ville, "telephone": t.telephone, "email": t.email, "niu": t.niu,
                "rccm": t.rccm, "delai": t.delai_paiement, "lien": f"/commercial/tiers/{t.pk}/"}
-              for t in Tiers.objects.filter(type_tiers=type_tiers).order_by("code")]
+              for t in Tiers.objects.filter(type_tiers=type_tiers).order_by("code")
+              if not _criteres.get().get("tiers") or str(t.pk) == str(_criteres.get()["tiers"])]
     return colonnes, lignes
 
 
@@ -300,7 +327,7 @@ def liste_articles(debut, fin, **_):
     lignes = [{"reference": a.reference, "designation": a.designation, "famille": a.famille.libelle if a.famille else "",
                "nature": a.get_nature_display(), "unite": a.unite, "prix_achat": a.prix_achat, "prix_vente": a.prix_vente,
                "tva": a.taux_tva, "stock": a.stock if a.suivi_stock else None, "lien": f"/commercial/articles/{a.pk}/"}
-              for a in Article.objects.select_related("famille").order_by("reference")]
+              for a in _filtrer_articles(Article.objects.select_related("famille").order_by("reference"))]
     return colonnes, lignes
 
 
@@ -331,9 +358,14 @@ ETATS = {
 }
 
 
-def calculer(code, debut, fin):
+def calculer(code, debut, fin, **criteres):
+    """Calcule un état ; `criteres` : tiers, depot, famille, article (identifiants) de la fenêtre de sélection."""
     titre, periode, fonction = ETATS[code]
-    colonnes, lignes = fonction(debut, fin)
+    jeton = _criteres.set({k: v for k, v in criteres.items() if v})
+    try:
+        colonnes, lignes = fonction(debut, fin)
+    finally:
+        _criteres.reset(jeton)
     totaux = {cle: sum((l.get(cle) or ZERO for l in lignes), ZERO)
               for cle, _, genre in colonnes if genre in ("montant", "quantite") and cle not in ("prix_moyen", "stock")}
     return {"titre": titre, "periode": periode, "colonnes": colonnes, "lignes": lignes, "totaux": totaux}

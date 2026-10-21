@@ -6,7 +6,10 @@ from .navigation import MODULES, chemin_vers_actif, module_pour_chemin, structur
 def societe(request):
     if not request.user.is_authenticated:
         return {}
-    contexte = {"societe": Societe.get(), "exercice_courant": Exercice.courant(), "modules": MODULES}
+    from .selection import resume
+
+    contexte = {"societe": Societe.get(), "exercice_courant": Exercice.courant(), "modules": MODULES,
+                "selection": resume(request)}
     module = module_pour_chemin(request.path)
     if module is None:
         return contexte

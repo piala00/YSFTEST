@@ -467,7 +467,8 @@ def justificatif_solde_view(request):
 
     type_tiers = request.GET.get("type", Tiers.CLIENT)
     date = parse_date(request.GET.get("date") or "") or datetime.date.today()
-    blocs = services.justificatif_solde(date, type_tiers)
+    tiers = Tiers.objects.filter(pk=request.GET.get("tiers")).first() if request.GET.get("tiers") else None
+    blocs = services.justificatif_solde(date, type_tiers, tiers=tiers)
     return render(request, "comptabilite/justificatif_solde.html", {
         "blocs": blocs, "date": date, "type_tiers": type_tiers, "total": sum((b["solde"] for b in blocs), 0)})
 
@@ -477,6 +478,8 @@ def statistiques_tiers_view(request):
     form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
     type_tiers = request.GET.get("type", Tiers.CLIENT)
     lignes = services.statistiques_tiers(p["date_debut"], p["date_fin"], type_tiers)
+    if request.GET.get("tiers"):
+        lignes = [l for l in lignes if str(l["tiers"].pk) == request.GET["tiers"]]
     totaux = {k: sum((l[k] for l in lignes), 0) for k in ("report", "facture", "regle", "solde")}
     if request.GET.get("export") == "csv":
         return _export_csv("statistiques_tiers", ["Code", "Tiers", "Report", "Facturé", "Réglé", "Solde", "Nb factures",
