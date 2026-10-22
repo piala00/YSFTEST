@@ -53,6 +53,8 @@ class RepriseSageTests(TestCase):
         self.assertEqual(Tiers.objects.get(code="FCIMENCAM").type_tiers, Tiers.FOURNISSEUR)
         self.assertFalse(Tiers.objects.filter(code="SALARIE1").exists())            # CT_Type 2 ignoré
         self.assertFalse(Tiers.objects.get(code="CANCIEN").actif)                   # en sommeil
+        self.assertEqual(Tiers.objects.get(code="CANCIEN").payeur.code, "CDUPONT")    # CT_NumPayeur
+        self.assertIsNone(Tiers.objects.get(code="CDUPONT").payeur)                   # payeur = lui-même
         ciment = Article.objects.get(reference="CIM50")
         self.assertEqual((ciment.prix_achat, ciment.prix_vente), (Decimal("800"), Decimal("1000")))
         self.assertTrue(ciment.suivi_stock)

@@ -97,3 +97,26 @@ Pour les fiches et listes de V12, relever :
 - la page d'accueil.
 
 Pour chacun, donner le texte exact et les boutons.
+
+---
+
+## Retour sur la livraison du 22/10/2026 (`sage-reponses-claude-tous-les-lots`)
+
+**Intégré :**
+- Menu Fichier de la Comptabilité aligné sur la matrice S02 :
+  - Paramètres société › Identification, Monnaie & Formats, Préférences, Exercices… ;
+  - Lire les informations, Configuration système et partage ;
+  - Outils › Sauvegarder / Restaurer ma société, Journal des événements légaux…
+- Bilan : code **DY** pour l'écart de conversion passif (modèle DGI 2021).
+- Reprise Sage : **CT_NumPayeur** → tiers payeur de l'ERP.
+- Balance âgée : les délais 30 / 45 / 60 sont signalés comme historiques (8.50), pas comme défauts V12.
+- Aucun calcul automatique d'AIR ou de précompte, aucune mention de non-assujetti imposée, aucune date de facture
+  électronique : ces points restent non établis, comme vous l'indiquez.
+
+**Pour la prochaine fois :**
+1. **Gestion commerciale** : comparer S03 avec le fichier `docs/AUDIT_SAGE_V12_GESCOM.md`, joint cette fois à la
+   demande.
+2. **AIR et précompte** : une circulaire ou un avis de la DGI qui tranche l'assiette (HT ou TTC) et le moment
+   (facture ou règlement) pour les achats locaux.
+3. **Plan SYSCOHADA final** : le JO OHADA du 15/02/2017 complet, si une diffusion officielle est retrouvée.
+4. **Arrêté du MINFI** sur le suivi électronique de la facturation (L 8 bis) : périmètre et calendrier.

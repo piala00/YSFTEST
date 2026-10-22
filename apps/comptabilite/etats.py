@@ -154,7 +154,8 @@ POSTES_PASSIF = [
     ("DQ", "Banques, crédits d'escompte", ["565"]),
     ("DR", "Banques, établissements financiers et crédits de trésorerie", ["52", "53", "56"]),
     ("DT", "TOTAL TRÉSORERIE-PASSIF", None),
-    ("DV", "Écart de conversion-Passif", ["479"]),
+    # Code DY : modèle de bilan de la DGI du Cameroun (classeur 2021, BILAN PAYSAGE H39), skill ohada-cameroun-complements-2026
+    ("DY", "Écart de conversion-Passif", ["479"]),
 ]
 TOTAUX_PASSIF = {
     "CP": ["CA", "CB", "CD", "CE", "CF", "CG", "CH", "CJ", "CL", "CM"],
@@ -254,7 +255,7 @@ def bilan(date_fin, exercice=None):
 
     lignes_passif = [{"ref": ref, "libelle": libelle, "montant": passif[ref], "total": prefixes is None}
                      for ref, libelle, prefixes in POSTES_PASSIF]
-    total_passif = passif["DF"] + passif["DP"] + passif["DT"] + passif["DV"]
+    total_passif = passif["DF"] + passif["DP"] + passif["DT"] + passif["DY"]
 
     return {
         "actif": lignes_actif,

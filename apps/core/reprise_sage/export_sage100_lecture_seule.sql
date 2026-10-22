@@ -29,7 +29,7 @@ FROM dbo.F_COMPTEG
 ORDER BY CG_Num;
 
 -- tiers.csv (CT_Type : 0 = client, 1 = fournisseur, 2 = salarié, 3 = autre ; seuls 0 et 1 sont repris)
-SELECT CT_Num, CT_Intitule, CT_Type, CG_NumPrinc, CT_Ville, CT_Telephone, CT_EMail, CT_Sommeil
+SELECT CT_Num, CT_Intitule, CT_Type, CG_NumPrinc, CT_Ville, CT_Telephone, CT_EMail, CT_Sommeil, CT_NumPayeur
 FROM dbo.F_COMPTET
 ORDER BY CT_Num;
 

@@ -89,6 +89,7 @@ tiers.csv ← F_COMPTET
   CT_Telephone    facultatif  DOCUMENTÉ V12.20  M01 V12.20   Téléphone
   CT_EMail        facultatif  DOCUMENTÉ V12.20  M01 V12.20   E-mail
   CT_Sommeil      facultatif  DOCUMENTÉ V12.20  M01 V12.20   1 = en sommeil (repris inactif)
+  CT_NumPayeur    facultatif  DOCUMENTÉ V12.20  M01 V12.20   Tiers payeur (égal à CT_Num quand le tiers règle lui-même)
 
 articles.csv ← F_ARTICLE
   AR_Ref          obligatoire DOCUMENTÉ V12.20  C058         Référence

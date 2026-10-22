@@ -88,7 +88,7 @@ def _valeurs_par_defaut():
         "date_debut": (exercice.date_debut if exercice else aujourdhui.replace(month=1, day=1)).isoformat(),
         "date_fin": (exercice.date_fin if exercice else aujourdhui).isoformat(),
         "date": aujourdhui.isoformat(),
-        # Balance âgée : valeurs par défaut de Sage (date d'écriture, délais 30 / 45 / 60 jours)
+        # Balance âgée : date d'écriture, délais 30 / 45 / 60 jours (manuel Sage historique 8.50, non confirmé en V12)
         "d_apres": "ECRITURE", "delai1": "30", "delai2": "45", "delai3": "60",
     }
 

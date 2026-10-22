@@ -1,5 +1,5 @@
-CT_Num;CT_Intitule;CT_Type;CG_NumPrinc;CT_Ville;CT_Telephone;CT_EMail;CT_Sommeil
-CDUPONT;Quincaillerie Dupont;0;4111;Bertoua;699000000;contact@dupont.example;0
-FCIMENCAM;Cimenterie fictive;1;4011;Douala;;;0
-SALARIE1;Employé fictif;2;;;;;0
-CANCIEN;Ancien client;0;4111;;;;1
+CT_Num;CT_Intitule;CT_Type;CG_NumPrinc;CT_Ville;CT_Telephone;CT_EMail;CT_Sommeil;CT_NumPayeur
+CDUPONT;Quincaillerie Dupont;0;4111;Bertoua;699000000;contact@dupont.example;0;CDUPONT
+FCIMENCAM;Cimenterie fictive;1;4011;Douala;;;0;FCIMENCAM
+SALARIE1;Employé fictif;2;;;;;0;SALARIE1
+CANCIEN;Ancien client;0;4111;;;;1;CDUPONT

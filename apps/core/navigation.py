@@ -102,40 +102,62 @@ def SEP():
 # Menus communs
 # ---------------------------------------------------------------------------
 def menu_fichier_comptabilite():
-    """Fichier de Sage 100 Comptabilité : même trame que les autres logiciels Sage 100 (skill Comptabilité :
-    dossier, paramètres société, droits, import/export, formats, mise en page, maintenance, outils)."""
-    I = "INDICATIF"
+    """Fichier de Sage 100 Comptabilité, selon le découpage fonctionnel officiel S02 (matrice des 8 offres, sans
+    numéro de build ; skill « sage100-matrices-menus-complement ») : Paramètres société et ses rubriques, puis
+    lecture des informations, autorisations, import / export, impression et outils."""
+    D, I = "DOC-V12", "INDICATIF"
+    P = "fichier.parametres"
     return Onglet("fichier", "Fichier", "bi-folder2", [
-        E("fichier.nouveau", "Nouveau", icone="bi-file-earmark-plus"),
-        E("fichier.ouvrir", "Ouvrir", icone="bi-folder2-open"),
-        E("fichier.fermer", "Fermer", icone="bi-x-square", action="fermer"),
+        E("fichier.nouveau", "Nouveau", icone="bi-file-earmark-plus", preuve=D),
+        E("fichier.ouvrir", "Ouvrir", icone="bi-folder2-open", preuve=D),
+        E("fichier.favoris", "Favoris", icone="bi-star", preuve=D),
+        E("fichier.fermer", "Fermer", icone="bi-x-square", action="fermer", preuve=D),
         SEP(),
-        E("fichier.societe", "À propos de votre société", icone="bi-building", enfants=[
-            E("fichier.societe.identification", "Identification", "comptabilite:societe"),
-            E("fichier.societe.exercices", "Exercices comptables", "comptabilite:exercices"),
-            E("fichier.societe.comptes", "Comptes", preuve=I),
-            E("fichier.societe.tiers", "Tiers", preuve=I),
-            E("fichier.societe.taxes", "Taxes", "comptabilite:structure", "taxes", preuve=I, vue="parametres"),
-            E("fichier.societe.analytique", "Analytique", preuve=I),
-            E("fichier.societe.devises", "Devises", preuve=I),
-            E("fichier.societe.banques", "Banques", "comptabilite:structure", "banques", preuve=I, vue="parametres"),
-            E("fichier.societe.editions", "Éditions", preuve=I),
+        E(P, "Paramètres société", icone="bi-building", preuve=D, enfants=[
+            E(f"{P}.identification", "Identification", preuve=D, enfants=[
+                # « Fichiers liés » figure dans Monnaie & Formats : affiché sur la page Identification de l'ERP
+                E(f"{P}.identification.identification", "Identification", "comptabilite:societe", preuve=D),
+                E(f"{P}.identification.monnaie", "Monnaie & Formats", preuve=D),
+                E(f"{P}.identification.preferences", "Préférences", preuve=D),
+                E(f"{P}.identification.exercices", "Exercices", "comptabilite:exercices", preuve=D),
+                E(f"{P}.identification.reports", "Reports à-nouveaux", preuve=D),
+                E(f"{P}.identification.securite", "Sécurité", preuve=D),
+            ]),
+            E(f"{P}.comptes", "Comptes généraux", preuve=D),
+            E(f"{P}.tiers", "Tiers", preuve=D),
+            E(f"{P}.analytique", "Analytique", preuve=D),
+            E(f"{P}.tva", "Tva et taxes", "comptabilite:structure", "taxes", preuve=D, vue="parametres"),
+            E(f"{P}.fiscaux", "Paramètres fiscaux", preuve=D),
+            E(f"{P}.contacts", "Contacts", preuve=D),
+            E(f"{P}.international", "International", preuve=D),
+            E(f"{P}.banque", "Banque", "comptabilite:structure", "banques", preuve=D, vue="parametres"),
+            E(f"{P}.comptabilisation", "Comptabilisation", preuve=D),
+            E(f"{P}.echanges", "Echange de données", preuve=D),
+            E(f"{P}.rappel", "Rappel/ Recouvrement", preuve=D),
+            E(f"{P}.efacture", "Factures électroniques", preuve=D),
+            E(f"{P}.colonnage", "Colonnage", preuve=D),
+            E(f"{P}.modeles", "Modèles", preuve=D),
+            E(f"{P}.saisie", "Saisie - Personnalisation en saisie", preuve=D),
         ]),
-        E("fichier.lire_infos", "Lire les informations"),
-        E("fichier.autorisations", "Autorisations d'accès", "comptabilite:autorisations", icone="bi-shield-lock"),
+        E("fichier.lire_infos", "Lire les informations", preuve=D),
+        E("fichier.configuration", "Configuration système et partage", preuve=D),
+        E("fichier.autorisations", "Autorisations d'accès", "comptabilite:autorisations", icone="bi-shield-lock", preuve=D),
         E("fichier.journal_evenements", "Journal des événements", "comptabilite:journal_evenements", icone="bi-clock-history", preuve="AJOUT-ERP"),
         SEP(),
-        E("fichier.importer", "Importer", icone="bi-box-arrow-in-down"),
-        E("fichier.exporter", "Exporter", icone="bi-box-arrow-up"),
-        E("fichier.format_import", "Format import/export paramétrable"),
+        E("fichier.importer", "Importer", icone="bi-box-arrow-in-down", preuve=D),
+        E("fichier.exporter", "Exporter", icone="bi-box-arrow-up", preuve=D),
         SEP(),
-        E("fichier.mise_en_page", "Mise en page"),
-        E("fichier.imprimer", "Imprimer…", icone="bi-printer", action="imprimer"),
-        E("fichier.impression_differee", "Impression différée"),
+        E("fichier.imprimer_parametres", "Imprimer les paramètres société", preuve=D),
+        E("fichier.mise_en_page", "Mise en page", preuve=I),
+        E("fichier.imprimer", "Imprimer…", icone="bi-printer", action="imprimer", preuve=I),
+        E("fichier.impression_differee", "Impression différée", preuve=I),
         SEP(),
-        E("fichier.outils", "Outils", icone="bi-tools", enfants=[
-            E("fichier.outils.maintenance", "Maintenance", preuve=I),
-            E("fichier.outils.sauvegarde", "Sauvegarde", "comptabilite:sauvegarde", preuve=I),
+        E("fichier.outils", "Outils", icone="bi-tools", preuve=D, enfants=[
+            E("fichier.outils.maintenance", "Maintenance", preuve=D),
+            E("fichier.outils.sauvegarde", "Sauvegarder ma société", "comptabilite:sauvegarde", preuve=D),
+            E("fichier.outils.restauration", "Restaurer ma société", "comptabilite:sauvegarde", preuve=D, vue="restaurer"),
+            E("fichier.outils.historique", "Historique des modifications et des suppressions", preuve=D),
+            E("fichier.outils.evenements_legaux", "Journal des événements légaux", preuve=D),
         ]),
         SEP(),
         E("fichier.quitter", "Quitter", icone="bi-power", action="quitter"),
@@ -144,7 +166,7 @@ def menu_fichier_comptabilite():
 
 def menu_fichier(module, societe_url, fermer=True):
     return Onglet("fichier", "Fichier", "bi-folder2", [
-        E("fichier.societe", "À propos de votre société", icone="bi-building", enfants=[
+        E("fichier.societe", "Paramètres société", icone="bi-building", enfants=[
             E("fichier.societe.identification", "Identification", societe_url),
             *([E("fichier.societe.exercices", "Exercices comptables", "comptabilite:exercices")] if module == "comptabilite" else []),
         ]),

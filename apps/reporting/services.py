@@ -99,7 +99,8 @@ def achats_par_fournisseur(debut, fin):
 
 
 # Balance âgée, fenêtre de sélection Sage (skill sage100-fenetres-selection-v12, P008) : « D'après la date
-# d'écriture » par défaut, ou d'échéance ; trois délais, 30, 45 et 60 jours par défaut.
+# d'écriture » ou d'échéance ; trois délais, 30, 45 et 60 jours par défaut. Ces défauts viennent du manuel
+# historique 8.50 : ils ne sont pas confirmés en V12 (skill sage100-v12-etats-fiches-achats-complement, A-P008).
 D_APRES_ECRITURE, D_APRES_ECHEANCE = "ECRITURE", "ECHEANCE"
 DELAIS_SAGE = (30, 45, 60)
 

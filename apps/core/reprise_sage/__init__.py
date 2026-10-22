@@ -52,6 +52,7 @@ FICHIERS = {
         "CT_Telephone": (False, DOC, "M01 V12.20", "Téléphone"),
         "CT_EMail": (False, DOC, "M01 V12.20", "E-mail"),
         "CT_Sommeil": (False, DOC, "M01 V12.20", "1 = en sommeil (repris inactif)"),
+        "CT_NumPayeur": (False, DOC, "M01 V12.20", "Tiers payeur (égal à CT_Num quand le tiers règle lui-même)"),
     }),
     "articles": ("F_ARTICLE", {
         "AR_Ref": (True, DOC, "C058", "Référence"),
@@ -278,6 +279,24 @@ class _Import:
         if l.get("CG_NumPrinc"):
             valeurs["compte_collectif"] = Compte.objects.filter(numero=l["CG_NumPrinc"]).first()
         self._maj(Tiers, {"code": l["CT_Num"][:20]}, valeurs, bilan)
+
+    def _fin_tiers(self, bilan):
+        """Tiers payeur, après la lecture de tous les tiers (le payeur peut figurer plus loin dans le fichier)."""
+        from apps.commercial.models import Tiers
+
+        for l in self.donnees["tiers"]:
+            payeur = (l.get("CT_NumPayeur") or "").strip()
+            tiers = Tiers.objects.filter(code=l["CT_Num"][:20]).first()
+            if tiers is None:
+                continue
+            cible = None if payeur in ("", l["CT_Num"]) else Tiers.objects.filter(code=payeur[:20]).first()
+            if payeur not in ("", l["CT_Num"]) and (cible is None or cible.type_tiers != tiers.type_tiers or cible.payeur_id):
+                bilan.anomalies.append(f"tiers {l['CT_Num']} : payeur « {payeur} » introuvable, d'un autre type ou "
+                                       "lui-même payé par un tiers : non repris")
+                continue
+            if tiers.payeur_id != getattr(cible, "pk", None):
+                tiers.payeur = cible
+                tiers.save(update_fields=["payeur"])
 
     def _articles(self, l, bilan):
         from apps.commercial.models import Article, FamilleArticle

@@ -1,0 +1,15 @@
+champ_technique;initialisation_documentee;reserve;source_id;localisation;qualification
+CT_Num;A saisir;"Identifiant technique ; ne prouve pas le libellé UI.";S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CT_Intitule;A saisir;;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CG_NumPrinc;A saisir;"Compte général principal ; ne pas fixer 411 ou 401 français pour OHADA.";S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CT_Type;0 = client;"Contexte création par la Comptabilité ; ne pas en faire le défaut d’une fiche fournisseur.";S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CT_Classement;CT_Num;;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CT_DateCreate;Date système;;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CT_Saut;1;Indice technique.;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+N_Risque;1;Nom du premier code risque dépend du dossier.;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CT_NumPayeur;CT_Num;Initialisé par la Comptabilité pour usage commercial.;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+N_CatTarif;1;"Indice technique ; pas libellé universel ni preuve d’ordre UI.";S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+N_CatCompta;1;"Indice technique ; pas une catégorie camerounaise déterminée.";S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+N_Period;1;Indice technique.;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CT_Facture;1;;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
+CT_BLFact;0;;S01;PDF 61–62 / imprimées 60–61;FAIT_TECHNIQUE_V12.20
