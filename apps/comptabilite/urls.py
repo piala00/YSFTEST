@@ -44,6 +44,7 @@ urlpatterns = [
     path("rapprochement/", views.rapprochement_view, name="rapprochement"),
     path("tiers/justificatif-solde/", views.justificatif_solde_view, name="justificatif_solde"),
     path("tiers/statistiques/", views.statistiques_tiers_view, name="statistiques_tiers"),
+    path("controles/liaison-commerciale/", views.controle_liaison_view, name="controle_liaison"),
     path("cloture/exercice/", views.cloture_exercice_view, name="cloture_exercice"),
     path("cloture/journaux/", views.cloture_journaux_view, name="cloture_journaux"),
     path("analytique/ventilation/", views.ventilation_view, name="ventilation"),

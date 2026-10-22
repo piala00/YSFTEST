@@ -626,7 +626,10 @@ COMPTABILITE = Module(
                 E("etats.fiscal.tva", "Déclaration de TVA", "comptabilite:tva", vue="etat", preuve="AJOUT-ERP"),
                 E("etats.dsf", "Déclaration statistique et fiscale (DSF)", preuve="AJOUT-ERP"),
             ]),
-            E("etats.controles", "Analyse et contrôles", icone="bi-clipboard-check", preuve="INDICATIF"),
+            E("etats.controles", "Analyse et contrôles", icone="bi-clipboard-check", preuve="INDICATIF", enfants=[
+                E("etats.controles.liaison", "Contrôle de la liaison commerciale", "comptabilite:controle_liaison",
+                  preuve="AJOUT-ERP"),
+            ]),
         ]),
         menu_fenetre("comptabilite"),
         menu_aide("comptabilite"),

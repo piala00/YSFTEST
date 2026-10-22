@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Contrôle de la liaison commerciale{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Contrôle de la liaison commerciale</h1></div>
+<form class="card card-body d-print-none mb-3 filtres-etat"><div class="row g-2 align-items-end">
+  {% for field in form %}<div class="col-md-2"><label class="form-label small mb-0">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+  <div class="col-md-auto"><button class="btn btn-primary btn-sm">Afficher</button></div></div></form>
+<p class="small text-muted">Chaque facture, avoir et règlement validé en Gestion commerciale doit avoir son écriture validée, au même
+  montant sur le compte du tiers. À contrôler avant chaque clôture : une balance équilibrée ne révèle ni une facture oubliée,
+  ni une facture passée deux fois.</p>
+<div class="card mb-3"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>Flux</th><th class="num">Pièces</th>
+  <th class="num">Conformes</th><th class="num">HT</th><th class="num">Taxes</th><th class="num">TTC / montant</th></tr></thead><tbody>
+  {% for f in flux %}<tr><td>{{ f.flux }}</td><td class="num">{{ f.nombre }}</td>
+    <td class="num {% if f.conformes != f.nombre %}text-danger fw-semibold{% endif %}">{{ f.conformes }}</td>
+    <td class="num">{% if f.ht is not None %}{{ f.ht|montant }}{% endif %}</td><td class="num">{% if f.tva is not None %}{{ f.tva|montant }}{% endif %}</td>
+    <td class="num">{{ f.ttc|montant }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% if anomalies %}
+<div class="card border-danger"><div class="card-header bg-white text-danger fw-semibold"><i class="bi bi-exclamation-triangle"></i> {{ anomalies|length }} anomalie(s)</div>
+  <table class="table table-sm mb-0"><tbody>
+  {% for a in anomalies %}<tr><td>{% if a.url %}<a href="{{ a.url }}">{{ a.libelle }}</a>{% else %}{{ a.libelle }}{% endif %}</td><td class="text-danger">{{ a.probleme }}</td></tr>{% endfor %}
+  </tbody></table></div>
+{% else %}
+<div class="alert alert-success"><i class="bi bi-check-circle"></i> Aucune anomalie : toutes les pièces commerciales de la période sont comptabilisées au bon montant.</div>
+{% endif %}
+{% endblock %}

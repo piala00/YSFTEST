@@ -1,0 +1,15 @@
+﻿droit_id;couche;faits;conception_ERP_proposee;verification
+D01;Connexion Windows / Sage;F32;Choisir le mode d’authentification;Compte actif, société et applications autorisées
+D02;Profil et groupe;F32;Définir des permissions explicites par action;Lecture et modification séparées
+D03;Transformation prospect;F33;Droit métier distinct de consultation tiers;Tester les différents points d’entrée
+D04;Création / modification tiers;F44,F29;Permission de créer dans la société et contrôle des doublons;Refus atomique, aucun tiers partiel
+D05;Comptabilisation;F06,F07;Permission de comptabiliser distincte de saisir une facture;Revalider la permission à l’exécution du lot
+D06;Journal / compte / période;;Ajouter des restrictions de ressource dans l’ERP;Tester accès direct et export
+D07;BAP / paiements;F41;Séparer approbation de facture, ordre bancaire et écriture;Aucun paiement sur seule autorisation de consultation
+D08;Compte technique;F30,F31;Définir les permissions propres du service;Tracer demandeur et identité technique
+D09;Lecture SQL directe;;Ne pas supposer que les droits Sage filtrent une connexion SQL;Attribuer explicitement les accès SQL et limiter les données exposées
+D10;Export / reporting;F35;Gérer extraction et périmètre société séparément;Tester que les données interdites ne sont pas exportées
+D11;Mots de passe liés;F02,F04,F37;Règles de secrets propres à chaque canal;Tester ouverture complète sans exposer les secrets
+D12;Commercial / équipe;F42;Distinguer périmètre commercial et données comptables;Interdire qu’un filtre de représentant soit considéré comme protection SQL
+D13;Administration société;;Séparer changement de coordonnées, liaison et droits dans l’ERP;Tracer avant/après et vérifier les flux affectés
+D14;Suppression / réaffectation;;Exiger une opération dédiée et une analyse de dépendances;Aucun effacement silencieux d’un tiers ou d’un document référencé

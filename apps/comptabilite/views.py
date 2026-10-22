@@ -489,3 +489,11 @@ def statistiques_tiers_view(request):
                             for l in lignes])
     return render(request, "comptabilite/statistiques_tiers.html", {
         "form": form, "p": p, "lignes": lignes, "totaux": totaux, "type_tiers": type_tiers, "export": True})
+
+
+@login_required
+def controle_liaison_view(request):
+    """Etat › Analyse et contrôles › Contrôle de la liaison commerciale (ajout ERP)."""
+    form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
+    resultat = services.controle_liaison(p["date_debut"], p["date_fin"])
+    return render(request, "comptabilite/controle_liaison.html", {"form": form, "p": p, **resultat})

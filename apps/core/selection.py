@@ -41,6 +41,7 @@ ETATS = {
     "comptabilite:compte_resultat": (["periode"], None),
     "comptabilite:tva": (["periode"], None),
     "comptabilite:balance_analytique": (["periode"], None),
+    "comptabilite:controle_liaison": (["periode"], None),
     # Gestion commerciale
     "commercial:mouvements": (["periode", "depot", "famille", "article"], None),
     "commercial:etat_inventaire": (["date", "depot"], None),

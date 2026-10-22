@@ -405,6 +405,60 @@ def exercice_suivant(exercice, creer=True):
     return suivant
 
 
+def controle_liaison(date_debut, date_fin):
+    """Rapprochement Gestion commerciale → Comptabilité (proposition du dossier « liaisons comptabilité ») :
+    chaque facture, avoir et règlement validé doit avoir son écriture validée, au bon montant sur le compte du
+    tiers ; chaque écriture des journaux VT / AC qui cite une pièce commerciale doit la retrouver.
+    Une balance équilibrée ne garantit pas l'absence de facture oubliée ou passée deux fois."""
+    from apps.commercial.models import Document, Reglement
+
+    anomalies, flux = [], []
+
+    def montant_tiers(ecriture, tiers):
+        agg = ecriture.lignes.filter(tiers=tiers).aggregate(d=Sum("debit"), c=Sum("credit"))
+        return abs((agg["d"] or ZERO) - (agg["c"] or ZERO))
+
+    def verifier(piece, montant, libelle):
+        from django.urls import reverse
+
+        vue = "commercial:reglement_detail" if isinstance(piece, Reglement) else "commercial:document_detail"
+        anomalies_avant = len(anomalies)
+        ecriture = piece.ecriture
+        if ecriture is None:
+            anomalies.append({"url": reverse(vue, args=[piece.pk]), "libelle": libelle, "probleme": "Aucune écriture comptable"})
+            return False
+        if ecriture.statut != Ecriture.STATUT_VALIDEE:
+            anomalies.append({"url": reverse(vue, args=[piece.pk]), "libelle": libelle, "probleme": f"Écriture {ecriture.numero} non validée"})
+        ecart = montant - montant_tiers(ecriture, piece.tiers)
+        if ecart:
+            anomalies.append({"url": reverse(vue, args=[piece.pk]), "libelle": libelle,
+                              "probleme": f"Montant du tiers en comptabilité différent ({ecart:+,.0f})".replace(",", " ")})
+        return len(anomalies) == anomalies_avant
+
+    documents = (Document.objects.filter(type_document__in=Document.TYPES_FACTURATION, date__range=(date_debut, date_fin))
+                 .exclude(statut__in=(Document.BROUILLON, Document.ANNULE)).select_related("tiers", "ecriture"))
+    for domaine, est_vente in (("Ventes", True), ("Achats", False)):
+        docs = [d for d in documents if d.est_vente == est_vente]
+        passes = [d for d in docs if verifier(d, d.total_ttc, f"{d.get_type_document_display()} {d.numero} - {d.tiers.nom}")]
+        ht = sum((d.total_ht for d in docs), ZERO)
+        ttc = sum((d.total_ttc for d in docs), ZERO)
+        flux.append({"flux": domaine, "nombre": len(docs), "conformes": len(passes), "ht": ht,
+                     "tva": sum((d.total_tva for d in docs), ZERO), "ttc": ttc})
+    reglements = Reglement.objects.filter(date__range=(date_debut, date_fin)).select_related("tiers", "ecriture")
+    passes = [r for r in reglements if verifier(r, r.montant, f"Règlement {r.numero} - {r.tiers.nom}")]
+    total = sum((r.montant for r in reglements), ZERO)
+    flux.append({"flux": "Règlements", "nombre": len(reglements), "conformes": len(passes), "ht": None, "tva": None, "ttc": total})
+
+    # Écritures orphelines : pièce commerciale citée mais introuvable (ou rattachée à une autre écriture)
+    rattachees = set(Document.objects.exclude(ecriture=None).values_list("ecriture_id", flat=True)) | \
+        set(Reglement.objects.exclude(ecriture=None).values_list("ecriture_id", flat=True))
+    for ecriture in (Ecriture.objects.filter(date__range=(date_debut, date_fin), journal__code__in=("VT", "AC"))
+                     .exclude(origine="").exclude(pk__in=rattachees)):
+        anomalies.append({"url": "", "libelle": f"Écriture {ecriture.journal.code} {ecriture.numero} ({ecriture.origine})",
+                          "probleme": "Pièce commerciale introuvable : écriture passée en double ou pièce supprimée"})
+    return {"flux": flux, "anomalies": anomalies}
+
+
 def controles_cloture(exercice):
     """Préconditions de la clôture (liste de messages bloquants)."""
     erreurs = []
@@ -416,6 +470,10 @@ def controles_cloture(exercice):
         erreurs.append(f"L'exercice précédent {precedent.code} doit être clôturé d'abord.")
     if exercice.cloture:
         erreurs.append(f"L'exercice {exercice.code} est déjà clôturé.")
+    anomalies = controle_liaison(exercice.date_debut, exercice.date_fin)["anomalies"]
+    if anomalies:
+        erreurs.append(f"{len(anomalies)} anomalie(s) entre la Gestion commerciale et la Comptabilité : "
+                       "voir Etat › Analyse et contrôles › Contrôle de la liaison commerciale.")
     return erreurs
 
 

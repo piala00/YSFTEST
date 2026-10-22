@@ -1,0 +1,45 @@
+﻿scenario_id;theme;precondition;action;attendu_ou_releve;nature;impacts;statut_execution
+T01;Société;Deux sociétés ont la même raison sociale mais des identifiants techniques différents;Vérifier les cibles résolues;Aucun rapprochement sur le seul nom;ERP-PROPOSE;P01,P05;NON_EXECUTE
+T02;Société;Raison sociale modifiée dans une copie de dossier;Rouvrir chaque module et examiner nouvelles pièces et anciennes éditions;Relever ce qui se propage réellement sans le présumer;OBSERVATION-SAGE;P01;NON_EXECUTE
+T03;Société;Activité puis forme juridique modifiées séparément;Tester l’ouverture et le transfert après chaque variation;Noter message exact, version et absence/présence de blocage;OBSERVATION-SAGE;P02;NON_EXECUTE
+T04;Société;Adresse modifiée après facture validée;Comparer fiche actuelle, PDF conservé et réimpression;Documenter les trois résultats séparément;OBSERVATION-SAGE;P03;NON_EXECUTE
+T05;Connexion;MAE pointant vers un dossier homonyme incorrect;Tester la résolution avant toute écriture;L’ERP affiche le dossier réel et refuse une cible non validée;ERP-PROPOSE;P05,P06;NON_EXECUTE
+T06;Connexion;Même base SQL et raccourcis différents;Lire leur cible et tester les ouvertures;Identifier les fichiers logiques sans déduire deux bases physiques;OBSERVATION-SAGE;P06;NON_EXECUTE
+T07;Connexion;Ouverture OM avec identifiants comptables/commerciaux différents;Utiliser le mécanisme documenté sur copie autorisée;Capturer réussite/refus et permissions sans secret;OBSERVATION-SAGE;P24;NON_EXECUTE
+T08;Connexion;Identifiants liés différents avec Driver Sage ODBC;Tester la connexion avec pilote/version relevés;Relever le refus attendu documentaire et son diagnostic;OBSERVATION-SAGE;P24;NON_EXECUTE
+T09;Documents;Connexion par instance/base puis consultation PDF;Comparer avec une ouverture utilisant le chemin documenté;Distinguer connexion données et résolution Multimedia;OBSERVATION-SAGE;P07;NON_EXECUTE
+T10;Tiers;Client créé depuis Gestion commerciale dans un même dossier;Rouvrir Comptabilité avec profil autorisé;Relever champs visibles, valeurs et délai de visibilité;OBSERVATION-SAGE;P11,P12;NON_EXECUTE
+T11;Tiers;Fournisseur créé depuis Comptabilité;Consulter le module commercial lié;Relever champs disponibles et compléments encore nécessaires;OBSERVATION-SAGE;P11,P12;NON_EXECUTE
+T12;Tiers;Même nom avec deux codes ou deux sociétés;Lancer recherche de doublon ERP;Aucune fusion silencieuse;ERP-PROPOSE;P11;NON_EXECUTE
+T13;Tiers;Deux créations concurrentes avec le même code;Exécuter les deux demandes ERP simultanément;Une seule création, conflit expliqué et aucune fiche partielle;ERP-PROPOSE;P11;NON_EXECUTE
+T14;Tiers;Collectif absent ou non accepté;Préparer le transfert ERP;Anomalie explicite avant envoi, aucun compte arbitraire;ERP-PROPOSE;P12;NON_EXECUTE
+T15;Tiers;Prospect et profil sans droit de transformation;Essayer fiche, devis et création de commande;Relever les refus par point d’entrée;OBSERVATION-SAGE;P23;NON_EXECUTE
+T16;Tiers;Transformation autorisée d’un prospect ayant des documents;Comparer collectif et payeur des en-têtes;Vérifier l’effet documentaire annoncé;OBSERVATION-SAGE;P12,P13;NON_EXECUTE
+T17;Tiers;Changement de payeur avec des pièces ouvertes;Créer ensuite une nouvelle pièce et comparer les anciennes;Relever portée exacte de la modification;OBSERVATION-SAGE;P13;NON_EXECUTE
+T18;Tiers;Tiers en sommeil ou bloqué ou encours dépassé;Tester vente, validation, transfert et encaissement séparément;Documenter chaque comportement, aucun blocage global présumé;OBSERVATION-SAGE;P15;NON_EXECUTE
+T19;Tiers;Demande de suppression d’un tiers utilisé;Chercher toutes les dépendances ERP;Refus ou désactivation contrôlée avec historique conservé;ERP-PROPOSE;P30;NON_EXECUTE
+T20;Comptabilisation;Facture validée et options de journal contrôlées;Préparer un transfert sur copie autorisée;Comparer montants, tiers, journal et dates dans les deux modules;OBSERVATION-SAGE;P18;NON_EXECUTE
+T21;Comptabilisation;Facture non validée;Lancer un transfert de test sur copie;Relever contrôle et message exact;OBSERVATION-SAGE;P18;NON_EXECUTE
+T22;Paramètres;Catégorie du tiers changée après un document;Comparer ancien document et nouveau document;Vérifier la portée de la modification sans recalcul présumé;OBSERVATION-SAGE;P14;NON_EXECUTE
+T23;Paramètres;Taux de taxe changé entre deux documents;Comparer calcul antérieur et nouveau calcul;Ne pas appliquer un taux français comme règle fiscale locale;OBSERVATION-SAGE;P17;NON_EXECUTE
+T24;Paramètres;Famille comptable modifiée après création d’un article;Comparer ancien article et article nouvellement créé;Relever héritage et absence/présence de propagation;OBSERVATION-SAGE;P16;NON_EXECUTE
+T25;Paramètres;Journal ou exercice fermé;Préparer un lot ERP;Refus avant comptabilisation et journal de l’anomalie;ERP-PROPOSE;P08,P18;NON_EXECUTE
+T26;Paiements;Règlement partiel associé à une facture;Prélettrer puis intégrer selon version de test;Comparer résidu commercial et comptable;OBSERVATION-SAGE;P13,P19;NON_EXECUTE
+T27;Paiements;Remise intermédiaire puis banque finale;Comparer statuts avant/après intégration;Ne pas solder commercialement sur une étape intermédiaire non prévue;OBSERVATION-SAGE;P19,P20;NON_EXECUTE
+T28;Paiements;Relance de la même intégration de règlement;Observer sans modifier les marqueurs par SQL;Documenter si le traitement natif évite ou non un doublon;OBSERVATION-SAGE;P19;NON_EXECUTE
+T29;Paiements;Paiement refusé par le circuit BAP;Tester préparation, validation, transmission et comptabilisation;Relever les autorisations effectives de chaque étape;OBSERVATION-SAGE;P20,P23;NON_EXECUTE
+T30;Immobilisations;Bien calculé mais non comptabilisé;Comparer écritures avant/après mise à jour de test;Distinguer calcul et transfert;OBSERVATION-SAGE;P21;NON_EXECUTE
+T31;Immobilisations;Même période testée en mensuel puis annuel dans copies distinctes;Comparer lots et options disponibles;Documenter prévention de double comptabilisation sans l’inventer;OBSERVATION-SAGE;P21;NON_EXECUTE
+T32;ECF;Deux intégrations de la même balance;Tester remplacer et cumuler dans copies distinctes;Comparer totaux et OD conservées/supprimées;OBSERVATION-SAGE;P22;NON_EXECUTE
+T33;Droits;Utilisateur commercial sans accès comptable;Tester consultation et comptabilisation par tous les points d’entrée;Relever droits effectifs, pas seulement visibilité du menu;OBSERVATION-SAGE;P23;NON_EXECUTE
+T34;Droits;Permission ERP retirée après préparation avant exécution;Exécuter le lot différé;Nouvelle vérification serveur et refus si permission requise absente;ERP-PROPOSE;P23,P25;NON_EXECUTE
+T35;Droits;Compte de service distinct de l’utilisateur demandeur;Exécuter flux ERP et consulter l’audit;Identités et responsabilités séparées dans les traces;ERP-PROPOSE;P25;NON_EXECUTE
+T36;Droits;Connexion SQL en lecture indépendante d’un profil Sage limité;Examiner permissions SQL autorisées et périmètre exposé;Ne pas présumer le filtrage applicatif dans SQL;OBSERVATION-TECHNIQUE;P25;NON_EXECUTE
+T37;Connecteur;Token API invalide puis révoqué;Tester connecteur sans journaliser le secret;Erreur d’authentification distinguée de l’autorisation métier;ERP-PROPOSE;P26;NON_EXECUTE
+T38;Connecteur;Champ libre renommé;Comparer configuration et nom technique réel;Anomalie de correspondance explicite;OBSERVATION-SAGE;P27;NON_EXECUTE
+T39;Reprise;Coupure après acceptation distante mais avant confirmation;Simuler dans le connecteur ERP de test;État inconnu puis vérification de réception avant rejeu;ERP-PROPOSE;P28;NON_EXECUTE
+T40;Reprise;Même clé d’événement et contenu modifié;Réémettre dans le connecteur ERP de test;Conflit explicite, aucune duplication ou substitution silencieuse;ERP-PROPOSE;P28;NON_EXECUTE
+T41;Reprise;Une ligne de lot rejetée;Comparer statut du lot et lignes acceptées;Aucune réussite totale annoncée sans rapprochement;ERP-PROPOSE;P28;NON_EXECUTE
+T42;Maintenance;Restauration d’une copie cohérente;Vérifier tiers, factures, règlements et documents;Constater la restauration fonctionnelle et les correspondances;OBSERVATION-TECHNIQUE;P29;NON_EXECUTE
+T43;Paie;Compte et rubrique du modèle modifiés;Exporter une OD anonymisée de test;Comparer charges, dettes, journal et analytique avant import;OBSERVATION-SAGE;P10;NON_EXECUTE
+T44;Clôture;Flux métier en attente ou état de transfert inconnu;Préparer clôture ERP;Liste des écarts à résoudre avant clôture selon règles choisies;ERP-PROPOSE;P08,P28;NON_EXECUTE
