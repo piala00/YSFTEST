@@ -27,7 +27,8 @@
   <div class="col-md-4"><div class="card p-3">
     {% if object.tiers %}<div class="text-muted small">{{ object.est_vente|yesno:"Client,Fournisseur" }}</div>
     <a class="fw-semibold" href="{% url 'commercial:tiers_detail' object.tiers.pk %}">{{ object.tiers.nom }}</a>
-    <div class="small">{{ object.tiers.adresse }} {{ object.tiers.ville }}</div>{% endif %}
+    <div class="small">{{ object.tiers.adresse }} {{ object.tiers.ville }}</div>
+    {% if object.payeur %}<div class="small mt-1">Payeur : <a href="{% url 'commercial:tiers_detail' object.payeur.pk %}">{{ object.payeur.nom }}</a></div>{% endif %}{% endif %}
     {% if object.depot %}<div class="small mt-1"><i class="bi bi-house-gear"></i> Dépôt : <strong>{{ object.depot }}</strong>{% if object.depot_destination %} <i class="bi bi-arrow-right"></i> <strong>{{ object.depot_destination }}</strong>{% endif %}</div>{% endif %}
     {% if object.est_stock %}<div class="small text-muted mt-1">{% if object.mouvemente_stock %}Mouvemente le stock à la validation{% endif %}</div>{% endif %}
   </div></div>

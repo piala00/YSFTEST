@@ -12,6 +12,28 @@ class TiersForm(BootstrapMixin, forms.ModelForm):
         model = Tiers
         exclude = ("cree_le",)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        type_tiers = self.data.get("type_tiers") or self.initial.get("type_tiers") or self.instance.type_tiers
+        # Payeur : un tiers du même type qui règle lui-même (un seul niveau, comme le compte payeur de Sage)
+        self.fields["payeur"].queryset = (Tiers.objects.filter(type_tiers=type_tiers, payeur__isnull=True, actif=True)
+                                          .exclude(pk=self.instance.pk))
+
+    def clean(self):
+        donnees = super().clean()
+        if self.instance.pk or self.errors or self.data.get("confirmer_doublon"):
+            return donnees
+        candidat = Tiers(type_tiers=donnees.get("type_tiers"), nom=donnees.get("nom") or "")
+        doublons = candidat.doublons_possibles()
+        if doublons:
+            # Même nom : revue manuelle, jamais de refus définitif (deux tiers peuvent porter le même nom)
+            self.fields["confirmer_doublon"] = forms.BooleanField(
+                required=False, label="Créer quand même ce tiers", widget=forms.CheckboxInput(attrs={"class": "form-check-input"}))
+            raise forms.ValidationError(
+                "Un tiers porte déjà ce nom : " + ", ".join(str(t) for t in doublons)
+                + ". Vérifiez qu'il ne s'agit pas du même, puis cochez « Créer quand même ce tiers ».")
+        return donnees
+
 
 class FamilleArticleForm(BootstrapMixin, forms.ModelForm):
     class Meta:
@@ -34,7 +56,7 @@ class DepotForm(BootstrapMixin, forms.ModelForm):
 class DocumentForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Document
-        fields = ("tiers", "date", "date_echeance", "depot", "depot_destination", "reference_externe", "notes")
+        fields = ("tiers", "payeur", "date", "date_echeance", "depot", "depot_destination", "reference_externe", "notes")
         widgets = {"date": DateInput(), "date_echeance": DateInput(), "notes": forms.Textarea(attrs={"rows": 2})}
 
     def __init__(self, *args, type_document=None, **kwargs):
@@ -47,7 +69,7 @@ class DocumentForm(BootstrapMixin, forms.ModelForm):
         if not doc.depot_id and not self.initial.get("depot"):
             self.initial["depot"] = Depot.par_defaut().pk
         if doc.est_stock:
-            del self.fields["tiers"], self.fields["date_echeance"]
+            del self.fields["tiers"], self.fields["payeur"], self.fields["date_echeance"]
             self.fields["depot"].required = True
             self.fields["depot"].label = "Dépôt d'origine" if doc.est_virement else "Dépôt"
             if doc.est_virement:
@@ -60,6 +82,8 @@ class DocumentForm(BootstrapMixin, forms.ModelForm):
             self.fields["tiers"].queryset = Tiers.objects.filter(type_tiers=type_tiers, actif=True)
             self.fields["tiers"].label = "Client" if type_tiers == Tiers.CLIENT else "Fournisseur"
             self.fields["tiers"].required = True
+            self.fields["payeur"].queryset = Tiers.objects.filter(type_tiers=type_tiers, payeur__isnull=True, actif=True)
+            self.fields["payeur"].empty_label = "Le tiers lui-même (ou le payeur de sa fiche)"
             if not doc.est_facturation:
                 del self.fields["date_echeance"]
 

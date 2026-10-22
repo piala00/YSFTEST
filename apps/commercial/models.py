@@ -4,7 +4,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from apps.core.models import Sequence, Societe
@@ -71,6 +71,9 @@ class Tiers(models.Model):
         "Compte bloqué", default=False,
         help_text="Aucun document ne peut être saisi pour ce tiers (différent du code risque « Blocage », "
                   "qui laisse saisir devis et commandes avec un message)")
+    payeur = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="tiers_payes", verbose_name="Tiers payeur",
+        help_text="Tiers qui règle les factures (siège, centrale, maison mère). Vide : le tiers règle lui-même.")
     assujetti_tva = models.BooleanField("Assujetti à la TVA", default=True)
     regime_fiscal = models.CharField("Régime d'imposition", max_length=20, choices=Societe.REGIMES_FISCAUX, blank=True,
                                      help_text="Utile pour l'AIR et le précompte (taux selon le régime)")
@@ -88,6 +91,28 @@ class Tiers(models.Model):
     @property
     def est_client(self):
         return self.type_tiers == self.CLIENT
+
+    def clean(self):
+        if self.payeur_id:
+            if self.payeur_id == self.pk:
+                raise ValidationError({"payeur": "Laissez vide quand le tiers règle lui-même."})
+            if self.payeur.type_tiers != self.type_tiers:
+                raise ValidationError({"payeur": "Le tiers payeur doit être du même type (client ou fournisseur)."})
+            if self.payeur.payeur_id:
+                raise ValidationError({"payeur": f"{self.payeur.nom} a lui-même un tiers payeur : choisissez ce dernier."})
+
+    @property
+    def tiers_payeur(self):
+        return self.payeur or self
+
+    def doublons_possibles(self):
+        """Tiers de même type au nom identique (casse et espaces ignorées) : à revoir avant de créer un doublon."""
+        mots = self.nom.split()
+        if not mots:
+            return []
+        nom = " ".join(mots).lower()
+        candidats = Tiers.objects.filter(type_tiers=self.type_tiers, nom__istartswith=mots[0]).exclude(pk=self.pk)
+        return [t for t in candidats if " ".join(t.nom.split()).lower() == nom]
 
     def get_compte_collectif(self):
         from apps.comptabilite.models import Compte
@@ -108,10 +133,14 @@ class Tiers(models.Model):
         total = self.encours() + montant_supplementaire
         return max(total - self.plafond_credit, ZERO)
 
+    def factures_a_regler(self):
+        """Factures et avoirs validés dont ce tiers est le payeur (les siennes et celles des tiers qu'il paie)."""
+        return Document.objects.filter(Q(payeur=self) | Q(payeur__isnull=True, tiers=self),
+                                       type_document__in=Document.TYPES_FACTURATION, statut=Document.VALIDE)
+
     def encours(self):
-        """Montant restant dû sur les factures validées."""
-        return sum((d.reste_a_payer for d in self.documents.filter(
-            type_document__in=Document.TYPES_FACTURATION, statut=Document.VALIDE)), ZERO)
+        """Montant restant dû sur les factures validées dont il est le payeur."""
+        return sum((d.reste_a_payer for d in self.factures_a_regler()), ZERO)
 
 
 class Depot(models.Model):
@@ -352,6 +381,8 @@ class Document(models.Model):
     date = models.DateField(default=timezone.localdate)
     date_echeance = models.DateField("Échéance", null=True, blank=True)
     tiers = models.ForeignKey(Tiers, null=True, blank=True, on_delete=models.PROTECT, related_name="documents")
+    payeur = models.ForeignKey(Tiers, null=True, blank=True, on_delete=models.PROTECT, related_name="documents_payes",
+                               verbose_name="Tiers payeur", help_text="Repris de la fiche du tiers ; vide : le tiers lui-même")
     depot = models.ForeignKey(Depot, null=True, blank=True, on_delete=models.PROTECT, related_name="documents",
                               verbose_name="Dépôt")
     depot_destination = models.ForeignKey(Depot, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
@@ -508,7 +539,14 @@ class Document(models.Model):
             self.depot = Depot.par_defaut()
         if not self.date_echeance and self.est_facturation and self.tiers_id:
             self.date_echeance = self.date + timezone.timedelta(days=self.tiers.delai_paiement)
+        if self._state.adding and not self.payeur_id and self.tiers_id:
+            self.payeur_id = self.tiers.payeur_id           # payeur de la fiche, figé sur la pièce
         super().save(*args, **kwargs)
+
+    @property
+    def tiers_payeur(self):
+        """Tiers dont le compte porte la créance ou la dette de la pièce."""
+        return self.payeur or self.tiers
 
     # --- Cycle de vie ---------------------------------------------------
     def clean(self):
@@ -526,6 +564,11 @@ class Document(models.Model):
             raise ValidationError({"tiers": f"Ce type de document requiert un tiers de type « {attendu.lower()} »."})
         if self.tiers.compte_bloque:
             raise ValidationError({"tiers": f"Le compte de {self.tiers.nom} est bloqué : aucun document ne peut être saisi."})
+        if self.payeur_id:
+            if self.payeur.type_tiers != self.tiers.type_tiers:
+                raise ValidationError({"payeur": "Le tiers payeur doit être du même type que le tiers."})
+            if self.payeur.compte_bloque:
+                raise ValidationError({"payeur": f"Le compte du payeur {self.payeur.nom} est bloqué."})
 
     # Pièces de vente soumises au contrôle d'encours (plafond et code risque du client)
     TYPES_CONTROLE_ENCOURS = (COMMANDE, PREPARATION, LIVRAISON, FACTURE)
@@ -536,7 +579,7 @@ class Document(models.Model):
         """Bloque (ValidationError) ou renvoie un avertissement si la pièce fait dépasser le plafond."""
         if self.type_document not in self.TYPES_CONTROLE_ENCOURS or not self.tiers_id:
             return None
-        tiers = self.tiers
+        tiers = self.tiers_payeur               # l'encours se contrôle sur le payeur, qui porte la créance
         if tiers.code_risque == Tiers.RISQUE_AUCUN or not tiers.plafond_credit:
             return None
         # Une facture issue d'un BL ou d'une commande ne compte qu'une fois : seule la facture crée la créance
@@ -633,7 +676,7 @@ class Document(models.Model):
         if not lignes:
             raise ValidationError("Toutes les lignes de ce document ont déjà été transformées.")
         nouveau = Document.objects.create(
-            type_document=type_cible, tiers=self.tiers, origine=self, date=timezone.localdate(), depot=self.depot,
+            type_document=type_cible, tiers=self.tiers, payeur=self.payeur, origine=self, date=timezone.localdate(), depot=self.depot,
             reference_externe=self.reference_externe, notes=self.notes, cree_par=utilisateur,
         )
         for ligne in lignes:
@@ -792,7 +835,7 @@ class Reglement(models.Model):
         comptabiliser_reglement(self)
         if factures is None:
             types = (Document.FACTURE,) if self.est_encaissement else (Document.ACHAT_FACTURE,)
-            factures = self.tiers.documents.filter(type_document__in=types, statut=Document.VALIDE).order_by("date", "numero")
+            factures = self.tiers.factures_a_regler().filter(type_document__in=types).order_by("date", "numero")
         disponible = self.montant_non_impute
         for facture in factures:
             if disponible <= 0:

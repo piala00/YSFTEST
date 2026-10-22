@@ -16,7 +16,8 @@
 </div>
 <div class="border rounded p-3 mb-4 ms-auto" style="width:45%">
   {% if object.tiers %}<strong>{{ object.tiers.nom }}</strong><br>{{ object.tiers.adresse }}<br>{{ object.tiers.ville }}
-  {% if object.tiers.niu %}<br>NIU : {{ object.tiers.niu }}{% endif %}{% endif %}
+  {% if object.tiers.niu %}<br>NIU : {{ object.tiers.niu }}{% endif %}
+  {% if object.payeur %}<br>Facture réglée par : {{ object.payeur.nom }}{% endif %}{% endif %}
   {% if object.depot %}<div class="small mt-1">Dépôt : {{ object.depot }}{% if object.depot_destination %} → {{ object.depot_destination }}{% endif %}</div>{% endif %}</div>
 <table class="table table-bordered table-sm">
 <thead class="table-light"><tr><th>Désignation</th><th class="num">Qté</th><th class="num">P.U. HT</th><th class="num">Rem.</th><th class="num">TVA</th><th class="num">Montant HT</th></tr></thead>

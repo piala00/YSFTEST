@@ -2,7 +2,7 @@
 import datetime
 from decimal import Decimal
 
-from django.db.models import F, Sum
+from django.db.models import F, Q, Sum
 from django.db.models.functions import TruncMonth
 
 from apps.commercial.models import Article, Document, LigneDocument, Tiers
@@ -126,15 +126,16 @@ def balance_agee(type_tiers=Tiers.CLIENT, date_ref=None, tiers=None, d_apres=D_A
     par_tiers = {}
     factures = Document.objects.filter(type_document=type_facture, statut=Document.VALIDE, date__lte=date_ref)
     if tiers:
-        factures = factures.filter(tiers_id=tiers)
-    for doc in factures.select_related("tiers"):
+        factures = factures.filter(Q(payeur_id=tiers) | Q(payeur__isnull=True, tiers_id=tiers))
+    for doc in factures.select_related("tiers", "payeur"):
         reste = doc.reste_a_payer
         if reste <= 0:
             continue
         age = (date_ref - ((doc.date_echeance or doc.date) if echeance else doc.date)).days
         cle = ("non_echu" if echeance and age <= 0 else "j30" if age <= d1 else "j60" if age <= d2
                else "j90" if age <= d3 else "plus")
-        ligne = par_tiers.setdefault(doc.tiers_id, {"tiers": doc.tiers, "total": ZERO, **{k: ZERO for k in cles}})
+        payeur = doc.tiers_payeur                         # la dette est suivie chez le payeur
+        ligne = par_tiers.setdefault(payeur.pk, {"tiers": payeur, "total": ZERO, **{k: ZERO for k in cles}})
         ligne[cle] += reste
         ligne["total"] += reste
     lignes = sorted(par_tiers.values(), key=lambda l: -l["total"])

@@ -81,10 +81,10 @@ def comptabiliser_document(document):
     """
     if document.ecriture_id:
         return document.ecriture
-    tiers = document.tiers
+    tiers = document.tiers_payeur          # la créance / la dette va au tiers payeur
     compte_tiers = tiers.get_compte_collectif()
     sens = -1 if document.est_avoir else 1
-    libelle = f"{document.get_type_document_display()} {document.numero} - {tiers.nom}"
+    libelle = f"{document.get_type_document_display()} {document.numero} - {document.tiers.nom}"
 
     lignes = []
     if document.est_vente:
@@ -429,7 +429,7 @@ def controle_liaison(date_debut, date_fin):
             return False
         if ecriture.statut != Ecriture.STATUT_VALIDEE:
             anomalies.append({"url": reverse(vue, args=[piece.pk]), "libelle": libelle, "probleme": f"Écriture {ecriture.numero} non validée"})
-        ecart = montant - montant_tiers(ecriture, piece.tiers)
+        ecart = montant - montant_tiers(ecriture, getattr(piece, "tiers_payeur", piece.tiers))
         if ecart:
             anomalies.append({"url": reverse(vue, args=[piece.pk]), "libelle": libelle,
                               "probleme": f"Montant du tiers en comptabilité différent ({ecart:+,.0f})".replace(",", " ")})
