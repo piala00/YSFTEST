@@ -38,6 +38,8 @@ L'adresse est du type `https://erp-ohada-test.onrender.com`. Chaque envoi sur la
   puis restauration du fichier ensuite.
 - C'est un site de test public : **n'y mettez pas les données réelles d'une société**.
 
+> **Render inaccessible ?** Utilisez PythonAnywhere (gratuit, données conservées) : voir `docs/HEBERGEMENT_PYTHONANYWHERE.md`.
+
 ## Choisir une base durable (relevé du 21/10/2026, skill `sage100-sql-hebergement`)
 
 Prix en dollars US, hors taxes et frais de change : à revérifier avant de s'engager. Aucune de ces offres n'a été
