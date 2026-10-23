@@ -10,7 +10,7 @@ body { background: #f4f6f9; font-size: .92rem; }
 .btn-topbar { color: #fff; border: 1px solid rgba(255,255,255,.35); }
 .btn-topbar:hover, .btn-topbar.show { color: #fff; background: rgba(255,255,255,.15); }
 
-/* Barre de menus façon Sage 100c */
+/* Barre de menus */
 .barre-menus { display: flex; background: #fff; border-bottom: 1px solid #d5dce4; padding: 0 .4rem; position: relative; z-index: 1030; user-select: none; }
 .barre-menus .menu { position: relative; }
 .barre-menus .menu-titre { background: none; border: 0; padding: .45rem .8rem; color: #212529; font-size: .9rem; }
@@ -157,7 +157,7 @@ body.sans-barre-verticale .coche-barre { visibility: hidden; }
 body.selection-validee .filtres-etat { display: none !important; }
 
 /* ======================================================================
-   Bureau façon Sage 100 V12 : accueil au fond, fenêtres internes par-dessus
+   Bureau : accueil au fond, fenêtres internes par-dessus
    ====================================================================== */
 body[data-bureau] { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 body[data-bureau] > .espace { flex: 1; min-height: 0; }
@@ -219,7 +219,7 @@ html.dans-fenetre .fenetre-contenu:has(#fenetre-selection) { padding: 0; }
 html.dans-fenetre .selection-dialogue { margin: 0; width: max-content; min-width: 400px; max-width: 520px; box-shadow: none; border-radius: 0; }
 html.dans-fenetre .selection-dialogue > .card-header { display: none; }
 
-/* Fenêtre de sélection façon Sage : barre Fonctions / Plus de critères / Différer, libellés à gauche */
+/* Fenêtre de sélection : barre Fonctions / Plus de critères / Différer, libellés à gauche */
 .selection-barre { display: flex; gap: 14px; align-items: center; padding: 5px 10px; border-bottom: 1px solid #dde3ea; background: #f6f8fa;
   font-size: .82rem; color: #8a95a1; }
 .selection-barre span { display: inline-flex; align-items: center; gap: 4px; }
@@ -230,25 +230,25 @@ html.dans-fenetre .selection-dialogue > .card-header { display: none; }
 .selection-dialogue .btn-ok { background: #3f8f3a; border-color: #3f8f3a; color: #fff; min-width: 6rem; }
 .selection-dialogue .btn-ok:hover { filter: brightness(.92); color: #fff; }
 
-/* Écran d'accueil IntuiSage */
+/* Écran d accueil (onglets Accueil / Tableau de bord) */
 .accueil-onglets { display: flex; gap: 4px; border-bottom: 1px solid #cfd6dd; margin-bottom: 14px; }
 .accueil-onglets button { border: 0; background: none; padding: 6px 16px; font-weight: 600; color: #5b6775; border-bottom: 3px solid transparent; }
 .accueil-onglets button.actif { color: #1e2a3a; border-bottom-color: var(--module); }
 .accueil-colonnes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 32px; }
-.accueil-sage h2 { font-size: 1.05rem; font-weight: 600; margin: 4px 0 10px; color: #2b3540; }
-.accueil-sage .tuiles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-.accueil-sage .tuile { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 10px; width: 128px; height: 122px;
+.accueil-bureau h2 { font-size: 1.05rem; font-weight: 600; margin: 4px 0 10px; color: #2b3540; }
+.accueil-bureau .tuiles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.accueil-bureau .tuile { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 10px; width: 128px; height: 122px;
   padding: 10px 8px 12px; background: #f1f2f3; border: 1px solid #e0e3e6; color: #3a4048; text-align: center; font-size: .8rem;
   line-height: 1.2; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-.accueil-sage .tuile i { font-size: 2.3rem; color: #5a6068; margin-bottom: auto; padding-top: 8px; }
-.accueil-sage .tuile:hover { background: #e6e9ec; border-color: var(--module); }
-.accueil-sage .tuile-chiffre { justify-content: center; }
-.accueil-sage .tuile-chiffre .chiffre { font-size: 1.15rem; font-weight: 700; color: #1e2a3a; }
-.accueil-sage .tuile-chiffre.alerte { border-color: #e0a100; background: #fff7e0; }
+.accueil-bureau .tuile i { font-size: 2.3rem; color: #5a6068; margin-bottom: auto; padding-top: 8px; }
+.accueil-bureau .tuile:hover { background: #e6e9ec; border-color: var(--module); }
+.accueil-bureau .tuile-chiffre { justify-content: center; }
+.accueil-bureau .tuile-chiffre .chiffre { font-size: 1.15rem; font-weight: 700; color: #1e2a3a; }
+.accueil-bureau .tuile-chiffre.alerte { border-color: #e0a100; background: #fff7e0; }
 .accueil-dernieres { background: #fff; }
 @media (max-width: 992px) { .accueil-colonnes { grid-template-columns: 1fr; } }
 
-/* Barre verticale en accordéon (Sage 100 V12) : un domaine ouvert en haut, les autres empilés en bas, en vert */
+/* Barre verticale en accordéon : un domaine ouvert en haut, les autres empilés en bas, en vert */
 .arbre.accordeon { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .groupe-barre { display: flex; flex-direction: column; min-height: 0; }
 .groupe-barre.ouvert { flex: 1; }
@@ -263,10 +263,10 @@ html.dans-fenetre .selection-dialogue > .card-header { display: none; }
 .groupe-liens li .desactive { color: #a3abb4; }
 .groupe-liens .arbre-choix { margin: 4px 10px 8px; width: calc(100% - 20px); }
 
-/* Liste façon Sage 100 V12 (Documents des ventes / des achats) */
-html.dans-fenetre .fenetre-contenu:has(#liste-sage) { padding: 0; }
-.liste-sage { display: flex; flex-direction: column; height: 75vh; min-height: 360px; font-size: .82rem; background: #fff; }
-html.dans-fenetre .liste-sage { height: 100vh; }
+/* Liste (Documents des ventes / des achats) */
+html.dans-fenetre .fenetre-contenu:has(#liste-pieces) { padding: 0; }
+.liste-pieces { display: flex; flex-direction: column; height: 75vh; min-height: 360px; font-size: .82rem; background: #fff; }
+html.dans-fenetre .liste-pieces { height: 100vh; }
 .liste-barre { display: flex; align-items: center; gap: 14px; padding: 4px 8px; border-bottom: 1px solid #d5dce4; background: #f6f8fa; }
 .liste-barre button, .liste-barre .inactif { border: 0; background: none; padding: 2px 4px; color: #2b3540; display: inline-flex; gap: 5px; align-items: center; }
 .liste-barre .inactif { color: #9aa4ae; }
@@ -300,10 +300,10 @@ html.dans-fenetre .liste-sage { height: 100vh; }
 .liste-pied .btn-ok:disabled { opacity: .45; }
 .liste-etat { padding: 2px 8px; font-size: .75rem; color: #5b6775; border-top: 1px solid #e3e7eb; background: #fff; }
 
-/* Fenêtre d'une pièce façon Sage 100 V12 (consultation et saisie) */
-html.dans-fenetre .fenetre-contenu:has(.piece-sage) { padding: 0; }
-.piece-sage { display: flex; flex-direction: column; min-height: 75vh; font-size: .82rem; background: #fff; }
-html.dans-fenetre .piece-sage { min-height: 100vh; }
+/* Fenêtre d'une pièce (consultation et saisie) */
+html.dans-fenetre .fenetre-contenu:has(.piece-fenetre) { padding: 0; }
+.piece-fenetre { display: flex; flex-direction: column; min-height: 75vh; font-size: .82rem; background: #fff; }
+html.dans-fenetre .piece-fenetre { min-height: 100vh; }
 .piece-barre { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 5px 10px; border-bottom: 1px solid #d5dce4; background: #f6f8fa; }
 .piece-barre > a, .piece-barre > button, .piece-barre .dropdown > button, .piece-barre .inactif { border: 0; background: none; padding: 2px 3px;
   color: #2b3540; text-decoration: none; display: inline-flex; gap: 5px; align-items: center; }

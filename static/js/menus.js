@@ -1,4 +1,4 @@
-/* Barre de menus façon Sage 100c : un clic ouvre un menu, le survol passe d'un menu à l'autre,
+/* Barre de menus : un clic ouvre un menu, le survol passe d'un menu à l'autre,
    les sous-menus s'ouvrent en cascade, Échap ou un clic extérieur referme. */
 (function () {
   const dansFenetre = document.documentElement.classList.contains('dans-fenetre');
@@ -106,7 +106,7 @@
   try { if (localStorage.getItem('erp-barre-verticale') === 'masquee') document.body.classList.add('sans-barre-verticale'); } catch (e) {}
 
   window.erpAction = nom => { const action = ACTIONS[nom]; if (action) action(); };
-  // Sur le bureau, la barre d'outils et le menu Édition agissent sur la fenêtre active (comme dans Sage)
+  // Sur le bureau, la barre d'outils et le menu Édition agissent sur la fenêtre active
   const TRANSMISES = ['ajouter', 'modifier', 'rechercher', 'imprimer', 'actualiser', 'couper', 'copier', 'coller', 'effacer',
                       'selectionner_tout', 'annuler'];
   document.querySelectorAll('[data-action]').forEach(el => {
@@ -166,7 +166,7 @@
     document.getElementById('form-logout')?.addEventListener('submit', () => {
       try { Object.keys(sessionStorage).filter(k => k.startsWith('erp-fenetres-')).forEach(k => sessionStorage.removeItem(k)); } catch (e) {}
     });
-    // Réduire / Agrandir-Restaurer, comme les fenêtres de Sage (double-clic sur la barre de titre = agrandir)
+    // Réduire / Agrandir-Restaurer (double-clic sur la barre de titre = agrandir)
     const fenetre = document.querySelector('.fenetre');
     const reduire = document.getElementById('fenetre-reduire'), agrandir = document.getElementById('fenetre-agrandir');
     const majAgrandir = () => {

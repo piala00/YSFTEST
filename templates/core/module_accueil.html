@@ -1,14 +1,14 @@
 {% extends "base.html" %}{% load erp %}
 {% block title %}Accueil{% endblock %}
 {% block content %}
-{# Écran d'accueil façon Sage 100 V12 : onglets IntuiSage / Dashboard ; les commandes s'ouvrent dans des fenêtres par-dessus #}
-<div class="accueil-sage">
+{# Écran d'accueil : onglets Accueil / Tableau de bord ; les commandes s'ouvrent dans des fenêtres par-dessus #}
+<div class="accueil-bureau">
   <div class="accueil-onglets" role="tablist">
-    <button type="button" role="tab" class="actif" data-onglet="intuisage" id="onglet-intuisage">IntuiSage</button>
-    <button type="button" role="tab" data-onglet="dashboard" id="onglet-dashboard">Dashboard</button>
+    <button type="button" role="tab" class="actif" data-onglet="accueil" id="onglet-accueil">Accueil</button>
+    <button type="button" role="tab" data-onglet="tableau" id="onglet-tableau">Tableau de bord</button>
   </div>
 
-  <div class="accueil-panneau" data-panneau="intuisage">
+  <div class="accueil-panneau" data-panneau="accueil">
     <div class="accueil-colonnes">
       <div class="accueil-gauche">
         <h2>À surveiller</h2>
@@ -38,7 +38,7 @@
     </div>
   </div>
 
-  <div class="accueil-panneau" data-panneau="dashboard" hidden>
+  <div class="accueil-panneau" data-panneau="tableau" hidden>
     <div class="row g-3 mb-4">
     {% for i in indicateurs %}
       <div class="col-6 col-md-4 col-xl-2">
@@ -71,6 +71,6 @@
     try { localStorage.setItem('erp-accueil-onglet', nom); } catch (e) {}
   };
   onglets.forEach(b => b.addEventListener('click', () => montrer(b.dataset.onglet)));
-  try { const nom = localStorage.getItem('erp-accueil-onglet'); if (nom) montrer(nom); } catch (e) {}
+  try { const nom = localStorage.getItem('erp-accueil-onglet'); if (nom === 'accueil' || nom === 'tableau') montrer(nom); } catch (e) {}
 })();
 </script>{% endblock %}

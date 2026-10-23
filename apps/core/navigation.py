@@ -207,7 +207,7 @@ def menu_edition():
         E("edition.atteindre", "Atteindre", preuve=P),
         SEP(),
         E("edition.inverseur", "Inverseur", preuve=P),
-        E("edition.calculette", "Calculette Sage", icone="bi-calculator", preuve=P),
+        E("edition.calculette", "Calculette", icone="bi-calculator", preuve=P),
         E("edition.journal", "Journal de traitement", preuve=P),
     ])
 
@@ -398,10 +398,10 @@ GESTION_COMMERCIALE = Module(
                 E("stocks.bon_fabrication", "Bon de fabrication"),
             ]),
             E("traitement.documents_internes", "Documents internes"),
-            E("traitement.sage_connect", "Sage Connect", enfants=[
-                E("traitement.sage_connect.societe", "Accéder à la société"),
-                E("traitement.sage_connect.transmission", "Transmission des factures clients"),
-                E("traitement.sage_connect.reception", "Réception des factures fournisseurs"),
+            E("traitement.services_connectes", "Services connectés", enfants=[
+                E("traitement.services_connectes.societe", "Accéder à la société"),
+                E("traitement.services_connectes.transmission", "Transmission des factures clients"),
+                E("traitement.services_connectes.reception", "Réception des factures fournisseurs"),
             ]),
             E("traitement.efacture", "Facture électronique"),
             SEP(),

@@ -2,7 +2,7 @@
 {% block title %}{{ titre }}{% endblock %}
 {% block content %}
 {# Saisie d'une pièce façon Sage 100 V12 : en-tête en trois colonnes, grille des lignes, pied (totaux), OK / Annuler #}
-<form method="post" id="doc-form" class="piece-sage">{% csrf_token %}
+<form method="post" id="doc-form" class="piece-fenetre">{% csrf_token %}
   <div class="piece-barre">
     <span class="inactif"><i class="bi bi-gear"></i> Fonctions</span><span class="inactif"><i class="bi bi-bar-chart-steps"></i> Barèmes</span>
     <span class="inactif"><i class="bi bi-card-list"></i> Informations</span><span class="inactif"><i class="bi bi-file-earmark"></i> Pied</span>

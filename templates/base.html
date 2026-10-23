@@ -10,7 +10,7 @@
   {% if module %}<style>:root { --module: {{ module.couleur }}; }</style>{% endif %}
   {% block head %}{% endblock %}
   {% if module %}<script>
-  // Espace de travail façon Sage : l'accueil est le bureau, chaque commande s'ouvre dans une fenêtre interne.
+  // Espace de travail : l'accueil est le bureau, chaque commande s'ouvre dans une fenêtre interne.
   window.ERP_MDI = {module: "{{ module.code }}", accueil: "{% url module.accueil %}", accueils: {{ accueils|safe }}};
   (function () {
     var m = window.ERP_MDI, ici = location.pathname + location.search;

@@ -12,7 +12,7 @@ class PageAccueilTests(TestCase):
         self.client.force_login(get_user_model().objects.create_superuser("accueil", "", "x"))
 
     def test_accueil_raccourcis_et_indicateurs_sans_recopier_les_menus(self):
-        for url, attendus in (("/commercial/", ["Factures clients non réglées", "Saisir un document de vente", "IntuiSage", "Dashboard"]),
+        for url, attendus in (("/commercial/", ["Factures clients non réglées", "Saisir un document de vente", "Accueil", "Tableau de bord"]),
                               ("/comptabilite/", ["Trésorerie", "Saisie par pièce", "Dernières écritures"])):
             reponse = self.client.get(url)
             self.assertEqual(reponse.status_code, 200)
@@ -20,7 +20,7 @@ class PageAccueilTests(TestCase):
                 self.assertContains(reponse, texte)
             contenu = reponse.content.decode()
             main = contenu[contenu.find("<main"):]
-            self.assertNotIn("Calculette Sage", main)          # plus de recopie du menu Édition dans la page
+            self.assertNotIn("Calculette", main)          # plus de recopie du menu Édition dans la page
             # La barre verticale présente les menus de travail, pas Fenêtre
             self.assertEqual(reponse.context["onglet_arbre"]["code"], "traitement")
 

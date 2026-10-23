@@ -1,8 +1,8 @@
-/* Bureau façon Sage 100 V12 : l'écran d'accueil reste au fond et chaque commande s'ouvre dans une fenêtre
+/* Bureau : l'écran d'accueil reste au fond et chaque commande s'ouvre dans une fenêtre
    interne que l'on peut déplacer, étirer par ses bords, réduire, agrandir et fermer. Plusieurs fenêtres
    (documents des ventes, documents des achats…) peuvent être ouvertes et placées côte à côte.
    Les boîtes de dialogue (fenêtre de sélection d'un état) gardent la taille de leur contenu, sans
-   redimensionnement, comme dans Sage. */
+   redimensionnement. */
 (function () {
   const mdi = window.ERP_MDI, zone = document.getElementById('fenetres-mdi'), barreReduites = document.getElementById('fenetres-reduites');
   const espace = document.querySelector('main.mdi');
@@ -65,7 +65,7 @@
     afficherReduites();
   }
 
-  // Taille et position par défaut : en cascade, comme les fenêtres filles de Sage
+  // Taille et position par défaut : en cascade
   function positionDefaut() {
     const s = surface(), n = fenetres.filter(f => f.etat !== 'reduite').length % 8;
     const l = Math.min(Math.max(640, Math.round(s.l * 0.72)), s.l), h = Math.min(Math.max(380, Math.round(s.h * 0.78)), s.h);

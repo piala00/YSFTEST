@@ -29,7 +29,7 @@ def commercial():
     alertes = [a for a in Article.objects.filter(suivi_stock=True, actif=True) if a.en_alerte]
     D = Document
     return {
-        # Blocs de l'écran d'accueil IntuiSage de Sage 100 V12 (capture d'une Gestion commerciale Premium)
+        # Blocs de tuiles de l'écran d'accueil (modèle étudié : Gestion commerciale V12)
         "raccourcis": [
             {"groupe": "Gestion des ventes", "liens": [
                 _raccourci("Liste des clients", "bi-person", "commercial:clients"),
