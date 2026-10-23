@@ -1,27 +1,108 @@
 {% extends "base.html" %}{% load erp %}
-{% block title %}{{ domaine|capfirst }}{% endblock %}
+{% block title %}Documents des {{ domaine }}{% endblock %}
 {% block content %}
-<div class="page-title"><h1>{{ element_actif.titre|default:domaine|capfirst }}</h1>
-  <div class="dropdown"><button class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus"></i> Nouveau</button>
-    <ul class="dropdown-menu dropdown-menu-end">{% for code, lib in types %}<li><a class="dropdown-item" href="{% url 'commercial:document_create' code %}">{{ lib }}</a></li>{% endfor %}</ul></div></div>
-<form class="row g-2 mb-3">
-  <div class="col-md-3"><select name="type" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Tous les types</option>
-    {% for code, lib in types %}<option value="{{ code }}" {% if code == type_document %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select></div>
-  <div class="col-md-2"><select name="statut" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Tous statuts</option>
-    {% for code, lib in statuts %}<option value="{{ code }}" {% if code == request.GET.statut %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select></div>
-  <div class="col-md-2"><select name="depot" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Tous les dépôts</option>
-    {% for d in depots %}<option value="{{ d.pk }}" {% if request.GET.depot == d.pk|stringformat:"s" %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></div>
-  <div class="col-md-3"><input name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="N°, tiers, référence…"></div>
-</form>
-<div class="card"><table class="table table-sm table-hover mb-0">
-<thead><tr><th>N°</th><th>Type</th><th>Date</th>{% if domaine == "stocks" %}<th>Dépôt</th><th>Destination</th><th>Référence</th><th class="num">Valeur</th>{% else %}<th>Tiers</th><th>Dépôt</th><th class="num">HT</th><th class="num">TTC</th><th class="num">Reste dû</th>{% endif %}<th>Statut</th></tr></thead><tbody>
-{% for d in object_list %}<tr><td><a href="{% url 'commercial:document_detail' d.pk %}">{{ d.numero_affiche }}</a></td><td>{{ d.get_type_document_display }}</td>
-<td>{{ d.date|date:"d/m/Y" }}</td>
-{% if domaine == "stocks" %}<td>{{ d.depot|default:"" }}</td><td>{{ d.depot_destination|default:"" }}</td><td>{{ d.reference_externe }}</td><td class="num">{{ d.total_ht|montant }}</td>
-{% else %}<td>{{ d.tiers.nom }}</td><td class="small text-muted">{{ d.depot|default:"" }}</td><td class="num">{{ d.total_ht|montant }}</td><td class="num">{{ d.total_ttc|montant }}</td>
-<td class="num">{% if d.statut == 'VALIDE' %}{{ d.reste_a_payer|montant_ou_vide }}{% endif %}</td>{% endif %}
-<td>{% include "commercial/_statut.html" with doc=d %}</td></tr>
-{% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucun document.</td></tr>{% endfor %}
-</tbody></table></div>
-{% include "pagination.html" %}
+{# Liste de documents façon Sage 100 V12 : filtres prédéfinis à gauche, grille triable, boutons en bas, barre d'état #}
+<div class="liste-sage" id="liste-sage" data-domaine="{{ domaine }}">
+  <div class="liste-barre">
+    <span class="inactif" title="Non disponible"><i class="bi bi-gear"></i> Fonction <i class="bi bi-caret-down-fill"></i></span>
+    <button type="button" id="liste-filtrer"><i class="bi bi-search"></i> Filtrer</button>
+    <span class="inactif" title="Non disponible"><i class="bi bi-star-fill"></i> Mes filtres <i class="bi bi-caret-down-fill"></i></span>
+    <form class="liste-recherche" method="get">
+      {% if filtre %}<input type="hidden" name="filtre" value="{{ filtre }}">{% endif %}
+      <input name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="N° pièce, tiers, référence…" aria-label="Rechercher">
+      <button class="btn btn-sm" title="Rechercher"><i class="bi bi-search"></i></button>
+    </form>
+  </div>
+  <div class="liste-corps">
+    <nav class="liste-filtres" aria-label="Filtres">
+      {% for code, libelle in filtres %}<a href="?{% if base_filtre %}{{ base_filtre }}&amp;{% endif %}filtre={{ code }}" class="{% if code == filtre %}actif{% endif %}">{{ libelle }}</a>{% endfor %}
+      <form method="get" class="liste-criteres" id="liste-criteres" hidden>
+        <input type="hidden" name="filtre" value="{{ filtre }}">
+        <label class="small mb-0" for="crit-statut">Statut</label>
+        <select id="crit-statut" name="statut" class="form-select form-select-sm mb-1" onchange="this.form.submit()"><option value="">Tous</option>
+          {% for code, lib in statuts %}<option value="{{ code }}" {% if code == request.GET.statut %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select>
+        <label class="small mb-0" for="crit-depot">Dépôt</label>
+        <select id="crit-depot" name="depot" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Tous</option>
+          {% for d in depots %}<option value="{{ d.pk }}" {% if request.GET.depot == d.pk|stringformat:"s" %}selected{% endif %}>{{ d }}</option>{% endfor %}</select>
+      </form>
+      <button type="button" class="plus-criteres" id="plus-criteres">Plus de critères…</button>
+    </nav>
+    <div class="liste-grille">
+      <table class="table table-sm mb-0" id="grille">
+        <thead><tr>{% for cle, libelle in colonnes %}<th class="{% if libelle == 'Hors taxe' or libelle == 'Solde dû' or libelle == 'Valeur' %}num{% endif %}">{% if cle %}<a href="?{% if base_tri %}{{ base_tri }}&amp;{% endif %}tri={{ cle }}&amp;sens={% if tri == cle and sens == 'asc' %}desc{% else %}asc{% endif %}">{{ libelle }}{% if tri == cle %} <i class="bi bi-caret-{% if sens == 'asc' %}up{% else %}down{% endif %}-fill"></i>{% endif %}</a>{% else %}{{ libelle }}{% endif %}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for d in object_list %}<tr data-url="{% url 'commercial:document_detail' d.pk %}" data-modifiable="{% if d.statut == 'BROUILLON' %}1{% endif %}" data-annuler="{% url 'commercial:document_annuler' d.pk %}" data-imprimer="{% url 'commercial:document_print' d.pk %}" tabindex="0">
+          <td><span class="type-piece type-{{ d.type_document|lower }}" title="{{ d.get_type_document_display }}">{{ prefixes|valeur:d.type_document }}</span></td>
+          {% if domaine == "stocks" %}
+          <td>{{ d.date|date:"dmy" }}</td><td><a href="{% url 'commercial:document_detail' d.pk %}" data-nouvelle-fenetre>{{ d.numero_affiche }}</a></td><td>{{ d.reference_externe }}</td>
+          <td>{{ d.depot|default:"" }}</td><td>{{ d.depot_destination|default:"" }}</td><td class="num">{{ d.total_ht|montant }}</td><td>{{ d.statut_liste }}</td>
+          {% else %}
+          <td>{% if d.ecriture_id %}<i class="bi bi-lock-fill" title="Comptabilisé"></i>{% endif %}</td>
+          <td>{{ d.date|date:"dmy" }}</td><td>{{ d.tiers.code }}</td>
+          <td><a href="{% url 'commercial:document_detail' d.pk %}" data-nouvelle-fenetre>{{ d.numero_affiche }}</a></td><td>{{ d.reference_externe }}</td>
+          <td class="num">{% if d.est_facturation and d.statut == 'VALIDE' %}{% with reste=d.reste_a_payer %}{% if reste %}{{ reste|montant }}{% else %}<i class="bi bi-circle-fill text-success" title="Soldé"></i>{% endif %}{% endwith %}{% endif %}</td>
+          <td class="num">{{ d.total_ht|montant }}</td><td>{{ d.statut_liste }}</td><td>{{ d.tiers.nom }}</td><td>{{ d.depot|default:"" }}</td>
+          {% endif %}
+        </tr>
+        {% empty %}<tr><td colspan="{{ colonnes|length }}" class="text-muted text-center p-4">Aucun document.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="liste-pied">
+    <div class="dropdown">
+      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Actions</button>
+      <ul class="dropdown-menu">
+        <li><button type="button" class="dropdown-item" data-liste="imprimer">Imprimer la pièce sélectionnée</button></li>
+        <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}">Actualiser la liste</a></li>
+      </ul>
+    </div>
+    {% include "pagination.html" %}
+    <div class="ms-auto d-flex gap-1">
+      <button type="button" class="btn btn-sm btn-ok" data-liste="ouvrir" disabled>Ouvrir</button>
+      <div class="dropup">
+        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Nouveau</button>
+        <ul class="dropdown-menu dropdown-menu-end">{% for code, lib in types %}<li><a class="dropdown-item" data-nouvelle-fenetre href="{% url 'commercial:document_create' code %}">{{ lib }}</a></li>{% endfor %}</ul>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-liste="supprimer" disabled>Supprimer</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-liste="fermer">Fermer</button>
+    </div>
+  </div>
+  <div class="liste-etat" id="liste-etat" data-total="{{ total }}">{{ total }} élément{{ total|pluralize }} dans la liste</div>
+  <form method="post" id="form-supprimer" hidden>{% csrf_token %}<input type="hidden" name="suivant" value="{{ request.get_full_path }}"></form>
+</div>
 {% endblock %}
+{% block scripts %}<script>
+(function () {
+  const grille = document.getElementById('grille'), etat = document.getElementById('liste-etat'), total = etat.dataset.total;
+  const boutons = sel => document.querySelector(`[data-liste="${sel}"]`);
+  let ligne = null;
+  const ouvrirUrl = url => (window.parent !== window && window.parent.erpFenetres) ? window.parent.erpFenetres.ouvrir(url) : (location.href = url);
+  const selectionner = tr => {
+    grille.querySelectorAll('tr.selection').forEach(t => t.classList.remove('selection'));
+    ligne = tr; tr.classList.add('selection');
+    boutons('ouvrir').disabled = false;
+    boutons('supprimer').disabled = !tr.dataset.modifiable;
+    etat.textContent = `1 élément sélectionné sur ${total} éléments de la liste`;
+  };
+  grille.querySelectorAll('tbody tr[data-url]').forEach(tr => {
+    tr.addEventListener('click', () => selectionner(tr));
+    tr.addEventListener('dblclick', () => ouvrirUrl(tr.dataset.url));
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter') ouvrirUrl(tr.dataset.url); });
+  });
+  boutons('ouvrir').addEventListener('click', () => ligne && ouvrirUrl(ligne.dataset.url));
+  boutons('imprimer').addEventListener('click', () => ligne && window.open(ligne.dataset.imprimer, '_blank'));
+  boutons('supprimer').addEventListener('click', () => {
+    if (!ligne || !confirm('Supprimer (annuler) ce document en brouillon ?')) return;
+    const f = document.getElementById('form-supprimer'); f.action = ligne.dataset.annuler; f.submit();
+  });
+  boutons('fermer').addEventListener('click', () => {
+    if (window.parent !== window && window.parent.erpFenetres) window.parent.erpFenetres.fermerCadre(window.frameElement);
+    else history.back();
+  });
+  document.getElementById('plus-criteres').addEventListener('click', () => {
+    const c = document.getElementById('liste-criteres'); c.hidden = !c.hidden;
+  });
+  document.getElementById('liste-filtrer').addEventListener('click', () => document.querySelector('.liste-recherche input[name=q]').focus());
+})();
+</script>{% endblock %}

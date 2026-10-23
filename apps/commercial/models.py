@@ -528,6 +528,27 @@ class Document(models.Model):
     def est_brouillon_numero(self):
         return self.numero.startswith("BROU-")
 
+    # Colonne « Statut » des listes de documents, sur le modèle de Sage (« A préparer », « A facturer »,
+    # « A comptabiliser »…) ; ici la facture est comptabilisée dès sa validation.
+    STATUTS_LISTE = {
+        DEVIS: "Accepté", COMMANDE: "A préparer", PREPARATION: "A livrer", LIVRAISON: "A facturer", RETOUR: "A facturer",
+        AVOIR_FINANCIER: "A facturer", ACHAT_DEMANDE: "A commander", ACHAT_PREPARATION: "A commander",
+        ACHAT_COMMANDE: "A réceptionner", ACHAT_RECEPTION: "A facturer", ACHAT_RETOUR: "A facturer",
+        ACHAT_AVOIR_FINANCIER: "A facturer",
+    }
+
+    @property
+    def statut_liste(self):
+        if self.statut == self.BROUILLON:
+            return "Saisi"
+        if self.statut == self.ANNULE:
+            return "Annulé"
+        if self.statut == self.TRANSFORME:
+            return "Transformé"
+        if self.est_facturation:
+            return "Comptabilisé" if self.ecriture_id else "A comptabiliser"
+        return self.STATUTS_LISTE.get(self.type_document, "Validé")
+
     @property
     def numero_affiche(self):
         return "(brouillon)" if self.est_brouillon_numero else self.numero

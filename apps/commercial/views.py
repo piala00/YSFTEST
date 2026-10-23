@@ -435,25 +435,58 @@ class MouvementListView(LoginRequiredMixin, ListView):
 
 # ---------------------------------------------------------------- Documents
 class DocumentListView(LoginRequiredMixin, ListView):
+    """Documents des ventes / des achats / des stocks, présentés comme la liste de Sage 100 V12 : filtres prédéfinis
+    à gauche (Documents en cours, un filtre par type, Facture comptabilisée, Tous les documents), tri par colonne."""
     model = Document
     template_name = "commercial/document_list.html"
-    paginate_by = 50
+    paginate_by = 100
+    TRIS = {"date": "date", "piece": "numero", "tiers": "tiers__code", "intitule": "tiers__nom", "reference": "reference_externe",
+            "ht": "total_ht", "depot": "depot__intitule", "type": "type_document"}
+    FACTURES = {"ventes": (Document.FACTURE, Document.FACTURE_RETOUR, Document.AVOIR),
+                "achats": (Document.ACHAT_FACTURE, Document.ACHAT_FACTURE_RETOUR, Document.ACHAT_AVOIR)}
+
+    def filtres(self):
+        """[(code, libellé)] du volet de gauche, comme dans Sage."""
+        libelles = dict(Document.TYPES)
+        factures = self.FACTURES.get(self.domaine, ())
+        courts = {Document.ACHAT_COMMANDE: "Bon de commande", Document.ACHAT_RECEPTION: "Bon de livraison",
+                  Document.ACHAT_RETOUR: "Bon de retour", Document.ACHAT_AVOIR_FINANCIER: "Bon d'avoir financier"}
+        liste = [("en_cours", "Documents en cours")]
+        liste += [(t, courts.get(t, libelles[t])) for t in self._types() if t not in factures]
+        if factures:
+            liste += [("facture", "Facture"), ("facture_comptabilisee", "Facture comptabilisée")]
+        return liste + [("tous", "Tous les documents")]
 
     def get_queryset(self):
         self.domaine = self.kwargs["domaine"]
+        g = self.request.GET
         qs = Document.objects.filter(type_document__in=self._types()).select_related("tiers", "depot", "depot_destination")
-        if self.request.GET.get("depot"):
-            qs = qs.filter(Q(depot_id=self.request.GET["depot"]) | Q(depot_destination_id=self.request.GET["depot"]))
-        self.type_document = self.request.GET.get("type", "")
+        if g.get("depot"):
+            qs = qs.filter(Q(depot_id=g["depot"]) | Q(depot_destination_id=g["depot"]))
+        self.type_document = g.get("type", "")
+        self.filtre = g.get("filtre") or self.type_document or ("tous" if g.get("impayees") or g.get("q") else "en_cours")
+        factures = self.FACTURES.get(self.domaine, ())
         if self.type_document:
             qs = qs.filter(type_document=self.type_document)
-        statut = self.request.GET.get("statut")
-        if statut:
-            qs = qs.filter(statut=statut)
-        q = self.request.GET.get("q")
+        elif self.filtre == "en_cours":
+            qs = qs.filter(statut__in=(Document.BROUILLON, Document.VALIDE))
+        elif self.filtre == "facture":
+            qs = qs.filter(type_document__in=factures, ecriture__isnull=True).exclude(statut=Document.ANNULE)
+        elif self.filtre == "facture_comptabilisee":
+            qs = qs.filter(type_document__in=factures, ecriture__isnull=False)
+        elif self.filtre in dict(Document.TYPES):
+            qs = qs.filter(type_document=self.filtre)
+        if g.get("statut"):
+            qs = qs.filter(statut=g["statut"])
+        q = g.get("q")
         if q:
-            qs = qs.filter(Q(numero__icontains=q) | Q(tiers__nom__icontains=q) | Q(reference_externe__icontains=q))
-        if self.request.GET.get("impayees"):
+            qs = qs.filter(Q(numero__icontains=q) | Q(tiers__nom__icontains=q) | Q(tiers__code__icontains=q)
+                           | Q(reference_externe__icontains=q))
+        self.tri = g.get("tri") if g.get("tri") in self.TRIS else "date"
+        self.sens = "asc" if g.get("sens") == "asc" else "desc"
+        champ = self.TRIS[self.tri]
+        qs = qs.order_by(("" if self.sens == "asc" else "-") + champ, "-id")
+        if g.get("impayees"):
             qs = [d for d in qs.filter(type_document__in=(Document.FACTURE, Document.ACHAT_FACTURE), statut=Document.VALIDE)
                   if d.reste_a_payer > 0]
         return qs
@@ -464,8 +497,25 @@ class DocumentListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         libelles = dict(Document.TYPES)
-        ctx.update(domaine=self.domaine, types=[(t, libelles[t]) for t in self._types()],
-                   type_document=self.type_document, statuts=Document.STATUTS, depots=Depot.objects.all())
+        g = self.request.GET.copy()
+        for cle in ("page", "tri", "sens"):
+            g.pop(cle, None)
+        base_tri = g.urlencode()
+        g.pop("filtre", None)
+        g.pop("type", None)
+        base_filtre = g.urlencode()
+        tiers = "client" if self.domaine == "ventes" else "fournisseur"
+        colonnes = [("type", "Type"), ("", "Etat"), ("date", "Date"), ("tiers", f"N° {tiers}"), ("piece", "N° pièce"),
+                    ("reference", "Référence"), ("", "Solde dû"), ("ht", "Hors taxe"), ("", "Statut"),
+                    ("intitule", f"Intitulé {tiers}"), ("depot", "Dépôt")]
+        if self.domaine == "stocks":
+            colonnes = [("type", "Type"), ("date", "Date"), ("piece", "N° pièce"), ("reference", "Référence"),
+                        ("depot", "Dépôt"), ("", "Destination"), ("ht", "Valeur"), ("", "Statut")]
+        ctx.update(domaine=self.domaine, types=[(t, libelles[t]) for t in self._types()], type_document=self.type_document,
+                   statuts=Document.STATUTS, depots=Depot.objects.all(), filtres=self.filtres(),
+                   filtre=self.filtre, colonnes=colonnes, tri=self.tri, sens=self.sens, base_tri=base_tri,
+                   base_filtre=base_filtre, prefixes=Document.PREFIXES,
+                   total=ctx["paginator"].count if ctx.get("paginator") else len(ctx["object_list"]))
         return ctx
 
 
@@ -592,6 +642,9 @@ def document_annuler(request, pk):
         messages.success(request, "Document annulé.")
     except ValidationError as exc:
         _erreur(request, exc)
+    suivant = request.POST.get("suivant", "")
+    if suivant.startswith("/") and not suivant.startswith("//"):      # retour à la liste d'où vient la demande
+        return redirect(suivant)
     return redirect("commercial:document_detail", pk=pk)
 
 

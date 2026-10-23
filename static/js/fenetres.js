@@ -228,6 +228,7 @@
     ouvrir, mosaique,
     active: () => active(),
     fermer: f => fermer(f),
+    fermerCadre: cadre => { const f = parCadre(cadre); if (f) fermer(f); },
     activerCadre: cadre => activer(parCadre(cadre)),
     retour: cadre => {
       const f = parCadre(cadre);

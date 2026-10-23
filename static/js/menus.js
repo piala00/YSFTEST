@@ -197,6 +197,18 @@
     else if (bouton) bouton.hidden = true;
   }
 
+  // Barre verticale en accordéon : un seul domaine ouvert, mémorisé
+  const groupes = document.querySelectorAll('.arbre.accordeon .groupe-barre');
+  if (groupes.length) {
+    const cleGroupe = 'erp-barre-groupe-' + ((window.ERP_MDI && window.ERP_MDI.module) || '');
+    const ouvrirGroupe = nom => groupes.forEach(g => g.classList.toggle('ouvert', g.dataset.groupe === nom));
+    groupes.forEach(g => g.querySelector('.groupe-titre').addEventListener('click', () => {
+      ouvrirGroupe(g.dataset.groupe);
+      try { localStorage.setItem(cleGroupe, g.dataset.groupe); } catch (e) {}
+    }));
+    try { const nom = localStorage.getItem(cleGroupe); if (nom && document.querySelector(`.groupe-barre[data-groupe="${nom}"]`)) ouvrirGroupe(nom); } catch (e) {}
+  }
+
   // Barre de navigation : choix du menu affiché
   const choix = document.getElementById('arbre-choix');
   if (choix) choix.addEventListener('change', () => {
@@ -215,6 +227,9 @@
       if (!a) return;
       if (a.getAttribute('href').startsWith('javascript:history.back')) {   // Annuler / Retour : revient en arrière ou ferme
         e.preventDefault(); parent.retour(cadre); return;
+      }
+      if (a.hasAttribute('data-nouvelle-fenetre')) {     // pièce ouverte depuis une liste : nouvelle fenêtre par-dessus
+        e.preventDefault(); parent.ouvrir(a.href); return;
       }
       const url = new URL(a.href, location.href);
       if (url.origin === location.origin && (accueils.includes(url.pathname) || url.pathname === '/')) a.target = '_top';

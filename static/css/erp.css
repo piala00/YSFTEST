@@ -247,3 +247,55 @@ html.dans-fenetre .selection-dialogue > .card-header { display: none; }
 .accueil-sage .tuile-chiffre.alerte { border-color: #e0a100; background: #fff7e0; }
 .accueil-dernieres { background: #fff; }
 @media (max-width: 992px) { .accueil-colonnes { grid-template-columns: 1fr; } }
+
+/* Barre verticale en accordéon (Sage 100 V12) : un domaine ouvert en haut, les autres empilés en bas, en vert */
+.arbre.accordeon { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.groupe-barre { display: flex; flex-direction: column; min-height: 0; }
+.groupe-barre.ouvert { flex: 1; }
+.groupe-titre { border: 0; text-align: left; padding: 7px 10px; font-size: .84rem; color: #fff; background: #2f7d32;
+  border-bottom: 1px solid rgba(255,255,255,.18); }
+.groupe-barre.ouvert .groupe-titre { background: #3a9a3e; font-weight: 600; }
+.groupe-titre:hover { filter: brightness(1.08); }
+.groupe-liens { display: none; list-style: none; margin: 0; padding: 6px 0; overflow: auto; }
+.groupe-barre.ouvert .groupe-liens { display: block; flex: 1; }
+.groupe-liens li a, .groupe-liens li .desactive { display: block; padding: 4px 18px; font-size: .82rem; color: #1f6f2a; text-decoration: none; }
+.groupe-liens li a:hover { background: #e8f3e8; }
+.groupe-liens li .desactive { color: #a3abb4; }
+.groupe-liens .arbre-choix { margin: 4px 10px 8px; width: calc(100% - 20px); }
+
+/* Liste façon Sage 100 V12 (Documents des ventes / des achats) */
+html.dans-fenetre .fenetre-contenu:has(#liste-sage) { padding: 0; }
+.liste-sage { display: flex; flex-direction: column; height: 75vh; min-height: 360px; font-size: .82rem; background: #fff; }
+html.dans-fenetre .liste-sage { height: 100vh; }
+.liste-barre { display: flex; align-items: center; gap: 14px; padding: 4px 8px; border-bottom: 1px solid #d5dce4; background: #f6f8fa; }
+.liste-barre button, .liste-barre .inactif { border: 0; background: none; padding: 2px 4px; color: #2b3540; display: inline-flex; gap: 5px; align-items: center; }
+.liste-barre .inactif { color: #9aa4ae; }
+.liste-barre button:hover { color: var(--module); }
+.liste-recherche { margin-left: auto; display: flex; gap: 2px; }
+.liste-recherche input { width: 16rem; }
+.liste-corps { flex: 1; display: flex; min-height: 0; }
+.liste-filtres { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid #d5dce4; overflow: auto; }
+.liste-filtres a { padding: 2px 8px; color: #222; text-decoration: none; }
+.liste-filtres a:hover { background: #eef3ee; }
+.liste-filtres a.actif { background: #3a9a3e; color: #fff; }
+.liste-criteres { padding: 6px 8px; }
+.plus-criteres { margin-top: auto; border: 0; background: none; color: #1f6f2a; text-decoration: underline; text-align: right; padding: 6px 10px; font-size: .8rem; }
+.liste-grille { flex: 1; overflow: auto; min-width: 0; }
+.liste-grille table { font-size: .8rem; white-space: nowrap; }
+.liste-grille thead th { position: sticky; top: 0; background: #fff; font-weight: 400; color: #4a5561; border-bottom: 1px solid #c9d1d9;
+  border-right: 1px solid #edf0f3; z-index: 1; }
+.liste-grille thead th a { color: inherit; text-decoration: none; display: block; }
+.liste-grille tbody tr { cursor: default; }
+.liste-grille tbody tr:hover { background: #f1f6f1; }
+.liste-grille tbody tr.selection, .liste-grille tbody tr.selection:hover { background: #bfe3bf; }
+.liste-grille tbody td a { color: inherit; text-decoration: none; }
+.type-piece { display: inline-block; min-width: 1.9rem; padding: 0 3px; font-size: .68rem; font-weight: 700; text-align: center; color: #fff;
+  background: #3b6ea8; border-radius: 2px; }
+.type-facture, .type-facture_retour, .type-avoir, .type-achat_facture, .type-achat_facture_retour, .type-achat_avoir { background: #1d5f99; }
+.type-livraison, .type-achat_reception { background: #5b6672; }
+.type-commande, .type-achat_commande, .type-devis { background: #6f7f39; }
+.liste-pied { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-top: 1px solid #d5dce4; background: #f6f8fa; }
+.liste-pied .pagination { margin: 0; }
+.liste-pied .btn-ok, .liste-pied .btn-ok:disabled { background: #3f8f3a; border-color: #3f8f3a; color: #fff; min-width: 5.5rem; }
+.liste-pied .btn-ok:disabled { opacity: .45; }
+.liste-etat { padding: 2px 8px; font-size: .75rem; color: #5b6775; border-top: 1px solid #e3e7eb; background: #fff; }

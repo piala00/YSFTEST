@@ -2,7 +2,7 @@ from django.urls import reverse
 
 from .droits import Droits, annoter
 from .models import Exercice, Societe
-from .navigation import MODULES, chemin_vers_actif, module_pour_chemin, structure_module
+from .navigation import MODULES, barre_verticale, chemin_vers_actif, module_pour_chemin, structure_module
 
 
 def societe(request):
@@ -42,6 +42,13 @@ def societe(request):
         arbre = next((o for o in onglets if o["code"] in ("traitement", "etat")), actif)
     match = getattr(request, "resolver_match", None)
     contexte["est_accueil"] = bool(match and match.view_name == module.accueil)
+    groupes = barre_verticale(module)
+    if groupes and not droits.libre:
+        from .droits import url_permise
+
+        for g in groupes:
+            g["liens"] = [l for l in g["liens"] if not l["url"] or url_permise(droits, l["url"])]
+    contexte["barre_verticale"] = [g for g in groupes if g["liens"]]
     contexte["accueils"] = [reverse(m.accueil) for m in MODULES]
     contexte.update(module=module, onglets=onglets, onglet_actif=actif, onglet_arbre=arbre, element_actif=element_actif,
                     fil_ariane=chemin_vers_actif(actif["elements"]))

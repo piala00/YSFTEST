@@ -703,6 +703,49 @@ MODULES_PAR_CODE = {m.code: m for m in MODULES}
 # ---------------------------------------------------------------------------
 # Résolution de l'élément actif
 # ---------------------------------------------------------------------------
+# Barre verticale de Sage 100 V12 : raccourcis par domaine, en accordéon (un domaine ouvert, les autres empilés en
+# bas). Gestion des ventes relevée sur une Gestion commerciale Premium V12 ; les autres domaines sont construits sur
+# le même modèle (Gestion des fabrications, des affaires et Sage eFacture n'existent pas dans l'ERP).
+# (titre, nom d'URL ou "", arguments, paramètres)
+BARRE_VERTICALE = {
+    "commercial": [
+        ("Gestion des ventes", [
+            ("Liste des clients", "commercial:clients", (), {}),
+            ("Liste des documents de vente", "commercial:documents", ("ventes",), {}),
+            ("Saisir un document de vente", "commercial:document_create", ("FACTURE",), {}),
+            ("Saisir une commande client", "commercial:document_create", ("COMMANDE",), {}),
+            ("Gestion des comptes clients", "commercial:clients", (), {"vue": "comptes"}),
+            ("CRM", "", (), {}),
+        ]),
+        ("Gestion des achats", [
+            ("Liste des fournisseurs", "commercial:fournisseurs", (), {}),
+            ("Liste des documents d'achat", "commercial:documents", ("achats",), {}),
+            ("Saisir un document d'achat", "commercial:document_create", ("ACHAT_FACTURE",), {}),
+            ("Saisir une commande fournisseur", "commercial:document_create", ("ACHAT_COMMANDE",), {}),
+            ("Gestion des comptes fournisseurs", "commercial:fournisseurs", (), {"vue": "comptes"}),
+        ]),
+        ("Gestion des articles et stocks", [
+            ("Liste des articles", "commercial:articles", (), {}),
+            ("Liste des documents de stock", "commercial:documents", ("stocks",), {}),
+            ("Saisir un document de stock", "commercial:document_create", ("STOCK_ENTREE",), {}),
+            ("Gestion des comptes articles", "commercial:stock", (), {}),
+            ("Saisie d'inventaire", "commercial:inventaires", (), {}),
+            ("Livre d'inventaire", "commercial:etat_inventaire", (), {"vue": "livre"}),
+        ]),
+    ],
+}
+
+
+def barre_verticale(module):
+    """[{titre, liens: [{titre, url}]}] du logiciel (vide si Sage n'en a pas été relevée)."""
+    groupes = []
+    for titre, liens in BARRE_VERTICALE.get(module.code, []):
+        groupes.append({"titre": titre, "liens": [
+            {"titre": t, "url": (reverse(nom, args=args) + (f"?{urlencode(query)}" if query else "")) if nom else None}
+            for t, nom, args, query in liens]})
+    return groupes
+
+
 # Fichiers liés (Fichier › À propos de votre société) : dans Sage, le fichier commercial pointe vers le fichier
 # comptable et inversement. Ici les logiciels partagent une seule base : tout ce qui est créé dans l'un est
 # aussitôt présent dans l'autre.
