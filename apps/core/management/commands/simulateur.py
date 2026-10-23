@@ -65,6 +65,7 @@ class Command(BaseCommand):
         pages = capture.capturer_web(depart)
         ressources = capture.ressources_statiques()
         navigation = donnees()
+        navigation.pop("preuves", None)        # provenance des menus : notes d'étude, pas affichées dans le logiciel
         contexte = {"societe": societe.raison_sociale, "exercice": exercice.code if exercice else "",
                     "utilisateur": capture.capturer_api()["utilisateur"]}
         web = _remplacer((GABARITS / "web.html").read_text(encoding="utf-8"), {
