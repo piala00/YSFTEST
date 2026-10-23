@@ -12,7 +12,7 @@ class PageAccueilTests(TestCase):
         self.client.force_login(get_user_model().objects.create_superuser("accueil", "", "x"))
 
     def test_accueil_raccourcis_et_indicateurs_sans_recopier_les_menus(self):
-        for url, attendus in (("/commercial/", ["Factures clients non réglées", "Bon de livraison", "Derniers documents"]),
+        for url, attendus in (("/commercial/", ["Factures clients non réglées", "Saisir un document de vente", "IntuiSage", "Dashboard"]),
                               ("/comptabilite/", ["Trésorerie", "Saisie par pièce", "Dernières écritures"])):
             reponse = self.client.get(url)
             self.assertEqual(reponse.status_code, 200)
@@ -23,3 +23,15 @@ class PageAccueilTests(TestCase):
             self.assertNotIn("Calculette Sage", main)          # plus de recopie du menu Édition dans la page
             # La barre verticale présente les menus de travail, pas Fenêtre
             self.assertEqual(reponse.context["onglet_arbre"]["code"], "traitement")
+
+    def test_bureau_et_fenetres_internes(self):
+        """L'accueil est le bureau : les commandes s'y ouvrent dans des fenêtres internes (cadres du même site)."""
+        reponse = self.client.get("/commercial/")
+        self.assertContains(reponse, 'id="fenetres-mdi"')
+        self.assertContains(reponse, "js/fenetres.js")
+        self.assertEqual(reponse["X-Frame-Options"], "SAMEORIGIN")
+        page = self.client.get("/commercial/clients/")                     # page ouverte dans une fenêtre
+        self.assertNotContains(page, 'id="fenetres-mdi"')
+        self.assertContains(page, "dans-fenetre")
+        selection = self.client.get("/commercial/stock/mouvements/")      # boîte de dialogue titrée comme l'état
+        self.assertContains(selection, "<title>Mouvements de stock")

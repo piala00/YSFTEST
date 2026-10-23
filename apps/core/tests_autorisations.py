@@ -56,8 +56,8 @@ class AutorisationsTests(TestCase):
         self.regler("achats.documents", d.LECTURE)
         self.client.force_login(self.vendeur)
         titres = [l["titre"] for g in self.client.get(reverse("commercial:accueil")).context["raccourcis"] for l in g["liens"]]
-        self.assertNotIn("Facture fournisseur", titres)        # formulaire de saisie : écriture interdite
-        self.assertIn("Facture", titres)
+        self.assertNotIn("Saisir un document d'achat", titres)   # formulaire de saisie : écriture interdite
+        self.assertIn("Saisir un document de vente", titres)
 
     def test_interdire_l_ecriture(self):
         self.regler("ventes.facture", d.LECTURE)

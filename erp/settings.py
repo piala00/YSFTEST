@@ -77,6 +77,9 @@ MIDDLEWARE = [
     "apps.core.selection.SelectionMiddleware",           # fenêtre de sélection avant les états
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+# Les fenêtres internes du bureau (façon Sage) affichent les pages du logiciel dans des cadres : même site seulement
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
 
 ROOT_URLCONF = "erp.urls"
 

@@ -9,8 +9,20 @@
   <link href="{% static 'css/erp.css' %}" rel="stylesheet">
   {% if module %}<style>:root { --module: {{ module.couleur }}; }</style>{% endif %}
   {% block head %}{% endblock %}
+  {% if module %}<script>
+  // Espace de travail façon Sage : l'accueil est le bureau, chaque commande s'ouvre dans une fenêtre interne.
+  window.ERP_MDI = {module: "{{ module.code }}", accueil: "{% url module.accueil %}", accueils: {{ accueils|safe }}};
+  (function () {
+    var m = window.ERP_MDI, ici = location.pathname + location.search;
+    if (window.top !== window.self) { document.documentElement.classList.add('dans-fenetre'); return; }
+    // Page ouverte directement (lien, actualisation) : on revient au bureau et on la rouvre dans une fenêtre
+    if (location.pathname !== m.accueil && !/[?&]seul=1/.test(location.search) && window.innerWidth >= 768) {
+      try { sessionStorage.setItem('erp-mdi-ouvrir-' + m.module, ici); location.replace(m.accueil); } catch (e) {}
+    }
+  })();
+  </script>{% endif %}
 </head>
-<body{% if selection %} class="selection-validee"{% endif %}>
+<body{% if selection %} class="selection-validee"{% endif %}{% if module and est_accueil %} data-bureau="1"{% endif %}>
 {% if user.is_authenticated %}
   <form id="form-logout" method="post" action="{% url 'logout' %}" class="d-none">{% csrf_token %}</form>
   <header class="topbar d-print-none {% if not module %}topbar-portail{% endif %}">
@@ -69,9 +81,12 @@
       {% endif %}{% endfor %}
     </aside>
   {% endif %}
-  <main class="flex-grow-1 main{% if module %} espace-travail{% else %} p-4{% endif %}">
-    {% if module %}
-    {# Espace de travail façon Sage : chaque commande s'ouvre dans une fenêtre au centre, les menus restent autour #}
+  <main class="flex-grow-1 main{% if module %} espace-travail{% if est_accueil %} mdi{% endif %}{% else %} p-4{% endif %}">
+    {% if module and est_accueil %}
+    {# Bureau : l'écran d'accueil reste au fond ; les fenêtres internes (déplaçables, redimensionnables) s'ouvrent par-dessus #}
+    <div class="bureau" id="bureau">
+    {% elif module %}
+    {# Page seule (petit écran ou ?seul=1) : une fenêtre au centre, les menus restent autour #}
     <div class="onglets-fenetres d-print-none" id="onglets-fenetres" data-module="{{ module.code }}" data-accueil="{% url module.accueil %}"></div>
     <section class="fenetre">
       <div class="fenetre-titre d-print-none">
@@ -85,7 +100,7 @@
       </div>
       <div class="fenetre-contenu">
     {% endif %}
-    {% if fil_ariane %}<nav class="fil-ariane d-print-none"><span>{{ onglet_actif.titre }}</span>{% for n in fil_ariane %} <i class="bi bi-chevron-right"></i> <span>{{ n.titre }}</span>{% endfor %}</nav>{% endif %}
+    {% if fil_ariane and not est_accueil %}<nav class="fil-ariane d-print-none"><span>{{ onglet_actif.titre }}</span>{% for n in fil_ariane %} <i class="bi bi-chevron-right"></i> <span>{{ n.titre }}</span>{% endfor %}</nav>{% endif %}
     {% include "core/_messages.html" %}
     {% if selection %}<div class="barre-selection d-print-none"><i class="bi bi-funnel"></i> <span>{{ selection.texte|default:"Sélection" }}</span>
       <span class="ms-auto d-flex gap-2"><a class="btn btn-sm btn-outline-secondary" href="{{ selection.modifier }}"><i class="bi bi-sliders"></i> Modifier la sélection</a>
@@ -93,7 +108,10 @@
       {% if selection.export %}<a class="btn btn-sm btn-outline-success" href="{{ selection.export }}"><i class="bi bi-filetype-csv"></i> Exporter</a>{% endif %}</span></div>
     <div class="d-none d-print-block small mb-2">Sélection : {{ selection.texte }}</div>{% endif %}
     {% block content %}{% endblock %}
-    {% if module %}</div></section>{% endif %}
+    {% if module and est_accueil %}</div>
+    <div class="fenetres-mdi d-print-none" id="fenetres-mdi"></div>
+    <div class="fenetres-reduites d-print-none" id="fenetres-reduites"></div>
+    {% elif module %}</div></section>{% endif %}
   </main>
   {% if module %}</div>{% endif %}
 {% else %}
@@ -101,6 +119,7 @@
 {% endif %}
 <script src="{% static 'vendor/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'js/menus.js' %}"></script>
+{% if module and est_accueil %}<script src="{% static 'js/fenetres.js' %}"></script>{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

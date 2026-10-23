@@ -214,7 +214,7 @@ def menu_edition():
 
 def menu_fenetre(module):
     return Onglet("fenetre", "Fenêtre", "bi-window-stack", [
-        E("fenetre.reorganiser", "Réorganiser"),
+        E("fenetre.reorganiser", "Réorganiser", icone="bi-grid-1x2", action="reorganiser"),
         E("fenetre.actualiser", "Actualiser", icone="bi-arrow-clockwise", action="actualiser"),
         E("fenetre.personnaliser", "Personnaliser"),
         E("fenetre.personnaliser_ecrans", "Personnaliser les écrans"),

@@ -155,3 +155,95 @@ body.sans-barre-verticale .coche-barre { visibility: hidden; }
 .barre-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; margin-bottom: 12px;
   background: #f4f6f8; border: 1px solid #dde3ea; border-radius: 6px; font-size: .85rem; }
 body.selection-validee .filtres-etat { display: none !important; }
+
+/* ======================================================================
+   Bureau façon Sage 100 V12 : accueil au fond, fenêtres internes par-dessus
+   ====================================================================== */
+body[data-bureau] { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+body[data-bureau] > .espace { flex: 1; min-height: 0; }
+.espace-travail.mdi { position: relative; padding: 0; overflow: hidden; background: #e9edf1; }
+.mdi .bureau { position: absolute; inset: 0; overflow: auto; padding: 12px 16px 48px; }
+.fenetres-mdi { position: absolute; inset: 0; pointer-events: none; }
+.fenetre-mdi { position: absolute; display: flex; flex-direction: column; pointer-events: auto; background: #fff;
+  border: 1px solid #8a96a3; box-shadow: 0 6px 22px rgba(20, 30, 40, .28); min-width: 0; }
+.fenetre-mdi.active { border-color: var(--module); }
+.mdi-titre { display: flex; align-items: center; gap: 8px; height: 30px; flex: 0 0 30px; padding: 0 0 0 10px; cursor: move;
+  user-select: none; background: #4a5561; color: #fff; font-size: .85rem; }
+.fenetre-mdi.active .mdi-titre { background: var(--module); }
+.fenetre-mdi.agrandie .mdi-titre { cursor: default; }
+.mdi-libelle { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mdi-boutons { display: flex; height: 100%; }
+.mdi-boutons button, .mdi-reduite button { border: 0; background: none; color: inherit; width: 38px; height: 100%; padding: 0; }
+.mdi-boutons button:hover { background: rgba(255, 255, 255, .18); }
+.mdi-boutons .mdi-fermer:hover, .mdi-reduite .mdi-fermer:hover { background: #c62828; color: #fff; }
+.mdi-corps { flex: 1; min-height: 0; }
+.mdi-corps iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+.mdi-bord { position: absolute; z-index: 2; }
+.mdi-n, .mdi-s { left: 6px; right: 6px; height: 6px; cursor: ns-resize; }
+.mdi-n { top: -3px; } .mdi-s { bottom: -3px; }
+.mdi-e, .mdi-o { top: 6px; bottom: 6px; width: 6px; cursor: ew-resize; }
+.mdi-e { right: -3px; } .mdi-o { left: -3px; }
+.mdi-ne, .mdi-no, .mdi-se, .mdi-so { width: 12px; height: 12px; }
+.mdi-ne { top: -4px; right: -4px; cursor: nesw-resize; } .mdi-so { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.mdi-no { top: -4px; left: -4px; cursor: nwse-resize; } .mdi-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+/* Boîte de dialogue : taille fixe, seule la fermeture reste (comme « Mouvements de stock ») */
+.fenetre-mdi.dialogue .mdi-bord, .fenetre-mdi.dialogue [data-cmd=reduire], .fenetre-mdi.dialogue [data-cmd=agrandir] { display: none; }
+.fenetre-mdi.agrandie { box-shadow: none; border-width: 0; }
+.fenetre-mdi.agrandie .mdi-bord { display: none; }
+/* Pendant un déplacement, les iframes ne capturent pas la souris */
+body.mdi-glisse iframe { pointer-events: none; }
+body.mdi-glisse { cursor: move; user-select: none; }
+/* Fenêtres réduites : petites barres de titre en bas du bureau */
+.fenetres-reduites { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 8px;
+  pointer-events: none; z-index: 5000; }
+.mdi-reduite { pointer-events: auto; display: flex; align-items: center; width: 230px; height: 28px; background: #4a5561; color: #fff;
+  font-size: .8rem; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.mdi-reduite span { flex: 1; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.mdi-reduite button { width: 28px; }
+.mdi-reduite button:hover { background: rgba(255, 255, 255, .18); }
+@media (max-width: 768px) {
+  .mdi .bureau { padding: 8px 16px 48px; }
+}
+
+/* Page affichée à l'intérieur d'une fenêtre : ni en-tête, ni menus, ni barre verticale */
+html.dans-fenetre .topbar, html.dans-fenetre .barre-menus, html.dans-fenetre .barre-outils, html.dans-fenetre .arbre,
+html.dans-fenetre .onglets-fenetres, html.dans-fenetre .fenetre-titre { display: none !important; }
+html.dans-fenetre body { background: #fff; }
+html.dans-fenetre .espace { min-height: 0; }
+html.dans-fenetre .espace-travail { padding: 0; background: #fff; }
+html.dans-fenetre .fenetre { border: 0; border-radius: 0; box-shadow: none; }
+html.dans-fenetre .fenetre-contenu { padding: .9rem 1rem; }
+html.dans-fenetre .fil-ariane { display: none; }
+/* Boîte de dialogue dans sa fenêtre : collée au cadre, à la taille de son contenu */
+html.dans-fenetre .fenetre-contenu:has(#fenetre-selection) { padding: 0; }
+html.dans-fenetre .selection-dialogue { margin: 0; width: max-content; min-width: 400px; max-width: 520px; box-shadow: none; border-radius: 0; }
+html.dans-fenetre .selection-dialogue > .card-header { display: none; }
+
+/* Fenêtre de sélection façon Sage : barre Fonctions / Plus de critères / Différer, libellés à gauche */
+.selection-barre { display: flex; gap: 14px; align-items: center; padding: 5px 10px; border-bottom: 1px solid #dde3ea; background: #f6f8fa;
+  font-size: .82rem; color: #8a95a1; }
+.selection-barre span { display: inline-flex; align-items: center; gap: 4px; }
+.selection-ligne { display: grid; grid-template-columns: 9.5rem 1fr; align-items: center; gap: 6px; margin-bottom: 5px; }
+.selection-ligne > label { text-align: right; font-size: .82rem; margin: 0; }
+.selection-plage { display: flex; align-items: center; gap: 6px; }
+.selection-plage .form-control, .selection-plage .form-select { min-width: 0; }
+.selection-dialogue .btn-ok { background: #3f8f3a; border-color: #3f8f3a; color: #fff; min-width: 6rem; }
+.selection-dialogue .btn-ok:hover { filter: brightness(.92); color: #fff; }
+
+/* Écran d'accueil IntuiSage */
+.accueil-onglets { display: flex; gap: 4px; border-bottom: 1px solid #cfd6dd; margin-bottom: 14px; }
+.accueil-onglets button { border: 0; background: none; padding: 6px 16px; font-weight: 600; color: #5b6775; border-bottom: 3px solid transparent; }
+.accueil-onglets button.actif { color: #1e2a3a; border-bottom-color: var(--module); }
+.accueil-colonnes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 32px; }
+.accueil-sage h2 { font-size: 1.05rem; font-weight: 600; margin: 4px 0 10px; color: #2b3540; }
+.accueil-sage .tuiles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.accueil-sage .tuile { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 10px; width: 128px; height: 122px;
+  padding: 10px 8px 12px; background: #f1f2f3; border: 1px solid #e0e3e6; color: #3a4048; text-align: center; font-size: .8rem;
+  line-height: 1.2; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.accueil-sage .tuile i { font-size: 2.3rem; color: #5a6068; margin-bottom: auto; padding-top: 8px; }
+.accueil-sage .tuile:hover { background: #e6e9ec; border-color: var(--module); }
+.accueil-sage .tuile-chiffre { justify-content: center; }
+.accueil-sage .tuile-chiffre .chiffre { font-size: 1.15rem; font-weight: 700; color: #1e2a3a; }
+.accueil-sage .tuile-chiffre.alerte { border-color: #e0a100; background: #fff7e0; }
+.accueil-dernieres { background: #fff; }
+@media (max-width: 992px) { .accueil-colonnes { grid-template-columns: 1fr; } }

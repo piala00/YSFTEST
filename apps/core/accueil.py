@@ -29,28 +29,25 @@ def commercial():
     alertes = [a for a in Article.objects.filter(suivi_stock=True, actif=True) if a.en_alerte]
     D = Document
     return {
+        # Blocs de l'écran d'accueil IntuiSage de Sage 100 V12 (capture d'une Gestion commerciale Premium)
         "raccourcis": [
-            {"groupe": "Ventes", "liens": [
-                _raccourci("Devis", "bi-file-earmark-text", "commercial:document_create", D.DEVIS),
-                _raccourci("Bon de livraison", "bi-truck", "commercial:document_create", D.LIVRAISON),
-                _raccourci("Facture", "bi-receipt", "commercial:document_create", D.FACTURE),
-                _raccourci("Règlement", "bi-cash-coin", "commercial:reglement_create"),
+            {"groupe": "Gestion des ventes", "liens": [
+                _raccourci("Liste des clients", "bi-person", "commercial:clients"),
+                _raccourci("Saisir un document de vente", "bi-file-earmark-plus", "commercial:document_create", D.FACTURE),
+                _raccourci("Saisir un règlement client", "bi-plus-lg", "commercial:reglement_create"),
+                _raccourci("Gestion des comptes clients", "bi-archive", "commercial:clients", query="vue=comptes"),
             ]},
-            {"groupe": "Achats", "liens": [
-                _raccourci("Bon de commande", "bi-cart", "commercial:document_create", D.ACHAT_COMMANDE),
-                _raccourci("Bon de réception", "bi-box-arrow-in-down", "commercial:document_create", D.ACHAT_RECEPTION),
-                _raccourci("Facture fournisseur", "bi-receipt-cutoff", "commercial:document_create", D.ACHAT_FACTURE),
+            {"groupe": "Gestion des achats", "liens": [
+                _raccourci("Liste des fournisseurs", "bi-person-badge", "commercial:fournisseurs"),
+                _raccourci("Saisir un document d'achat", "bi-file-earmark-plus", "commercial:document_create", D.ACHAT_FACTURE),
+                _raccourci("Saisir un règlement fournisseur", "bi-plus-lg", "commercial:reglement_create"),
+                _raccourci("Gestion des comptes fournisseurs", "bi-archive", "commercial:fournisseurs", query="vue=comptes"),
             ]},
-            {"groupe": "Stocks", "liens": [
-                _raccourci("Mouvement d'entrée", "bi-box-arrow-in-right", "commercial:document_create", D.STOCK_ENTREE),
-                _raccourci("Mouvement de sortie", "bi-box-arrow-right", "commercial:document_create", D.STOCK_SORTIE),
-                _raccourci("Transfert de dépôt", "bi-arrow-left-right", "commercial:document_create", D.STOCK_VIREMENT),
-                _raccourci("État du stock", "bi-boxes", "commercial:stock"),
-            ]},
-            {"groupe": "Fichiers", "liens": [
-                _raccourci("Clients", "bi-people", "commercial:clients"),
-                _raccourci("Fournisseurs", "bi-truck-front", "commercial:fournisseurs"),
-                _raccourci("Articles", "bi-box-seam", "commercial:articles"),
+            {"groupe": "Gestion des stocks", "liens": [
+                _raccourci("Liste des articles", "bi-box", "commercial:articles"),
+                _raccourci("Saisir un document de stock", "bi-file-earmark-plus", "commercial:document_create", D.STOCK_ENTREE),
+                _raccourci("Gestion des comptes articles", "bi-archive", "commercial:stock"),
+                _raccourci("Livre d'inventaire", "bi-printer", "commercial:etat_inventaire"),
             ]},
         ],
         "indicateurs": [

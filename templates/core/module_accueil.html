@@ -1,33 +1,55 @@
 {% extends "base.html" %}{% load erp %}
 {% block title %}Accueil{% endblock %}
 {% block content %}
-<div class="page-title"><h1><i class="bi {{ module.icone }}" style="color:var(--module)"></i> {{ module.titre }}</h1>
-  <span class="text-muted">{{ societe }} · exercice {{ exercice_courant }}</span></div>
-
-<div class="row g-3 mb-4">
-{% for i in indicateurs %}
-  <div class="col-6 col-md-4 col-xl-2">
-    <a class="card card-body h-100 text-decoration-none indicateur{% if i.alerte %} border-warning{% endif %}" href="{{ i.url }}">
-      <div class="small text-muted">{{ i.titre }}</div>
-      <div class="fs-5 fw-semibold text-body">{% if i.genre == "nombre" %}{{ i.valeur }}{% else %}{{ i.valeur|montant }}{% endif %}</div>
-      {% if i.detail %}<div class="small {% if i.alerte %}text-warning-emphasis{% else %}text-muted{% endif %}">{{ i.detail }}</div>{% endif %}
-    </a>
+{# Écran d'accueil façon Sage 100 V12 : onglets IntuiSage / Dashboard ; les commandes s'ouvrent dans des fenêtres par-dessus #}
+<div class="accueil-sage">
+  <div class="accueil-onglets" role="tablist">
+    <button type="button" role="tab" class="actif" data-onglet="intuisage" id="onglet-intuisage">IntuiSage</button>
+    <button type="button" role="tab" data-onglet="dashboard" id="onglet-dashboard">Dashboard</button>
   </div>
-{% endfor %}
-</div>
 
-<div class="row g-3">
-  <div class="col-lg-7">
-    {% for g in raccourcis %}
-    <div class="mb-3">
-      <div class="small fw-semibold text-uppercase text-muted mb-2">{{ g.groupe }}</div>
-      <div class="raccourcis">
-        {% for r in g.liens %}<a class="raccourci" href="{{ r.url }}"><i class="bi {{ r.icone }}"></i><span>{{ r.titre }}</span></a>{% endfor %}
+  <div class="accueil-panneau" data-panneau="intuisage">
+    <div class="accueil-colonnes">
+      <div class="accueil-gauche">
+        <h2>À surveiller</h2>
+        <div class="tuiles">
+          {% for i in indicateurs %}{% if i.alerte or forloop.counter <= 2 %}
+          <a class="tuile tuile-chiffre{% if i.alerte %} alerte{% endif %}" href="{{ i.url }}">
+            <span class="chiffre">{% if i.genre == "nombre" %}{{ i.valeur }}{% else %}{{ i.valeur|montant }}{% endif %}</span>
+            <span>{{ i.titre }}</span></a>
+          {% endif %}{% endfor %}
+        </div>
+        <h2>{{ titre_dernieres }}</h2>
+        <table class="table table-sm table-hover small accueil-dernieres">
+          <tbody>{% for d in dernieres %}
+            <tr><td class="text-nowrap">{{ d.date|date:"d/m/y" }}</td><td><a href="{{ d.url }}">{{ d.piece }}</a> <span class="text-muted">{{ d.libelle }}</span></td>
+            <td class="num text-nowrap">{{ d.montant|montant }}</td></tr>
+          {% empty %}<tr><td class="text-muted text-center p-3">Aucune pièce pour l'instant.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+      <div class="accueil-droite">
+        {% for g in raccourcis %}
+        <h2>{{ g.groupe }}</h2>
+        <div class="tuiles">
+          {% for r in g.liens %}<a class="tuile" href="{{ r.url }}"><i class="bi {{ r.icone }}"></i><span>{{ r.titre }}</span></a>{% endfor %}
+        </div>
+        {% endfor %}
       </div>
     </div>
-    {% endfor %}
   </div>
-  <div class="col-lg-5">
+
+  <div class="accueil-panneau" data-panneau="dashboard" hidden>
+    <div class="row g-3 mb-4">
+    {% for i in indicateurs %}
+      <div class="col-6 col-md-4 col-xl-2">
+        <a class="card card-body h-100 text-decoration-none indicateur{% if i.alerte %} border-warning{% endif %}" href="{{ i.url }}">
+          <div class="small text-muted">{{ i.titre }}</div>
+          <div class="fs-5 fw-semibold text-body">{% if i.genre == "nombre" %}{{ i.valeur }}{% else %}{{ i.valeur|montant }}{% endif %}</div>
+          {% if i.detail %}<div class="small {% if i.alerte %}text-warning-emphasis{% else %}text-muted{% endif %}">{{ i.detail }}</div>{% endif %}
+        </a>
+      </div>
+    {% endfor %}
+    </div>
     <div class="card">
       <div class="card-header bg-white fw-semibold">{{ titre_dernieres }}</div>
       <table class="table table-sm table-hover mb-0 small">
@@ -37,7 +59,18 @@
         {% empty %}<tr><td class="text-muted text-center p-4">Aucune pièce pour l'instant.</td></tr>{% endfor %}</tbody>
       </table>
     </div>
-    <p class="small text-muted mt-3 mb-0">Toutes les commandes sont dans la barre de menus : Fichier, Édition, Structure, Traitement, Etat.</p>
   </div>
 </div>
 {% endblock %}
+{% block scripts %}<script>
+(function () {
+  const onglets = document.querySelectorAll('.accueil-onglets [data-onglet]');
+  const montrer = nom => {
+    onglets.forEach(b => b.classList.toggle('actif', b.dataset.onglet === nom));
+    document.querySelectorAll('.accueil-panneau').forEach(p => { p.hidden = p.dataset.panneau !== nom; });
+    try { localStorage.setItem('erp-accueil-onglet', nom); } catch (e) {}
+  };
+  onglets.forEach(b => b.addEventListener('click', () => montrer(b.dataset.onglet)));
+  try { const nom = localStorage.getItem('erp-accueil-onglet'); if (nom) montrer(nom); } catch (e) {}
+})();
+</script>{% endblock %}

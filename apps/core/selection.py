@@ -128,7 +128,24 @@ def fenetre(request):
     caches = [(k, v) for k, v in request.GET.items() if k not in occupes and k not in ("ok", "page")]
     champs = [{"critere": c, "choix": _choix(c, valeurs)} for c in criteres]
     delais = [("delai1", "1er délai"), ("delai2", "2ème délai"), ("delai3", "3ème délai")]
-    return render(request, "core/selection.html", {"champs": champs, "valeurs": valeurs, "caches": caches, "delais": delais})
+    return render(request, "core/selection.html", {"champs": champs, "valeurs": valeurs, "caches": caches, "delais": delais,
+                                                   "titre_etat": _titre_etat(request)})
+
+
+def _titre_etat(request):
+    """Titre de la boîte de dialogue : le nom de l'état dans les menus (« Mouvements de stock »…)."""
+    from .droits import arbre
+    from .navigation import module_pour_chemin
+
+    module, nom = module_pour_chemin(request.path), _nom(request)
+    if module is None:
+        return ""
+    for _, lignes in arbre(module)[0]:
+        for el, _ in lignes:
+            if el.url == nom and (not el.args or list(el.args) == list(request.resolver_match.args)
+                                  or list(el.args) == list(request.resolver_match.kwargs.values())):
+                return el.titre
+    return ""
 
 
 def resume(request):

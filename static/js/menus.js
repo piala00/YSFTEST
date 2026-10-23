@@ -1,6 +1,8 @@
 /* Barre de menus façon Sage 100c : un clic ouvre un menu, le survol passe d'un menu à l'autre,
    les sous-menus s'ouvrent en cascade, Échap ou un clic extérieur referme. */
 (function () {
+  const dansFenetre = document.documentElement.classList.contains('dans-fenetre');
+  const mdi = () => (!dansFenetre && window.erpFenetres) || null;
   const barre = document.getElementById('barre-menus');
   if (barre) {
     const menus = barre.querySelectorAll('.menu');
@@ -47,7 +49,11 @@
   const ACTIONS = {
     imprimer: () => window.print(),
     actualiser: () => window.location.reload(),
-    fermer: () => { window.close(); window.location.href = '/'; },
+    fermer: () => {
+      if (mdi() && mdi().active()) return mdi().fermer(mdi().active());
+      window.close(); window.location.href = '/';
+    },
+    reorganiser: () => mdi() ? mdi().mosaique() : signaler('Aucune fenêtre à réorganiser.'),
     annuler: () => { if (dernierChamp) { dernierChamp.focus(); document.execCommand('undo'); } },
     couper: () => {
       if (!dernierChamp) return signaler('Sélectionnez du texte dans un champ.');
@@ -99,10 +105,20 @@
   };
   try { if (localStorage.getItem('erp-barre-verticale') === 'masquee') document.body.classList.add('sans-barre-verticale'); } catch (e) {}
 
+  window.erpAction = nom => { const action = ACTIONS[nom]; if (action) action(); };
+  // Sur le bureau, la barre d'outils et le menu Édition agissent sur la fenêtre active (comme dans Sage)
+  const TRANSMISES = ['ajouter', 'modifier', 'rechercher', 'imprimer', 'actualiser', 'couper', 'copier', 'coller', 'effacer',
+                      'selectionner_tout', 'annuler'];
   document.querySelectorAll('[data-action]').forEach(el => {
     el.addEventListener('mousedown', e => e.preventDefault());   // garder la sélection du champ actif
     el.addEventListener('click', e => {
       e.preventDefault();
+      const active = mdi() && mdi().active();
+      if (active && TRANSMISES.includes(el.dataset.action) && active.iframe.contentWindow.erpAction) {
+        active.iframe.contentWindow.erpAction(el.dataset.action);
+        if (barre) { barre.classList.remove('active'); barre.querySelectorAll('.menu').forEach(m => m.classList.remove('ouvert')); }
+        return;
+      }
       const action = ACTIONS[el.dataset.action];
       if (action) action();
       if (barre) { barre.classList.remove('active'); barre.querySelectorAll('.menu').forEach(m => m.classList.remove('ouvert')); }
@@ -113,7 +129,7 @@
   // Fenêtres ouvertes : chaque page consultée devient un onglet de l'espace de travail
   // ------------------------------------------------------------------
   const zone = document.getElementById('onglets-fenetres');
-  if (zone) {
+  if (zone && !dansFenetre) {
     const cle = 'erp-fenetres-' + zone.dataset.module, accueil = zone.dataset.accueil;
     const ici = location.pathname + location.search;
     const titre = (document.getElementById('fenetre-titre').textContent.trim() || document.title.split(' · ')[0]).trim();
@@ -186,4 +202,24 @@
   if (choix) choix.addEventListener('change', () => {
     document.querySelectorAll('.arbre-menu').forEach(div => { div.hidden = div.dataset.menu !== choix.value; });
   });
+
+  // ------------------------------------------------------------------
+  // Page affichée dans une fenêtre interne du bureau
+  // ------------------------------------------------------------------
+  if (dansFenetre && window.parent.erpFenetres) {
+    const parent = window.parent.erpFenetres, cadre = window.frameElement;
+    const accueils = (window.ERP_MDI && window.ERP_MDI.accueils) || [];
+    if (accueils.includes(location.pathname)) { window.top.location.href = location.href; return; }
+    document.addEventListener('click', e => {
+      const a = e.target.closest('a[href]');
+      if (!a) return;
+      if (a.getAttribute('href').startsWith('javascript:history.back')) {   // Annuler / Retour : revient en arrière ou ferme
+        e.preventDefault(); parent.retour(cadre); return;
+      }
+      const url = new URL(a.href, location.href);
+      if (url.origin === location.origin && (accueils.includes(url.pathname) || url.pathname === '/')) a.target = '_top';
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') parent.echap(cadre); });
+    document.addEventListener('mousedown', () => parent.activerCadre(cadre), true);
+  }
 })();
