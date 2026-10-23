@@ -1,45 +1,57 @@
 {% extends "base.html" %}{% load l10n %}
 {% block title %}{{ titre }}{% endblock %}
 {% block content %}
-<div class="page-title"><h1>{{ titre }} {% if document.pk %}<small class="text-muted fs-6">{{ document.numero_affiche }}</small>{% endif %}</h1></div>
-<form method="post" id="doc-form">{% csrf_token %}
-<div class="card mb-3"><div class="card-body"><div class="row g-3">
-  {% for field in form %}
-  <div class="{% if field.name == 'notes' %}col-12{% else %}col-md-3{% endif %}">
-    <label class="form-label small">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}
-    {% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
-  </div>{% endfor %}
-</div></div></div>
+{# Saisie d'une pièce façon Sage 100 V12 : en-tête en trois colonnes, grille des lignes, pied (totaux), OK / Annuler #}
+<form method="post" id="doc-form" class="piece-sage">{% csrf_token %}
+  <div class="piece-barre">
+    <span class="inactif"><i class="bi bi-gear"></i> Fonctions</span><span class="inactif"><i class="bi bi-bar-chart-steps"></i> Barèmes</span>
+    <span class="inactif"><i class="bi bi-card-list"></i> Informations</span><span class="inactif"><i class="bi bi-file-earmark"></i> Pied</span>
+    <span class="inactif"><i class="bi bi-printer"></i> Imprimer</span><span class="inactif"><i class="bi bi-journal-check"></i> Comptabiliser</span>
+    <span class="inactif"><i class="bi bi-arrow-repeat"></i> Transformer</span>
+    <span class="ms-auto small text-muted">{{ titre }}{% if document.pk %} · {{ document.numero_affiche }}{% endif %}</span>
+  </div>
+  {% if form.non_field_errors %}<div class="alert alert-danger m-2 py-1">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="piece-entete">
+    {% for colonne in colonnes_entete %}<div class="piece-champs">
+      {% for field in form %}{% if field.name in colonne %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+      <div>{{ field }}{% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+      {% endif %}{% endfor %}
+    </div>{% endfor %}
+  </div>
 
-<div class="card"><div class="card-body p-0">
-{{ formset.management_form }}
-{% if formset.non_form_errors %}<div class="alert alert-danger m-2">{{ formset.non_form_errors }}</div>{% endif %}
-<table class="table table-sm mb-0" id="lignes">
-<thead class="table-light"><tr><th style="width:22%">Article</th><th>Désignation</th><th style="width:9%">Qté</th><th style="width:12%">{% if domaine == "stocks" %}Coût unitaire{% else %}P.U. HT{% endif %}</th>
-{% if domaine == "stocks" %}<th class="d-none"></th><th class="d-none"></th>{% else %}<th style="width:7%">Rem. %</th><th style="width:7%">TVA %</th>{% endif %}<th class="num" style="width:11%">Montant HT</th><th></th></tr></thead>
-<tbody>
-{% for f in formset %}
-<tr class="ligne">
-  <td>{{ f.id }}{{ f.article }}{% for e in f.non_field_errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
-  <td>{{ f.designation }}<div class="small text-muted stock-info"></div></td><td>{{ f.quantite }}</td><td>{{ f.prix_unitaire }}</td><td{% if domaine == "stocks" %} class="d-none"{% endif %}>{{ f.remise }}</td><td{% if domaine == "stocks" %} class="d-none"{% endif %}>{{ f.taux_tva }}</td>
-  <td class="num montant-ht align-middle">0</td>
-  <td class="align-middle">{% if f.instance.pk %}{{ f.DELETE }}{% else %}<span class="d-none">{{ f.DELETE }}</span>{% endif %}</td>
-</tr>
-{% endfor %}
-</tbody>
-<tfoot>
-<tr><td colspan="8"><button type="button" class="btn btn-sm btn-outline-secondary" id="ajout-ligne"><i class="bi bi-plus"></i> Ajouter une ligne</button></td></tr>
-<tr><td colspan="6" class="text-end">Total HT</td><td class="num fw-semibold" id="total-ht">0</td><td></td></tr>
-<tr{% if domaine == "stocks" %} class="d-none"{% endif %}><td colspan="6" class="text-end">TVA</td><td class="num" id="total-tva">0</td><td></td></tr>
-<tr class="total"><td colspan="6" class="text-end">{% if domaine == "stocks" %}Valeur du mouvement{% else %}Total TTC{% endif %}</td><td class="num" id="total-ttc">0</td><td></td></tr>
-</tfoot></table>
-</div></div>
+  <div class="piece-lignes-barre"><button type="button" class="btn btn-sm btn-outline-secondary" id="ajout-ligne">Nouveau</button></div>
+  <div class="piece-grille">
+  {{ formset.management_form }}
+  {% if formset.non_form_errors %}<div class="alert alert-danger m-2">{{ formset.non_form_errors }}</div>{% endif %}
+  <table class="table table-sm mb-0" id="lignes">
+  <thead><tr><th style="width:22%">Référence article</th><th>Désignation</th><th style="width:9%">Quantité</th><th style="width:12%">{% if domaine == "stocks" %}Coût unitaire{% else %}P.U. HT{% endif %}</th>
+  {% if domaine == "stocks" %}<th class="d-none"></th><th class="d-none"></th>{% else %}<th style="width:7%">Remise %</th><th style="width:7%">TVA %</th>{% endif %}<th class="num" style="width:11%">Montant HT</th><th title="Supprimer la ligne">Suppr.</th></tr></thead>
+  <tbody>
+  {% for f in formset %}
+  <tr class="ligne">
+    <td>{{ f.id }}{{ f.article }}{% for e in f.non_field_errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+    <td>{{ f.designation }}<div class="small text-muted stock-info"></div></td><td>{{ f.quantite }}</td><td>{{ f.prix_unitaire }}</td><td{% if domaine == "stocks" %} class="d-none"{% endif %}>{{ f.remise }}</td><td{% if domaine == "stocks" %} class="d-none"{% endif %}>{{ f.taux_tva }}</td>
+    <td class="num montant-ht align-middle">0</td>
+    <td class="align-middle">{% if f.instance.pk %}{{ f.DELETE }}{% else %}<span class="d-none">{{ f.DELETE }}</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody></table>
+  </div>
 
-<div class="mt-3 d-flex gap-2">
-  <button class="btn btn-outline-primary" name="brouillon"><i class="bi bi-save"></i> Enregistrer en brouillon</button>
-  <button class="btn btn-success" name="valider" onclick="return confirm('Valider définitivement ce document ?')"><i class="bi bi-check2-circle"></i> Enregistrer et valider</button>
-  <a href="javascript:history.back()" class="btn btn-outline-secondary">Annuler</a>
-</div>
+  <div class="piece-pied">
+    <div class="piece-pied-bloc"><span>Saisie</span><span class="num small text-muted">montants recalculés à l'enregistrement</span></div>
+    <div class="piece-pied-bloc">
+      <span>{% if domaine == "stocks" %}Valeur du mouvement{% else %}Total HT{% endif %}</span><span class="num" id="total-ht">0</span>
+      <span{% if domaine == "stocks" %} class="d-none"{% endif %}>TVA</span><span class="num{% if domaine == 'stocks' %} d-none{% endif %}" id="total-tva">0</span>
+      <span{% if domaine == "stocks" %} class="d-none"{% endif %}>Total TTC</span><span class="num fw-semibold{% if domaine == 'stocks' %} d-none{% endif %}" id="total-ttc">0</span>
+    </div>
+  </div>
+  <div class="piece-boutons">
+    <button class="btn btn-sm btn-outline-secondary" name="brouillon" title="Enregistrer la pièce en brouillon">OK</button>
+    <button class="btn btn-sm btn-ok" name="valider" onclick="return confirm('Valider définitivement ce document ?')">Valider la pièce</button>
+    <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary">Annuler</a>
+  </div>
 </form>
 {{ articles_json|json_script:"articles-data" }}
 {{ tiers_json|json_script:"tiers-data" }}

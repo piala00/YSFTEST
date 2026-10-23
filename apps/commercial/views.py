@@ -568,6 +568,9 @@ def _document_form(request, document, type_document):
         "form": form, "formset": formset, "document": document,
         "titre": dict(Document.TYPES)[type_document], "est_vente": est_vente, "domaine": document.domaine,
         "articles_json": _articles_json(), "tiers_json": _tiers_json(),
+        # En-tête en trois colonnes, comme la fenêtre de pièce de Sage 100 V12
+        "colonnes_entete": [("tiers", "payeur", "depot", "depot_destination"), ("date", "date_echeance"),
+                            ("reference_externe", "notes")],
     })
 
 

@@ -1,74 +1,121 @@
 {% extends "base.html" %}{% load erp %}
-{% block title %}{{ object.numero_affiche }}{% endblock %}
+{% block title %}{{ object.get_type_document_display }} : {{ object.statut_liste }} N° {{ object.numero_affiche }}{% if object.tiers %} {{ object.tiers.code }} {{ object.tiers.nom }}{% endif %}{% endblock %}
 {% block content %}
-<div class="page-title">
-  <h1>{{ object.get_type_document_display }} {{ object.numero_affiche }} <span class="fs-6 align-middle">{% include "commercial/_statut.html" with doc=object %}</span></h1>
-  <div class="d-flex gap-2 flex-wrap">
-    {% if object.modifiable %}
-      <a class="btn btn-outline-secondary btn-sm" href="{% url 'commercial:document_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier</a>
-      <form method="post" action="{% url 'commercial:document_valider' object.pk %}" onsubmit="return confirm('Valider ce document ?')">{% csrf_token %}
-        <button class="btn btn-success btn-sm"><i class="bi bi-check2-circle"></i> Valider</button></form>
-    {% endif %}
-    {% for code, lib in object.transformations_possibles %}
-      <form method="post" action="{% url 'commercial:document_transformer' object.pk %}">{% csrf_token %}
-        <input type="hidden" name="type_cible" value="{{ code }}"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-right-circle"></i> {{ lib }}</button></form>
-    {% endfor %}
-    {% if object.est_facturation and not object.est_avoir and object.statut == 'VALIDE' and object.reste_a_payer > 0 %}
-      <a class="btn btn-primary btn-sm" href="{% url 'commercial:reglement_create' %}?document={{ object.pk }}"><i class="bi bi-cash"></i> Saisir un règlement</a>
-    {% endif %}
-    <a class="btn btn-outline-dark btn-sm" target="_blank" href="{% url 'commercial:document_print' object.pk %}"><i class="bi bi-printer"></i> Imprimer</a>
-    {% if object.statut == 'BROUILLON' or object.statut == 'VALIDE' and not object.est_facturation %}
-      <form method="post" action="{% url 'commercial:document_annuler' object.pk %}" onsubmit="return confirm('Annuler ce document ?')">{% csrf_token %}
-        <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle"></i> Annuler</button></form>
-    {% endif %}
+{# Fenêtre d'une pièce façon Sage 100 V12 : barre de commandes, en-tête, grille des lignes, pied (totaux), OK / Annuler #}
+<div class="piece-sage" id="piece-sage">
+  <div class="piece-barre">
+    <div class="dropdown">
+      <button type="button" class="dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-gear"></i> Fonctions</button>
+      <ul class="dropdown-menu">
+        {% if object.modifiable %}
+        <li><a class="dropdown-item" href="{% url 'commercial:document_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier la pièce</a></li>
+        <li><form method="post" action="{% url 'commercial:document_valider' object.pk %}" onsubmit="return confirm('Valider ce document ?')">{% csrf_token %}
+          <button class="dropdown-item"><i class="bi bi-check2-circle"></i> Valider la pièce</button></form></li>
+        {% endif %}
+        {% if object.est_facturation and not object.est_avoir and object.statut == 'VALIDE' and object.reste_a_payer > 0 %}
+        <li><a class="dropdown-item" data-nouvelle-fenetre href="{% url 'commercial:reglement_create' %}?document={{ object.pk }}"><i class="bi bi-cash"></i> Saisir un règlement</a></li>
+        {% endif %}
+        {% if object.statut == 'BROUILLON' or object.statut == 'VALIDE' and not object.est_facturation %}
+        <li><form method="post" action="{% url 'commercial:document_annuler' object.pk %}" onsubmit="return confirm('Annuler ce document ?')">{% csrf_token %}
+          <button class="dropdown-item text-danger"><i class="bi bi-x-circle"></i> Annuler la pièce</button></form></li>
+        {% endif %}
+        {% if object.tiers %}<li><a class="dropdown-item" data-nouvelle-fenetre href="{% url 'commercial:tiers_detail' object.tiers.pk %}"><i class="bi bi-person"></i> Fiche du tiers</a></li>{% endif %}
+      </ul>
+    </div>
+    <span class="inactif"><i class="bi bi-bar-chart-steps"></i> Barèmes</span>
+    <button type="button" id="piece-informations"><i class="bi bi-card-list"></i> Informations</button>
+    <span class="inactif"><i class="bi bi-file-earmark"></i> Pied</span>
+    <a target="_blank" href="{% url 'commercial:document_print' object.pk %}"><i class="bi bi-printer"></i> Imprimer</a>
+    {% if object.ecriture %}<a data-nouvelle-fenetre href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}" title="Écriture {{ object.ecriture.numero }}"><i class="bi bi-journal-check"></i> Comptabiliser</a>
+    {% else %}<span class="inactif" title="{% if object.est_facturation %}Comptabilisée à la validation{% else %}Pièce non comptable{% endif %}"><i class="bi bi-journal-check"></i> Comptabiliser</span>{% endif %}
+    {% with transfos=object.transformations_possibles %}
+    <div class="dropdown">
+      <button type="button" class="dropdown-toggle" data-bs-toggle="dropdown" {% if not transfos %}disabled{% endif %}><i class="bi bi-arrow-repeat"></i> Transformer</button>
+      <ul class="dropdown-menu">{% for code, lib in transfos %}<li><form method="post" action="{% url 'commercial:document_transformer' object.pk %}">{% csrf_token %}
+        <input type="hidden" name="type_cible" value="{{ code }}"><button class="dropdown-item">{{ lib }}</button></form></li>{% endfor %}</ul>
+    </div>
+    {% endwith %}
+  </div>
+
+  <div class="piece-entete">
+    <div class="piece-champs">
+      {% if object.tiers %}
+      <label>{% if object.est_vente %}Client{% else %}Fournisseur{% endif %}</label>
+      <div class="piece-double"><span class="valeur">{{ object.tiers.code }}</span><a class="valeur" data-nouvelle-fenetre href="{% url 'commercial:tiers_detail' object.tiers.pk %}">{{ object.tiers.nom }}</a></div>
+      {% endif %}
+      <label>Statut</label><span class="valeur">{{ object.statut_liste }}</span>
+      {% if object.payeur %}<label>Payeur</label><span class="valeur">{{ object.payeur.code }} {{ object.payeur.nom }}</span>{% endif %}
+      {% if object.depot %}<label>Dépôt</label><span class="valeur">{{ object.depot }}{% if object.depot_destination %} → {{ object.depot_destination }}{% endif %}</span>{% endif %}
+    </div>
+    <div class="piece-champs">
+      <label>Date</label><span class="valeur">{{ object.date|date:"dmy" }}</span>
+      {% if object.date_echeance %}<label>Échéance</label><span class="valeur">{{ object.date_echeance|date:"dmy" }}</span>{% endif %}
+      {% if object.origine %}<label>Issu de</label><a class="valeur" data-nouvelle-fenetre href="{% url 'commercial:document_detail' object.origine.pk %}">{{ object.origine.numero_affiche }}</a>{% endif %}
+      {% for g in object.documents_generes.all %}<label>Transformé en</label><a class="valeur" data-nouvelle-fenetre href="{% url 'commercial:document_detail' g.pk %}">{{ g.numero_affiche }}</a>{% endfor %}
+    </div>
+    <div class="piece-champs">
+      <label>N° document</label><span class="valeur">{{ object.numero_affiche }}</span>
+      <label>Référence</label><span class="valeur">{{ object.reference_externe }}</span>
+      {% if object.ecriture %}<label>Écriture</label><a class="valeur" data-nouvelle-fenetre href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}">{{ object.ecriture.numero }}</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="piece-grille">
+    {% with suivi=object.transformations_possibles %}
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Référence article</th><th>Désignation</th><th class="num">{% if object.est_stock %}Coût unitaire{% else %}P.U. HT{% endif %}</th><th class="num">Quantité</th>
+        {% if suivi %}<th class="num" title="Quantité non encore reprise dans un document suivant">Reste à transformer</th>{% endif %}
+        <th class="num">Remise</th><th class="num">TVA</th><th class="num">Montant HT</th><th>Dépôt</th></tr></thead>
+      <tbody>{% for l in object.lignes.all %}<tr><td>{{ l.article.reference|default:"" }}</td><td>{{ l.designation }}</td><td class="num">{{ l.prix_unitaire|montant }}</td>
+        <td class="num">{{ l.quantite|floatformat:"-3" }}</td>
+        {% if suivi %}<td class="num {% if l.reste_a_transformer > 0 %}text-primary fw-semibold{% else %}text-muted{% endif %}">{{ l.reste_a_transformer|floatformat:"-3" }}</td>{% endif %}
+        <td class="num">{% if l.remise %}{{ l.remise }} %{% endif %}</td><td class="num">{{ l.taux_tva }} %</td><td class="num">{{ l.montant_ht|montant }}</td><td>{{ object.depot|default:"" }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+    {% endwith %}
+  </div>
+
+  <div class="piece-infos" id="piece-infos" hidden>
+    {% if object.mouvements_stock.exists %}<h3>Mouvements de stock générés</h3><table class="table table-sm mb-2"><tbody>
+    {% for m in object.mouvements_stock.all %}<tr><td>{{ m.article.reference }}</td><td>{{ m.article.designation }}</td><td>{{ m.depot }}</td>
+    <td class="num {% if m.quantite < 0 %}text-danger{% else %}text-success{% endif %}">{{ m.quantite|floatformat:"-3" }}</td><td class="num text-muted">{{ m.cout_unitaire|floatformat:2 }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+    {% if object.imputations.exists %}<h3>Règlements imputés</h3><table class="table table-sm mb-2"><tbody>
+    {% for i in object.imputations.all %}<tr><td><a data-nouvelle-fenetre href="{% url 'commercial:reglement_detail' i.reglement.pk %}">{{ i.reglement.numero }}</a></td><td>{{ i.reglement.date|date:"d/m/Y" }}</td><td>{{ i.reglement.get_mode_display }}</td><td class="num">{{ i.montant|montant }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
+    {% if object.notes %}<h3>Notes</h3><p class="small mb-0">{{ object.notes|linebreaksbr }}</p>{% endif %}
+    {% if not object.mouvements_stock.exists and not object.imputations.exists and not object.notes %}<p class="small text-muted mb-0">Aucune information complémentaire.</p>{% endif %}
+  </div>
+
+  <div class="piece-pied">
+    <div class="piece-pied-bloc">
+      <span>Nombre de lignes</span><span class="num">{{ object.lignes.count }}</span>
+      {% if object.est_facturation and not object.est_avoir %}<span>Réglé</span><span class="num">{{ object.montant_regle|montant }}</span>
+      <span>Reste à payer</span><span class="num {% if object.reste_a_payer > 0 %}text-danger{% endif %}">{{ object.reste_a_payer|montant }}</span>{% endif %}
+    </div>
+    <div class="piece-pied-bloc">
+      {% if object.est_stock %}<span>Valeur du mouvement</span><span class="num">{{ object.total_ht|montant }}</span>
+      {% else %}<span>Total HT</span><span class="num">{{ object.total_ht|montant }}</span>
+      {% for v in object.ventilation_tva %}<span>TVA {{ v.taux }} %</span><span class="num">{{ v.tva|montant }}</span>{% endfor %}
+      <span>Total TTC</span><span class="num fw-semibold">{{ object.total_ttc|montant }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="piece-boutons">
+    <span class="piece-cree small text-muted">Créé le {{ object.cree_le|date:"d/m/y" }}{% if object.cree_par %} par {{ object.cree_par }}{% endif %}</span>
+    <a class="btn btn-sm btn-outline-secondary" data-nouvelle-fenetre href="{% url 'commercial:document_create' object.type_document %}">Nouveau</a>
+    <button type="button" class="btn btn-sm btn-outline-secondary piece-fermer">OK</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary piece-fermer">Annuler</button>
   </div>
 </div>
-<div class="row g-3 mb-3">
-  <div class="col-md-4"><div class="card p-3">
-    {% if object.tiers %}<div class="text-muted small">{{ object.est_vente|yesno:"Client,Fournisseur" }}</div>
-    <a class="fw-semibold" href="{% url 'commercial:tiers_detail' object.tiers.pk %}">{{ object.tiers.nom }}</a>
-    <div class="small">{{ object.tiers.adresse }} {{ object.tiers.ville }}</div>
-    {% if object.payeur %}<div class="small mt-1">Payeur : <a href="{% url 'commercial:tiers_detail' object.payeur.pk %}">{{ object.payeur.nom }}</a></div>{% endif %}{% endif %}
-    {% if object.depot %}<div class="small mt-1"><i class="bi bi-house-gear"></i> Dépôt : <strong>{{ object.depot }}</strong>{% if object.depot_destination %} <i class="bi bi-arrow-right"></i> <strong>{{ object.depot_destination }}</strong>{% endif %}</div>{% endif %}
-    {% if object.est_stock %}<div class="small text-muted mt-1">{% if object.mouvemente_stock %}Mouvemente le stock à la validation{% endif %}</div>{% endif %}
-  </div></div>
-  <div class="col-md-4"><div class="card p-3 small">
-    Date : <strong>{{ object.date|date:"d/m/Y" }}</strong><br>
-    {% if object.date_echeance %}Échéance : <strong>{{ object.date_echeance|date:"d/m/Y" }}</strong><br>{% endif %}
-    {% if object.reference_externe %}Référence : {{ object.reference_externe }}<br>{% endif %}
-    {% if object.origine %}Issu de : <a href="{% url 'commercial:document_detail' object.origine.pk %}">{{ object.origine.numero_affiche }}</a><br>{% endif %}
-    {% for g in object.documents_generes.all %}Transformé en : <a href="{% url 'commercial:document_detail' g.pk %}">{{ g.get_type_document_display }} {{ g.numero_affiche }}</a><br>{% endfor %}
-  </div></div>
-  {% if object.ecriture or object.est_facturation %}<div class="col-md-4"><div class="card p-3 small">
-    {% if object.ecriture %}Écriture comptable : <a href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}">{{ object.ecriture.numero }}</a><br>{% endif %}
-    {% if object.est_facturation and not object.est_avoir %}
-      Réglé : <strong>{{ object.montant_regle|montant }}</strong><br>
-      Reste à payer : <strong class="{% if object.reste_a_payer > 0 %}text-danger{% else %}text-success{% endif %}">{{ object.reste_a_payer|montant }}</strong>
-    {% endif %}
-  </div></div>{% endif %}
-</div>
-<div class="card mb-3"><table class="table table-sm mb-0">
-{% with suivi=object.transformations_possibles %}
-<thead class="table-light"><tr><th>Article</th><th>Désignation</th><th class="num">Qté</th>{% if suivi %}<th class="num" title="Quantité non encore reprise dans un document suivant">Reste à transformer</th>{% endif %}<th class="num">{% if object.est_stock %}Coût unitaire{% else %}P.U. HT{% endif %}</th><th class="num">Remise</th><th class="num">TVA</th><th class="num">Montant HT</th></tr></thead><tbody>
-{% for l in object.lignes.all %}<tr><td>{{ l.article.reference|default:"" }}</td><td>{{ l.designation }}</td><td class="num">{{ l.quantite|floatformat:"-3" }}</td>{% if suivi %}<td class="num {% if l.reste_a_transformer > 0 %}text-primary fw-semibold{% else %}text-muted{% endif %}">{{ l.reste_a_transformer|floatformat:"-3" }}</td>{% endif %}
-<td class="num">{{ l.prix_unitaire|montant }}</td><td class="num">{% if l.remise %}{{ l.remise }} %{% endif %}</td><td class="num">{{ l.taux_tva }} %</td><td class="num">{{ l.montant_ht|montant }}</td></tr>{% endfor %}
-</tbody><tfoot>
-{% if object.est_stock %}
-<tr class="total"><td colspan="{{ suivi|yesno:'7,6' }}" class="text-end">Valeur du mouvement</td><td class="num">{{ object.total_ht|montant }} {{ societe.devise }}</td></tr>
-{% else %}
-<tr><td colspan="{{ suivi|yesno:'7,6' }}" class="text-end">Total HT</td><td class="num">{{ object.total_ht|montant }}</td></tr>
-{% for v in object.ventilation_tva %}<tr><td colspan="{{ suivi|yesno:'7,6' }}" class="text-end small text-muted">TVA {{ v.taux }} % sur {{ v.base|montant }}</td><td class="num">{{ v.tva|montant }}</td></tr>{% endfor %}
-<tr class="total"><td colspan="{{ suivi|yesno:'7,6' }}" class="text-end">Total TTC</td><td class="num">{{ object.total_ttc|montant }} {{ societe.devise }}</td></tr>
-{% endif %}
-</tfoot>{% endwith %}</table></div>
-{% if object.mouvements_stock.exists %}
-<div class="card mb-3"><div class="card-header bg-white fw-semibold">Mouvements de stock générés</div><table class="table table-sm mb-0"><tbody>
-{% for m in object.mouvements_stock.all %}<tr><td>{{ m.article.reference }}</td><td>{{ m.article.designation }}</td><td>{{ m.depot }}</td>
-<td class="num {% if m.quantite < 0 %}text-danger{% else %}text-success{% endif %}">{{ m.quantite|floatformat:"-3" }}</td><td class="num text-muted">{{ m.cout_unitaire|floatformat:2 }}</td></tr>{% endfor %}
-</tbody></table></div>{% endif %}
-{% if object.imputations.exists %}
-<div class="card"><div class="card-header bg-white fw-semibold">Règlements imputés</div><table class="table table-sm mb-0"><tbody>
-{% for i in object.imputations.all %}<tr><td><a href="{% url 'commercial:reglement_detail' i.reglement.pk %}">{{ i.reglement.numero }}</a></td><td>{{ i.reglement.date|date:"d/m/Y" }}</td><td>{{ i.reglement.get_mode_display }}</td><td class="num">{{ i.montant|montant }}</td></tr>{% endfor %}
-</tbody></table></div>{% endif %}
-{% if object.notes %}<div class="card p-3 mt-3 small">{{ object.notes|linebreaksbr }}</div>{% endif %}
 {% endblock %}
+{% block scripts %}<script>
+(function () {
+  document.getElementById('piece-informations').addEventListener('click', () => {
+    const i = document.getElementById('piece-infos'); i.hidden = !i.hidden;
+  });
+  document.querySelectorAll('.piece-fermer').forEach(b => b.addEventListener('click', () => {
+    if (window.parent !== window && window.parent.erpFenetres) window.parent.erpFenetres.fermerCadre(window.frameElement);
+    else history.back();
+  }));
+})();
+</script>{% endblock %}

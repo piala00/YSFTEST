@@ -299,3 +299,37 @@ html.dans-fenetre .liste-sage { height: 100vh; }
 .liste-pied .btn-ok, .liste-pied .btn-ok:disabled { background: #3f8f3a; border-color: #3f8f3a; color: #fff; min-width: 5.5rem; }
 .liste-pied .btn-ok:disabled { opacity: .45; }
 .liste-etat { padding: 2px 8px; font-size: .75rem; color: #5b6775; border-top: 1px solid #e3e7eb; background: #fff; }
+
+/* Fenêtre d'une pièce façon Sage 100 V12 (consultation et saisie) */
+html.dans-fenetre .fenetre-contenu:has(.piece-sage) { padding: 0; }
+.piece-sage { display: flex; flex-direction: column; min-height: 75vh; font-size: .82rem; background: #fff; }
+html.dans-fenetre .piece-sage { min-height: 100vh; }
+.piece-barre { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 5px 10px; border-bottom: 1px solid #d5dce4; background: #f6f8fa; }
+.piece-barre > a, .piece-barre > button, .piece-barre .dropdown > button, .piece-barre .inactif { border: 0; background: none; padding: 2px 3px;
+  color: #2b3540; text-decoration: none; display: inline-flex; gap: 5px; align-items: center; }
+.piece-barre .inactif, .piece-barre button:disabled { color: #9aa4ae; }
+.piece-barre a:hover, .piece-barre button:not(:disabled):hover { color: var(--module); }
+.piece-barre .dropdown-item { font-size: .82rem; }
+.piece-entete { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 18px; padding: 8px 12px; border-bottom: 1px solid #d5dce4; }
+.piece-champs { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 4px 6px; align-content: start; align-items: center; }
+.piece-champs > label { text-align: right; margin: 0; color: #2b3540; }
+.piece-champs .valeur { display: block; min-height: 1.6rem; padding: 2px 6px; border: 1px solid #d5dce4; background: #f4f5f6; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; color: #222; }
+.piece-champs a.valeur { color: #1f5f99; }
+.piece-double { display: grid; grid-template-columns: minmax(3.5rem, 5.5rem) minmax(0, 1fr); gap: 4px; }
+.piece-champs .form-control, .piece-champs .form-select { font-size: .82rem; padding-top: 2px; padding-bottom: 2px; }
+.piece-lignes-barre { display: flex; justify-content: flex-end; gap: 4px; padding: 4px 10px; background: #eceff2; border-bottom: 1px solid #d5dce4; }
+.piece-grille { flex: 1; overflow: auto; min-height: 160px; }
+.piece-grille table { font-size: .8rem; }
+.piece-grille thead th { position: sticky; top: 0; background: #fff; font-weight: 400; color: #4a5561; border-bottom: 1px solid #c9d1d9;
+  border-right: 1px solid #edf0f3; z-index: 1; white-space: nowrap; }
+.piece-grille .form-control, .piece-grille .form-select { font-size: .8rem; padding-top: 1px; padding-bottom: 1px; }
+.piece-infos { padding: 8px 12px; border-top: 1px solid #d5dce4; background: #fafbfc; }
+.piece-infos h3 { font-size: .85rem; font-weight: 600; margin: 4px 0; }
+.piece-pied { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 10px; }
+.piece-pied-bloc { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 8px 14px; background: #d4ede4; }
+.piece-boutons { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px 10px 10px; }
+.piece-boutons .piece-cree { margin-right: auto; }
+.piece-boutons .btn { min-width: 6rem; }
+.piece-boutons .btn-ok { background: #3f8f3a; border-color: #3f8f3a; color: #fff; }
+@media (max-width: 620px) { .piece-entete, .piece-pied { grid-template-columns: 1fr; } }
