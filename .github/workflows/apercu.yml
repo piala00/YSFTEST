@@ -32,7 +32,7 @@ jobs:
         run: |
           rm -f db.sqlite3
           python manage.py migrate --noinput -v0
-          python manage.py init_erp --demo --regime-tva automatique -v0
+          python manage.py init_erp --demo -v0
           mkdir -p _site
           python manage.py simulateur --dossier _site
           python manage.py explorateur_menus --autonome --sortie _site/explorateur-menus.html

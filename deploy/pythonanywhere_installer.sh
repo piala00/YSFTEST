@@ -43,9 +43,9 @@ echo "3/5 Base de données et fichiers statiques"
 
 echo "4/5 Société, plan comptable, compte admin"
 if [ "$DEMO" = "--demo" ]; then
-  "$VENV/bin/python" manage.py init_erp --demo --regime-tva automatique --admin "$MOT_DE_PASSE"
+  "$VENV/bin/python" manage.py init_erp --demo --admin "$MOT_DE_PASSE"
 else
-  "$VENV/bin/python" manage.py init_erp --regime-tva automatique --admin "$MOT_DE_PASSE"
+  "$VENV/bin/python" manage.py init_erp --admin "$MOT_DE_PASSE"
 fi
 
 echo "5/5 Fichier WSGI de l'application web"

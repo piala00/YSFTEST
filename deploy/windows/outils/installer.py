@@ -106,7 +106,9 @@ def preparer_base():
     from_zero = not (LOGICIEL / ".initialise").exists()
     if from_zero:
         demo = oui("Ajouter les données de démonstration (clients, articles, pièces fictifs) ?", "O")
-        lancer("manage.py", "init_erp", *(["--demo"] if demo else []))
+        print("\nTVA : par défaut, aucune TVA n'est appliquée (modifiable ensuite dans les Paramètres de la société).")
+        tva = oui("La société facture-t-elle la TVA (taux du Cameroun : 19,25 %, 11 %, 0 %) ?", "N")
+        lancer("manage.py", "init_erp", *(["--demo"] if demo else []), *(["--regime-tva", "automatique"] if tva else []))
         configurer_gros_detail()
         (LOGICIEL / ".initialise").write_text("ok", encoding="utf-8")
     print("Base prête.")

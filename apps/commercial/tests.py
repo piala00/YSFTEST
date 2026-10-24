@@ -16,7 +16,7 @@ from .models import Article, Depot, Document, Inventaire, LigneDocument, Regleme
 class BaseCommerciale(TestCase):
     @classmethod
     def setUpTestData(cls):
-        call_command("init_erp", verbosity=0)
+        call_command("init_erp", verbosity=0, regime_tva="automatique")   # ces calculs supposent la TVA activée
         cls.client_ = Tiers.objects.create(code="C1", nom="Client test")
         cls.fournisseur = Tiers.objects.create(code="F1", nom="Fournisseur test", type_tiers=Tiers.FOURNISSEUR)
         cls.article = Article.objects.create(reference="A1", designation="Article", prix_achat=800, prix_vente=1000)

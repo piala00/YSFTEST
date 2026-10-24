@@ -62,7 +62,8 @@ class Societe(models.Model):
     regime_fiscal = models.CharField(
         "Régime d'imposition", max_length=20, choices=REGIMES_FISCAUX, blank=True,
         help_text="CGI 2026, art. 93 ter et quater. IGS : CA annuel HT < 50 M FCFA (30 M pour les professions libérales).")
-    taux_tva_defaut = models.DecimalField("Taux TVA par défaut (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
+    taux_tva_defaut = models.DecimalField("Taux TVA par défaut (%)", max_digits=5, decimal_places=2, default=Decimal("0"),
+                                          help_text="0 par défaut : pas de TVA tant que la société ne l'active pas")
     stock_negatif_autorise = models.BooleanField(
         "Autoriser le stock négatif", default=False,
         help_text="Si décoché, une sortie de stock supérieure au stock disponible du dépôt est refusée")

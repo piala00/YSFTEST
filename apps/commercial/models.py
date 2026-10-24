@@ -900,7 +900,8 @@ class LigneDocument(models.Model):
     quantite = models.DecimalField(max_digits=18, decimal_places=3, default=Decimal("1"))
     prix_unitaire = models.DecimalField("P.U. HT", max_digits=18, decimal_places=2, default=ZERO)
     remise = models.DecimalField("Remise (%)", max_digits=5, decimal_places=2, default=ZERO)
-    taux_tva = models.DecimalField("TVA (%)", max_digits=5, decimal_places=2, default=Decimal("19.25"))
+    taux_tva = models.DecimalField("TVA (%)", max_digits=5, decimal_places=2, null=True, blank=True, default=None,
+                                   help_text="Vide : taux de l'article (ou de la société pour une ligne libre)")
     montant_ht = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     montant_tva = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     ligne_origine = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="lignes_generees")
@@ -938,6 +939,8 @@ class LigneDocument(models.Model):
         return self.quantite - self.quantite_transformee
 
     def calculer(self):
+        if self.taux_tva is None:                  # non saisi : taux de l'article, sinon celui de la société
+            self.taux_tva = self.article.taux_tva if self.article_id else taux_tva_defaut()
         brut = Decimal(self.quantite) * Decimal(self.prix_unitaire)
         self.montant_ht = arrondi(brut * (1 - Decimal(self.remise) / 100))
         self.montant_tva = arrondi(self.montant_ht * Decimal(self.taux_tva) / 100)
@@ -945,6 +948,8 @@ class LigneDocument(models.Model):
     def save(self, *args, **kwargs):
         if self.article_id and not self.designation:
             self.designation = self.article.designation
+        if self.taux_tva is None:
+            self.taux_tva = self.article.taux_tva if self.article_id else taux_tva_defaut()
         if self.document_id:
             doc = self.document
             if doc.est_stock:

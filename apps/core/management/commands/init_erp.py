@@ -124,8 +124,7 @@ class Command(BaseCommand):
         societe = Societe.get()
         societe.raison_sociale = "GTC SARL (démo)"
         societe.ville = "Bertoua"
-        societe.regime_tva = Societe.TVA_AUTOMATIQUE
-        societe.save()
+        societe.save()                       # TVA : celle choisie (--regime-tva), aucune par défaut
 
         clients = [
             Tiers.objects.create(code="C0001", nom="Boutique Mbarga", ville="Bertoua", telephone="+237 690 00 00 01"),

@@ -29,6 +29,11 @@ Pour la base SQL Server (facultatif), il faut SQL Server 2017 ou plus récent.
    - Données de démonstration : clients, articles et pièces fictifs pour
      essayer. Répondez N pour partir d'un dossier vide.
 
+   - TVA : par défaut, AUCUNE TVA n'est appliquée. Répondez O seulement si
+     la société facture la TVA (les taux du Cameroun sont alors créés).
+     Modifiable ensuite dans Fichier > Paramètres de la société
+     (« Configuration de la TVA »).
+
    - Vente en gros et au détail : pour ne pas ouvrir les cartons dans les
      magasins de gros, vous pouvez réserver la vente au détail à une ou deux
      boutiques. Les magasins les approvisionnent par transfert. Donnez le

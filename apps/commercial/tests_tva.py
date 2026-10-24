@@ -30,20 +30,23 @@ class RegimeTvaTests(TestCase):
         doc.recalculer()
         return doc
 
-    def achat_puis_vente(self):
-        article = Article.objects.create(reference="A1", designation="Article", prix_achat=1000, prix_vente=2000)
+    def achat_puis_vente(self, taux=Decimal("19.25")):
+        article = Article.objects.create(reference="A1", designation="Article", prix_achat=1000, prix_vente=2000, taux_tva=taux)
         achat = self.document(Document.ACHAT_FACTURE, self.fournisseur, article, 10, 1000).valider()
         vente = self.document(Document.FACTURE, self.client_, article, 5, 2000).valider()
         article.refresh_from_db()
         return article, achat, vente
 
-    def test_configuration_non_precisee_garde_le_comportement_historique(self):
+    def test_tva_desactivee_par_defaut(self):
         societe = Societe.get()
-        self.assertEqual(societe.regime_tva, Societe.TVA_NON_PRECISEE)
-        self.assertTrue(societe.assujettie_tva)
+        self.assertEqual((societe.regime_tva, societe.taux_tva_defaut), (Societe.TVA_NON_PRECISEE, 0))
+        article = Article.objects.create(reference="A0", designation="Article", prix_vente=2000, suivi_stock=False)
+        self.assertEqual(article.taux_tva, 0)                                 # aucun taux proposé
+        vente = self.document(Document.FACTURE, self.client_, article, 5, 2000).valider()
+        self.assertEqual((vente.total_tva, vente.total_ttc), (0, Decimal("10000")))
+        # Un article à qui l'utilisateur donne un taux le garde : rien n'est interdit, rien n'est imposé
         article, achat, vente = self.achat_puis_vente()
         self.assertEqual(vente.total_tva, Decimal("1925"))
-        self.assertEqual(article.cmup, Decimal("1000"))
 
     def test_societe_assujettie(self):
         self.regime(Societe.TVA_ASSUJETTIE)
@@ -72,7 +75,8 @@ class RegimeTvaTests(TestCase):
         self.assertEqual(soldes["701"], Decimal("-10000"))
 
     def test_brouillon_saisi_avant_le_changement_de_regime(self):
-        article = Article.objects.create(reference="A2", designation="Article", prix_vente=1000, suivi_stock=False)
+        article = Article.objects.create(reference="A2", designation="Article", prix_vente=1000, suivi_stock=False,
+                                         taux_tva=Decimal("19.25"))
         devis = self.document(Document.FACTURE, self.client_, article, 1, 1000)
         self.assertEqual(devis.total_tva, Decimal("193"))
         self.regime(Societe.TVA_NON_ASSUJETTIE)
