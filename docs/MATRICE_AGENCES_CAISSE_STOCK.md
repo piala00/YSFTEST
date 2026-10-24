@@ -66,4 +66,4 @@ Statuts :
 
 ## Tests exécutés
 
-Commande : `python manage.py test`. Résultat : **174 tests, tous réussis** (dont les tests de la revue GPT du 24/10) (à la date de la livraison).
+Commande : `python manage.py test`. Résultat : **173 tests, tous réussis** (dont les tests de la revue GPT du 24/10) (à la date de la livraison).
