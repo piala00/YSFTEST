@@ -51,6 +51,20 @@ L’utilisateur demande un Skill contenant toutes ces informations pour Claude. 
 
 L’utilisateur ajoute deux profils : clients achetant au comptant et clients achetant à crédit. Les clients à crédit ont un compte dans la société, un plafond de crédit accordé et un délai de règlement pour chaque facture. Lors de leurs versements, la société établit un reçu.
 
-Pour améliorer le suivi des créances, la personne qui crée le reçu doit le rattacher à une facture : le reçu indique quelle facture il règle. L’utilisateur insiste sur « chaque reçu doit être rattaché à une facture ». Cette exigence concerne le règlement des factures à crédit ; elle doit être conciliée avec l’exigence antérieure d’avance avant livraison/facturation, sans inventer une facture. Les exceptions et le traitement d’un versement couvrant plusieurs factures restent à arbitrer, sans généraliser le multi-factures par défaut.
+Pour améliorer le suivi des créances, la personne qui crée le reçu doit le rattacher à une facture : le reçu indique quelle facture il règle. L’utilisateur insiste sur « chaque reçu doit être rattaché à une facture ». Cette exigence concerne le règlement des factures à crédit ; elle doit être conciliée avec l’exigence antérieure d’avance avant livraison/facturation, sans inventer une facture. Cette formulation appartient à U4. La clarification U5 ci-dessous autorise explicitement plusieurs factures et l’attente de rattachement ; elle prévaut sur cette règle historique.
 
 La personne ayant généré le reçu doit être identifiable. Cette exigence est étendue explicitement à tous les documents (factures, commandes, reçus), écritures et opérations. À l’ouverture d’un document, son auteur doit être affiché et les traces doivent être conservées. La forme exacte des informations et la séparation créateur/modificateur/valideur sont des propositions détaillées dans la référence dédiée.
+
+## U5 — Fenêtres indépendantes et nouvelle saisie des règlements
+
+L’utilisateur constate qu’ouvrir « ajouter/saisir un règlement » depuis une facture fait disparaître la facture. Il demande que chaque formulaire reste ouvert dans sa propre fenêtre : facture conservée en arrière-plan, règlement dans une autre fenêtre, possibilité de remettre chacun au premier plan, d’ouvrir plusieurs documents et de fermer uniquement celui choisi. Il ne demande pas un simple retour arrière remplaçant les écrans.
+
+Le parcours demandé est Traitement → gestion de règlement → saisie de règlement client (vocabulaire utilisateur, casse et libellés définitifs à adapter). Le formulaire s’ouvre ; l’utilisateur choisit d’abord le client. Le logiciel propose automatiquement les factures non soldées de ce client. L’utilisateur choisit la facture ou les factures auxquelles affecter le règlement. S’il n’y en a pas, il peut enregistrer le règlement en attente de facture pour un rattachement ultérieur.
+
+U5 remplace donc le blocage historique « un reçu, une facture obligatoire » par un règlement client avec zéro, une ou plusieurs factures affectées selon la situation. Les contrôles de montant et les règles comptables détaillées sont des propositions techniques distinctes, pas des champs d’en-tête déjà approuvés.
+
+L’utilisateur annonce une feuille illustrant la saisie et précise que l’en-tête de l’ERP sera différent de celui du modèle Sage. Cette feuille n’a pas encore été reçue au moment de la version 2 ; aucun champ, position ni bouton non fourni n’est présenté comme confirmé.
+
+
+## U6 — Captures et fonctionnement général des fenêtres
+Deux captures Sage reçues le 24/10/2026. L’utilisateur précise un besoin transversal pour les fenêtres de comptabilité et gestion commerciale. Voir FONCTIONNEMENT_FENETRES_U6.md ; la réception des captures ne vaut pas validation d’un en-tête ERP identique.

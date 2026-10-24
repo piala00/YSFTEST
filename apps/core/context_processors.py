@@ -5,13 +5,18 @@ from .models import Exercice, Societe
 from .navigation import MODULES, barre_verticale, chemin_vers_actif, module_pour_chemin, structure_module
 
 
+def fenetres_a_actualiser(request, *chemins):
+    """Après un enregistrement : les fenêtres ouvertes sur ces pages (ex. factures réglées) se rechargent."""
+    request.session["erp_actualiser"] = list(dict.fromkeys(request.session.get("erp_actualiser", []) + list(chemins)))
+
+
 def societe(request):
     if not request.user.is_authenticated:
         return {}
     from .selection import resume
 
     contexte = {"societe": Societe.get(), "exercice_courant": Exercice.courant(), "modules": MODULES,
-                "selection": resume(request)}
+                "selection": resume(request), "erp_actualiser": request.session.pop("erp_actualiser", None)}
     module = module_pour_chemin(request.path)
     if module is None:
         return contexte

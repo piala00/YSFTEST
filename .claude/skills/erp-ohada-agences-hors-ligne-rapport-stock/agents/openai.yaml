@@ -1,4 +1,14 @@
 interface:
-  display_name: "ERP OHADA — agences, caisse et stock"
-  short_description: "Hors ligne, liaisons, rapport commercial et fiche magasin"
-  default_prompt: "Utilise $erp-ohada-agences-hors-ligne-rapport-stock pour comparer les deux tâches à mon code existant et préparer les adaptations vérifiables."
+  display_name: ERP OHADA — agences, caisse et stock
+  short_description: Hors ligne, liaisons, rapport commercial et fiche magasin
+  default_prompt: Utilise $erp-ohada-agences-hors-ligne-rapport-stock pour comparer
+    les deux tâches à mon code existant et préparer les adaptations vérifiables.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

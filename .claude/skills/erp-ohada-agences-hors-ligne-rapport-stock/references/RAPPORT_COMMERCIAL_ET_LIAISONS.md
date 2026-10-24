@@ -16,7 +16,7 @@ La base de présentation HT/TTC, la gestion des dates d’annulation et les dét
 
 Séparer règlements des ventes du jour, règlements d’anciennes créances, avances sur BC et versements hors-recettes pour d’autres agences. Ventiler espèces, banque, Mobile Money et autres moyens réellement configurés. Chaque reçu a une référence unique et un lien vers son bénéficiaire.
 
-Complément U4 : un reçu de règlement de créance doit être rattaché à une facture. Par défaut, limiter chaque reçu de créance à une facture ; une facture peut recevoir plusieurs reçus partiels dans la proposition de gestion. Un versement couvrant plusieurs factures nécessite un arbitrage décrit dans REGLEMENTS_CREDIT_ET_TRACABILITE.md ; ne pas imposer silencieusement un reçu multi-factures. Une facture payée n’est pas un second reçu. Le passage d’une avance à une facture modifie l’affectation, pas le montant encaissé à nouveau.
+Règle actuelle U5 : un règlement peut être affecté à une ou plusieurs factures sélectionnées ; si aucune facture n’est disponible, il peut être enregistré en attente de rattachement. Conserver un seul encaissement monétaire, un suivi des affectations et du non affecté. Une facture payée n’est pas un second reçu. Le rattachement ultérieur d’un règlement en attente ou d’une avance ne crée pas de nouvel encaissement.
 
 ### Sorties et dépenses
 
@@ -43,7 +43,7 @@ Exemple demandé : client de Bertoua, versement de 100 000 FCFA à Garoua-Boula�
 
 Ne pas considérer cette description fonctionnelle comme un schéma d’écritures complet. Définir comptes de liaison réciproques, dates et comptes d’attente éventuels avec le paramétrage comptable applicable. Préserver les états locaux et la traçabilité des écritures déjà validées.
 
-Pour un paiement reçu hors ligne sans client ou facture connus dans le référentiel local, conserver code et éléments de correspondance contrôlés. Le complément U4 impose une facture au reçu de créance définitif : proposer un enregistrement du versement et un justificatif provisoire en attente de vérification, à arbitrer. Ne pas prétendre la créance déjà soldée, créer automatiquement un doublon client à partir d’un nom ressemblant ni lettrer arbitrairement une facture.
+Pour un paiement reçu hors ligne sans client ou facture connus dans le référentiel local, conserver code et éléments de correspondance contrôlés. U5 autorise l’enregistrement du règlement en attente de rattachement si la facture n’est pas disponible ; sa dénomination documentaire et son traitement comptable restent à préciser. Ne pas prétendre la créance déjà soldée, créer automatiquement un doublon client à partir d’un nom ressemblant ni lettrer arbitrairement une facture.
 
 Pour une dépense pour une autre agence, appliquer la même séparation exécution/bénéficiaire : baisse de la caisse qui paie, hors des dépenses propres selon classement, liaison et pièce à recevoir côté bénéficiaire. Ne pas créer une seconde sortie physique au destinataire.
 

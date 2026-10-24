@@ -144,6 +144,9 @@ else:
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
+            # Plusieurs postes du réseau local sur le même serveur : attendre un verrou plutôt qu'échouer,
+            # et journal WAL (lectures pendant les écritures)
+            "OPTIONS": {"timeout": 20, "init_command": "PRAGMA journal_mode=WAL;"},
         }
     }
 

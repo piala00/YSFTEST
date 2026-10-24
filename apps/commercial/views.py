@@ -719,6 +719,10 @@ def reglement_create(request):
         except ValidationError as exc:
             form.add_error(None, exc)
         else:
+            from apps.core.context_processors import fenetres_a_actualiser
+
+            fenetres_a_actualiser(request, *[reverse("commercial:document_detail", args=[i.document_id])
+                                             for i in reglement.imputations.all()])
             lien = reverse("commercial:reglement_detail", args=[reglement.pk])
             attente = reglement.en_attente_de_rattachement
             messages.success(request, format_html(
@@ -789,6 +793,9 @@ def reglement_rattacher(request, pk):
         except ValidationError as exc:
             form.add_error(None, exc)
         else:
+            from apps.core.context_processors import fenetres_a_actualiser
+
+            fenetres_a_actualiser(request, reverse("commercial:document_detail", args=[imputation.document_id]))
             messages.success(request, f"{imputation.montant:,.0f} rattachés à la facture {imputation.document.numero}.".replace(",", " "))
             return redirect("commercial:reglement_detail", pk=reglement.pk)
     return render(request, "core/form.html", {"form": form, "titre": f"Rattacher le reste du reçu {reglement.numero} "

@@ -246,6 +246,15 @@
       parent.ouvrir(url.href);
     });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') parent.echap(cadre); });
+    // Saisie en cours : un formulaire d'enregistrement (POST) modifié et pas encore envoyé
+    const saisie = e => { const f = e.target.form || e.target.closest?.('form'); if (f && (f.method || '').toLowerCase() === 'post') window.erpModifie = true; };
+    document.addEventListener('input', saisie, true);
+    document.addEventListener('change', saisie, true);
+    document.addEventListener('submit', () => { window.erpModifie = false; }, true);
+    window.addEventListener('beforeunload', e => { if (window.erpModifie) { e.preventDefault(); e.returnValue = ''; } });
+    // Enregistrement terminé : les fenêtres des pièces concernées se mettent à jour
+    const aActualiser = document.querySelector('meta[name=erp-actualiser]');
+    if (aActualiser && parent.actualiser) parent.actualiser(aActualiser.content.split(' '));
     document.addEventListener('mousedown', () => parent.activerCadre(cadre), true);
   }
 })();

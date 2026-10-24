@@ -54,10 +54,47 @@ Fermez-la pour arrêter le logiciel.
 Si la page ne s'ouvre pas tout de suite, actualisez-la (touche F5) après
 quelques secondes.
 
-Pour travailler depuis les autres ordinateurs de l'agence, lancez plutôt
-4-DEMARRER-EN-RESEAU.bat :
-  - les autres postes ouvrent http://NOM-DE-CE-PC:8000 ;
-  - autorisez le pare-feu Windows si la question est posée.
+
+2 bis. PLUSIEURS ORDINATEURS EN RÉSEAU LOCAL (un serveur, des postes)
+--------------------------------------------------------------------
+
+Dans l'agence, UN ordinateur est le serveur : le logiciel et la base y
+sont installés. Les autres ordinateurs sont des postes utilisateurs.
+Ils n'installent rien et utilisent le logiciel dans leur navigateur
+(Edge, Chrome, Firefox), chacun avec son propre compte.
+Le réseau local suffit : Internet n'est pas nécessaire. La
+synchronisation avec la direction est une autre fonction, prévue plus
+tard.
+
+Sur le SERVEUR (une seule machine) :
+  1. Installez avec 1-INSTALLER.bat (voir partie 1).
+     Pour plus de 3 ou 4 postes, préférez SQL Server à SQLite.
+  2. La première fois, faites un clic droit sur
+     4-DEMARRER-SERVEUR-RESEAU.bat > « Exécuter en tant
+     qu'administrateur ». Cela ouvre le pare-feu Windows (port 8000).
+     Les fois suivantes, un double-clic suffit.
+  3. La fenêtre affiche l'adresse à utiliser sur les autres postes,
+     par exemple http://SERVEUR-AGENCE:8000 ou http://192.168.1.10:8000.
+     Elle crée aussi le raccourci « ERP OHADA (poste utilisateur).url ».
+  4. Facultatif : 5-DEMARRAGE-AUTOMATIQUE-SERVEUR.bat fait démarrer le
+     serveur tout seul à chaque ouverture de session Windows. Relancez-le
+     pour annuler.
+  5. Le serveur doit rester allumé pendant les heures de travail. Fermer
+     sa fenêtre noire arrête le logiciel pour TOUS les postes.
+  Conseil : faites donner au serveur une adresse IP fixe (réglage de la
+  box ou du routeur), pour que l'adresse ne change pas.
+
+Sur chaque POSTE UTILISATEUR :
+  - Copiez le raccourci « ERP OHADA (poste utilisateur).url » sur le
+    bureau (clé USB ou dossier partagé), ou tapez l'adresse du serveur
+    dans le navigateur.
+  - Connectez-vous avec le compte de l'utilisateur. L'administrateur crée
+    les comptes et leurs droits dans Fichier > Autorisations d'accès.
+
+Si un poste n'arrive pas à se connecter :
+  - Vérifiez que la fenêtre du serveur est ouverte ;
+  - que le poste et le serveur sont sur le même réseau ;
+  - que le pare-feu du serveur autorise le port 8000 (étape 2).
 
 
 3. UTILISER SQL SERVER
@@ -120,7 +157,8 @@ Pour passer de SQLite à SQL Server (ou l'inverse), lancez
 1-INSTALLER.bat         installation ou réparation
 2-DEMARRER-ERP.bat      démarrer le logiciel sur ce poste
 3-CHANGER-DE-BASE.bat   passer de SQLite à SQL Server ou l'inverse
-4-DEMARRER-EN-RESEAU.bat  démarrer pour tous les postes de l'agence
+4-DEMARRER-SERVEUR-RESEAU.bat      serveur pour tous les postes de l'agence
+5-DEMARRAGE-AUTOMATIQUE-SERVEUR.bat  démarrage du serveur à l'ouverture de session
 logiciel\               le programme ERP
 python\                 Python 3.12 (Python Software Foundation), utilisé
                         uniquement par l'ERP

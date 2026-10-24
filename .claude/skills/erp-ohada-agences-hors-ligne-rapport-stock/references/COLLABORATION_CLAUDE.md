@@ -19,7 +19,7 @@ Lire les instructions locales du dépôt, puis examiner société/agence/dépôt
 
 Rendre une matrice avec les colonnes : exigence_id, état (existant vérifié / partiel / absent / non vérifié), fichiers ou écrans concernés, écart précis, adaptation envisagée, décision nécessaire, test et preuve. Une fonctionnalité décrite dans une réponse n’est pas un existant vérifié.
 
-Conserver toutes les exigences E01–E44 et tracer chaque couverture, y compris le complément U4 sur règlements/crédit et auteurs visibles. Traiter les propositions P01–P26 comme des moyens proposés : adapter la réalisation technique, justifier les alternatives et conserver les contrôles métier. Les décisions ouvertes ne sont pas toutes bloquantes ; éviter de redemander ce que l’utilisateur a déjà expliqué.
+Conserver les exigences E01–E51 et tracer chaque couverture. U5 remplace la règle historique E40/P22 : plusieurs factures sélectionnables et règlement en attente autorisé ; appliquer les scénarios R29/R31 révisés. Les autres besoins U4 sur crédit et auteurs sont conservés. Traiter les propositions P01–P26 comme des moyens proposés : adapter la réalisation technique, justifier les alternatives et conserver les contrôles métier. Les décisions ouvertes ne sont pas toutes bloquantes ; éviter de redemander ce que l’utilisateur a déjà expliqué.
 
 ## Ordre d’intégration proposé
 
@@ -39,4 +39,4 @@ Préciser : version/commit, exigences traitées, fichiers modifiés, migrations,
 
 ## Message de transmission utilisable
 
-« Utilise le Skill erp-ohada-agences-hors-ligne-rapport-stock pour les deux tâches que je t’ai confiées et leur complément sur les règlements. Commence par comparer ses exigences à ton travail et au code existant. Conserve les fonctions déjà présentes. Distingue les besoins confirmés, les propositions et les décisions ouvertes. Fournis ensuite les adaptations et les preuves de recette, en priorité le hors-recettes interagences, le reçu lié à une facture, les avances sans double encaissement, l’auteur visible sur tous les documents et la fiche magasin sans quantités attendues ni double sortie de stock. »
+« Utilise le Skill erp-ohada-agences-hors-ligne-rapport-stock pour les deux tâches que je t’ai confiées et leur complément sur les règlements. Commence par comparer ses exigences à ton travail et au code existant. Conserve les fonctions déjà présentes. Distingue les besoins confirmés, les propositions et les décisions ouvertes. Fournis ensuite les adaptations et les preuves de recette, en priorité le hors-recettes interagences, les fenêtres indépendantes, les factures non soldées proposées au choix et le règlement en attente de rattachement, les avances sans double encaissement, l’auteur visible sur tous les documents et la fiche magasin sans quantités attendues ni double sortie de stock. »

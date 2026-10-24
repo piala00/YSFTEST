@@ -9,6 +9,7 @@
   <link href="{% static 'css/erp.css' %}" rel="stylesheet">
   {% if module %}<style>:root { --module: {{ module.couleur }}; }</style>{% endif %}
   {% block head %}{% endblock %}
+  {% if erp_actualiser %}<meta name="erp-actualiser" content="{{ erp_actualiser|join:' ' }}">{% endif %}
   {% if module %}<script>
   // Espace de travail : l'accueil est le bureau, chaque commande s'ouvre dans une fenêtre interne.
   window.ERP_MDI = {module: "{{ module.code }}", accueil: "{% url module.accueil %}", accueils: {{ accueils|safe }}};

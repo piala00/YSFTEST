@@ -38,8 +38,8 @@ E36;T2;Compte client;CONFIRME_UTILISATEUR;U4;Prévoir un compte pour les clients
 E37;T2;Crédit;CONFIRME_UTILISATEUR;U4;Enregistrer le plafond de crédit accordé au client.
 E38;T2;Échéance;CONFIRME_UTILISATEUR;U4;Suivre le délai de règlement de chaque facture du client à crédit.
 E39;T2;Versement;CONFIRME_UTILISATEUR;U4;Établir un reçu lors du versement du client.
-E40;T2;Affectation;CONFIRME_UTILISATEUR;U4;La personne créant un reçu de règlement de créance doit obligatoirement le rattacher à une facture.
-E41;T2;Détail reçu;CONFIRME_UTILISATEUR;U4;Conserver les informations et détails du reçu, dont la facture qu’il règle.
+E40;T2;Affectation;CONFIRME_UTILISATEUR;U5 remplace U4;"Choisir le client puis la ou les factures non soldées proposées automatiquement ; permettre un règlement en attente de rattachement si aucune facture n’est disponible."
+E41;T2;Détail reçu;CONFIRME_UTILISATEUR;U4/U5;Conserver les détails du règlement, ses affectations par facture et son montant restant à rattacher.
 E42;T1+T2;Auteur;CONFIRME_UTILISATEUR;U4;Rendre identifiable la personne ayant généré le reçu.
 E43;T1+T2;Auteur visible;CONFIRME_UTILISATEUR;U4;"Afficher à l’ouverture de chaque document la personne qui l’a généré ; inclure factures et commandes."
 E44;T1+T2;Traçabilité;CONFIRME_UTILISATEUR;U4;Conserver la trace des auteurs pour tous les documents, écritures et opérations.
@@ -64,8 +64,16 @@ P18;T2;Couverture stock;PROPOSITION_CONCEPTION;A1-A2;Étendre la fiche indépend
 P19;T1+T2;Périmètre;PROPOSITION_CONCEPTION;A1-A2;Auditer le code existant avant toute modification et rattacher les livraisons aux exigences E/P.
 P20;T1;Transferts;PROPOSITION_CONCEPTION;A1-A2;"Tracer expédition, transit et réception ; compter le stock global une seule fois."
 P21;T1+T2;Sauvegardes;PROPOSITION_CONCEPTION;A1-A2;"Sauvegarder local et central ; préserver les files de synchronisation et tester la restauration sans rejouer les opérations."
-P22;T2;Affectation stricte;PROPOSITION_CONCEPTION;A1-A2;"Par défaut un reçu de créance concerne une facture ; distinguer versement physique, reçu et affectation ; ne pas autoriser un reçu multi-factures sans validation."
+P22;T2;Affectations séparées;PROPOSITION_CONCEPTION;A3 après U5;"Séparer le règlement monétaire unique de ses affectations 0..N factures ; conserver le non affecté sans facture fictive ni double encaissement."
 P23;T2;Soldes;PROPOSITION_CONCEPTION;A1-A2;"Calculer le reste dû depuis factures, avoirs et affectations validées ; conserver les règlements partiels et contrôles de suraffectation."
-P24;T2;Avances;PROPOSITION_CONCEPTION;A1-A2;"Distinguer avance sur BC avant facture et reçu réglant une créance ; l’affectation ultérieure ne crée pas de nouvel encaissement."
+P24;T2;Avances;PROPOSITION_CONCEPTION;A3 après U5;"Conserver avance sur BC et règlement client en attente de facture comme situations distinctes ; le rattachement ultérieur ne crée pas de nouvel encaissement."
 P25;T1+T2;Audit;PROPOSITION_CONCEPTION;A1-A2;"Enregistrer l’auteur côté serveur, la date de création, l’agence et le site ; distinguer auteur initial, modificateur, valideur, annulateur, automate et utilisateur de synchronisation."
 P26;T2;Crédit hors ligne;PROPOSITION_CONCEPTION;A1-A2;"Ne pas promettre un plafond global strict avec plusieurs agences déconnectées autorisées à engager le même client ; prévoir quota ou validation selon arbitrage."
+E45;T2;Fenêtres;CONFIRME_UTILISATEUR;U5;Ouvrir un règlement depuis une facture sans fermer ni remplacer la fenêtre facture.
+E46;T2;Navigation;CONFIRME_UTILISATEUR;U5;Permettre plusieurs fenêtres de documents ouvertes avec navigation premier plan/arrière-plan et fermeture individuelle.
+E47;T2;Parcours règlement;CONFIRME_UTILISATEUR;U5;"Ouvrir la saisie de règlement client depuis Traitement / gestion des règlements ; sélectionner d’abord le client."
+E48;T2;Factures proposées;CONFIRME_UTILISATEUR;U5;Charger automatiquement les factures non soldées du client choisi.
+E49;T2;Sélection multiple;CONFIRME_UTILISATEUR;U5;Permettre la sélection d’une ou plusieurs factures sur lesquelles rattacher le règlement.
+E50;T2;Règlement en attente;CONFIRME_UTILISATEUR;U5;Autoriser l’enregistrement du règlement en attente de facture pour rattachement ultérieur lorsqu’aucune facture n’est disponible.
+E51;T2;En-tête adapté;CONFIRME_UTILISATEUR;U5;"Adapter l’en-tête au besoin ERP ; captures Sage reçues en U6, champs et disposition ERP spécifiques restent à préciser."
+E52;T2;Fenêtres transversales;CONFIRME_UTILISATEUR;U6;Étendre le fonctionnement des fenêtres à tous les écrans concernés de comptabilité et gestion commerciale, au-delà du règlement ouvert depuis une facture.

@@ -14,7 +14,7 @@ Statuts :
 | Id | Exigence (résumé) | Existant / adaptation | Écart restant | Preuve |
 |---|---|---|---|---|
 | E01 | Plusieurs sociétés distinctes | Une installation (base) par société ; paramètres société dans `core.Societe` | Pas de multi-sociétés dans une même base (choix : isolation physique) | — |
-| E02 | Hors ligne, atout principal | Serveur Django local par agence (SQLite ou PostgreSQL), aucun service distant requis | Paquet d'installation Windows locale à fournir | — |
+| E02 | Hors ligne, atout principal | Serveur local par agence, aucun service distant requis. Paquet Windows sans Internet (Python inclus). **Réseau local (24/10) :** un poste serveur (4-DEMARRER-SERVEUR-RESEAU.bat : accès des autres postes, pare-feu, adresse affichée et raccourci « poste utilisateur », démarrage automatique facultatif) ; les autres postes utilisent leur navigateur avec leur propre compte. SQLite configuré pour plusieurs postes (attente de verrou, WAL), SQL Server conseillé au-delà de 3 ou 4 postes. | Synchronisation avec la direction : tranche « échanges entre agences » | — |
 | E03 | Petites, moyennes, grandes entreprises | Options activables (TVA, analytique, dépôts, droits) | Assistant de paramétrage à la création (E12) | — |
 | E04–E05 | Agences dans plusieurs villes ; une société, serveurs locaux sans interconnexion | `core.Agence` (agence locale + autres agences), compte de liaison 185NN créé automatiquement et modifiable | — | `tests_rapport_commercial.test_agence_et_compte_de_liaison` |
 | E06–E07 | Stocks, clients, créances, états par agence | Chaque serveur d'agence tient ses propres données ; balance âgée, états de stock, bilan | Bilan d'agence avec charges communes : D15 | tests reporting |
@@ -67,3 +67,13 @@ Statuts :
 ## Tests exécutés
 
 Commande : `python manage.py test`. Résultat : **173 tests, tous réussis** (dont les tests de la revue GPT du 24/10) (à la date de la livraison).
+
+
+## Complément U5 / U6 : fenêtres et règlements (skill v3)
+
+| Exigence | Réalisation | Preuve |
+|---|---|---|
+| Fenêtres indépendantes (facture → règlement, et tout autre écran) | Un lien vers un autre écran ouvre une nouvelle fenêtre interne ; la fenêtre d'origine reste ouverte. Le même écran et les sous-pages du même objet restent dans la même fenêtre. | Essai navigateur : 2 fenêtres après « Saisir un règlement » |
+| Saisie non enregistrée protégée | Fermer une fenêtre dont le formulaire est modifié demande confirmation (revenir / abandonner) ; quitter la page aussi | Essai navigateur |
+| Actualisation après règlement | Les fenêtres ouvertes sur les factures réglées ou rattachées se rechargent, sauf si elles contiennent une saisie en cours | Essai navigateur |
+| Saisie des règlements guidée par le client | Choix du tiers, factures non soldées proposées, sélection multiple avec montant imputé, règlement « en attente de facture » si aucune ; liste des règlements du tiers, filtres et totaux | `test_formulaire_recu_plusieurs_factures_et_rattachement`, `test_reglement_en_attente_de_facture`, `test_montants_imputes_saisis_par_facture` |

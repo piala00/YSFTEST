@@ -89,8 +89,24 @@
     f.etat = f.etat === 'agrandie' ? 'normale' : 'agrandie'; placer(f); activer(f); enregistrer();
   }
   function restaurer(f) { f.etat = f.etat === 'reduite' ? (f.avantReduction || 'normale') : f.etat; placer(f); activer(f); enregistrer(); }
-  function fermer(f) {
+  // Une fenêtre dont le formulaire a été modifié et non enregistré ne se ferme pas sans confirmation
+  function modifiee(f) {
+    try { return !!f.iframe.contentWindow.erpModifie; } catch (e) { return false; }
+  }
+  function fermer(f, force) {
+    if (!force && modifiee(f) && !confirm(`« ${f.titre} » contient une saisie non enregistrée.\n\nOK : fermer et abandonner la saisie.\nAnnuler : revenir à la saisie.`)) {
+      activer(f); return false;
+    }
     fenetres = fenetres.filter(g => g !== f); f.el.remove(); afficherReduites(); activer(active()); enregistrer();
+    return true;
+  }
+  // Après un enregistrement (ex. règlement) : recharger les fenêtres ouvertes sur les pages concernées,
+  // sauf celles qui contiennent une saisie en cours (elles ne sont jamais écrasées)
+  function actualiser(chemins) {
+    fenetres.forEach(f => {
+      const chemin = (f.url || '').split('?')[0];
+      if (chemins.includes(chemin) && !modifiee(f)) { try { f.iframe.contentWindow.location.reload(); } catch (e) {} }
+    });
   }
 
   function afficherReduites() {
@@ -225,7 +241,7 @@
   // Interface pour les pages affichées dans les fenêtres (menus.js) et pour la barre d'outils
   const parCadre = cadre => fenetres.find(f => f.iframe === cadre);
   window.erpFenetres = {
-    ouvrir, mosaique,
+    ouvrir, mosaique, actualiser,
     active: () => active(),
     fermer: f => fermer(f),
     fermerCadre: cadre => { const f = parCadre(cadre); if (f) fermer(f); },
