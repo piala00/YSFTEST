@@ -1,0 +1,160 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}{{ titre }}{% endblock %}
+{% block content %}
+<div class="saisie-reglements">
+<div class="d-flex justify-content-between align-items-center mb-1">
+  <h1 class="h6 mb-0">{{ titre }}</h1>
+  <div class="small">{% if tiers %}<a href="{% url 'commercial:tiers_detail' tiers.pk %}"><i class="bi bi-person-vcard"></i> Fiche {{ tiers.nom }}</a>{% endif %}</div>
+</div>
+<div class="row g-2">
+  {# Panneau de gauche : quels règlements du tiers afficher #}
+  <div class="col-md-2"><div class="list-group list-group-flush small border rounded">
+    <a class="list-group-item list-group-item-action py-1 {% if not filtre %}active{% endif %}" href="?sens={{ sens }}{% if tiers %}&amp;tiers={{ tiers.pk }}{% endif %}">Tous</a>
+    <a class="list-group-item list-group-item-action py-1 {% if filtre == 'non_imputes' %}active{% endif %}" href="?sens={{ sens }}{% if tiers %}&amp;tiers={{ tiers.pk }}{% endif %}&amp;filtre=non_imputes">Règlements non imputés</a>
+    <a class="list-group-item list-group-item-action py-1 {% if filtre == 'soldes' %}active{% endif %}" href="?sens={{ sens }}{% if tiers %}&amp;tiers={{ tiers.pk }}{% endif %}&amp;filtre=soldes">Règlements soldés</a>
+  </div></div>
+
+  <div class="col-md-10">
+    {# 1. Le tiers d'abord #}
+    <form method="get" class="d-flex align-items-center gap-2 mb-1" id="choix-tiers">
+      <input type="hidden" name="sens" value="{{ sens }}"><input type="hidden" name="filtre" value="{{ filtre }}">
+      <label class="small" for="tiers-choisi">{% if sens == "E" %}Client{% else %}Fournisseur{% endif %}</label>
+      <select name="tiers" id="tiers-choisi" class="form-select form-select-sm" style="max-width:28rem" onchange="this.form.submit()">
+        <option value="">— choisir —</option>
+        {% for t in form.fields.tiers.queryset %}<option value="{{ t.pk }}" {% if tiers and t.pk == tiers.pk %}selected{% endif %}>{{ t.code }} · {{ t.nom }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-sm btn-outline-success ms-auto">Afficher</button>
+    </form>
+
+    {% if tiers %}
+    <form method="post" id="form-reglement">{% csrf_token %}
+      <input type="hidden" name="tiers" value="{{ tiers.pk }}">
+      {% if form.non_field_errors %}<div class="alert alert-danger py-1 small mb-1">{{ form.non_field_errors }}</div>{% endif %}
+      {% for f in form %}{% for e in f.errors %}<div class="alert alert-danger py-1 small mb-1">{{ f.label }} : {{ e }}</div>{% endfor %}{% endfor %}
+
+      {# 2. Ligne de saisie du règlement #}
+      <div class="card mb-1"><div class="card-body py-1 px-2">
+        <div class="row g-1 align-items-end small">
+          <div class="col-md-2"><label class="form-label mb-0" for="id_date">Date</label>{{ form.date }}</div>
+          <div class="col-md-1"><label class="form-label mb-0">N° pièce</label><input class="form-control form-control-sm" value="automatique" disabled></div>
+          <div class="col-md-3"><label class="form-label mb-0" for="id_libelle">Libellé</label>{{ form.libelle }}</div>
+          <div class="col-md-2"><label class="form-label mb-0" for="id_mode">Mode</label>{{ form.mode }}</div>
+          <div class="col-md-2"><label class="form-label mb-0" for="id_journal">Code journal</label>{{ form.journal }}</div>
+          <div class="col-md-2"><label class="form-label mb-0" for="id_montant">Montant *</label>{{ form.montant }}</div>
+          <div class="col-md-2"><label class="form-label mb-0" for="id_reference">Référence</label>{{ form.reference }}</div>
+          <div class="col-md-4"><label class="form-label mb-0" for="id_agence_encaissement">Encaissé par une autre agence</label>{{ form.agence_encaissement }}</div>
+          <div class="col-md-6 text-end">
+            <a class="btn btn-sm btn-outline-success" href="?sens={{ sens }}&amp;tiers={{ tiers.pk }}&amp;filtre={{ filtre }}">Nouveau</a>
+            <button class="btn btn-sm btn-success">Enregistrer</button>
+          </div>
+        </div>
+      </div></div>
+
+      {# 3. Factures non soldées du tiers, à cocher (adaptation de notre ERP) #}
+      <div class="card mb-1">
+        <div class="card-header bg-white py-1 small d-flex justify-content-between">
+          <span class="fw-semibold">Factures non soldées à régler</span>
+          <span class="text-muted">Cochez les factures ; le montant se répartit de la plus ancienne à la plus récente (modifiable).</span>
+        </div>
+        <table class="table table-sm mb-0 align-middle small" id="table-factures">
+          <thead><tr><th style="width:2rem"></th><th>Facture</th><th>Date</th><th>Échéance</th><th>Client</th>
+            <th class="num">Montant TTC</th><th class="num">Reste dû</th><th class="num" style="width:9rem">Montant imputé</th></tr></thead>
+          <tbody>
+          {% for f in factures %}<tr data-id="{{ f.pk }}" data-reste="{{ f.reste_a_payer|stringformat:'s' }}">
+            <td><input class="form-check-input" type="checkbox" name="factures" value="{{ f.pk }}" {% if f.pk in choisies %}checked{% endif %}></td>
+            <td><a href="{% url 'commercial:document_detail' f.pk %}" data-nouvelle-fenetre>{{ f.numero }}</a></td><td>{{ f.date|date:"d/m/Y" }}</td>
+            <td class="{% if f.date_echeance and f.date_echeance < aujourdhui %}text-danger{% endif %}">{{ f.date_echeance|date:"d/m/Y" }}</td>
+            <td>{% if f.tiers_id != tiers.pk %}{{ f.tiers.nom }}{% endif %}</td>
+            <td class="num">{{ f.total_ttc|montant }}</td><td class="num">{{ f.reste_a_payer|montant }}</td>
+            <td><input class="form-control form-control-sm text-end montant-impute" name="montant_{{ f.pk }}" inputmode="decimal" autocomplete="off"
+                       value="{% for k, v in montants_saisis.items %}{% if k == f.pk|stringformat:'s' %}{{ v }}{% endif %}{% endfor %}"></td></tr>
+          {% empty %}<tr><td colspan="8" class="text-muted text-center">Aucune facture non soldée : le règlement sera en attente de facture.</td></tr>{% endfor %}
+          </tbody>
+          <tfoot><tr><td colspan="7" class="text-end">Imputé sur les factures</td><td class="num fw-semibold" id="total-impute">0</td></tr>
+            <tr><td colspan="7" class="text-end">En attente de rattachement à une prochaine facture</td><td class="num fw-semibold text-warning-emphasis" id="reste-attente">0</td></tr></tfoot>
+        </table>
+        <div class="card-footer bg-white py-1 small d-flex flex-wrap gap-3">
+          <div class="form-check">{{ form.en_attente }} <label class="form-check-label" for="id_en_attente">{{ form.en_attente.label }}</label></div>
+          <details {% if form.commande.value %}open{% endif %}><summary>Avance sur un bon de commande</summary>{{ form.commande }}</details>
+        </div>
+      </div>
+    </form>
+
+    {# 4. Règlements du tiers #}
+    <div class="card mb-1"><div class="table-responsive" style="max-height:18rem">
+      <table class="table table-sm table-hover mb-0 small">
+        <thead class="sticky-top bg-white"><tr><th>Date</th><th>N° pièce</th><th>Libellé</th><th>Mode</th><th>Code journal</th>
+          <th class="num">Montant</th><th class="num">Imputé</th><th class="num">Solde</th><th>Saisi par</th></tr></thead>
+        <tbody>{% for r in reglements %}<tr>
+          <td>{{ r.date|date:"d/m/y" }}</td><td><a href="{% url 'commercial:reglement_detail' r.pk %}" data-nouvelle-fenetre>{{ r.numero }}</a></td>
+          <td>{{ r.libelle }}{% if r.commande %} <span class="badge text-bg-light">avance</span>{% endif %}</td><td>{{ r.get_mode_display }}</td><td>{{ r.journal.code }}</td>
+          <td class="num">{{ r.montant|montant }}</td><td class="num">{{ r.impute|montant_ou_vide }}</td>
+          <td class="num {% if r.solde > 0 %}text-warning-emphasis fw-semibold{% endif %}">{{ r.solde|montant_ou_vide }}</td><td>{{ r.cree_par|default:"" }}</td></tr>
+        {% empty %}<tr><td colspan="9" class="text-muted text-center">Aucun règlement.</td></tr>{% endfor %}</tbody>
+      </table></div></div>
+    {% else %}
+    <div class="text-muted small border rounded p-3">Choisissez d'abord le {% if sens == "E" %}client{% else %}fournisseur{% endif %} : ses factures non soldées et ses règlements s'affichent.</div>
+    {% endif %}
+
+    {# 5. Totaux du tiers #}
+    <div class="row g-2 mt-1 small">
+      <div class="col-md-7"><div class="border rounded p-2 h-100">Type de règlement : {% if filtre == "non_imputes" %}Non imputés{% elif filtre == "soldes" %}Soldés{% else %}Tous{% endif %}</div></div>
+      <div class="col-md-5"><div class="rounded p-2" style="background:#cdeee4">
+        <div class="d-flex justify-content-between"><span>Total règlement</span><span>{{ totaux.reglement|montant_ou_vide }}</span></div>
+        <div class="d-flex justify-content-between"><span>Total imputé</span><span>{{ totaux.impute|montant_ou_vide }}</span></div>
+        <div class="d-flex justify-content-between fw-bold"><span>Solde</span><span>{{ totaux.solde|montant_ou_vide }}</span></div>
+      </div></div>
+    </div>
+    <div class="text-end mt-2"><a href="javascript:history.back()" class="btn btn-sm btn-outline-success">Fermer</a></div>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById('form-reglement');
+  if (!form) return;
+  const montant = document.getElementById('id_montant'), attente = document.getElementById('id_en_attente');
+  const nombre = v => parseFloat(String(v || '').replace(/\s/g, '').replace(',', '.')) || 0;
+  const fmt = v => Math.round(v).toLocaleString('fr-FR');
+  const lignes = () => [...form.querySelectorAll('#table-factures tr[data-id]')];
+  lignes().forEach(tr => { const c = tr.querySelector('input.montant-impute'); if (c.value) c.dataset.manuel = '1'; });
+
+  // Répartit le montant du règlement sur les factures cochées, de la plus ancienne à la plus récente,
+  // sans toucher aux montants modifiés à la main.
+  function repartir() {
+    let disponible = nombre(montant.value);
+    lignes().forEach(tr => {
+      const coche = tr.querySelector('input[type=checkbox]'), champ = tr.querySelector('input.montant-impute');
+      champ.disabled = !coche.checked;
+      if (!coche.checked) { champ.value = ''; delete champ.dataset.manuel; return; }
+      if (champ.dataset.manuel) { disponible -= nombre(champ.value); return; }
+      const part = Math.max(0, Math.min(nombre(tr.dataset.reste), disponible));
+      champ.value = part ? part : '';
+      disponible -= part;
+    });
+    totaux();
+  }
+  function totaux() {
+    const coches = lignes().filter(tr => tr.querySelector('input[type=checkbox]').checked);
+    const impute = coches.reduce((s, tr) => s + nombre(tr.querySelector('input.montant-impute').value), 0);
+    document.getElementById('total-impute').textContent = fmt(impute);
+    document.getElementById('reste-attente').textContent = fmt(Math.max(0, nombre(montant.value) - impute));
+    attente.disabled = coches.length > 0;
+    if (coches.length) attente.checked = false;
+    if (!lignes().length) attente.checked = true;
+  }
+  lignes().forEach(tr => {
+    tr.querySelector('input[type=checkbox]').addEventListener('change', repartir);
+    const champ = tr.querySelector('input.montant-impute');
+    champ.addEventListener('input', () => { if (champ.value) champ.dataset.manuel = '1'; else delete champ.dataset.manuel; totaux(); });
+  });
+  montant.addEventListener('input', repartir);
+  repartir();
+  const cochee = lignes().find(tr => tr.querySelector('input[type=checkbox]').checked);   // facture d'où l'on vient
+  if (cochee) cochee.scrollIntoView({ block: 'center' });
+})();
+</script>
+{% endblock %}

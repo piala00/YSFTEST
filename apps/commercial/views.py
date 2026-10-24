@@ -679,11 +679,16 @@ class ReglementListView(LoginRequiredMixin, ListView):
 
 @login_required
 def reglement_create(request):
-    initial = {}
-    facture = None
+    """Saisie des règlements clients (ou fournisseurs) : choisir le tiers, saisir le règlement, cocher les factures non
+    soldées proposées ; la liste des règlements du tiers et ses totaux restent affichés dans la même fenêtre."""
+    from django.db.models import Sum
+
+    from .forms import non_soldees
+
+    initial, sens = {}, request.GET.get("sens")
     if request.GET.get("document"):
         facture = get_object_or_404(Document, pk=request.GET["document"], type_document__in=Document.TYPES_FACTURATION)
-        initial = {"tiers": facture.tiers_payeur, "factures": [facture], "montant": facture.reste_a_payer,
+        initial = {"tiers": facture.tiers_payeur, "factures": [facture.pk], "montant": facture.reste_a_payer,
                    "libelle": f"Règlement {facture.numero}"}
     elif request.GET.get("commande"):
         commande = get_object_or_404(Document, pk=request.GET["commande"], type_document__in=(Document.COMMANDE, Document.ACHAT_COMMANDE))
@@ -692,20 +697,78 @@ def reglement_create(request):
     elif request.GET.get("tiers"):
         initial = {"tiers": request.GET["tiers"]}
     initial.setdefault("journal", Journal.objects.filter(code="CA").first())
+    initial.setdefault("date", timezone.localdate())
 
     form = ReglementForm(request.POST or None, initial=initial)
+    tiers_id = request.POST.get("tiers") or getattr(initial.get("tiers"), "pk", initial.get("tiers"))
+    tiers = Tiers.objects.filter(pk=tiers_id).first() if tiers_id else None
+    if tiers:
+        sens = "E" if tiers.type_tiers == Tiers.CLIENT else "D"
+    sens = sens or "E"
+    form.fields["tiers"].queryset = form.fields["tiers"].queryset.filter(
+        type_tiers=Tiers.CLIENT if sens == "E" else Tiers.FOURNISSEUR)
     if request.method == "POST" and form.is_valid():
         try:
             with transaction.atomic():
                 reglement = form.save(commit=False)
                 reglement.journal = form.cleaned_data["journal"]
                 factures = list(form.cleaned_data.get("factures") or [])
-                reglement.enregistrer(factures if factures else None)
-            messages.success(request, f"Règlement {reglement.numero} enregistré et comptabilisé.")
-            return redirect("commercial:reglement_detail", pk=reglement.pk)
+                montants = {f.pk: request.POST.get(f"montant_{f.pk}", "").replace(" ", "").replace(",", ".") for f in factures}
+                reglement.enregistrer(factures if factures else None, montants=montants,
+                                      en_attente=form.cleaned_data.get("en_attente", False))
         except ValidationError as exc:
             form.add_error(None, exc)
-    return render(request, "core/form.html", {"form": form, "titre": "Nouveau règlement", "facture": facture})
+        else:
+            lien = reverse("commercial:reglement_detail", args=[reglement.pk])
+            attente = reglement.en_attente_de_rattachement
+            messages.success(request, format_html(
+                'Règlement <a href="{}" data-nouvelle-fenetre>{}</a> enregistré et comptabilisé{}.', lien, reglement.numero,
+                f" — {attente:,.0f} en attente de rattachement".replace(",", " ") if attente else ""))
+            return redirect(f"{reverse('commercial:reglement_create')}?tiers={reglement.tiers_id}&filtre={request.GET.get('filtre', '')}")
+
+    # Liste des règlements du tiers (comme la fenêtre de saisie du modèle étudié) et totaux
+    filtre = request.GET.get("filtre", "")
+    reglements, factures = [], []
+    totaux = {"reglement": ZERO, "impute": ZERO}
+    if tiers:
+        qs = (Reglement.objects.filter(tiers=tiers).select_related("journal")
+              .annotate(impute=Sum("imputations__montant")).order_by("date", "numero"))
+        for r in qs:
+            r.impute = r.impute or ZERO
+            r.solde = ZERO if r.commande_id else r.montant - r.impute
+            if (filtre == "non_imputes" and r.solde <= 0) or (filtre == "soldes" and r.solde > 0):
+                continue
+            reglements.append(r)
+            totaux["reglement"] += r.montant
+            totaux["impute"] += r.impute
+        types = (Document.FACTURE,) if tiers.type_tiers == Tiers.CLIENT else (Document.ACHAT_FACTURE,)
+        factures = list(non_soldees(Document.objects.filter(type_document__in=types, statut=Document.VALIDE)
+                                    .filter(Q(tiers=tiers) | Q(payeur=tiers)).select_related("tiers").order_by("date", "numero")))
+    totaux["solde"] = totaux["reglement"] - totaux["impute"]
+    choisies = [int(x) for x in (request.POST.getlist("factures") if request.method == "POST" else initial.get("factures", []))]
+    montants = {k[8:]: v for k, v in request.POST.items() if k.startswith("montant_")}
+    return render(request, "commercial/reglement_form.html", {
+        "form": form, "titre": f"Saisie des règlements {'clients' if sens == 'E' else 'fournisseurs'}", "sens": sens,
+        "tiers": tiers, "filtre": filtre, "reglements": reglements, "totaux": totaux, "factures": factures,
+        "choisies": choisies, "montants_saisis": montants, "aujourdhui": timezone.localdate()})
+
+
+@login_required
+def reglement_factures(request):
+    """Factures non soldées d'un tiers (et de ceux dont il est le payeur), pour la saisie des règlements."""
+    from django.http import JsonResponse
+
+    from .forms import non_soldees
+
+    tiers = get_object_or_404(Tiers, pk=request.GET.get("tiers"))
+    types = (Document.FACTURE,) if tiers.type_tiers == Tiers.CLIENT else (Document.ACHAT_FACTURE,)
+    factures = non_soldees(Document.objects.filter(type_document__in=types, statut=Document.VALIDE)
+                           .filter(Q(tiers=tiers) | Q(payeur=tiers)).select_related("tiers").order_by("date", "numero"))
+    return JsonResponse({"tiers": tiers.nom, "factures": [
+        {"id": f.pk, "numero": f.numero, "date": f.date.strftime("%d/%m/%Y"),
+         "echeance": f.date_echeance.strftime("%d/%m/%Y") if f.date_echeance else "",
+         "client": f.tiers.nom if f.tiers_id != tiers.pk else "", "total": str(f.total_ttc), "reste": str(f.reste_a_payer),
+         "echue": bool(f.date_echeance and f.date_echeance < timezone.localdate())} for f in factures]})
 
 
 class ReglementDetailView(LoginRequiredMixin, DetailView):

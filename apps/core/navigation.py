@@ -415,8 +415,8 @@ GESTION_COMMERCIALE = Module(
             E("traitement.planning", "Gestion du planning des ressources"),
             E("traitement.bon_a_payer", "Gestion du bon à payer"),
             E("reglements", "Gestion des règlements", icone="bi-cash-coin", enfants=[
-                E("reglements.clients", "Gestion des règlements clients", "commercial:reglements", sens="E"),
-                E("reglements.fournisseurs", "Gestion des règlements fournisseurs", "commercial:reglements", sens="D"),
+                E("reglements.clients", "Gestion des règlements clients", "commercial:reglement_create", sens="E"),
+                E("reglements.fournisseurs", "Gestion des règlements fournisseurs", "commercial:reglement_create", sens="D"),
                 E("reglements.caisse", "Opérations de caisse (dépenses, hors recettes)", "commercial:operations_caisse",
                   preuve="AJOUT-ERP"),
                 E("reglements.generation", "Génération des règlements"),

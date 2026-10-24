@@ -204,7 +204,8 @@ def element_de_la_page(request, module, element_actif=None):
         return codes.get(kwargs["structure"])
     equivalents = {"delettrage": "lettrage", "stock_comptabiliser": "stock", "journal_create": "journaux",
                    "journal_update": "journaux", "article_parametres": "articles",
-                   "reglement_rattacher": "reglements"}
+                   "reglements": "reglement_create", "reglement_detail": "reglement_create",
+                   "reglement_rattacher": "reglement_create", "reglement_factures": "reglement_create"}
     if court in equivalents:
         return index.get(f"{module.code}:{equivalents[court]}")
     for suffixe in ("_create", "_update", "_detail"):

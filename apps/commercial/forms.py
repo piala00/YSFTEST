@@ -143,9 +143,14 @@ class ReglementForm(BootstrapMixin, forms.ModelForm):
         help_text="Une ou plusieurs factures (Ctrl + clic), réglées de la plus ancienne à la plus récente. "
                   "Si le montant dépasse leur reste dû, l'excédent reste en attente de rattachement à une prochaine facture.")
 
+    en_attente = forms.BooleanField(
+        required=False, label="Règlement en attente de facture",
+        help_text="Aucune facture à régler : tout le montant attend d'être rattaché à une prochaine facture")
+
     class Meta:
         model = Reglement
-        fields = ("tiers", "factures", "commande", "date", "mode", "journal", "agence_encaissement", "montant", "reference", "libelle")
+        fields = ("tiers", "date", "mode", "journal", "agence_encaissement", "montant", "reference", "libelle", "commande",
+                  "factures", "en_attente")
         widgets = {"date": DateInput()}
 
     def __init__(self, *args, **kwargs):

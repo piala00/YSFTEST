@@ -172,7 +172,11 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
             "tiers": self.client_.pk, "factures": [f1.pk, f2.pk], "date": f1.date.isoformat(), "mode": "ESPECES",
             "journal": caisse.pk, "montant": "30000", "libelle": "Versement"})
         recu = Reglement.objects.get(libelle="Versement")
-        self.assertRedirects(reponse, reverse("commercial:reglement_detail", args=[recu.pk]))
+        self.assertRedirects(reponse, reverse("commercial:reglement_create") + f"?tiers={self.client_.pk}&filtre=")  # reste dans la saisie
+        saisie = self.client.get(reverse("commercial:reglement_create") + f"?tiers={self.client_.pk}")
+        self.assertContains(saisie, recu.numero)                                   # liste des règlements du client
+        self.assertContains(saisie, "Total imputé")
+        self.assertNotContains(saisie, f'value="{f1.pk}"')                          # f1 soldée : plus proposée
         self.assertEqual((recu.imputations.count(), recu.en_attente_de_rattachement), (2, Decimal("30000") - 2 * Decimal("11925")))
         self.assertContains(self.client.get(reverse("commercial:reglement_detail", args=[recu.pk])), "Rattacher à une facture")
         f3 = self.document(Document.FACTURE, self.client_).valider()
@@ -181,6 +185,28 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
         f3.refresh_from_db()
         self.assertEqual((f3.reste_a_payer, recu.en_attente_de_rattachement), (Decimal("11925") - Decimal("6150"), 0))
         self.assertEqual(recu.imputations.get(document=f3).cree_par.username, "caisse")   # qui a rattaché
+
+    def test_reglement_en_attente_de_facture(self):
+        caisse = Journal.objects.get(code="CA")
+        with self.assertRaisesMessage(ValidationError, "en attente de facture"):     # ni facture ni choix explicite
+            Reglement(tiers=self.client_, journal=caisse, montant=Decimal("5000")).enregistrer()
+        recu = Reglement(tiers=self.client_, journal=caisse, montant=Decimal("5000")).enregistrer(en_attente=True)
+        self.assertEqual((recu.imputations.count(), recu.en_attente_de_rattachement), (0, Decimal("5000")))
+        f = self.document(Document.FACTURE, self.client_).valider()
+        recu.rattacher(f)
+        f.refresh_from_db()
+        self.assertEqual(f.reste_a_payer, Decimal("11925") - Decimal("5000"))
+
+    def test_montants_imputes_saisis_par_facture(self):
+        f1 = self.document(Document.FACTURE, self.client_).valider()
+        f2 = self.document(Document.FACTURE, self.client_).valider()
+        caisse = Journal.objects.get(code="CA")
+        recu = Reglement(tiers=self.client_, journal=caisse, montant=Decimal("10000")).enregistrer(
+            [f1, f2], montants={f1.pk: "3000", f2.pk: "5000"})
+        self.assertEqual({i.document_id: i.montant for i in recu.imputations.all()}, {f1.pk: 3000, f2.pk: 5000})
+        self.assertEqual(recu.en_attente_de_rattachement, Decimal("2000"))
+        with self.assertRaises(ValidationError):                                    # plus que le montant du règlement
+            Reglement(tiers=self.client_, journal=caisse, montant=Decimal("1000")).enregistrer([f2], montants={f2.pk: "2000"})
 
     def test_reglement_partiel_et_facture_d_un_autre_client(self):
         f = self.document(Document.FACTURE, self.client_).valider()

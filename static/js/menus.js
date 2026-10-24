@@ -232,7 +232,18 @@
         e.preventDefault(); parent.ouvrir(a.href); return;
       }
       const url = new URL(a.href, location.href);
-      if (url.origin === location.origin && (accueils.includes(url.pathname) || url.pathname === '/')) a.target = '_top';
+      if (url.origin === location.origin && (accueils.includes(url.pathname) || url.pathname === '/')) { a.target = '_top'; return; }
+      // Chaque écran est une fenêtre indépendante : un autre écran (règlement depuis une facture, fiche tiers, autre
+      // pièce…) s'ouvre dans une nouvelle fenêtre, la fenêtre d'origine reste ouverte derrière. Restent dans la même
+      // fenêtre : le même écran (filtres, tri, pages) et les sous-pages du même objet (consulter ↔ modifier).
+      const href = a.getAttribute('href');
+      if (url.origin !== location.origin || a.target || a.hasAttribute('download') || a.hasAttribute('data-meme-fenetre')
+          || href.startsWith('#') || href.startsWith('javascript') || e.ctrlKey || e.metaKey || e.shiftKey
+          || /^\/(admin|static|media|deconnexion|connexion|api)\b/.test(url.pathname)) return;
+      const ici = location.pathname, la = url.pathname;
+      if (la === ici || la.startsWith(ici) || ici.startsWith(la) || /(imprimer|print|export|csv|pdf)/.test(la)) return;
+      e.preventDefault();
+      parent.ouvrir(url.href);
     });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') parent.echap(cadre); });
     document.addEventListener('mousedown', () => parent.activerCadre(cadre), true);

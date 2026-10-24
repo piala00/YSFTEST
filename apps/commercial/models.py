@@ -1043,7 +1043,7 @@ class Reglement(models.Model):
         if f.reste_a_payer <= 0:
             raise ValidationError({"factures": f"La facture {f.numero} est déjà soldée."})
 
-    def controler_rattachement(self, factures=None):
+    def controler_rattachement(self, factures=None, en_attente=False):
         """Reçu de règlement de créance client : rattaché à une ou plusieurs factures du client, réglées dans l'ordre
         (de la plus ancienne à la plus récente), totalement ou partiellement. Le reste éventuel du reçu reste en attente
         de rattachement à une prochaine facture. L'avance sur bon de commande suit son propre circuit."""
@@ -1054,8 +1054,9 @@ class Reglement(models.Model):
                 raise ValidationError("Choisissez soit des factures (règlement de créance), soit un bon de commande (avance).")
             self._cibles = None
             return
-        if self.est_encaissement and not cibles:
-            raise ValidationError({"factures": "Un reçu de règlement de créance doit être rattaché à au moins une facture."})
+        if self.est_encaissement and not cibles and not en_attente:
+            raise ValidationError({"factures": "Un reçu de règlement de créance doit être rattaché à au moins une facture "
+                                               "(ou enregistré « en attente de facture »)."})
         if len({f.pk for f in cibles}) != len(cibles):
             raise ValidationError({"factures": "Une même facture est choisie deux fois."})
         for f in cibles:
@@ -1063,7 +1064,7 @@ class Reglement(models.Model):
         cibles.sort(key=lambda f: (f.date, f.numero))
         if cibles:
             self.facture = cibles[0]                          # première facture réglée (affichage, listes)
-        self._cibles = cibles or None
+        self._cibles = cibles or ([] if en_attente else None)     # [] : tout le reçu attend une facture
         if self.agence_encaissement_id:
             if self.agence_encaissement.locale:
                 raise ValidationError({"agence_encaissement": "Choisissez l'agence qui a reçu le versement (pas celle-ci)."})
@@ -1074,12 +1075,24 @@ class Reglement(models.Model):
                 raise ValidationError({"reference": f"Le reçu {self.reference} de {self.agence_encaissement.nom} est déjà enregistré."})
 
     @transaction.atomic
-    def enregistrer(self, factures=None):
+    def enregistrer(self, factures=None, montants=None, en_attente=False):
         """Numérote, comptabilise et impute le règlement : sur les factures choisies (reçu client), sur la facture issue
-        de la commande (avance), ou en FIFO (fournisseur sans facture désignée). Le reste non imputé reste en attente."""
+        de la commande (avance), ou en FIFO (fournisseur sans facture désignée). Le reste non imputé reste en attente.
+
+        montants : {facture_id: montant} saisis ligne par ligne ; à défaut, répartition de la plus ancienne à la plus
+        récente. en_attente : reçu enregistré sans facture, entièrement en attente de rattachement."""
         from apps.comptabilite.services import comptabiliser_reglement
 
-        self.controler_rattachement(factures)
+        self.controler_rattachement(factures, en_attente=en_attente)
+        montants = {int(k): Decimal(v) for k, v in (montants or {}).items() if v not in (None, "")}
+        if montants:
+            for f in self._cibles or []:
+                m = montants.get(f.pk)
+                if m is not None and (m <= 0 or m > f.reste_a_payer):
+                    raise ValidationError({"factures": f"{f.numero} : montant imputé incorrect (entre 0 et le reste dû "
+                                                       f"{f.reste_a_payer:,.0f}).".replace(",", " ")})
+            if sum((montants.get(f.pk, ZERO) for f in self._cibles or []), ZERO) > self.montant:
+                raise ValidationError({"montant": "Le total imputé sur les factures dépasse le montant du règlement."})
         if self.commande_id:
             commande = self.commande
             if commande.type_document not in (Document.COMMANDE, Document.ACHAT_COMMANDE) or commande.statut == Document.ANNULE:
@@ -1107,7 +1120,7 @@ class Reglement(models.Model):
             reste = facture.reste_a_payer
             if reste <= 0:
                 continue
-            montant = min(reste, disponible)
+            montant = min(reste, disponible, montants.get(facture.pk, reste))
             Imputation.objects.create(reglement=self, document=facture, montant=montant)
             disponible -= montant
         return self

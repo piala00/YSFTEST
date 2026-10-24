@@ -92,12 +92,14 @@ class ReglementSerializer(serializers.ModelSerializer):
         many=True, write_only=True, required=False,
         queryset=Document.objects.filter(type_document__in=(Document.FACTURE, Document.ACHAT_FACTURE)))
     imputations = ImputationSerializer(many=True, read_only=True)
+    en_attente = serializers.BooleanField(write_only=True, required=False, default=False,
+                                          help_text="Règlement sans facture, en attente de rattachement")
     en_attente_de_rattachement = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
 
     class Meta:
         model = Reglement
         fields = ["id", "numero", "date", "tiers", "tiers_nom", "mode", "journal", "montant", "facture", "factures", "commande",
-                  "agence_encaissement", "reference", "libelle", "cree_par", "imputations", "en_attente_de_rattachement"]
+                  "agence_encaissement", "reference", "libelle", "cree_par", "imputations", "en_attente_de_rattachement", "en_attente"]
         read_only_fields = ["numero", "cree_par"]
 
     def create(self, validated_data):
@@ -105,8 +107,9 @@ class ReglementSerializer(serializers.ModelSerializer):
         from rest_framework.exceptions import ValidationError
 
         factures = validated_data.pop("factures", None) or None
+        en_attente = validated_data.pop("en_attente", False)
         try:
-            return Reglement(**validated_data).enregistrer(factures)
+            return Reglement(**validated_data).enregistrer(factures, en_attente=en_attente)
         except ErreurModele as exc:                     # ex. reçu de créance sans facture
             raise ValidationError(exc.message_dict if hasattr(exc, "error_dict") else exc.messages)
 
