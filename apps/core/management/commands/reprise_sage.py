@@ -1,5 +1,6 @@
 import datetime
 import getpass
+import os
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
@@ -31,6 +32,8 @@ class Command(BaseCommand):
                                                         "(défaut : début d'exercice ; les pièces en cours le sont toujours)")
         parser.add_argument("--appliquer", action="store_true", help="Enregistre l'import (sinon simple simulation)")
         parser.add_argument("--rapport", help="Écrit aussi le rapport dans ce fichier")
+        parser.add_argument("--lister", action="store_true",
+                            help="Avec --serveur : liste les instances SQL de l'ordinateur et les bases de dossier de l'instance")
         parser.add_argument("--sql", action="store_true", help="Affiche les requêtes d'export (CSV) à lancer dans Sage")
         parser.add_argument("--correspondance", action="store_true", help="Affiche la correspondance des colonnes")
 
@@ -41,6 +44,21 @@ class Command(BaseCommand):
         if options["sql"]:
             aujourdhui = datetime.date.today()
             self.stdout.write(source.script_export(debut or aujourdhui.replace(month=1, day=1), bascule or aujourdhui, historique))
+            return
+        if options["lister"]:
+            if not options["serveur"]:
+                raise CommandError("Indiquez --serveur (ordinateur), et --instance pour une instance nommée.")
+            self.stdout.write(f"Instances SQL de {options['serveur']} :")
+            for i in source.instances_sql(options["serveur"]):
+                self.stdout.write(f"  {i['nom'] or '(instance par défaut)'}  version {i['version'] or '?'}  port {i['port'] or '?'}")
+            adresse = source.adresse_serveur(options["serveur"], options["instance"])
+            try:
+                connexion = source.connecter(adresse, "master", options["utilisateur"], self._mot_de_passe(options))
+            except Exception as exc:
+                raise CommandError(f"Connexion à {adresse} impossible : {exc}")
+            self.stdout.write(f"Bases de dossier sur {adresse} :")
+            for b in source.bases_sage(connexion):
+                self.stdout.write(f"  {b['nom']}  {b['societe']}")
             return
         if options["correspondance"]:
             for nom in reprise_sage.ORDRE:
@@ -56,7 +74,7 @@ class Command(BaseCommand):
             if not options["base"] or not debut:
                 raise CommandError("Lecture directe : indiquez aussi --base et --debut-exercice.")
             options["serveur"] = source.adresse_serveur(options["serveur"], options["instance"])
-            mot_de_passe = getpass.getpass("Mot de passe SQL : ") if options["utilisateur"] else ""
+            mot_de_passe = self._mot_de_passe(options)
             try:
                 connexion = source.connecter(options["serveur"], options["base"], options["utilisateur"], mot_de_passe)
             except Exception as exc:
@@ -75,3 +93,11 @@ class Command(BaseCommand):
             Path(options["rapport"]).write_text(texte + "\n", encoding="utf-8")
         if not rapport.conforme:
             raise CommandError("Reprise non conforme : rien n'a été enregistré.")
+
+    @staticmethod
+    def _mot_de_passe(options):
+        """Compte SQL : mot de passe lu dans REPRISE_MOT_DE_PASSE (ou SYNCHRO_MOT_DE_PASSE), sinon demandé au clavier."""
+        if not options["utilisateur"]:
+            return ""                              # authentification Windows
+        return (os.environ.get("REPRISE_MOT_DE_PASSE") or os.environ.get("SYNCHRO_MOT_DE_PASSE")
+                or getpass.getpass("Mot de passe SQL : "))

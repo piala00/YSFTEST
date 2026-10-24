@@ -10,3 +10,6 @@ dist/
 *.spec.bak
 db.sqlite3.avant-mise-a-jour
 sortie/
+*.sqlite3
+*.sqlite3-*
+rapport-*.txt
