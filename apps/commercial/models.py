@@ -149,7 +149,7 @@ class Tiers(models.Model):
 class Depot(models.Model):
     """Dépôt de stockage (magasin, agence, entrepôt)."""
 
-    code = models.CharField(max_length=10, unique=True)
+    code = models.CharField(max_length=20, unique=True)
     intitule = models.CharField(max_length=100)
     adresse = models.CharField(max_length=200, blank=True)
     ville = models.CharField(max_length=80, blank=True)
