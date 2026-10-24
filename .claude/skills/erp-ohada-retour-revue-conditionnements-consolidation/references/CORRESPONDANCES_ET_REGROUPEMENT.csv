@@ -1,0 +1,12 @@
+objet;identite;ce_qui_reste_local;traitement_central
+Société;UUID commun validé;Identité indépendante du nom affiché;Identifie le périmètre central et le contrôle des lots.
+Agence;UUID stable et code local;Reste propriétaire de ses documents;Préserve origine et filtre d’analyse.
+Client;Identité commune + compte client par agence;Conserver codes et créances locaux;"Rapprochements explicitement approuvés ; pas fusion par nom."
+Payeur;Référence explicite au tiers payeur;Le client livré et le débiteur peuvent différer;Conserver la créance sur le bon compte à l’import.
+Comptes;Numéro historique + correspondance vers plan de regroupement;Aucune renumérotation forcée des écritures validées;Neutralisation des liaisons selon règles validées.
+Articles;Identité commune + références d’origine;Ne pas dupliquer un article à chaque agence sans correspondance;Unités et facteurs compatibles ou anomalie visible.
+Stock;Ouverture et mouvements locaux;Déclaration magasin indépendante conservée;Pas addition d’un instantané et des mêmes mouvements.
+Caisse;Journal/compte et mode réels;L’encaissement physique reste dans l’agence qui reçoit;"Une transaction externe ; la représentation bénéficiaire n’ajoute pas une autre caisse."
+Liaison;Identifiant partagé et références des deux côtés;Pièces locales et affectation facture;Rapprocher montants, devise, contrepartie et état sans supprimer l’historique.
+Auteurs;Identité et site d’origine;L’acteur initial n’est pas l’importateur;Réception centrale et actions techniques ajoutées séparément.
+Clôture;Date métier/version/photo autorisée;Contrôle et réouverture locale selon droits;Global indique les versions et les agences absentes.

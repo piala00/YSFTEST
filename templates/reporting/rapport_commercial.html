@@ -39,6 +39,10 @@
   <tfoot><tr class="total"><td colspan="4">Total hors recettes et autres entrées</td><td class="num">{{ r.total_hors_recettes|add:r.total_autres_entrees|montant }}</td></tr></tfoot>
 </table></div>
 
+{% if r.autres_tresoreries %}<div class="card mb-3"><div class="card-header bg-white fw-semibold small">Encaissements clients du jour sur les autres trésoreries (hors caisse)</div><table class="table table-sm mb-0">
+  <tbody>{% for t in r.autres_tresoreries %}<tr><td>{{ t.journal__code }} - {{ t.journal__intitule }}</td><td>{% for code, libelle in modes %}{% if code == t.mode %}{{ libelle }}{% endif %}{% endfor %}</td>
+    <td>{{ t.nombre }} reçu{{ t.nombre|pluralize }}</td><td class="num">{{ t.total|montant }}</td></tr>{% endfor %}</tbody>
+</table></div>{% endif %}
 <div class="card mb-3"><div class="card-header bg-white fw-semibold small">Versements de nos clients reçus par d'autres agences (hors caisse, compte de liaison)</div><table class="table table-sm mb-0">
   <tbody>{% for g in r.recus_autres_agences %}<tr><td><a href="{% url 'commercial:reglement_detail' g.pk %}" data-nouvelle-fenetre>{{ g.numero }}</a></td><td>{{ g.agence_encaissement.nom }} · reçu {{ g.reference }}</td>
     <td>{{ g.tiers.nom }}</td><td>{% if g.facture %}Facture {{ g.facture.numero }}{% endif %}</td><td class="num">{{ g.montant|montant }}</td></tr>

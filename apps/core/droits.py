@@ -326,3 +326,39 @@ class DroitsMenusAPI(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         return self._verifier(request, view, obj)
+
+
+# ---------------------------------------------------------------------------
+# Filtrage des listes de l'API par droits effectifs (un menu interdit ne doit pas fuir par une liste globale)
+# ---------------------------------------------------------------------------
+def types_documents_consultables(utilisateur):
+    """Types de documents que l'utilisateur peut consulter, ou None s'il n'a aucune restriction."""
+    from apps.commercial.models import Document
+
+    from .navigation import MODULES_PAR_CODE
+
+    droits = Droits(utilisateur, MODULES_PAR_CODE["commercial"])
+    if droits.libre:
+        return None
+    return [t for t, _ in Document.TYPES if droits.permet(_code_document(t), CONSULTER)]
+
+
+def types_tiers_consultables(utilisateur):
+    from apps.commercial.models import Tiers
+
+    from .navigation import MODULES_PAR_CODE
+
+    droits = Droits(utilisateur, MODULES_PAR_CODE["commercial"])
+    if droits.libre:
+        return None
+    codes = {Tiers.CLIENT: "tiers.clients", Tiers.FOURNISSEUR: "tiers.fournisseurs"}
+    return [t for t, code in codes.items() if droits.permet(code, CONSULTER)]
+
+
+def page_permise(utilisateur, nom_url):
+    """La page HTML équivalente (nom d'URL) est-elle consultable ? Sert aux états exposés par l'API."""
+    from django.urls import reverse
+
+    url = reverse(nom_url)
+    module = module_de(url)
+    return module is None or url_permise(Droits(utilisateur, module), url)

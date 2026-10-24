@@ -4,8 +4,11 @@
 <div class="page-title"><h1>Rapprochement fiche de stock / ordinateur</h1><span class="text-muted">{{ depot }} · du {{ debut|date:"d/m/Y" }} au {{ fin|date:"d/m/Y" }}</span></div>
 
 <h2 class="h6 mt-3">Bons à pointer ({{ a_pointer|length }})</h2>
+{% if en_retard %}<div class="alert alert-warning py-2 small"><i class="bi bi-alarm"></i> <strong>{{ en_retard|length }} bon{{ en_retard|length|pluralize }}</strong>
+  non pointé{{ en_retard|length|pluralize }} depuis plus de {{ delai }} jour{{ delai|pluralize }} (délai réglable dans les paramètres de la société).</div>{% endif %}
 <div class="card mb-3"><table class="table table-sm mb-0">
   <tbody>{% for d in a_pointer %}<tr><td>{{ d.date|date:"d/m/Y" }}</td><td>{{ d.get_type_document_display }}</td><td>{{ d.numero_affiche }}</td><td>{{ d.tiers.nom|default:"" }}</td>
+    <td>{% if d.pk in en_retard %}<span class="badge text-bg-warning">en retard</span>{% endif %}</td>
     <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'commercial:pointage' %}?numero={{ d.numero }}&amp;depot={{ depot.pk }}">Pointer</a></td></tr>
   {% empty %}<tr><td class="text-success p-3"><i class="bi bi-check-circle"></i> Tous les bons de la période sont pointés.</td></tr>{% endfor %}</tbody>
 </table></div>
@@ -21,9 +24,9 @@
 
 <h2 class="h6">Stock par article {% if request.GET.tous == "1" %}(tous les articles){% else %}(articles en écart · <a href="?{{ request.GET.urlencode }}&amp;tous=1">voir tous</a>){% endif %}</h2>
 <div class="card"><table class="table table-sm mb-0">
-  <thead><tr><th>Article</th><th class="num">Stock ordinateur</th><th class="num">Écarts cumulés</th><th class="num">Stock fiche</th></tr></thead>
+  <thead><tr><th>Article</th><th class="num">Stock ordinateur</th><th class="num">Écarts cumulés</th><th class="num">Bons non pointés</th><th class="num">Stock fiche</th></tr></thead>
   <tbody>{% for l in articles %}<tr><td>{{ l.article.reference }} {{ l.article.designation }}</td><td class="num">{{ l.machine|floatformat:"-3" }}</td>
-    <td class="num {% if l.ecart %}text-danger{% endif %}">{{ l.ecart|floatformat:"-3" }}</td><td class="num fw-semibold">{{ l.fiche|floatformat:"-3" }}</td></tr>
-  {% empty %}<tr><td colspan="4" class="text-success p-3"><i class="bi bi-check-circle"></i> La fiche de stock et l'ordinateur concordent.</td></tr>{% endfor %}</tbody>
+    <td class="num {% if l.ecart %}text-danger{% endif %}">{{ l.ecart|floatformat:"-3" }}</td><td class="num text-warning-emphasis">{{ l.attente|floatformat:"-3" }}</td><td class="num fw-semibold">{{ l.fiche|floatformat:"-3" }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-success p-3"><i class="bi bi-check-circle"></i> La fiche de stock et l'ordinateur concordent.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endblock %}

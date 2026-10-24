@@ -2,7 +2,7 @@
 import datetime
 from decimal import Decimal
 
-from django.db.models import F, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncMonth
 
 from apps.commercial.models import Article, Document, LigneDocument, Tiers
@@ -202,10 +202,11 @@ def rapport_commercial(jour, journal=None):
     for f in (Document.objects.filter(type_document__in=(D.FACTURE, D.FACTURE_RETOUR, D.AVOIR), date=jour)
               .exclude(statut__in=(D.BROUILLON, D.ANNULE)).select_related("tiers").order_by("numero")):
         signe = -1 if f.est_avoir else 1
-        imputations = Imputation.objects.filter(document=f).select_related("reglement")
+        # Photographie du jour du rapport : les règlements postérieurs ne modifient pas un rapport passé
+        imputations = Imputation.objects.filter(document=f, reglement__date__lte=jour).select_related("reglement")
         acompte = sum((i.montant for i in imputations if i.reglement.commande_id and i.reglement.date < jour), ZERO)
         encaisse = sum((i.montant for i in imputations if i.reglement.date == jour), ZERO)
-        reste = f.reste_a_payer if not f.est_avoir else ZERO
+        reste = ZERO if f.est_avoir else f.total_ttc - sum((i.montant for i in imputations), ZERO)
         nature = ("Avoir" if f.est_avoir else "Comptant" if reste <= 0 and encaisse and not acompte
                   else "Payée d'avance" if reste <= 0 and acompte else "Comptant (partiel)" if encaisse else "En compte")
         if reste > 0 and f.tiers_id and not f.tiers_payeur.vente_credit:
@@ -215,8 +216,10 @@ def rapport_commercial(jour, journal=None):
     commandes = []
     for c in (Document.objects.filter(type_document=D.COMMANDE, date=jour).exclude(statut=D.ANNULE)
               .select_related("tiers").order_by("numero")):
-        avance = c.acomptes.aggregate(s=Sum("montant"))["s"] or ZERO
+        avance = c.acomptes.filter(date__lte=jour).aggregate(s=Sum("montant"))["s"] or ZERO
         facture = c.facture_issue()
+        if facture and facture.date > jour:                # facturée plus tard : pas encore au jour du rapport
+            facture = None
         commandes.append({"doc": c, "ttc": c.total_ttc, "avance": avance,
                           "nature": "Payé d'avance" if avance >= c.total_ttc > 0 else "Acompte" if avance else "En compte",
                           "facture": facture, "facturee_jour": bool(facture and facture.date == jour)})
@@ -276,6 +279,11 @@ def rapport_commercial(jour, journal=None):
         "fournisseurs": fournisseurs, "total_fournisseurs": total(fournisseurs),
         "solde": solde,
         # Hors caisse : nos clients ont versé dans une autre agence (compte de liaison), créance soldée ici
+        # Encaissements clients du jour sur les autres trésoreries (banque, Mobile Money) : hors caisse, séparés
+        "autres_tresoreries": list(Reglement.objects.filter(date=jour, tiers__type_tiers=Tiers.CLIENT,
+                                                            journal__type_journal=Journal.TYPE_TRESORERIE)
+                                   .exclude(journal=journal).values("journal__code", "journal__intitule", "mode")
+                                   .annotate(total=Sum("montant"), nombre=Count("id")).order_by("journal__code", "mode")),
         "recus_autres_agences": list(Reglement.objects.filter(date=jour, agence_encaissement__isnull=False)
                                      .select_related("tiers", "facture", "agence_encaissement").order_by("numero")),
     }

@@ -5,17 +5,20 @@
   <span class="text-muted">{{ depot }} · du {{ debut|date:"d/m/Y" }} au {{ fin|date:"d/m/Y" }}</span></div>
 {% if not article %}<p class="text-muted">Choisissez un article dans la sélection.</p>{% else %}
 <div class="card"><table class="table table-sm mb-0">
-  <thead><tr><th>Date</th><th>Bon</th><th>Libellé</th><th class="num">Entrée</th><th class="num">Sortie</th><th class="num">Solde</th><th>Pointé</th></tr></thead>
+  <thead><tr><th>Date</th><th>Bon</th><th>Libellé</th><th class="num">Entrée</th><th class="num">Sortie</th><th class="num">Solde fiche</th><th class="num">En attente</th><th>Pointé</th></tr></thead>
   <tbody>
-    <tr class="sous-total"><td colspan="5">Report (stock de la fiche au début de la période)</td><td class="num">{{ fiche.ouverture.fiche|floatformat:"-3" }}</td><td></td></tr>
+    <tr class="sous-total"><td colspan="5">Report (stock de la fiche au début de la période)</td><td class="num">{{ fiche.ouverture.fiche|floatformat:"-3" }}</td><td class="num">{{ fiche.ouverture.attente|floatformat:"-3"|default:"" }}</td><td></td></tr>
     {% for l in fiche.lignes %}<tr><td>{{ l.date|date:"d/m/Y" }}</td><td>{% if l.document %}{{ l.document.numero_affiche }}{% endif %}</td><td>{{ l.libelle }}</td>
       <td class="num">{{ l.entree|floatformat:"-3"|default:"" }}</td><td class="num">{{ l.sortie|floatformat:"-3" }}</td><td class="num fw-semibold">{{ l.solde|floatformat:"-3" }}</td>
+      <td class="num text-warning-emphasis">{% if l.a_pointer %}{{ l.attente|floatformat:"-3" }}{% endif %}</td>
       <td>{% if l.pointe %}{% if l.ecart %}<span class="text-danger" title="Écart avec l'ordinateur : {{ l.ecart|floatformat:'-3' }}"><i class="bi bi-exclamation-triangle-fill"></i> écart</span>{% else %}<i class="bi bi-check-lg text-success"></i>{% endif %}{% else %}<span class="text-warning-emphasis small">à pointer</span>{% endif %}</td></tr>
-    {% empty %}<tr><td colspan="7" class="text-muted text-center">Aucun mouvement sur la période.</td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="8" class="text-muted text-center">Aucun mouvement sur la période.</td></tr>{% endfor %}
   </tbody>
-  <tfoot><tr class="total"><td colspan="5">Stock de la fiche</td><td class="num">{{ fiche.solde_fiche|floatformat:"-3" }}</td><td></td></tr>
-    <tr><td colspan="5">Stock de l'ordinateur</td><td class="num">{{ fiche.solde_machine|floatformat:"-3" }}</td><td></td></tr>
-    {% if fiche.ecart %}<tr><td colspan="5" class="text-danger">Écart fiche / ordinateur</td><td class="num text-danger">{{ fiche.ecart|floatformat:"-3" }}</td><td></td></tr>{% endif %}</tfoot>
+  <tfoot><tr class="total"><td colspan="5">Stock de la fiche (bons déclarés par le fichiste)</td><td class="num">{{ fiche.solde_fiche|floatformat:"-3" }}</td><td colspan="2"></td></tr>
+    {% if fiche.attente %}<tr><td colspan="5" class="text-warning-emphasis">Bons non pointés (quantités de l'ordinateur, hors fiche)</td><td class="num text-warning-emphasis">{{ fiche.attente|floatformat:"-3" }}</td><td colspan="2"></td></tr>
+    <tr><td colspan="5">Stock projeté si les bons en attente sont confirmés</td><td class="num">{{ fiche.solde_projete|floatformat:"-3" }}</td><td colspan="2"></td></tr>{% endif %}
+    <tr><td colspan="5">Stock de l'ordinateur</td><td class="num">{{ fiche.solde_machine|floatformat:"-3" }}</td><td colspan="2"></td></tr>
+    {% if fiche.ecart %}<tr><td colspan="5" class="text-danger">Écart de pointage fiche / ordinateur</td><td class="num text-danger">{{ fiche.ecart|floatformat:"-3" }}</td><td colspan="2"></td></tr>{% endif %}</tfoot>
 </table></div>
 {% endif %}
 {% endblock %}

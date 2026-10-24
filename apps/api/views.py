@@ -9,11 +9,16 @@ from rest_framework.response import Response
 from apps.commercial.models import Article, Document, Reglement, Tiers
 from apps.comptabilite import etats, services as compta
 from apps.comptabilite.models import Compte, Ecriture, Journal
+from apps.core.droits import page_permise, types_documents_consultables, types_tiers_consultables
 from apps.core.models import Exercice
 from apps.core.navigation import MODULES, MODULES_PAR_CODE, serialiser_module
 from apps.reporting import services as reporting
 
 from . import serializers as s
+
+
+def _refus():
+    return Response({"detail": "Opération refusée par vos autorisations d'accès."}, status=status.HTTP_403_FORBIDDEN)
 
 
 def _erreur(exc):
@@ -40,6 +45,9 @@ class TiersViewSet(RechercheMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Tiers.objects.all()
+        permis = types_tiers_consultables(self.request.user)
+        if permis is not None:                       # clients ou fournisseurs interdits : absents de la liste
+            qs = qs.filter(type_tiers__in=permis)
         if self.request.query_params.get("type"):
             qs = qs.filter(type_tiers=self.request.query_params["type"])
         self.queryset = qs
@@ -63,6 +71,9 @@ class DocumentViewSet(RechercheMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Document.objects.select_related("tiers", "depot").prefetch_related("lignes")
+        permis = types_documents_consultables(self.request.user)
+        if permis is not None:                       # un type de pièce interdit ne fuit pas par la liste globale
+            qs = qs.filter(type_document__in=permis)
         p = self.request.query_params
         if p.get("type"):
             qs = qs.filter(type_document=p["type"])
@@ -146,6 +157,8 @@ def _dates(request):
 
 @api_view(["GET"])
 def dashboard(request):
+    if not page_permise(request.user, "reporting:dashboard"):
+        return _refus()
     d = reporting.tableau_de_bord()
     d["alertes_stock"] = [{"id": a.id, "reference": a.reference, "designation": a.designation,
                            "stock": a.stock, "stock_minimum": a.stock_minimum} for a in d["alertes_stock"]]
@@ -154,6 +167,8 @@ def dashboard(request):
 
 @api_view(["GET"])
 def balance(request):
+    if not page_permise(request.user, "comptabilite:balance"):
+        return _refus()
     debut, fin = _dates(request)
     lignes, totaux = compta.balance(debut, fin, request.query_params.get("compte_debut", ""),
                                     request.query_params.get("compte_fin", ""))
@@ -165,18 +180,24 @@ def balance(request):
 
 @api_view(["GET"])
 def bilan(request):
+    if not page_permise(request.user, "comptabilite:bilan"):
+        return _refus()
     _, fin = _dates(request)
     return Response(etats.bilan(fin))
 
 
 @api_view(["GET"])
 def compte_resultat(request):
+    if not page_permise(request.user, "comptabilite:compte_resultat"):
+        return _refus()
     debut, fin = _dates(request)
     return Response(etats.compte_de_resultat(debut, fin))
 
 
 @api_view(["GET"])
 def balance_agee(request):
+    if not page_permise(request.user, "reporting:balance_agee"):
+        return _refus()
     q = request.query_params
     data = reporting.balance_agee(q.get("type", Tiers.CLIENT), d_apres=q.get("d_apres") or reporting.D_APRES_ECRITURE,
                                   delais=(q.get("delai1"), q.get("delai2"), q.get("delai3")) if q.get("delai1") else reporting.DELAIS_SAGE)

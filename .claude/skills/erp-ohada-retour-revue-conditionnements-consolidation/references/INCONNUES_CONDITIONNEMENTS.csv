@@ -1,0 +1,9 @@
+id;question;statut;verification_necessaire
+U01;Ordre complet des onglets/champs V12;Correspondances publiées obtenues, capture exhaustive non obtenue.;"Relever la version, l’offre et chaque écran ; ne pas ordonner les contrôles depuis les colonnes SQL."
+U02;Boutons, choix, défauts;Non établis pour chaque fenêtre de conditionnement.;Captures avant toute modification et relevé des listes déroulantes.
+U03;Priorité des prix et remises;Structure client/catégorie documentée, chaîne complète en situation non testée.;Tester présentation, catégorie, tarif client, remise quantitative, HT/TTC et arrondis.
+U04;Effet exact sur états imprimés;Pas de colonnes ni totaux de chaque état observés sur V12.;Imprimer stock, inventaire, mouvements, statistiques en deux présentations et unité de référence.
+U05;Stocks par présentation;Propriétés d’affichage documentées, équations exactes d’un état non observées.;Ne pas ajouter des stocks carton et litre comme s’il s’agissait d’articles différents sans règle métier.
+U06;Compatibilités lots/gammes/conditionnements;"Règle technique gamme explicite ; aide de suivi sans build pour autres incompatibilités.";Vérifier combinaison exacte sur la V12 cible.
+U07;Prix sur réception et transformation;Aucune session Sage exécutée.;Tester achat, réception, retour, livraison partielle, facture, avoir et coût de revient.
+U08;Paramétrage réel de la société;Les exemples 15 L et petits volumes ne définissent pas tous les articles.;Confirmer vrac/emballé, unités, facteurs, seuils et prix réels anonymisés.

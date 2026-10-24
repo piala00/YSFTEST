@@ -912,12 +912,28 @@ class Reglement(models.Model):
         if self.montant is not None and self.montant <= 0:
             raise ValidationError({"montant": "Le montant doit être positif."})
 
+    MODES_HORS_ESPECES = (VIREMENT, MOBILE_MONEY)
+
+    def controler_mode_journal(self):
+        """Un virement ou un paiement Mobile Money n'entre pas dans une caisse d'espèces (compte 57)."""
+        from apps.comptabilite.models import Journal
+
+        compte = self.journal.compte_tresorerie if self.journal_id else None
+        if self.mode in self.MODES_HORS_ESPECES and compte and compte.numero.startswith("57"):
+            autre = Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__isnull=False).exclude(
+                compte_tresorerie__numero__startswith="57")
+            conseil = ", ".join(f"{j.code} - {j.intitule}" for j in autre[:3])
+            raise ValidationError({"journal": f"Un règlement « {self.get_mode_display()} » ne peut pas entrer dans la caisse "
+                                              f"espèces {self.journal.code}. Choisissez le journal correspondant"
+                                              f"{' (' + conseil + ')' if conseil else ''}."})
+
     @transaction.atomic
     def controler_rattachement(self, factures=None):
         """Reçu de règlement de créance client : rattaché à UNE facture du client, sans dépasser son reste dû.
         L'avance sur bon de commande suit son propre circuit (affectée à la facture issue de la commande)."""
         if factures is not None and not self.facture_id and len(factures) == 1:
             self.facture = factures[0]
+        self.controler_mode_journal()
         if not self.est_encaissement:
             return
         if self.commande_id:
@@ -1185,26 +1201,45 @@ class PointageFiche(models.Model):
         total = document.mouvements_stock.filter(depot=depot).aggregate(s=Sum("quantite"))["s"] or ZERO
         return 1 if total >= 0 else -1
 
+    @classmethod
+    def controler_saisies(cls, articles, saisies):
+        """Chaque article du bon doit être déclaré : vide ≠ 0 (le zéro doit être saisi), jamais négatif."""
+        manquants = [a.reference for a in articles if saisies.get(a.pk) is None]
+        if manquants:
+            raise ValidationError(f"Quantité non saisie pour : {', '.join(manquants)}. "
+                                  "Saisissez 0 si l'article n'est pas sorti.")
+        for a in articles:
+            q = saisies[a.pk]
+            if not q.is_finite() or q < 0 or q != q.quantize(Decimal("0.001")):
+                raise ValidationError(f"Quantité incorrecte pour {a.reference} : un nombre positif ou nul "
+                                      "(3 décimales au plus).")
+
     @transaction.atomic
-    def enregistrer(self, saisies):
-        """saisies : {article_id: quantité lue sur le bon}. Calcule les écarts ligne par ligne."""
+    def enregistrer(self, saisies, fichiste=None):
+        """saisies : {article_id: quantité lue sur le bon}. Calcule les écarts ligne par ligne.
+        fichiste : l'auteur de cette déclaration ; l'auteur de la déclaration remplacée reste dans l'historique."""
+        machine = self.quantites_machine(self.document, self.depot)
+        self.controler_saisies(machine, saisies)
         if not self.numero:
             self.numero = Sequence.suivant("PF", self.date.year)
         if self.pk and self.lignes.exists():
             if not (self.observation or "").strip():
                 raise ValidationError("Bon déjà pointé : indiquez le motif de la correction.")
-            # Correction : la déclaration précédente est conservée, avec son auteur et le motif
+            precedent = PointageFiche.objects.select_related("fichiste").get(pk=self.pk)   # état enregistré, avant correction
+            # Correction : la déclaration précédente est conservée, avec SON auteur ; le correcteur et le motif à part
             self.historique = self.historique + [{
-                "revision": self.revision, "date": timezone.now().isoformat(timespec="seconds"),
-                "fichiste": str(self.fichiste or ""), "statut": self.statut, "motif": self.observation,
+                "revision": precedent.revision, "date": timezone.now().isoformat(timespec="seconds"),
+                "fichiste": str(precedent.fichiste or ""), "statut": precedent.statut,
+                "corrige_par": str(fichiste or self.fichiste or ""), "motif": self.observation,
                 "quantites": {l.article.reference: str(l.quantite_saisie) for l in self.lignes.select_related("article")}}]
-            self.revision += 1
+            self.revision = precedent.revision + 1
+        if fichiste is not None:
+            self.fichiste = fichiste
         self.save()
-        machine = self.quantites_machine(self.document, self.depot)
         self.lignes.all().delete()
         ecart = False
         for article, quantite in machine.items():
-            saisie = saisies.get(article.pk, ZERO)
+            saisie = saisies[article.pk]
             LignePointage.objects.create(pointage=self, article=article, quantite_saisie=saisie, quantite_document=quantite)
             ecart = ecart or saisie != quantite
         self.statut = self.ECART if ecart else self.CONFORME

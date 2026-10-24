@@ -31,6 +31,9 @@ class Societe(models.Model):
     telephone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
     devise = models.CharField(max_length=10, default="XAF")
+    delai_pointage = models.PositiveIntegerField(
+        "Délai de pointage des bons (jours)", default=1,
+        help_text="Fiche de stock : un bon non pointé par le fichiste au-delà de ce délai est signalé en retard")
     regime_tva = models.CharField(
         "Configuration de la TVA", max_length=20, choices=REGIMES_TVA, blank=True, default=TVA_NON_PRECISEE,
         help_text="Automatique : taux du Cameroun créés (19,25 % ; 11 % ; 0 % export) et proposés sur les articles. "

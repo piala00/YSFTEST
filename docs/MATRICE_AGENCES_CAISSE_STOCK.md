@@ -27,9 +27,9 @@ Statuts :
 | Id | Exigence (résumé) | Existant / adaptation | Écart restant | Preuve |
 |---|---|---|---|---|
 | E13 | Ventes du jour automatiques | `reporting.services.rapport_commercial` : factures (comptant, payée d'avance, en compte, client au comptant non soldé) et bons de commande | Sens de « en compte » / « à crédit » : D04 | `test_rapport_complet_du_jour` |
-| E14 | Encaissements du jour | Reçus de la caisse du jour, nature (créance / avance) | — | idem |
+| E14 | Encaissements du jour | Reçus de la caisse du jour, nature (créance / avance) ; encaissements des autres trésoreries (banque, Mobile Money) montrés à part, par journal et par mode | — | `tests_revue_gpt.test_A07…` |
 | E15 | Sorties et dépenses | `OperationCaisse` : dépense, sortie pour agence, autre sortie, plus règlements fournisseurs | — | idem |
-| E16 | Solde de caisse | Ouverture + entrées − sorties, contrôle contre le compte de trésorerie | — | idem |
+| E16 | Solde de caisse | Ouverture + entrées − sorties, contrôle contre le compte de trésorerie ; virement et Mobile Money refusés sur une caisse espèces (compte 57) — A07 ; rapport d'un jour passé figé à sa date (règlements ultérieurs exclus) — A05 | Photographie de clôture et réouverture : D05 | `test_A05…`, `test_A07…` |
 | E17–E20 | Versement dans une autre agence, liaison, libellé « hors recettes », rubrique dédiée | **Côté agence qui encaisse** : `OperationCaisse HORS_RECETTE` (caisse au débit, liaison au crédit), rubrique du rapport, hors ventes propres. **Côté agence propriétaire** : `Reglement.agence_encaissement` + n° du reçu d'origine, sans caisse locale, liaison au débit, facture soldée, rubrique « versements reçus par d'autres agences » | Transmission entre agences manuelle (pas d'interconnexion) | `test_versement_recu_par_une_autre_agence` |
 | P11–P12 | Hors-recettes dans la caisse d'exécution, affectation unique | Un reçu d'agence ne peut être saisi qu'une fois (agence + n° de reçu unique) ; pas d'agence locale | — | idem (doublon refusé) |
 | E21 | Sorties pour d'autres agences | `OperationCaisse SORTIE_AGENCE` (liaison au débit) | — | `test_rapport_complet_du_jour` |
@@ -39,11 +39,11 @@ Statuts :
 | E26 | Transformation ultérieure | Transformation possible à tout moment ; avance reportée sur la facture | — | tests transformation |
 | P10 | Pas de double compte BC + facture | Le rapport sépare bons de commande (suivi) et factures (ventes) | — | `test_rapport_complet_du_jour` |
 | E27–E31 | Fiche de stock : n° de BL, articles chargés sans quantité, saisie par le fichiste | `PointageFiche` : recherche du bon par numéro complet ou fin de numéro non ambiguë ; quantités de l'ordinateur jamais envoyées à la page du fichiste | — | `test_saisie_a_l_aveugle_par_le_fichiste` |
-| E32–E33 | Rapprochement immédiat, écarts signalés | Statut conforme / écart dès l'enregistrement ; écarts, bons à pointer, stock de la fiche par article | — | `test_pointage_conforme_et_ecart` |
+| E32–E33 | Rapprochement immédiat, écarts signalés | Statut conforme / écart dès l'enregistrement ; écarts, bons à pointer ; alerte des bons non pointés au-delà d'un délai réglable (paramètres société) — R18 | — | `test_pointage_conforme_et_ecart`, `test_R18…` |
 | P14 | Pas de deuxième sortie de stock | Le pointage ne crée aucun mouvement de stock | — | idem (stock ordinateur inchangé) |
-| P15 | Rien qui permette de déduire l'attendu | Le fichiste voit seulement conforme / écart ; les quantités sont réservées aux contrôleurs | — | idem |
-| P16 | Déclarations originales, corrections motivées | Une correction exige un motif ; la déclaration précédente est conservée (révision, date, fichiste, quantités) ; historique affiché aux contrôleurs | Versions successives d'un BL modifié : non gérées (un BL validé n'est pas modifiable) | `test_correction_avec_motif_et_historique` |
-| P17–P18 | Mouvements ≠ comptage ; tous les flux | Le pointage couvre tout bon qui fait bouger le stock (BL, réception, transfert, entrée, sortie) ; l'inventaire physique est séparé | Ouverture de fiche (stock initial) : D11 | `test_bons_a_pointer` |
+| P15 | Rien qui permette de déduire l'attendu | Écran : conforme / écart seulement. API : listes de pièces et de tiers filtrées par droits effectifs (un type interdit n'apparaît ni en liste ni en détail) ; états de l'API (balance, bilan, balance âgée, tableau de bord) soumis aux droits des pages — A01 | Exports d'états à revoir avec le même contrôle | `test_A01…` |
+| P16 | Déclarations originales, corrections motivées | Vide ≠ 0 (le zéro doit être saisi), négatif refusé, 3 décimales au plus, contrôlés dans le modèle — A02/A03 ; correction motivée ; l'ancienne déclaration garde SON fichiste, le correcteur est noté à part (`corrige_par`) — A04 ; historique visible des contrôleurs | Versions d'un BL modifié : non gérées (BL validé non modifiable) | `test_A02…`, `test_A03…`, `test_A04…` |
+| P17–P18 | Mouvements ≠ comptage ; tous les flux ; registre indépendant | Le pointage couvre tout bon qui fait bouger le stock ; la fiche ne contient que les déclarations du fichiste (et les inventaires physiques) : les bons non pointés sont montrés « en attente » avec un solde projeté distinct, jamais recopiés — A06 | Date d'ouverture de la fiche par dépôt (aujourd'hui tout l'historique non pointé est en attente) : D11 | `test_A06…` |
 
 ## Complément U4 : crédit, reçus et auteurs
 
@@ -66,4 +66,4 @@ Statuts :
 
 ## Tests exécutés
 
-Commande : `python manage.py test`. Résultat : **155 tests, tous réussis** (à la date de la livraison).
+Commande : `python manage.py test`. Résultat : **164 tests, tous réussis** (dont les 8 tests de la revue GPT du 24/10) (à la date de la livraison).

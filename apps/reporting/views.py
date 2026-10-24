@@ -98,4 +98,7 @@ def rapport_commercial(request):
 
     jour = parse_date(request.GET.get("date") or "") or datetime.date.today()
     journal = Journal.objects.filter(pk=request.GET.get("caisse")).first() if request.GET.get("caisse") else None
-    return render(request, "reporting/rapport_commercial.html", {"r": services.rapport_commercial(jour, journal)})
+    from apps.commercial.models import Reglement
+
+    return render(request, "reporting/rapport_commercial.html", {"r": services.rapport_commercial(jour, journal),
+                                                                 "modes": Reglement.MODES})

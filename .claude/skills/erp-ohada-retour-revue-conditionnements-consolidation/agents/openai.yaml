@@ -1,0 +1,4 @@
+interface:
+  display_name: "Retour ERP — revue et échanges agences"
+  short_description: "Anomalies prouvées, conditionnements V12 et échanges"
+  default_prompt: "Utilise $erp-ohada-retour-revue-conditionnements-consolidation pour traiter le retour de revue avant les prochaines tranches de mon ERP."

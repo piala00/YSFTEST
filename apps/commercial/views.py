@@ -839,16 +839,15 @@ def pointage(request):
         saisies = {}
         try:
             for a in articles:
-                valeur = (request.POST.get(f"qte_{a.pk}") or "").replace(",", ".").replace(" ", "")
-                saisies[a.pk] = Decimal(valeur) if valeur else Decimal("0")
+                valeur = (request.POST.get(f"qte_{a.pk}") or "").replace(",", ".").replace(" ", "").replace("\xa0", "")
+                saisies[a.pk] = Decimal(valeur) if valeur else None          # vide = non saisi (différent de 0)
         except InvalidOperation:
             messages.error(request, "Quantité incorrecte : saisissez un nombre (ex. 12 ou 12,5).")
         else:
             p = existant or PointageFiche(document=document, depot=depot)
-            p.fichiste = request.user
             p.observation = request.POST.get("observation", "")[:200]
             try:
-                p.enregistrer(saisies)
+                p.enregistrer(saisies, fichiste=request.user)
             except ValidationError as exc:
                 messages.error(request, " ".join(exc.messages))
             else:
@@ -889,8 +888,13 @@ def fiche_rapprochement(request):
     depot = _depot_choisi(request)
     debut = parse_date(request.GET.get("date_debut") or "") or datetime.date.today().replace(day=1)
     fin = parse_date(request.GET.get("date_fin") or "") or datetime.date.today()
+    from apps.core.models import Societe
+
+    delai = Societe.get().delai_pointage
+    en_retard = {d.pk for d in fiche_stock.bons_en_retard(depot, datetime.date.today(), delai)}
     return render(request, "commercial/fiche_rapprochement.html", {
         "depot": depot, "debut": debut, "fin": fin, "a_pointer": fiche_stock.bons_a_pointer(depot, debut, fin),
+        "en_retard": en_retard, "delai": delai,
         "ecarts": fiche_stock.ecarts(depot, debut, fin),
         "articles": fiche_stock.rapprochement(depot, ecarts_seulement=request.GET.get("tous") != "1")})
 
