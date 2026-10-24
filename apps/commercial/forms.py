@@ -54,6 +54,12 @@ class ArticleForm(BootstrapMixin, forms.ModelForm):
         model = Article
         exclude = ("stock", "cmup")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Article de détail : un article simple (qui ne se convertit pas lui-même), autre que celui-ci
+        self.fields["article_detail"].queryset = (Article.objects.filter(article_detail__isnull=True, actif=True)
+                                                  .exclude(pk=self.instance.pk))
+
 
 class DepotForm(BootstrapMixin, forms.ModelForm):
     class Meta:

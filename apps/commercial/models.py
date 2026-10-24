@@ -238,10 +238,31 @@ class Article(models.Model):
                                               help_text="Fournisseur proposé par le réapprovisionnement")
     compte_vente = models.ForeignKey("comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     compte_achat = models.ForeignKey("comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    article_detail = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="articles_gros",
+        verbose_name="Article de détail",
+        help_text="Article vendu au détail (ex. bouteille de 1 L) : au transfert vers un dépôt de vente au détail, "
+                  "cet article y est converti automatiquement")
+    facteur_detail = models.DecimalField(
+        "Unités de détail par unité", max_digits=12, decimal_places=3, null=True, blank=True,
+        help_text="Ex. 15 : un carton de 15 L donne 15 bouteilles de 1 L")
     actif = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["designation"]
+
+    def clean(self):
+        if bool(self.article_detail_id) != bool(self.facteur_detail):
+            raise ValidationError("Indiquez à la fois l'article de détail et le nombre d'unités de détail par unité.")
+        if self.article_detail_id:
+            detail = self.article_detail
+            if self.facteur_detail <= 0:
+                raise ValidationError({"facteur_detail": "Le nombre d'unités de détail doit être positif."})
+            if detail.pk == self.pk or detail.article_detail_id:
+                raise ValidationError({"article_detail": "Choisissez un article de détail simple (pas cet article, "
+                                                         "ni un article qui se convertit lui-même)."})
+            if self.suivi_stock and not detail.suivi_stock:
+                raise ValidationError({"article_detail": "L'article de détail doit être suivi en stock."})
 
     def prix_pour(self, tiers):
         """Prix de vente HT pour un client et sa source (« catégorie GROS », « fiche article »)."""
@@ -718,8 +739,10 @@ class Document(models.Model):
             return
         if not Societe.get().separation_gros_detail:
             return
+        # Détail = quantité fractionnée, ou article de détail (bouteille issue de la conversion d'un carton)
         fractions = [l for l in self.lignes.select_related("article")
-                     if l.article_id and l.article.suivi_stock and l.quantite != l.quantite.to_integral_value()]
+                     if l.article_id and l.article.suivi_stock
+                     and (l.quantite != l.quantite.to_integral_value() or l.article.articles_gros.exists())]
         if fractions:
             boutiques = ", ".join(d.intitule for d in Depot.objects.filter(vente_detail=True, actif=True)) or "aucun dépôt désigné"
             raise ValidationError(
@@ -764,10 +787,21 @@ class Document(models.Model):
 
         libelle = f"{self.get_type_document_display()} {self.numero}"
         lignes = [l for l in self.lignes.select_related("article") if l.article_id and l.article.suivi_stock]
-        mouvements = []  # (article, depot, quantité signée, coût unitaire, ligne)
+        mouvements = []  # (article, depot, quantité signée, coût unitaire)
+        conversions = {}  # article de détail → entrée à valoriser (CMUP) et libellé de la conversion
         for ligne in lignes:
             article = Article.objects.select_for_update().get(pk=ligne.article_id)
-            if self.est_virement:
+            if self.est_virement and self.depot_destination.vente_detail and article.article_detail_id:
+                # Vers une boutique : le gros (carton) sort, le détail (bouteilles) entre ; valeur conservée
+                detail = Article.objects.select_for_update().get(pk=article.article_detail_id)
+                quantite_detail = ligne.quantite * article.facteur_detail
+                cout_detail = (article.cout_unitaire / article.facteur_detail).quantize(Decimal("0.0001"))
+                mouvements.append((article, self.depot, -ligne.quantite, article.cout_unitaire))
+                mouvements.append((detail, self.depot_destination, quantite_detail, cout_detail))
+                conversions[(detail.pk, self.depot_destination.pk)] = (
+                    f"{ligne.quantite.normalize():f} {article.unite} {article.designation} → "
+                    f"{quantite_detail.normalize():f} {detail.unite} {detail.designation}")
+            elif self.est_virement:
                 mouvements.append((article, self.depot, -ligne.quantite, article.cout_unitaire))
                 mouvements.append((article, self.depot_destination, ligne.quantite, article.cout_unitaire))
             elif self.type_document in self.TYPES_ENTREE:
@@ -792,10 +826,12 @@ class Document(models.Model):
                         f"disponible {stock.normalize():f}, demandé {besoin.normalize():f}.")
 
         for article, depot, quantite, cout in mouvements:
-            if quantite > 0 and self.type_document in self.TYPES_ENTREE_VALORISEE:
+            conversion = conversions.get((article.pk, depot.pk)) if quantite > 0 else None
+            if quantite > 0 and (self.type_document in self.TYPES_ENTREE_VALORISEE or conversion):
                 article.recalculer_cmup(quantite, cout)
             MouvementStock.objects.create(article=article, depot=depot, date=self.date, quantite=quantite,
-                                          cout_unitaire=cout, document=self, libelle=libelle)
+                                          cout_unitaire=cout, document=self,
+                                          libelle=f"{libelle} (conversion {conversion})"[:200] if conversion else libelle)
             StockDepot.ajouter(article, depot, quantite)
 
     @transaction.atomic
@@ -839,6 +875,16 @@ class Document(models.Model):
         if self.documents_generes.exclude(statut__in=(self.BROUILLON, self.ANNULE)).exists():
             raise ValidationError("Ce document a déjà été transformé : annulez d'abord les documents qui en sont issus.")
         if self.statut == self.VALIDE:
+            from apps.core.models import Societe
+
+            if not Societe.get().stock_negatif_autorise:
+                # Annuler ne doit pas rendre un stock négatif (ex. bouteilles d'un transfert déjà vendues en boutique)
+                for mvt in self.mouvements_stock.filter(quantite__gt=0).select_related("article", "depot"):
+                    disponible = StockDepot.quantite_de(mvt.article_id, mvt.depot_id)
+                    if disponible < mvt.quantite:
+                        raise ValidationError(
+                            f"Annulation impossible : « {mvt.article.designation} » n'a plus que {disponible.normalize():f} "
+                            f"en stock dans le dépôt {mvt.depot} (le document en avait fait entrer {mvt.quantite.normalize():f}).")
             for mvt in self.mouvements_stock.select_related("article", "depot"):
                 StockDepot.ajouter(mvt.article, mvt.depot, -mvt.quantite)
             self.mouvements_stock.all().delete()
