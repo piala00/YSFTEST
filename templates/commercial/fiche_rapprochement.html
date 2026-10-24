@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Rapprochement des fiches de stock{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Rapprochement fiche de stock / ordinateur</h1><span class="text-muted">{{ depot }} · du {{ debut|date:"d/m/Y" }} au {{ fin|date:"d/m/Y" }}</span></div>
+
+<h2 class="h6 mt-3">Bons à pointer ({{ a_pointer|length }})</h2>
+<div class="card mb-3"><table class="table table-sm mb-0">
+  <tbody>{% for d in a_pointer %}<tr><td>{{ d.date|date:"d/m/Y" }}</td><td>{{ d.get_type_document_display }}</td><td>{{ d.numero_affiche }}</td><td>{{ d.tiers.nom|default:"" }}</td>
+    <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'commercial:pointage' %}?numero={{ d.numero }}&amp;depot={{ depot.pk }}">Pointer</a></td></tr>
+  {% empty %}<tr><td class="text-success p-3"><i class="bi bi-check-circle"></i> Tous les bons de la période sont pointés.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2 class="h6">Écarts de pointage ({{ ecarts|length }})</h2>
+<div class="card mb-3"><table class="table table-sm mb-0">
+  <thead><tr><th>Bon</th><th>Article</th><th class="num">Fiche</th><th class="num">Ordinateur</th><th class="num">Écart</th><th>Pointage</th></tr></thead>
+  <tbody>{% for l in ecarts %}<tr><td>{{ l.pointage.document.numero_affiche }}</td><td>{{ l.article.reference }} {{ l.article.designation }}</td>
+    <td class="num">{{ l.quantite_saisie|floatformat:"-3" }}</td><td class="num">{{ l.quantite_document|floatformat:"-3" }}</td><td class="num text-danger">{{ l.ecart|floatformat:"-3" }}</td>
+    <td><a href="{% url 'commercial:pointage_detail' l.pointage.pk %}">{{ l.pointage.numero }}</a></td></tr>
+  {% empty %}<tr><td colspan="6" class="text-success p-3"><i class="bi bi-check-circle"></i> Aucun écart.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2 class="h6">Stock par article {% if request.GET.tous == "1" %}(tous les articles){% else %}(articles en écart · <a href="?{{ request.GET.urlencode }}&amp;tous=1">voir tous</a>){% endif %}</h2>
+<div class="card"><table class="table table-sm mb-0">
+  <thead><tr><th>Article</th><th class="num">Stock ordinateur</th><th class="num">Écarts cumulés</th><th class="num">Stock fiche</th></tr></thead>
+  <tbody>{% for l in articles %}<tr><td>{{ l.article.reference }} {{ l.article.designation }}</td><td class="num">{{ l.machine|floatformat:"-3" }}</td>
+    <td class="num {% if l.ecart %}text-danger{% endif %}">{{ l.ecart|floatformat:"-3" }}</td><td class="num fw-semibold">{{ l.fiche|floatformat:"-3" }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="text-success p-3"><i class="bi bi-check-circle"></i> La fiche de stock et l'ordinateur concordent.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

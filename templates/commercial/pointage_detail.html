@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Pointage {{ p.numero }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Pointage {{ p.numero }}
+  {% if p.statut == "CONFORME" %}<span class="badge text-bg-success align-middle">Conforme</span>{% else %}<span class="badge text-bg-danger align-middle">Écart</span>{% endif %}</h1>
+  <a class="btn btn-sm btn-primary" href="{% url 'commercial:pointage' %}?depot={{ p.depot.pk }}">Pointer un autre bon</a></div>
+<p class="small">{{ p.document.get_type_document_display }} <strong>{{ p.document.numero_affiche }}</strong> du {{ p.document.date|date:"d/m/Y" }}
+  · {{ p.depot }} · pointé le {{ p.date|date:"d/m/Y" }}{% if p.fichiste %} par {{ p.fichiste }}{% endif %}{% if p.observation %} · {{ p.observation }}{% endif %}</p>
+{% if p.statut == "ECART" %}<div class="alert alert-danger py-2 small">Les quantités saisies ne correspondent pas à celles de l'ordinateur pour les lignes signalées.
+  Vérifiez le bon papier : si c'est une erreur de saisie, <a href="{% url 'commercial:pointage' %}?numero={{ p.document.numero }}&amp;depot={{ p.depot.pk }}">reprenez le pointage</a> ; sinon, prévenez le contrôleur.</div>{% endif %}
+<div class="card"><table class="table table-sm mb-0">
+  <thead><tr><th>Référence</th><th>Désignation</th>{% if voir_quantites %}<th class="num">Fiche</th><th class="num">Ordinateur</th><th class="num">Écart</th>{% endif %}<th>Résultat</th></tr></thead>
+  <tbody>{% for l in p.lignes.all %}<tr><td>{{ l.article.reference }}</td><td>{{ l.article.designation }}</td>
+    {% if voir_quantites %}<td class="num">{{ l.quantite_saisie|floatformat:"-3" }}</td><td class="num">{{ l.quantite_document|floatformat:"-3" }}</td><td class="num {% if l.ecart %}text-danger fw-semibold{% endif %}">{{ l.ecart|floatformat:"-3" }}</td>{% endif %}
+    <td>{% if l.ecart %}<span class="text-danger"><i class="bi bi-x-circle-fill"></i> Écart</span>{% else %}<span class="text-success"><i class="bi bi-check-circle-fill"></i> Conforme</span>{% endif %}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

@@ -807,3 +807,103 @@ def operation_caisse_create(request):
         except ValidationError as exc:
             _erreur(request, exc)
     return render(request, "core/form.html", {"form": form, "titre": "Nouvelle opération de caisse"})
+
+
+# ---------------------------------------------------------------- Fiche de stock numérique (magasin)
+def _depot_choisi(request):
+    return Depot.objects.filter(pk=request.GET.get("depot") or request.POST.get("depot")).first() or Depot.par_defaut()
+
+
+@login_required
+def pointage(request):
+    """Le fichiste tape le numéro du bon : les articles s'affichent sans quantité ; il saisit celles du bon papier."""
+    from decimal import Decimal, InvalidOperation
+
+    from . import fiche_stock
+    from .models import PointageFiche
+
+    depot = _depot_choisi(request)
+    numero = (request.GET.get("numero") or request.POST.get("numero") or "").strip()
+    document = fiche_stock.trouver_bon(numero) if numero else None
+    articles, existant = [], None
+    if numero and document is None:
+        if Document.objects.filter(numero__iendswith=numero).count() > 1:
+            messages.error(request, f"Plusieurs bons se terminent par « {numero} » : tapez le numéro complet (ex. BL2026-{numero}).")
+        else:
+            messages.error(request, f"Aucun bon ne porte le numéro « {numero} ».")
+    elif document:
+        articles = sorted(PointageFiche.quantites_machine(document, depot), key=lambda a: a.reference)
+        existant = PointageFiche.objects.filter(document=document, depot=depot).first()
+        if not articles:
+            messages.warning(request, f"Le bon {document.numero_affiche} ne fait pas bouger le stock du dépôt {depot}.")
+    if request.method == "POST" and document and articles:
+        saisies = {}
+        try:
+            for a in articles:
+                valeur = (request.POST.get(f"qte_{a.pk}") or "").replace(",", ".").replace(" ", "")
+                saisies[a.pk] = Decimal(valeur) if valeur else Decimal("0")
+        except InvalidOperation:
+            messages.error(request, "Quantité incorrecte : saisissez un nombre (ex. 12 ou 12,5).")
+        else:
+            p = existant or PointageFiche(document=document, depot=depot)
+            p.fichiste = request.user
+            p.observation = request.POST.get("observation", "")[:200]
+            p.enregistrer(saisies)
+            return redirect("commercial:pointage_detail", pk=p.pk)
+    return render(request, "commercial/pointage.html", {
+        "depots": Depot.objects.filter(actif=True), "depot": depot, "numero": numero, "document": document,
+        "articles": articles, "existant": existant})
+
+
+@login_required
+def pointage_detail(request, pk):
+    from .models import PointageFiche
+
+    p = get_object_or_404(PointageFiche.objects.select_related("document", "depot", "fichiste"), pk=pk)
+    # Le fichiste voit conforme / écart ; les quantités de l'ordinateur sont réservées aux contrôleurs
+    return render(request, "commercial/pointage_detail.html", {"p": p, "voir_quantites": request.user.is_superuser or request.user.is_staff})
+
+
+@login_required
+def pointages(request):
+    from .models import PointageFiche
+
+    qs = PointageFiche.objects.select_related("document", "depot", "fichiste")
+    if request.GET.get("statut"):
+        qs = qs.filter(statut=request.GET["statut"])
+    return render(request, "commercial/pointage_list.html", {"pointages": qs[:300]})
+
+
+@login_required
+def fiche_rapprochement(request):
+    """Rapprochement fiche de stock / ordinateur : bons à pointer, écarts, stock de la fiche par article."""
+    import datetime
+
+    from django.utils.dateparse import parse_date
+
+    from . import fiche_stock
+
+    depot = _depot_choisi(request)
+    debut = parse_date(request.GET.get("date_debut") or "") or datetime.date.today().replace(day=1)
+    fin = parse_date(request.GET.get("date_fin") or "") or datetime.date.today()
+    return render(request, "commercial/fiche_rapprochement.html", {
+        "depot": depot, "debut": debut, "fin": fin, "a_pointer": fiche_stock.bons_a_pointer(depot, debut, fin),
+        "ecarts": fiche_stock.ecarts(depot, debut, fin),
+        "articles": fiche_stock.rapprochement(depot, ecarts_seulement=request.GET.get("tous") != "1")})
+
+
+@login_required
+def fiche_article(request):
+    """Fiche de stock d'un article (numérique), comme la fiche papier du fichiste."""
+    import datetime
+
+    from django.utils.dateparse import parse_date
+
+    from . import fiche_stock
+
+    depot = _depot_choisi(request)
+    article = Article.objects.filter(pk=request.GET.get("article")).first()
+    debut = parse_date(request.GET.get("date_debut") or "") or datetime.date.today().replace(day=1)
+    fin = parse_date(request.GET.get("date_fin") or "") or datetime.date.today()
+    fiche = fiche_stock.fiche_article(article, depot, debut, fin) if article else None
+    return render(request, "commercial/fiche_article.html", {"depot": depot, "article": article, "debut": debut, "fin": fin, "fiche": fiche})

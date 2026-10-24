@@ -426,6 +426,11 @@ GESTION_COMMERCIALE = Module(
             E("traitement.abonnements", "Abonnements"),
             E("traitement.contremarque", "Contremarque"),
             SEP(),
+            E("fiche_stock", "Fiche de stock (magasin)", icone="bi-clipboard-check", preuve="AJOUT-ERP", enfants=[
+                E("fiche_stock.pointage", "Pointage des bons", "commercial:pointage", preuve="AJOUT-ERP"),
+                E("fiche_stock.pointages", "Pointages effectués", "commercial:pointages", preuve="AJOUT-ERP"),
+                E("fiche_stock.rapprochement", "Rapprochement fiche / ordinateur", "commercial:fiche_rapprochement", preuve="AJOUT-ERP"),
+            ]),
             E("comptes", "Gestion des comptes", icone="bi-person-lines-fill", enfants=[
                 E("comptes.clients", "Gestion des clients", "commercial:clients", vue="comptes"),
                 E("comptes.fournisseurs", "Gestion des fournisseurs", "commercial:fournisseurs", vue="comptes"),
@@ -459,6 +464,7 @@ GESTION_COMMERCIALE = Module(
             E("etats.personnalises", "Etats personnalisés"),
             E("etats.rapport_commercial", "Rapport commercial journalier", "commercial:rapport_commercial",
               icone="bi-cash-stack", preuve="AJOUT-ERP"),
+            E("etats.fiche_stock", "Fiche de stock d'un article", "commercial:fiche_article", icone="bi-card-list", preuve="AJOUT-ERP"),
             SEP(),
             E("etats.analyse_clients", "Analyse clients", icone="bi-person-check", enfants=[
                 E("etats.clients.activite", "Activité clients", "commercial:statistique", "activite_clients"),
@@ -721,6 +727,8 @@ BARRE_VERTICALE = {
             ("Saisir un document de vente", "commercial:document_create", ("FACTURE",), {}),
             ("Saisir une commande client", "commercial:document_create", ("COMMANDE",), {}),
             ("Gestion des comptes clients", "commercial:clients", (), {"vue": "comptes"}),
+            ("Opérations de caisse", "commercial:operations_caisse", (), {}),
+            ("Rapport commercial journalier", "commercial:rapport_commercial", (), {}),
             ("CRM", "", (), {}),
         ]),
         ("Gestion des achats", [
@@ -737,6 +745,8 @@ BARRE_VERTICALE = {
             ("Gestion des comptes articles", "commercial:stock", (), {}),
             ("Saisie d'inventaire", "commercial:inventaires", (), {}),
             ("Livre d'inventaire", "commercial:etat_inventaire", (), {"vue": "livre"}),
+            ("Pointage des bons (fiche de stock)", "commercial:pointage", (), {}),
+            ("Rapprochement fiche / ordinateur", "commercial:fiche_rapprochement", (), {}),
         ]),
     ],
 }

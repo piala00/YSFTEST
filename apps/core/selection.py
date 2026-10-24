@@ -55,6 +55,8 @@ ETATS = {
     "reporting:balance_agee": (["date"] + TIERS + ["anciennete"], None),
     "reporting:rapport_commercial": (["date", "caisse"], None),
     "commercial:rapport_commercial": (["date", "caisse"], None),
+    "commercial:fiche_rapprochement": (["periode", "depot"], None),
+    "commercial:fiche_article": (["periode", "depot", "article"], None),
     "reporting:bilan": (["periode"], None),
     "reporting:compte_resultat": (["periode"], None),
 }

@@ -1080,6 +1080,78 @@ class MouvementStock(models.Model):
         return arrondi(self.quantite * self.cout_unitaire)
 
 
+class PointageFiche(models.Model):
+    """Fiche de stock numérique : le fichiste du magasin pointe chaque bon (livraison, réception, transfert…) en
+    saisissant lui-même les quantités lues sur le bon papier, sans voir celles de l'ordinateur. Le rapprochement
+    avec les mouvements de stock enregistrés est immédiat (au lieu du contrôle hebdomadaire des fiches papier)."""
+
+    CONFORME = "CONFORME"
+    ECART = "ECART"
+    STATUTS = [(CONFORME, "Conforme"), (ECART, "Écart")]
+
+    numero = models.CharField(max_length=30, unique=True, blank=True)
+    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="pointages")
+    depot = models.ForeignKey(Depot, on_delete=models.PROTECT, related_name="pointages")
+    date = models.DateField("Date du pointage", default=timezone.localdate)
+    statut = models.CharField(max_length=10, choices=STATUTS, default=CONFORME)
+    fichiste = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    observation = models.CharField(max_length=200, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+        unique_together = ("document", "depot")
+        verbose_name = "Pointage de fiche de stock"
+
+    def __str__(self):
+        return f"{self.numero} - {self.document.numero}"
+
+    @staticmethod
+    def quantites_machine(document, depot):
+        """{article: quantité} déplacée par le bon dans ce dépôt (valeur absolue), d'après les mouvements de stock."""
+        quantites = {}
+        for m in document.mouvements_stock.filter(depot=depot).select_related("article"):
+            quantites[m.article] = quantites.get(m.article, ZERO) + abs(m.quantite)
+        return quantites
+
+    @staticmethod
+    def sens(document, depot):
+        """+1 si le bon fait entrer la marchandise dans ce dépôt, -1 s'il la fait sortir."""
+        total = document.mouvements_stock.filter(depot=depot).aggregate(s=Sum("quantite"))["s"] or ZERO
+        return 1 if total >= 0 else -1
+
+    @transaction.atomic
+    def enregistrer(self, saisies):
+        """saisies : {article_id: quantité lue sur le bon}. Calcule les écarts ligne par ligne."""
+        if not self.numero:
+            self.numero = Sequence.suivant("PF", self.date.year)
+        self.save()
+        machine = self.quantites_machine(self.document, self.depot)
+        self.lignes.all().delete()
+        ecart = False
+        for article, quantite in machine.items():
+            saisie = saisies.get(article.pk, ZERO)
+            LignePointage.objects.create(pointage=self, article=article, quantite_saisie=saisie, quantite_document=quantite)
+            ecart = ecart or saisie != quantite
+        self.statut = self.ECART if ecart else self.CONFORME
+        self.save(update_fields=["statut"])
+        return self
+
+
+class LignePointage(models.Model):
+    pointage = models.ForeignKey(PointageFiche, on_delete=models.CASCADE, related_name="lignes")
+    article = models.ForeignKey(Article, on_delete=models.PROTECT)
+    quantite_saisie = models.DecimalField("Quantité du fichiste", max_digits=18, decimal_places=3)
+    quantite_document = models.DecimalField("Quantité enregistrée", max_digits=18, decimal_places=3)
+
+    class Meta:
+        ordering = ["article__reference"]
+
+    @property
+    def ecart(self):
+        return self.quantite_saisie - self.quantite_document
+
+
 class Inventaire(models.Model):
     """Saisie d'inventaire physique d'un dépôt : les écarts génèrent des mouvements d'entrée / de sortie."""
 

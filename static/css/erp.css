@@ -333,3 +333,7 @@ html.dans-fenetre .piece-fenetre { min-height: 100vh; }
 .piece-boutons .btn { min-width: 6rem; }
 .piece-boutons .btn-ok { background: #3f8f3a; border-color: #3f8f3a; color: #fff; }
 @media (max-width: 620px) { .piece-entete, .piece-pied { grid-template-columns: 1fr; } }
+
+/* Rapport commercial journalier */
+.rapport-commercial h2 { font-size: 1.05rem; font-weight: 600; margin: 1.1rem 0 .5rem; color: #2b3540; }
+.rapport-commercial .solde-caisse td:first-child { width: 70%; }
