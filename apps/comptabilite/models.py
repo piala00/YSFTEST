@@ -169,6 +169,8 @@ class Ecriture(models.Model):
     reference = models.CharField("Référence", max_length=50, blank=True)
     statut = models.CharField(max_length=12, choices=STATUTS, default=STATUT_BROUILLARD)
     origine = models.CharField(max_length=50, blank=True, help_text="Document commercial à l'origine")
+    source_cle = models.CharField("Clé dans le dossier d'origine", max_length=80, blank=True, db_index=True)
+    source_empreinte = models.CharField(max_length=64, blank=True)
     cree_le = models.DateTimeField(auto_now_add=True)
     cree_par = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
                                  verbose_name="Créé par")
@@ -198,8 +200,11 @@ class Ecriture(models.Model):
         return debit == credit and debit > 0
 
     def valider(self):
+        from apps.core.synchronisation import verifier_saisie
+
         if self.statut == self.STATUT_VALIDEE:
             return
+        verifier_saisie("la saisie des écritures")
         if not self.equilibree:
             debit, credit = self.totaux()
             raise ValidationError(f"Écriture déséquilibrée : débit {debit} ≠ crédit {credit}.")
@@ -218,6 +223,7 @@ class LigneEcriture(models.Model):
     debit = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     credit = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     lettrage = models.CharField(max_length=10, blank=True, db_index=True)
+    source_cle = models.CharField("Ligne d'origine", max_length=20, blank=True)
     section = models.ForeignKey(SectionAnalytique, null=True, blank=True, on_delete=models.PROTECT,
                                 related_name="lignes", verbose_name="Section analytique")
     date_pointage = models.DateField("Pointé le", null=True, blank=True,

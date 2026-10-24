@@ -22,3 +22,9 @@ Version 2 du cahier : U4 reste une provenance historique pour la règle ancienne
 
 
 U6 : deux captures utilisateur jointes sous assets/captures ; relevé visuel, sources complémentaires et limites dans FONCTIONNEMENT_FENETRES_U6.md. Version de transmission 3 : documentation complétée, aucun code applicatif modifié et aucune recette interactive Sage/ERP exécutée dans cette mise à jour.
+
+
+U7 — Reprise complète Sage demandée. Version de transmission 4 : cahier de migration et sources officielles ajoutés ; aucun importeur complet développé ni migration exécutée.
+
+
+Clarification U7 intégrée avant livraison v4 : synchronisation initiale puis incrémentale et bascule autonome ; architecture proposée, aucun connecteur intégral ni synchronisation réelle exécutés.

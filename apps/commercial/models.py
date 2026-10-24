@@ -434,6 +434,7 @@ class Document(models.Model):
         "Pièce reprise", max_length=40, blank=True, db_index=True,
         help_text="Pièce reprise du dossier d'origine (domaine-type-n°) : ni stock ni écriture générés par l'ERP, "
                   "la comptabilité vient des écritures reprises")
+    source_empreinte = models.CharField(max_length=64, blank=True)
     statut = models.CharField(max_length=12, choices=STATUTS, default=BROUILLON)
     origine = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="documents_generes")
     notes = models.TextField(blank=True)
@@ -705,6 +706,9 @@ class Document(models.Model):
     def valider(self):
         from apps.comptabilite.services import comptabiliser_document
 
+        from apps.core.synchronisation import verifier_saisie
+
+        verifier_saisie("la validation des pièces")
         if self.statut != self.BROUILLON:
             raise ValidationError("Seul un document en brouillon peut être validé.")
         if not self.lignes.exists():
@@ -840,6 +844,9 @@ class Document(models.Model):
 
     @transaction.atomic
     def transformer(self, type_cible, utilisateur=None):
+        from apps.core.synchronisation import verifier_saisie
+
+        verifier_saisie("la transformation des pièces")
         if type_cible not in self.TRANSFORMATIONS.get(self.type_document, ()):
             raise ValidationError("Transformation non autorisée pour ce document.")
         if self.statut != self.VALIDE:
@@ -1093,7 +1100,9 @@ class Reglement(models.Model):
         montants : {facture_id: montant} saisis ligne par ligne ; à défaut, répartition de la plus ancienne à la plus
         récente. en_attente : reçu enregistré sans facture, entièrement en attente de rattachement."""
         from apps.comptabilite.services import comptabiliser_reglement
+        from apps.core.synchronisation import verifier_saisie
 
+        verifier_saisie("la saisie des règlements")
         self.controler_rattachement(factures, en_attente=en_attente)
         montants = {int(k): Decimal(v) for k, v in (montants or {}).items() if v not in (None, "")}
         if montants:
@@ -1144,6 +1153,9 @@ class Reglement(models.Model):
     @transaction.atomic
     def rattacher(self, facture, montant=None):
         """Rattache (tout ou partie de) le reste en attente du reçu à une nouvelle facture du client."""
+        from apps.core.synchronisation import verifier_saisie
+
+        verifier_saisie("le rattachement des règlements")
         reste_recu = self.en_attente_de_rattachement
         if reste_recu <= 0:
             raise ValidationError("Ce reçu n'a plus de reste à rattacher.")
@@ -1234,6 +1246,9 @@ class OperationCaisse(models.Model):
     @transaction.atomic
     def enregistrer(self):
         """Numérote et comptabilise : entrée D caisse / C contrepartie ; sortie D contrepartie / C caisse."""
+        from apps.core.synchronisation import verifier_saisie
+
+        verifier_saisie("la saisie des opérations de caisse")
         from apps.comptabilite.services import creer_ecriture
 
         self.full_clean(exclude=["numero", "ecriture"])
@@ -1467,6 +1482,9 @@ class Inventaire(models.Model):
 
     @transaction.atomic
     def valider(self):
+        from apps.core.synchronisation import verifier_saisie
+
+        verifier_saisie("la validation des inventaires")
         if self.statut != self.BROUILLON:
             raise ValidationError("Cet inventaire est déjà validé.")
         entrees, sorties = [], []

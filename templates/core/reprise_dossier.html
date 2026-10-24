@@ -2,12 +2,22 @@
 {% block title %}{{ titre }}{% endblock %}
 {% block content %}
 <div class="page-title"><h1>{{ titre }}</h1></div>
+{% if societe_sync.source_mode == "MIROIR" %}
+<div class="alert alert-warning small py-2"><i class="bi bi-arrow-repeat"></i> <strong>Copie synchronisée</strong> du dossier « {{ societe_sync.source_dossier }} » :
+  la saisie continue dans l'ancien logiciel, l'ERP en reçoit les créations, modifications et suppressions à chaque synchronisation
+  (saisies refusées dans l'ERP pour éviter les doublons). Le jour choisi : arrêtez la saisie dans l'ancien logiciel, synchronisez
+  une dernière fois, vérifiez le rapport, puis terminez la bascule.</div>
+{% elif societe_sync.source_mode == "BASCULE" %}
+<div class="alert alert-success small py-2"><i class="bi bi-check2-circle"></i> <strong>Bascule effectuée</strong> le
+  {{ societe_sync.source_bascule_le|date:"d/m/Y H:i" }} depuis « {{ societe_sync.source_dossier }} » : l'ERP est le logiciel de saisie,
+  la synchronisation est arrêtée. L'ancien dossier reste consultable pour l'historique.</div>
+{% endif %}
 <div class="alert alert-info small py-2">
-  Reprend tout le dossier de votre ancien logiciel de gestion (base SQL Server) : <strong>comptabilité</strong> (plan comptable,
+  Synchronise tout le dossier de votre ancien logiciel de gestion (base SQL Server) pendant la transition, puis permet la bascule : <strong>comptabilité</strong> (plan comptable,
   tiers, journaux, plans analytiques, taxes, écritures de l'exercice avec lettrage et analytique) et <strong>gestion commerciale</strong>
   (dépôts, familles, articles, tarifs, stock, pièces en cours et historique, échéances, règlements en attente).
   <strong>L'ancien dossier n'est jamais modifié</strong> : l'ERP ne fait que des lectures. Faites d'abord une <strong>simulation</strong>
-  sur une copie du dossier, comparez le rapport avec votre balance, vos soldes clients et votre inventaire, puis importez.
+  sur une copie du dossier, comparez le rapport avec votre balance, vos soldes clients et votre inventaire, puis synchronisez.
 </div>
 <form method="post" class="card"><div class="card-body">{% csrf_token %}
   <div class="row g-2 small">
@@ -29,20 +39,27 @@
     <div class="col-md-2 align-self-end"><button class="btn btn-sm btn-outline-secondary w-100" name="action" value="rechercher">Rechercher les dossiers</button></div>
     <div class="col-md-2"><label class="form-label mb-0" for="debut_exercice">Début de l'exercice en cours</label>
       <input class="form-control form-control-sm" type="date" id="debut_exercice" name="debut_exercice" value="{{ valeurs.debut_exercice }}"></div>
-    <div class="col-md-2"><label class="form-label mb-0" for="date_bascule">Date de bascule</label>
+    <div class="col-md-2"><label class="form-label mb-0" for="date_bascule">Données jusqu'au</label>
       <input class="form-control form-control-sm" type="date" id="date_bascule" name="date_bascule" value="{{ valeurs.date_bascule }}"></div>
     <div class="col-md-2"><label class="form-label mb-0" for="historique_depuis">Historique des pièces depuis</label>
       <input class="form-control form-control-sm" type="date" id="historique_depuis" name="historique_depuis" value="{{ valeurs.historique_depuis }}">
       <div class="form-text">Vide : début d'exercice. Les pièces en cours et factures non soldées sont toujours reprises.</div></div>
   </div>
+  {% if societe_sync.source_mode != "BASCULE" %}
   <div class="d-flex flex-wrap gap-2 align-items-end mt-3">
     <button class="btn btn-primary btn-sm" name="action" value="simuler"><i class="bi bi-search"></i> Simuler (rien n'est enregistré)</button>
-    <div class="ms-auto d-flex gap-2 align-items-end">
-      <div><label class="form-label small mb-0" for="confirmation">Pour importer, tapez IMPORTER</label>
+    <div class="d-flex gap-2 align-items-end">
+      <div><label class="form-label small mb-0" for="confirmation">Tapez SYNCHRONISER</label>
         <input class="form-control form-control-sm" id="confirmation" name="confirmation" autocomplete="off"></div>
-      <button class="btn btn-danger btn-sm" name="action" value="importer"><i class="bi bi-box-arrow-in-down"></i> Importer</button>
+      <button class="btn btn-success btn-sm" name="action" value="synchroniser"><i class="bi bi-arrow-repeat"></i> Synchroniser</button>
     </div>
-  </div>
+    {% if societe_sync.source_mode == "MIROIR" %}
+    <div class="ms-auto d-flex gap-2 align-items-end">
+      <div><label class="form-label small mb-0" for="confirmation_bascule">Bascule définitive : tapez BASCULER</label>
+        <input class="form-control form-control-sm" id="confirmation_bascule" name="confirmation_bascule" autocomplete="off"></div>
+      <button class="btn btn-danger btn-sm" name="action" value="basculer"><i class="bi bi-box-arrow-in-right"></i> Terminer la bascule</button>
+    </div>{% endif %}
+  </div>{% endif %}
 </div></form>
 {% if rapport %}
 <div class="card mt-3"><div class="card-header bg-white fw-semibold d-flex justify-content-between">
@@ -50,7 +67,14 @@
   <span class="{% if rapport.conforme %}text-success{% else %}text-danger{% endif %}">{% if rapport.conforme %}Conforme{% else %}À corriger : rien n'a été enregistré{% endif %}</span></div>
   <pre class="mb-0 p-3 small" style="white-space:pre-wrap">{{ rapport.texte }}</pre></div>
 {% endif %}
-<div class="small text-muted mt-3">La date de bascule est le dernier jour de travail dans l'ancien logiciel : arrêtez-y la saisie, faites la
-  reprise, puis travaillez uniquement dans l'ERP. Le stock repris est celui du moment de la reprise. Chaque agence reprend son propre dossier
+{% if lots %}<div class="card mt-3"><div class="card-header bg-white fw-semibold small">Derniers passages</div>
+<table class="table table-sm mb-0 small"><thead><tr><th>Le</th><th>Données jusqu'au</th><th>Type</th><th>Résultat</th><th>Créées · m.à.j. · supprimées</th><th>Par</th></tr></thead>
+<tbody>{% for l in lots %}<tr><td>{{ l.debut|date:"d/m/Y H:i" }}</td><td>{{ l.date_bascule|date:"d/m/Y" }}</td>
+  <td>{% if l.applique %}Synchronisation{% else %}Simulation{% endif %}</td>
+  <td class="{% if l.conforme %}text-success{% else %}text-danger{% endif %}">{% if l.conforme %}conforme{% else %}non conforme{% endif %}</td>
+  <td>{% for nom, v in l.volumes.items %}{% if v.creees or v.mises_a_jour or v.supprimees %}{{ nom }} {{ v.creees }}·{{ v.mises_a_jour }}·{{ v.supprimees }} {% endif %}{% endfor %}</td>
+  <td>{{ l.utilisateur|default:"automatique" }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+<div class="small text-muted mt-3">Pendant la transition, synchronisez aussi souvent que nécessaire (à la main ici, ou automatiquement). Le jour
+  de la bascule : arrêtez la saisie dans l'ancien logiciel, synchronisez une dernière fois, vérifiez, puis terminez la bascule. Le stock repris est celui du moment de la reprise. Chaque agence reprend son propre dossier
   sur son propre serveur.</div>
 {% endblock %}

@@ -26,6 +26,31 @@ Sage 100 V12.20 »). **Sage n'est jamais modifié** : on lit, on exporte en CSV,
 
 Non repris : gammes, lots et séries, tarifs propres à un client, budgets, pièces archivées, fabrication.
 
+## Synchronisation pendant la transition, puis bascule (U7)
+
+Ce n'est pas un import unique : l'ERP devient une **copie synchronisée** du dossier Sage, puis le remplace.
+
+1. **Simulation** (ERP › Fichier › *Reprise d'un dossier existant*) : rapport complet, rien n'est enregistré.
+2. **Première synchronisation** (taper `SYNCHRONISER`) : la société passe en mode *copie synchronisée* (badge orange
+   dans la barre du haut, avec l'heure de la dernière synchronisation). La saisie continue dans Sage ; l'ERP refuse
+   les validations de pièces, règlements, opérations de caisse, inventaires et écritures, pour éviter les doubles
+   saisies. Consultation, états et contrôles sont disponibles.
+3. **Synchronisations suivantes** : à la main (même bouton) ou automatiquement toutes les heures
+   (`6-SYNCHRONISATION-AUTOMATIQUE.bat`, commande `python manage.py synchroniser_dossier`, paramètres
+   `SYNCHRO_SERVEUR`, `SYNCHRO_BASE`, `SYNCHRO_UTILISATEUR`, `SYNCHRO_MOT_DE_PASSE` dans `.env`). Chaque passage
+   reporte les **créations, modifications et suppressions** : fiches mises à jour ; écritures et pièces comparées par
+   clé d'origine et empreinte (seules celles qui ont changé sont refaites, le n° ERP est conservé) ; stock aligné
+   par des ajustements tracés ; une facture qui a disparu de la liste des non soldées est soldée, une pièce en cours
+   transformée dans Sage est marquée transformée. Un passage non conforme est annulé en entier.
+4. Chaque passage (simulation ou synchronisation, manuel ou automatique) est consigné : date, données jusqu'au,
+   conformité, volumes créés · mis à jour · supprimés, rapport complet (tableau *Derniers passages*).
+5. **Bascule** : arrêter la saisie dans Sage, synchroniser une dernière fois, vérifier, puis taper `BASCULER`.
+   La bascule exige que le dernier passage soit une synchronisation conforme. La synchronisation s'arrête
+   définitivement, la saisie s'ouvre dans l'ERP ; l'événement est inscrit au journal d'audit.
+
+Un poste ne synchronise qu'un dossier : un autre dossier est refusé (pas de mélange). Le nom « Sage » n'apparaît
+pas dans le logiciel (« ancien logiciel », « dossier d'origine »).
+
 ## Deux façons de lire Sage
 
 1. **Lecture directe (recommandée)** : ERP › Fichier › *Reprise d'un dossier existant* (administrateur), ou

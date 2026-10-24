@@ -77,3 +77,12 @@ Commande : `python manage.py test`. Résultat : **173 tests, tous réussis** (do
 | Saisie non enregistrée protégée | Fermer une fenêtre dont le formulaire est modifié demande confirmation (revenir / abandonner) ; quitter la page aussi | Essai navigateur |
 | Actualisation après règlement | Les fenêtres ouvertes sur les factures réglées ou rattachées se rechargent, sauf si elles contiennent une saisie en cours | Essai navigateur |
 | Saisie des règlements guidée par le client | Choix du tiers, factures non soldées proposées, sélection multiple avec montant imputé, règlement « en attente de facture » si aucune ; liste des règlements du tiers, filtres et totaux | `test_formulaire_recu_plusieurs_factures_et_rattachement`, `test_reglement_en_attente_de_facture`, `test_montants_imputes_saisis_par_facture` |
+
+## Complément U7 : synchronisation du dossier d'origine, puis bascule (skill v4)
+
+| Exigence | Réalisation | Preuve |
+|---|---|---|
+| E53 — Synchronisation complète (gestion commerciale et comptabilité) | Lecture seule de la base SQL Server (SELECT uniquement, ApplicationIntent=ReadOnly) ou CSV ; passages répétables qui reportent créations, modifications et suppressions ; chaque passage consigné (lot) ; synchronisation automatique horaire possible | `test_synchronisation_incrementale`, `test_copie_synchronisee_puis_bascule`, `test_synchronisation_planifiee` ; essai sur base fictive SQL Server |
+| E54 — Comptabilité et analytique | Plan comptable, plan tiers, journaux, taxes, plans et sections analytiques, écritures ligne à ligne avec lettrage et ventilations (premier plan) | `test_comptabilite_reprise` |
+| E55 — Autonomie après la bascule | Pendant la transition, saisies refusées dans l'ERP (pas de doublon) ; bascule confirmée (BASCULER) après une dernière synchronisation conforme ; ensuite synchronisation arrêtée et saisie ouverte | `test_ecran_en_copie_synchronisee_puis_bascule`, `test_continuer_dans_l_erp` |
+| Limites | Non synchronisés : pièces jointes et PDF, utilisateurs et droits, gammes, lots et séries, budgets, fabrication ; colonnes « à confirmer » sur une version antérieure à V12.20 | — |

@@ -59,7 +59,7 @@ class Command(BaseCommand):
                 connexion = source.connecter(options["serveur"], options["base"], options["utilisateur"], mot_de_passe)
             except Exception as exc:
                 raise CommandError(f"Connexion à Sage impossible : {exc}")
-            origine = source.SourceSQL(connexion, debut, bascule, historique)
+            origine = source.SourceSQL(connexion, debut, bascule, historique, dossier_nom=f"{options['serveur']}/{options['base']}")
         elif options["dossier"]:
             if not Path(options["dossier"]).is_dir():
                 raise CommandError(f"Dossier introuvable : {options['dossier']}")

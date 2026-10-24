@@ -11,6 +11,10 @@ Lire d’abord [FENETRES_ET_REGLEMENTS_V2.md](references/FENETRES_ET_REGLEMENTS_
 
 Les constats historiques de la revue du 24/10 restent des faits sur l’ancienne copie, mais les tests qui imposaient le refus de tout règlement sans facture doivent être révisés selon U5. Aucune modification applicative n’est prouvée par cette mise à jour du cahier.
 
+## Synchronisation complète Sage et bascule — U7
+
+Lire [REPRISE_COMPLETE_SAGE_U7.md](references/REPRISE_COMPLETE_SAGE_U7.md) pour toute synchronisation/migration : l’utilisateur exige la synchronisation complète Sage vers ERP, Gestion commerciale et Comptabilité avec plans tiers, journaux, analytique, historique et liens, puis abandon de Sage pour poursuivre dans l’ERP autonome. Prévoir initialisation, changements incrémentaux, reprises sans doublons et bascule contrôlée ; ne pas supposer une réécriture vers Sage. Ne pas présenter une reprise limitée aux référentiels/soldes comme complète, ni confondre restauration SQL et conversion ERP. Inventorier et rapprocher chaque objet ; signaler les fonctions manquantes, ne pas rejouer les effets des pièces historiques.
+
 ## Prendre connaissance du besoin
 
 Lire [CONTEXTE_UTILISATEUR.md](references/CONTEXTE_UTILISATEUR.md), puis [EXIGENCES.csv](references/EXIGENCES.csv). Traiter les deux tâches comme un ensemble :

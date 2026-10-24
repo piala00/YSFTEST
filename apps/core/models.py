@@ -44,6 +44,16 @@ class Societe(models.Model):
         "Vente au détail réservée aux dépôts désignés", default=False,
         help_text="Les magasins de gros ne vendent que par unités entières (pas de carton ouvert) ; la vente au détail "
                   "se fait uniquement dans les dépôts désignés (boutiques), approvisionnés par transfert")
+    # Synchronisation avec le dossier de l'ancien logiciel (transition), puis bascule vers l'ERP
+    SYNCHRO_AUCUNE = ""
+    SYNCHRO_MIROIR = "MIROIR"
+    SYNCHRO_BASCULE = "BASCULE"
+    MODES_SYNCHRO = [(SYNCHRO_AUCUNE, "Aucune"), (SYNCHRO_MIROIR, "Copie synchronisée (saisie dans l'ancien logiciel)"),
+                     (SYNCHRO_BASCULE, "Bascule effectuée (saisie dans l'ERP)")]
+    source_mode = models.CharField("Synchronisation", max_length=10, choices=MODES_SYNCHRO, blank=True, default=SYNCHRO_AUCUNE)
+    source_dossier = models.CharField("Dossier d'origine synchronisé", max_length=200, blank=True)
+    source_debut_exercice = models.DateField("Début d'exercice du dossier d'origine", null=True, blank=True)
+    source_bascule_le = models.DateTimeField("Bascule effectuée le", null=True, blank=True)
     delai_pointage = models.PositiveIntegerField(
         "Délai de pointage des bons (jours)", default=1,
         help_text="Fiche de stock : un bon non pointé par le fichiste au-delà de ce délai est signalé en retard")
@@ -255,3 +265,24 @@ class JournalEvenement(models.Model):
 
     def __str__(self):
         return f"{self.date:%d/%m/%Y %H:%M} {self.get_action_display()} {self.objet_type} {self.objet_libelle}"
+
+
+class LotSynchronisation(models.Model):
+    """Un passage de synchronisation (ou de simulation) depuis le dossier de l'ancien logiciel : quand, quoi, résultat."""
+
+    debut = models.DateTimeField(auto_now_add=True)
+    fin = models.DateTimeField(null=True, blank=True)
+    utilisateur = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    dossier = models.CharField(max_length=200)
+    date_bascule = models.DateField("Données jusqu'au")
+    applique = models.BooleanField("Appliqué", default=False, help_text="Faux : simulation (rien n'a été enregistré)")
+    conforme = models.BooleanField(default=False)
+    volumes = models.JSONField(default=dict, blank=True, help_text="Par donnée : lues, créées, mises à jour, supprimées")
+    rapport = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-debut"]
+        verbose_name = "Lot de synchronisation"
+
+    def __str__(self):
+        return f"{self.debut:%d/%m/%Y %H:%M} · {self.dossier} · {'appliqué' if self.applique else 'simulation'}"

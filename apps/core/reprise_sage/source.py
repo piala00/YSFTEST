@@ -150,8 +150,8 @@ def connecter(serveur, base, utilisateur="", mot_de_passe=""):
 class SourceSQL:
     """Lit directement les tables d'un dossier Sage 100 (SELECT uniquement)."""
 
-    def __init__(self, connexion, debut_exercice, date_bascule, historique_depuis=None):
-        self.connexion = connexion
+    def __init__(self, connexion, debut_exercice, date_bascule, historique_depuis=None, dossier_nom=""):
+        self.connexion, self.dossier_nom = connexion, dossier_nom
         self.debut, self.bascule, self.historique = debut_exercice, date_bascule, historique_depuis
         self.presentes = self._colonnes_presentes()
         self.requetes = Requetes(debut_exercice, date_bascule, historique_depuis, self.presentes)

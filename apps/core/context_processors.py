@@ -15,8 +15,13 @@ def societe(request):
         return {}
     from .selection import resume
 
-    contexte = {"societe": Societe.get(), "exercice_courant": Exercice.courant(), "modules": MODULES,
+    fiche = Societe.get()
+    contexte = {"societe": fiche, "exercice_courant": Exercice.courant(), "modules": MODULES,
                 "selection": resume(request), "erp_actualiser": request.session.pop("erp_actualiser", None)}
+    if fiche.source_mode == Societe.SYNCHRO_MIROIR:
+        from .models import LotSynchronisation
+
+        contexte["derniere_synchro"] = LotSynchronisation.objects.filter(applique=True, conforme=True).first()
     module = module_pour_chemin(request.path)
     if module is None:
         return contexte

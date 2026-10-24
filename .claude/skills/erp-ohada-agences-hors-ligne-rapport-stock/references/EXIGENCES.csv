@@ -77,3 +77,6 @@ E49;T2;Sélection multiple;CONFIRME_UTILISATEUR;U5;Permettre la sélection d’u
 E50;T2;Règlement en attente;CONFIRME_UTILISATEUR;U5;Autoriser l’enregistrement du règlement en attente de facture pour rattachement ultérieur lorsqu’aucune facture n’est disponible.
 E51;T2;En-tête adapté;CONFIRME_UTILISATEUR;U5;"Adapter l’en-tête au besoin ERP ; captures Sage reçues en U6, champs et disposition ERP spécifiques restent à préciser."
 E52;T2;Fenêtres transversales;CONFIRME_UTILISATEUR;U6;Étendre le fonctionnement des fenêtres à tous les écrans concernés de comptabilité et gestion commerciale, au-delà du règlement ouvert depuis une facture.
+E53;T1-T2;Synchronisation complète Sage;CONFIRME_UTILISATEUR;U7;Synchroniser toute la société Sage, ses périmètres commerciaux et comptables, données, paramètres, historiques et liens, puis permettre d’abandonner Sage et poursuivre dans l’ERP.
+E54;T1-T2;Reprise comptable et analytique;CONFIRME_UTILISATEUR;U7;"Inclure notamment plan comptable, plan tiers, journaux, plans et données analytiques ; ne pas limiter la reprise aux clients/articles/soldes."
+E55;T1-T2;Autonomie après synchronisation;CONFIRME_UTILISATEUR;U7 précisé;Permettre à une société précédemment sur Sage de poursuivre son activité dans notre ERP après synchronisation et abandon de Sage.

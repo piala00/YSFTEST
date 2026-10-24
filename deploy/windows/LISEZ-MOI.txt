@@ -131,6 +131,20 @@ Microsoft fourni dans ce dossier : il n'y a rien à installer.
 Pour passer de SQLite à SQL Server (ou l'inverse), lancez
 3-CHANGER-DE-BASE.bat. L'ancienne base n'est pas effacée.
 
+Reprendre un dossier Sage existant (transition, puis bascule) :
+  - Dans l'ERP : Fichier > Reprise d'un dossier existant (administrateur).
+    La base Sage est seulement LUE (aucune écriture). Simulez d'abord,
+    puis tapez SYNCHRONISER : l'ERP devient une copie synchronisée, en
+    consultation ; la saisie continue dans Sage.
+  - Synchronisez aussi souvent que voulu (bouton, ou automatiquement avec
+    6-SYNCHRONISATION-AUTOMATIQUE.bat : toutes les heures, paramètres
+    SYNCHRO_SERVEUR, SYNCHRO_BASE, SYNCHRO_UTILISATEUR,
+    SYNCHRO_MOT_DE_PASSE dans logiciel\.env ; utilisez de préférence un
+    compte SQL en lecture seule).
+  - Le jour de la bascule : arrêtez la saisie dans Sage, synchronisez une
+    dernière fois, vérifiez le rapport, puis tapez BASCULER. L'ERP devient
+    le seul logiciel de saisie ; la synchronisation s'arrête.
+
 
 4. EN CAS DE PROBLÈME
 ----------------------
@@ -164,6 +178,7 @@ Pour passer de SQLite à SQL Server (ou l'inverse), lancez
 3-CHANGER-DE-BASE.bat   passer de SQLite à SQL Server ou l'inverse
 4-DEMARRER-SERVEUR-RESEAU.bat      serveur pour tous les postes de l'agence
 5-DEMARRAGE-AUTOMATIQUE-SERVEUR.bat  démarrage du serveur à l'ouverture de session
+6-SYNCHRONISATION-AUTOMATIQUE.bat    synchronisation horaire du dossier repris
 logiciel\               le programme ERP
 python\                 Python 3.12 (Python Software Foundation), utilisé
                         uniquement par l'ERP

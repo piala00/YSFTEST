@@ -10,13 +10,14 @@ Principes :
 - chaque bloc est contrôlé (équilibre, totaux) ; au moindre écart, la reprise entière est annulée.
 """
 import datetime
+import hashlib
 from collections import OrderedDict, defaultdict
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 
 ZERO = Decimal("0")
-PREFIXE_ECRITURE = "SAGE "
+CLE_ECRITURE = "ORIG|"          # clé source d'une pièce comptable : ORIG|journal|mois|n° de pièce
 
 # (DO_Domaine, DO_Type) → type de pièce de l'ERP ; facture : selon DO_Provenance (1 retour, 2 avoir)
 TYPES_PIECES = {
@@ -36,6 +37,11 @@ def _entier(valeur, defaut=None):
         return int(Decimal((valeur or "").strip()))
     except Exception:
         return defaut
+
+
+def _empreinte(valeur):
+    """Empreinte d'un contenu d'origine : un changement dans l'ancien logiciel change l'empreinte."""
+    return hashlib.sha256(repr(valeur).encode("utf-8")).hexdigest()
 
 
 def _date(valeur):
@@ -137,9 +143,6 @@ class Complements:
         lignes = self.donnees["ecritures"]
         if not lignes:
             return
-        if Ecriture.objects.filter(reference__startswith=PREFIXE_ECRITURE).exists():
-            bilan.anomalies.append("écritures déjà reprises : non rejouées")
-            return
         # Ventilations analytiques par ligne Sage
         ventilations = defaultdict(list)
         if "analytique" in self.donnees:
@@ -159,7 +162,6 @@ class Complements:
                 premier = min(p for p, _, _ in liste)
                 autres_plans += sum(1 for p, _, _ in liste if p != premier)
                 ventilations[no] = [(section, montant) for p, section, montant in liste if p == premier]
-            self.rapport.bilans["analytique"].creees = sum(len(v) for v in ventilations.values())
             self.rapport.bilans["analytique"].ignorees = autres_plans
             if autres_plans:
                 self.rapport.avertissements.append(
@@ -217,50 +219,80 @@ class Complements:
                     journal = Journal.objects.create(code=code[:10], intitule=f"Journal {code} (reprise)", type_journal=Journal.TYPE_OD)
                     bilan.anomalies.append(f"journal {code} absent de F_JOURNAUX : créé en opérations diverses")
                 self.journaux[code] = journal
-        lignes_erp = []
+        # Synchronisation : chaque pièce d'origine a une clé stable et une empreinte de son contenu. Nouvelle pièce :
+        # créée ; contenu changé : lignes refaites (n° ERP conservé) ; pièce disparue de la période : supprimée.
+        existantes = {e.source_cle: e for e in Ecriture.objects.filter(source_cle__startswith=CLE_ECRITURE)}
+        vues = set()
         for (code, mois, numero), l in regroupees.items():
+            cle = f"{CLE_ECRITURE}{code}|{mois}|{numero}"[:80]
+            vues.add(cle)
+            empreinte = _empreinte([(x["no"], x["date"], x["compte"].numero, getattr(x["tiers"], "code", ""), x["debit"],
+                                     x["credit"], x["libelle"], x["lettrage"],
+                                     [(s.code, m) for s, m in ventilations.get(x["no"], [])]) for x in l])
             journal, date = self.journaux[code], min(x["date"] for x in l)
-            ecriture = Ecriture.objects.create(
-                journal=journal, exercice=Exercice.pour_date(date), date=date, statut=Ecriture.STATUT_VALIDEE,
-                numero=Sequence.suivant(journal.code, date.year, largeur=6), cree_par=self.utilisateur,
-                libelle=(next((x["libelle"] for x in l if x["libelle"]), "") or f"Pièce {numero} reprise")[:200],
-                reference=(f"{PREFIXE_ECRITURE}{numero}" if numero != "*" else f"{PREFIXE_ECRITURE}{code} {mois}")[:50])
-            bilan.creees += 1
+            libelle = (next((x["libelle"] for x in l if x["libelle"]), "") or f"Pièce {numero} reprise")[:200]
+            reference = (numero if numero != "*" else f"{code} {mois}")[:50]
+            ecriture = existantes.get(cle)
+            if ecriture is not None and ecriture.source_empreinte == empreinte:
+                continue
+            if ecriture is None:
+                ecriture = Ecriture.objects.create(
+                    journal=journal, exercice=Exercice.pour_date(date), date=date, statut=Ecriture.STATUT_VALIDEE,
+                    numero=Sequence.suivant(journal.code, date.year, largeur=6), cree_par=self.utilisateur,
+                    libelle=libelle, reference=reference, source_cle=cle, source_empreinte=empreinte)
+                bilan.creees += 1
+            else:
+                ecriture.lignes.all().delete()
+                ecriture.journal, ecriture.date, ecriture.exercice = journal, date, Exercice.pour_date(date)
+                ecriture.libelle, ecriture.reference, ecriture.source_empreinte = libelle, reference, empreinte
+                ecriture.save()
+                bilan.mises_a_jour += 1
+            if "analytique" in self.rapport.bilans:                # ventilations (re)passées avec la pièce
+                self.rapport.bilans["analytique"].creees += sum(len(ventilations.get(x["no"], [])) for x in l)
+            lignes_erp = []
             for x in l:
                 # Ventilation analytique : la ligne est découpée par section, le reste sans section
                 reste_d, reste_c = x["debit"], x["credit"]
                 for section, montant in ventilations.get(x["no"], []):
                     d, c = (montant, ZERO) if x["debit"] else (ZERO, montant)
                     lignes_erp.append(LigneEcriture(ecriture=ecriture, compte=x["compte"], tiers=x["tiers"], section=section,
-                                                    libelle=x["libelle"], debit=d, credit=c, lettrage=x["lettrage"]))
+                                                    libelle=x["libelle"], debit=d, credit=c, lettrage=x["lettrage"],
+                                                    source_cle=x["no"][:20]))
                     reste_d -= d
                     reste_c -= c
                 if reste_d or reste_c:
-                    lignes_erp.append(LigneEcriture(ecriture=ecriture, compte=x["compte"], tiers=x["tiers"],
-                                                    libelle=x["libelle"], debit=reste_d, credit=reste_c, lettrage=x["lettrage"]))
-        LigneEcriture.objects.bulk_create(lignes_erp, batch_size=2000)
-        debit = sum((x.debit for x in lignes_erp), ZERO)
-        credit = sum((x.credit for x in lignes_erp), ZERO)
+                    lignes_erp.append(LigneEcriture(ecriture=ecriture, compte=x["compte"], tiers=x["tiers"], libelle=x["libelle"],
+                                                    debit=reste_d, credit=reste_c, lettrage=x["lettrage"], source_cle=x["no"][:20]))
+            LigneEcriture.objects.bulk_create(lignes_erp, batch_size=2000)
+        # Pièces de la période synchronisée qui n'existent plus à l'origine (supprimées dans l'ancien logiciel)
+        debut_periode = self.debut_exercice or min(dates)
+        for cle, ecriture in existantes.items():
+            if cle not in vues and debut_periode <= ecriture.date <= self.date:
+                ecriture.delete()
+                bilan.supprimees += 1
+        # Contrôles sur l'ensemble des écritures synchronisées de la période (pas seulement celles de ce passage)
+        synchronisees = LigneEcriture.objects.filter(ecriture__source_cle__startswith=CLE_ECRITURE,
+                                                     ecriture__date__range=(debut_periode, self.date))
+        debit = sum((x.debit for x in synchronisees), ZERO)
+        credit = sum((x.credit for x in synchronisees), ZERO)
+        nb_erp = len({x.source_cle for x in synchronisees})
         self.rapport.controles.append(("Écritures : total débit origine = ERP", _fmt(debit_source), _fmt(debit), debit_source == debit))
         self.rapport.controles.append(("Écritures : total crédit origine = ERP", _fmt(credit_source), _fmt(credit), credit_source == credit))
         self.rapport.controles.append(("Écritures : nombre de lignes origine = ERP (avant ventilation analytique)",
-                                       str(len(lignes)), str(sum(len(l) for l in regroupees.values())),
-                                       len(lignes) == sum(len(l) for l in regroupees.values())))
+                                       str(len(lignes)), str(nb_erp), len(lignes) == nb_erp))
         negatives = [n for n, v in ventilations.items() if v and any(m < 0 for _, m in v)]
         if negatives:
             self.rapport.avertissements.append(f"{len(negatives)} ventilation(s) analytique(s) négative(s) : à vérifier.")
 
     # ------------------------------------------------------------------ pièces commerciales et règlements
     def _pieces_bloc(self):
+        """Pièces commerciales, échéances et règlements : synchronisés par clé (domaine-type-n°) et empreinte."""
         from apps.commercial.models import Article, Depot, Document, Imputation, LigneDocument, Reglement, Tiers
         from apps.comptabilite.models import Journal
 
         from . import _fmt
 
         bilan = self.rapport.bilans["documents"]
-        if Document.objects.exclude(reprise_sage="").exists():
-            bilan.anomalies.append("pièces déjà reprises : non rejouées")
-            return
         tiers = {t.code: t for t in Tiers.objects.all()}
         articles = {a.reference: a for a in Article.objects.all()}
         depots = {d.code: d for d in Depot.objects.all()}
@@ -269,11 +301,8 @@ class Complements:
         for l in self.donnees.get("lignes", []):
             lignes_par_piece[(l["DO_Domaine"], l["DO_Type"], l["DO_Piece"])].append(l)
         echeances = defaultdict(list)
-        echeance_piece = {}
         for e in self.donnees.get("echeances", []):
-            cle = (e["DO_Domaine"], e["DO_Type"], e["DO_Piece"])
-            echeances[cle].append(e)
-            echeance_piece[e["DR_No"]] = cle
+            echeances[(e["DO_Domaine"], e["DO_Type"], e["DO_Piece"])].append(e)
         impute_par_echeance, impute_par_reglement = defaultdict(lambda: ZERO), defaultdict(lambda: ZERO)
         avec_montant = any("RC_Montant" in i for i in self.donnees.get("imputations", [])[:1])
         for i in self.donnees.get("imputations", []):
@@ -284,9 +313,11 @@ class Complements:
             self.rapport.avertissements.append("RC_Montant absent de F_REGLECH : une échéance est soit réglée (DR_Regle = 1), "
                                                "soit due en entier ; les règlements partiels d'une échéance sont à vérifier.")
 
-        ttc_source = ttc_erp = ZERO
-        restes = {}          # pièce ERP → reste dû selon Sage
+        existantes = {d.reprise_sage: d for d in Document.objects.exclude(reprise_sage="")}
         numeros = set(Document.objects.values_list("numero", flat=True))
+        ttc_source = ttc_erp = ZERO
+        restes, vues = {}, set()
+        refaites = {"lignes": 0, "echeances": 0}                   # lignes et échéances des pièces créées ou mises à jour
         for d in self.donnees["documents"]:
             cle = (d["DO_Domaine"], d["DO_Type"], d["DO_Piece"])
             type_erp = TYPES_PIECES.get((_entier(d["DO_Domaine"]), _entier(d["DO_Type"])))
@@ -300,40 +331,61 @@ class Complements:
                 bilan.ignorees += 1
                 bilan.anomalies.append(f"pièce {d['DO_Piece']} : tiers « {d.get('DO_Tiers')} » inconnu, non reprise")
                 continue
-            payeur = tiers.get((d.get("CT_NumPayeur") or "").strip()[:20])
-            numero = d["DO_Piece"][:30]
-            if numero in numeros:                       # même n° déjà utilisé : suffixe du type Sage
-                numero = f"{numero}-{d['DO_Type']}"[:30]
-            numeros.add(numero)
-            doc = Document.objects.create(
-                type_document=type_erp, numero=numero, date=_date(d["DO_Date"]), tiers=fiche,
-                payeur=payeur if payeur and fiche and payeur.pk != fiche.pk else None,
-                depot=depots.get(d.get("DE_No") or "") or par_defaut,
-                depot_destination=depots.get(d.get("DO_Tiers") or "") if type_erp == "STOCK_VIREMENT" else None,
-                reference_externe=(d.get("DO_Ref") or "")[:50], statut=Document.VALIDE, cree_par=self.utilisateur,
-                reprise_sage=f"{d['DO_Domaine']}-{d['DO_Type']}-{d['DO_Piece']}"[:40],
-                notes="Pièce reprise du dossier d'origine (ni stock ni écriture générés par l'ERP)")
-            lignes_erp = []
-            for l in lignes_par_piece.get(cle, []):
-                quantite, ht, ttc = self.nombre(l["DL_Qte"]), self.nombre(l["DL_MontantHT"]), self.nombre(l["DL_MontantTTC"])
-                ttc_source += ttc if doc.est_facturation else ZERO
-                tva = ZERO if doc.est_stock else ttc - ht
-                lignes_erp.append(LigneDocument(
-                    document=doc, article=articles.get((l.get("AR_Ref") or "").strip()[:30]),
-                    designation=(l.get("DL_Design") or l.get("AR_Ref") or "")[:200], quantite=quantite,
-                    prix_unitaire=(ht / quantite).quantize(Decimal("0.01")) if quantite else ht,
-                    taux_tva=(tva * 100 / ht).quantize(Decimal("0.01")) if ht else ZERO,
-                    montant_ht=ht, montant_tva=tva))
-            LigneDocument.objects.bulk_create(lignes_erp)
-            doc.recalculer()
-            ttc_erp += doc.total_ttc if doc.est_facturation else ZERO
-            bilan.creees += 1
-            # Échéance et reste dû (factures)
+            cle_erp = f"{d['DO_Domaine']}-{d['DO_Type']}-{d['DO_Piece']}"[:40]
+            vues.add(cle_erp)
+            lignes_source = lignes_par_piece.get(cle, [])
             ech = echeances.get(cle, [])
-            if ech:
-                ouvertes = [e for e in ech if (e.get("DR_Regle") or "0").strip() in ("", "0")]
-                doc.date_echeance = min(_date(e["DR_Date"]) for e in (ouvertes or ech))
-                doc.save(update_fields=["date_echeance"])
+            empreinte = _empreinte([d, lignes_source, ech])
+            payeur = tiers.get((d.get("CT_NumPayeur") or "").strip()[:20])
+            entete = {"type_document": type_erp, "date": _date(d["DO_Date"]), "tiers": fiche,
+                      "payeur": payeur if payeur and fiche and payeur.pk != fiche.pk else None,
+                      "depot": depots.get(d.get("DE_No") or "") or par_defaut,
+                      "depot_destination": depots.get(d.get("DO_Tiers") or "") if type_erp == "STOCK_VIREMENT" else None,
+                      "reference_externe": (d.get("DO_Ref") or "")[:50]}
+            doc = existantes.get(cle_erp)
+            if doc is not None and doc.source_empreinte == empreinte:
+                pass                                       # inchangée depuis le passage précédent
+            elif doc is not None and (doc.documents_generes.exists() or
+                                      doc.imputations.exclude(reglement__reprise_sage__in=("ANTERIEURS",)).exists()):
+                bilan.anomalies.append(f"pièce {doc.numero} modifiée à l'origine mais déjà utilisée dans l'ERP : non mise à jour")
+            else:
+                if doc is None:
+                    numero = d["DO_Piece"][:30]
+                    if numero in numeros:                  # même n° déjà utilisé : suffixe du type d'origine
+                        numero = f"{numero}-{d['DO_Type']}"[:30]
+                    numeros.add(numero)
+                    doc = Document.objects.create(numero=numero, statut=Document.VALIDE, cree_par=self.utilisateur,
+                                                  reprise_sage=cle_erp, source_empreinte=empreinte,
+                                                  notes="Pièce reprise du dossier d'origine (ni stock ni écriture générés par l'ERP)",
+                                                  **entete)
+                    bilan.creees += 1
+                else:
+                    for champ, valeur in entete.items():
+                        setattr(doc, champ, valeur)
+                    doc.source_empreinte, doc.statut = empreinte, Document.VALIDE
+                    doc.save()
+                    doc.lignes.all().delete()
+                    bilan.mises_a_jour += 1
+                refaites["lignes"] += len(lignes_source)
+                refaites["echeances"] += len(ech)
+                lignes_erp = []
+                for l in lignes_source:
+                    quantite, ht, ttc = self.nombre(l["DL_Qte"]), self.nombre(l["DL_MontantHT"]), self.nombre(l["DL_MontantTTC"])
+                    tva = ZERO if doc.est_stock else ttc - ht
+                    lignes_erp.append(LigneDocument(
+                        document=doc, article=articles.get((l.get("AR_Ref") or "").strip()[:30]),
+                        designation=(l.get("DL_Design") or l.get("AR_Ref") or "")[:200], quantite=quantite,
+                        prix_unitaire=(ht / quantite).quantize(Decimal("0.01")) if quantite else ht,
+                        taux_tva=(tva * 100 / ht).quantize(Decimal("0.01")) if ht else ZERO, montant_ht=ht, montant_tva=tva))
+                LigneDocument.objects.bulk_create(lignes_erp)
+                doc.recalculer()
+                if ech:
+                    ouvertes = [e for e in ech if (e.get("DR_Regle") or "0").strip() in ("", "0")]
+                    doc.date_echeance = min(_date(e["DR_Date"]) for e in (ouvertes or ech))
+                    doc.save(update_fields=["date_echeance"])
+            if doc.est_facturation:
+                ttc_source += sum((self.nombre(l["DL_MontantTTC"]) for l in lignes_source), ZERO)
+                ttc_erp += doc.total_ttc
             if doc.est_facturation and not doc.est_avoir:
                 if ech and avec_montant:
                     reste = sum((self.nombre(e["DR_Montant"]) - impute_par_echeance[e["DR_No"]] for e in ech), ZERO)
@@ -343,17 +395,32 @@ class Complements:
                     reste = doc.total_ttc
                     bilan.anomalies.append(f"facture {doc.numero} sans échéance dans le dossier d'origine : reprise entièrement due")
                 restes[doc] = max(min(reste, doc.total_ttc), ZERO)
-        for nom in ("lignes", "echeances", "imputations"):
+        # Pièces reprises qui ne sont plus dans l'extraction : facture → soldée (l'extraction garde toute facture
+        # non soldée) ; pièce en cours → transformée dans l'ancien logiciel (commande devenue BL, BL facturé…)
+        for cle_erp, doc in existantes.items():
+            if cle_erp in vues:
+                continue
+            if doc.est_facturation and not doc.est_avoir:
+                restes[doc] = ZERO
+            elif not doc.est_facturation and not doc.est_stock and doc.statut == Document.VALIDE:
+                doc.statut = Document.TRANSFORME
+                doc.save(update_fields=["statut"])
+                bilan.mises_a_jour += 1
+        for nom, nombre in refaites.items():
             if nom in self.rapport.bilans:
-                self.rapport.bilans[nom].creees = self.rapport.bilans[nom].lues
+                self.rapport.bilans[nom].creees = nombre
+        if "imputations" in self.rapport.bilans and not existantes:  # premier passage ; ensuite : règlements recalculés
+            self.rapport.bilans["imputations"].creees = self.rapport.bilans["imputations"].lues
         self.rapport.controles.append(("Pièces : total TTC des factures origine = ERP", _fmt(ttc_source), _fmt(ttc_erp),
                                        abs(ttc_source - ttc_erp) <= Decimal("0.01") * max(len(restes), 1)))
 
-        # Part déjà réglée dans Sage : un règlement technique par tiers (sans écriture, déjà comptabilisé dans Sage)
+        # Part déjà réglée à l'origine : un règlement technique par tiers (sans écriture : déjà comptabilisé à
+        # l'origine), recalculé à chaque passage
         journal_an = Journal.objects.filter(type_journal=Journal.TYPE_AN).first()
+        Reglement.objects.filter(reprise_sage="ANTERIEURS").delete()
         anterieurs = defaultdict(list)
         for doc, reste in restes.items():
-            paye = doc.total_ttc - reste
+            paye = doc.total_ttc - reste - sum((i.montant for i in doc.imputations.all()), ZERO)
             if paye > 0:
                 anterieurs[doc.tiers_payeur].append((doc, paye))
         for t, liste in anterieurs.items():
@@ -362,9 +429,11 @@ class Complements:
                 numero=f"RS-ANT-{t.code}"[:30], libelle="Règlements antérieurs (reprise)", reprise_sage="ANTERIEURS",
                 cree_par=self.utilisateur)
             Imputation.objects.bulk_create([Imputation(reglement=reglement, document=doc, montant=p) for doc, p in liste])
-        # Règlements Sage non (entièrement) imputés : en attente de rattachement dans l'ERP
-        bilan_r = self.rapport.bilans.get("reglements")
+        # Règlements non (entièrement) imputés à l'origine : en attente de rattachement dans l'ERP
+        bilan_r = self.rapport.bilans.get("reglements") or self.rapport.bilans.setdefault("reglements", type(bilan)("reglements"))
         journal_defaut = Journal.objects.filter(code="CA").first() or journal_an
+        existants = {r.reprise_sage: r for r in Reglement.objects.filter(reprise_sage__startswith="RG-")}
+        vus = set()
         for r in self.donnees.get("reglements", []):
             fiche = tiers.get((r.get("CT_NumPayeur") or "").strip()[:20])
             if fiche is None:
@@ -377,14 +446,29 @@ class Complements:
             if reste <= 0:
                 bilan_r.ignorees += 1
                 continue
-            Reglement.objects.create(
-                tiers=fiche, date=_date(r["RG_Date"]), montant=reste, cree_par=self.utilisateur,
-                journal=self.journaux.get(r.get("JO_Num") or "") or journal_defaut,
-                numero=f"RS-{r['RG_No']}"[:30], reference=(r.get("RG_Reference") or "")[:50],
-                libelle=(r.get("RG_Libelle") or f"Règlement repris n° {r['RG_No']}")[:200] +
-                ("" if reste == montant else f" (reste non imputé sur {montant:,.0f})".replace(",", " ")),
-                reprise_sage=f"RG-{r['RG_No']}"[:40])
-            bilan_r.creees += 1
+            cle = f"RG-{r['RG_No']}"[:40]
+            vus.add(cle)
+            valeurs = {"tiers": fiche, "date": _date(r["RG_Date"]), "montant": reste,
+                       "journal": self.journaux.get(r.get("JO_Num") or "") or journal_defaut,
+                       "reference": (r.get("RG_Reference") or "")[:60],
+                       "libelle": ((r.get("RG_Libelle") or f"Règlement repris n° {r['RG_No']}") +
+                                   ("" if reste == montant else f" (reste non imputé sur {montant:,.0f})".replace(",", " ")))[:200]}
+            existant = existants.get(cle)
+            if existant is None:
+                Reglement.objects.create(numero=f"RS-{r['RG_No']}"[:30], reprise_sage=cle, cree_par=self.utilisateur, **valeurs)
+                bilan_r.creees += 1
+            elif any(getattr(existant, k) != v for k, v in valeurs.items()):
+                if existant.imputations.exists():
+                    bilan_r.anomalies.append(f"règlement {existant.numero} déjà rattaché dans l'ERP : non mis à jour")
+                else:
+                    for k, v in valeurs.items():
+                        setattr(existant, k, v)
+                    existant.save()
+                    bilan_r.mises_a_jour += 1
+        for cle, existant in existants.items():         # entièrement imputé (ou supprimé) à l'origine depuis
+            if cle not in vus and not existant.imputations.exists():
+                existant.delete()
+                bilan_r.supprimees += 1
         self._rapprocher_tiers(restes)
         en_attente = sum((r.montant for r in Reglement.objects.filter(reprise_sage__startswith="RG-")), ZERO)
         if en_attente:

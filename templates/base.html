@@ -32,6 +32,7 @@
       {% if module %}{{ module.titre }}{% else %}ERP OHADA{% endif %}
     </a>
     <span class="contexte">{{ societe.raison_sociale }}{% if exercice_courant %} · Exercice {{ exercice_courant.code }}{% endif %}</span>
+    {% if societe.source_mode == "MIROIR" %}<span class="badge text-bg-warning" title="La saisie se fait encore dans l'ancien logiciel ; l'ERP en reçoit une copie à chaque synchronisation (consultation, états, contrôles). La saisie s'ouvrira ici à la bascule."><i class="bi bi-arrow-repeat"></i> Copie synchronisée{% if derniere_synchro %} · {{ derniere_synchro.debut|date:"d/m H:i" }}{% endif %}</span>{% endif %}
     <div class="ms-auto d-flex align-items-center gap-2">
       {% if not module %}
       <div class="dropdown">

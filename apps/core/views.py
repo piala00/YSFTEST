@@ -284,12 +284,15 @@ def sauvegarde(request, module):
 
 
 def reprise_dossier(request, module):
-    """Fichier › Reprise d'un dossier existant : lecture directe (SELECT uniquement) de la base SQL Server de l'ancien
-    logiciel, simulation puis import de la comptabilité et de la gestion commerciale (administrateur)."""
+    """Fichier › Reprise d'un dossier existant : synchronisation depuis la base SQL Server de l'ancien logiciel
+    (SELECT uniquement) pendant la transition, puis bascule (administrateur)."""
     import datetime
 
-    from . import droits as d, journal
+    from django.core.exceptions import ValidationError
+
+    from . import droits as d
     from . import reprise_sage
+    from .models import LotSynchronisation, Societe
     from .reprise_sage import source
 
     if not request.user.is_superuser:
@@ -297,12 +300,14 @@ def reprise_dossier(request, module):
             "chemin": "Fichier › Reprise d'un dossier existant", "operation": "reprendre un dossier",
             "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
     aujourdhui = datetime.date.today()
+    societe = Societe.get()
     p = request.POST
-    valeurs = {"serveur": p.get("serveur", "localhost"), "base": p.get("base", ""), "utilisateur": p.get("utilisateur", ""),
-               "authentification": p.get("authentification", "windows"),
-               "debut_exercice": p.get("debut_exercice", f"{aujourdhui.year}-01-01"),
+    serveur_base = (societe.source_dossier or "/").split("/", 1)
+    valeurs = {"serveur": p.get("serveur", serveur_base[0] or "localhost"), "base": p.get("base", serveur_base[1]),
+               "utilisateur": p.get("utilisateur", ""), "authentification": p.get("authentification", "windows"),
+               "debut_exercice": p.get("debut_exercice", (societe.source_debut_exercice or aujourdhui.replace(month=1, day=1)).isoformat()),
                "date_bascule": p.get("date_bascule", aujourdhui.isoformat()), "historique_depuis": p.get("historique_depuis", "")}
-    contexte = {"valeurs": valeurs, "bases": [], "rapport": None, "titre": "Reprise d'un dossier existant"}
+    contexte = {"valeurs": valeurs, "bases": [], "rapport": None, "titre": "Reprise d'un dossier existant", "societe_sync": societe}
     action = p.get("action")
     if request.method == "POST" and action:
         utilisateur = valeurs["utilisateur"] if valeurs["authentification"] == "sql" else ""
@@ -313,23 +318,31 @@ def reprise_dossier(request, module):
                 contexte["bases"] = source.bases_sage(connexion)
                 if not contexte["bases"]:
                     messages.warning(request, "Aucun dossier trouvé sur ce serveur (ou droits de lecture insuffisants).")
+            elif action == "basculer":
+                if p.get("confirmation_bascule") != "BASCULER":
+                    raise ValueError("Tapez BASCULER pour confirmer la bascule (elle est définitive).")
+                reprise_sage.basculer(request.user)
+                messages.success(request, "Bascule effectuée : la synchronisation est arrêtée, la saisie se fait désormais dans l'ERP.")
             else:
                 dates = {}
                 for cle in ("debut_exercice", "date_bascule", "historique_depuis"):
                     dates[cle] = datetime.date.fromisoformat(valeurs[cle]) if valeurs[cle] else None
                 if not valeurs["base"] or not dates["debut_exercice"] or not dates["date_bascule"]:
-                    raise ValueError("Choisissez le dossier, le début d'exercice et la date de bascule.")
+                    raise ValueError("Choisissez le dossier, le début d'exercice et la date des données.")
+                appliquer = action == "synchroniser"
+                if appliquer and p.get("confirmation") != "SYNCHRONISER":
+                    raise ValueError("Tapez SYNCHRONISER pour confirmer (la simulation n'enregistre rien).")
                 connexion = source.connecter(valeurs["serveur"], valeurs["base"], utilisateur, mot_de_passe)
-                origine = source.SourceSQL(connexion, dates["debut_exercice"], dates["date_bascule"], dates["historique_depuis"])
-                appliquer = action == "importer" and p.get("confirmation") == "IMPORTER"
-                if action == "importer" and not appliquer:
-                    raise ValueError("Tapez IMPORTER pour confirmer l'import réel (la simulation n'enregistre rien).")
+                origine = source.SourceSQL(connexion, dates["debut_exercice"], dates["date_bascule"], dates["historique_depuis"],
+                                           dossier_nom=f"{valeurs['serveur']}/{valeurs['base']}")
                 rapport = reprise_sage.importer(origine, dates["date_bascule"], appliquer=appliquer, utilisateur=request.user,
                                                 debut_exercice=dates["debut_exercice"])
                 contexte["rapport"] = rapport
                 if appliquer and rapport.conforme:
-                    journal.enregistrer("CREATION", libelle=f"Reprise du dossier {valeurs['base']} au {dates['date_bascule']:%d/%m/%Y}")
-                    messages.success(request, "Reprise enregistrée : vous pouvez travailler dans l'ERP.")
-        except Exception as exc:                 # connexion refusée, date invalide… : message clair, rien n'est enregistré
-            messages.error(request, f"Reprise impossible : {exc}")
+                    messages.success(request, "Synchronisation enregistrée. Continuez à saisir dans l'ancien logiciel jusqu'à la bascule.")
+        except (ValidationError, ValueError, ConnectionError, Exception) as exc:   # message clair, rien n'est enregistré
+            texte = " ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+            messages.error(request, f"Opération impossible : {texte}")
+        societe.refresh_from_db()
+    contexte["lots"] = LotSynchronisation.objects.select_related("utilisateur")[:8]
     return render(request, "core/reprise_dossier.html", contexte)

@@ -68,3 +68,9 @@ L’utilisateur annonce une feuille illustrant la saisie et précise que l’en-
 
 ## U6 — Captures et fonctionnement général des fenêtres
 Deux captures Sage reçues le 24/10/2026. L’utilisateur précise un besoin transversal pour les fenêtres de comptabilité et gestion commerciale. Voir FONCTIONNEMENT_FENETRES_U6.md ; la réception des captures ne vaut pas validation d’un en-tête ERP identique.
+
+
+U7 — Importer toute la société Sage, Gestion commerciale et Comptabilité, dont plans tiers, journaux et plans analytiques, pour poursuivre l’activité dans notre ERP. Voir REPRISE_COMPLETE_SAGE_U7.md.
+
+
+Clarification U7 prioritaire : parler de synchronisation de la base Sage, couvrant les périmètres commerciaux et comptables, puis abandon de Sage et poursuite autonome dans notre ERP. La fréquence et les produits exacts restent à inventorier.

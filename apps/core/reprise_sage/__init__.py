@@ -187,6 +187,7 @@ class Bilan:
     creees: int = 0
     mises_a_jour: int = 0
     ignorees: int = 0
+    supprimees: int = 0
     anomalies: list = field(default_factory=list)
 
 
@@ -203,10 +204,10 @@ class Rapport:
         return not self.erreurs and all(c[3] for c in self.controles)
 
     def texte(self):
-        lignes = [f"Reprise du dossier d'origine — {'SIMULATION (rien n’est enregistré)' if self.simulation else 'IMPORT ENREGISTRÉ'}", ""]
-        lignes.append(f"{'Données':<12} {'lues':>7} {'créées':>7} {'m.à.j.':>7} {'ignorées':>9}")
+        lignes = [f"Synchronisation du dossier d'origine — {'SIMULATION (rien n’est enregistré)' if self.simulation else 'ENREGISTRÉE'}", ""]
+        lignes.append(f"{'Données':<12} {'lues':>7} {'créées':>7} {'m.à.j.':>7} {'supprimées':>10} {'ignorées':>9}")
         for b in self.bilans.values():
-            lignes.append(f"{b.fichier:<12} {b.lues:>7} {b.creees:>7} {b.mises_a_jour:>7} {b.ignorees:>9}")
+            lignes.append(f"{b.fichier:<12} {b.lues:>7} {b.creees:>7} {b.mises_a_jour:>7} {b.supprimees:>10} {b.ignorees:>9}")
         if self.controles:
             lignes += ["", "Rapprochement"]
             for nom, source, erp, ok in self.controles:
@@ -261,16 +262,34 @@ def controler_colonnes(nom, lignes):
 # ---------------------------------------------------------------------------
 # Import
 # ---------------------------------------------------------------------------
-def importer(source, date_bascule, appliquer=False, utilisateur=None, debut_exercice=None):
-    """Lit la source (dossier de CSV, ou SourceSQL : lecture directe de la base Sage), importe ou simule, et renvoie
-    le rapport de rapprochement. Tout ou rien : au moindre écart, rien n'est enregistré."""
+def importer(source, date_bascule, appliquer=False, utilisateur=None, debut_exercice=None, dossier=None):
+    """Synchronise le dossier d'origine dans l'ERP (ou simule) et renvoie le rapport de rapprochement.
+
+    source : dossier de CSV, ou SourceSQL (lecture directe). Rejouable : chaque passage reporte les créations,
+    modifications et suppressions depuis le précédent, sans doublon. Tout ou rien : au moindre écart, rien n'est
+    enregistré. Le premier passage appliqué met l'ERP en « copie synchronisée » (saisie dans l'ancien logiciel)
+    jusqu'à la bascule. Chaque passage est consigné (LotSynchronisation)."""
+    from django.utils import timezone
+
+    from apps.core.models import LotSynchronisation, Societe
+    from apps.core.synchronisation import synchronisation
+
     from .source import SourceCSV
 
     if isinstance(source, (str, Path)):
+        dossier = dossier or str(source)
         source = SourceCSV(source)
+    dossier = (dossier or getattr(source, "dossier_nom", "") or "dossier d'origine")[:200]
     rapport = Rapport(simulation=not appliquer)
+    societe = Societe.get()
+    if societe.source_mode == Societe.SYNCHRO_BASCULE:
+        rapport.erreurs.append(f"Bascule effectuée le {societe.source_bascule_le:%d/%m/%Y} : la synchronisation est arrêtée, "
+                               "l'ERP est le logiciel de saisie.")
+    elif societe.source_dossier and societe.source_dossier != dossier:
+        rapport.erreurs.append(f"Ce poste synchronise déjà le dossier « {societe.source_dossier} » : un autre dossier "
+                               f"(« {dossier} ») ne peut pas y être mélangé.")
     donnees = {}
-    for nom in ORDRE:
+    for nom in ORDRE if not rapport.erreurs else []:
         try:
             lignes, manquantes = source.lire(nom)
         except Exception as exc:                 # table illisible : signalée, la reprise est arrêtée
@@ -284,21 +303,52 @@ def importer(source, date_bascule, appliquer=False, utilisateur=None, debut_exer
     if "ecritures" in donnees and "soldes" in donnees:
         donnees.pop("soldes")
         rapport.avertissements.append("soldes.csv ignoré : les écritures détaillées (ecritures.csv) le remplacent.")
-    if not donnees:
+    if not donnees and not rapport.erreurs:
         rapport.erreurs.append("Aucune donnée trouvée dans le dossier d'origine (" + ", ".join(ORDRE) + ").")
-    if rapport.erreurs:
-        return rapport
-    try:
-        with transaction.atomic():
-            _Import(donnees, date_bascule, rapport, utilisateur, debut_exercice).executer()
-            if not appliquer or not rapport.conforme:
-                transaction.set_rollback(True)
-    except ValidationError as exc:
-        rapport.erreurs.extend(exc.messages)
+    lot = LotSynchronisation(utilisateur=utilisateur, dossier=dossier, date_bascule=date_bascule, applique=False)
+    if not rapport.erreurs:
+        try:
+            with transaction.atomic(), synchronisation():
+                _Import(donnees, date_bascule, rapport, utilisateur, debut_exercice).executer()
+                if appliquer and rapport.conforme:
+                    Societe.objects.filter(pk=societe.pk).update(
+                        source_mode=Societe.SYNCHRO_MIROIR, source_dossier=dossier,
+                        source_debut_exercice=debut_exercice or societe.source_debut_exercice)
+                else:
+                    transaction.set_rollback(True)
+        except ValidationError as exc:
+            rapport.erreurs.extend(exc.messages)
     if appliquer and not rapport.conforme:
         rapport.simulation = True
-        rapport.erreurs.append("Import annulé : corrigez les écarts ou erreurs ci-dessus (aucune donnée enregistrée).")
+        rapport.erreurs.append("Synchronisation annulée : corrigez les écarts ou erreurs ci-dessus (aucune donnée enregistrée).")
+    lot.applique, lot.conforme, lot.fin = not rapport.simulation, rapport.conforme, timezone.now()
+    lot.volumes = {b.fichier: {"lues": b.lues, "creees": b.creees, "mises_a_jour": b.mises_a_jour,
+                               "supprimees": b.supprimees, "ignorees": b.ignorees} for b in rapport.bilans.values()}
+    lot.rapport = rapport.texte()
+    lot.save()
+    rapport.lot = lot
     return rapport
+
+
+def basculer(utilisateur=None):
+    """Fin de la transition : la synchronisation s'arrête définitivement, la saisie s'ouvre dans l'ERP.
+    Exige que le dernier passage ait été appliqué et conforme."""
+    from django.utils import timezone
+
+    from apps.core import journal
+    from apps.core.models import LotSynchronisation, Societe
+
+    societe = Societe.get()
+    if societe.source_mode != Societe.SYNCHRO_MIROIR:
+        raise ValidationError("Aucune synchronisation en cours : rien à basculer.")
+    dernier = LotSynchronisation.objects.filter(dossier=societe.source_dossier).first()
+    if dernier is None or not (dernier.applique and dernier.conforme):
+        raise ValidationError("Le dernier passage n'est pas une synchronisation appliquée et conforme : synchronisez d'abord "
+                              "(après l'arrêt de la saisie dans l'ancien logiciel).")
+    societe.source_mode, societe.source_bascule_le = Societe.SYNCHRO_BASCULE, timezone.now()
+    societe.save(update_fields=["source_mode", "source_bascule_le"])
+    journal.enregistrer("CLOTURE", libelle=f"Bascule depuis {societe.source_dossier} (données au {dernier.date_bascule:%d/%m/%Y})")
+    return societe
 
 
 from .complements import Complements  # noqa: E402  (après les fonctions utilitaires qu'il réutilise)
@@ -473,29 +523,54 @@ class _Import(Complements):
         self.lignes_stock.setdefault(depot, []).append((article, quantite, valeur / quantite))
 
     def _fin_stocks(self, bilan):
+        """Premier passage : stock d'ouverture (une entrée par dépôt). Passages suivants : un ajustement par dépôt
+        réaligne l'ERP sur le stock d'origine (entrées et sorties au coût d'origine), sans jamais doubler le stock."""
         from apps.commercial.models import Article, Document, LigneDocument, StockDepot
 
-        deja = Document.objects.filter(type_document=Document.STOCK_ENTREE, reference_externe=REFERENCE_REPRISE)
-        if deja.exists():
-            bilan.anomalies.append("stock d'ouverture déjà repris : non rejoué")
-        else:
-            for depot, lignes in getattr(self, "lignes_stock", {}).items():
-                doc = Document.objects.create(type_document=Document.STOCK_ENTREE, depot=depot, date=self.date,
-                                              reference_externe=REFERENCE_REPRISE, cree_par=self.utilisateur,
-                                              notes="Stock d'ouverture repris du dossier d'origine (F_ARTSTOCK)")
-                for article, quantite, cout in lignes:
-                    LigneDocument.objects.create(document=doc, article=article, quantite=quantite, prix_unitaire=cout)
-                doc.recalculer()
-                doc.valider()
+        premier = not Document.objects.filter(type_document=Document.STOCK_ENTREE, reference_externe=REFERENCE_REPRISE).exists()
+        lignes_stock = getattr(self, "lignes_stock", {})
+        if premier:
+            for depot, lignes in lignes_stock.items():
+                self._piece_stock(Document.STOCK_ENTREE, depot, [(a, q, c) for a, q, c in lignes], REFERENCE_REPRISE,
+                                  "Stock d'ouverture repris du dossier d'origine")
                 bilan.creees += len(lignes)
+        else:
+            cibles = {(a.pk, d.pk): (a, d, q, c) for d, lignes in lignes_stock.items() for a, q, c in lignes}
+            for s in StockDepot.objects.exclude(quantite=0).select_related("article", "depot"):
+                cibles.setdefault((s.article_id, s.depot_id), (s.article, s.depot, Decimal(0), s.article.cout_unitaire))
+            entrees, sorties = {}, {}
+            for (article_pk, depot_pk), (article, depot, quantite, cout) in cibles.items():
+                ecart = quantite - StockDepot.quantite_de(article_pk, depot_pk)
+                if ecart > 0:
+                    entrees.setdefault(depot, []).append((article, ecart, cout))
+                elif ecart < 0:
+                    sorties.setdefault(depot, []).append((article, -ecart, cout))
+            for type_document, groupes in ((Document.STOCK_ENTREE, entrees), (Document.STOCK_SORTIE, sorties)):
+                for depot, lignes in groupes.items():
+                    self._piece_stock(type_document, depot, lignes, "SYNCHRONISATION",
+                                      "Ajustement : stock aligné sur le dossier d'origine à la synchronisation")
+                    bilan.mises_a_jour += len(lignes)
         source = getattr(self, "stock_source", [Decimal(0), Decimal(0)])
         quantite = sum((s.quantite for s in StockDepot.objects.all()), Decimal(0))
         valeur = sum((a.valeur_stock for a in Article.objects.filter(suivi_stock=True)), Decimal(0))
         self.rapport.controles.append(("Quantité totale en stock", _fmt(source[0]), _fmt(quantite), source[0] == quantite))
         # Arrondis admis : coût unitaire au centime (prix_unitaire) et valeur arrondie au franc par article
-        nb = sum(len(l) for l in getattr(self, "lignes_stock", {}).values())
+        nb = sum(len(l) for l in lignes_stock.values())
         tolerance = Decimal("0.005") * source[0] + nb
-        self.rapport.controles.append(("Valeur du stock", _fmt(source[1]), _fmt(valeur), abs(source[1] - valeur) <= tolerance))
+        if premier:
+            self.rapport.controles.append(("Valeur du stock", _fmt(source[1]), _fmt(valeur), abs(source[1] - valeur) <= tolerance))
+        elif abs(source[1] - valeur) > tolerance:      # CMUP de l'ERP et valeur d'origine peuvent diverger entre deux passages
+            self.rapport.avertissements.append(f"Valeur du stock : origine {_fmt(source[1])} · ERP {_fmt(valeur)} (CMUP).")
+
+    def _piece_stock(self, type_document, depot, lignes, reference, notes):
+        from apps.commercial.models import Document, LigneDocument
+
+        doc = Document.objects.create(type_document=type_document, depot=depot, date=self.date, reference_externe=reference,
+                                      cree_par=self.utilisateur, notes=notes)
+        for article, quantite, cout in lignes:
+            LigneDocument.objects.create(document=doc, article=article, quantite=quantite, prix_unitaire=cout)
+        doc.recalculer()
+        doc.valider()
 
     # --- Soldes d'ouverture -------------------------------------------------
     def _soldes(self, l, bilan):
