@@ -12,6 +12,7 @@ urlpatterns = [
     path("autorisations/", core_views.autorisations, {"module": "commercial"}, name="autorisations"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "commercial"}, name="journal_evenements"),
     path("sauvegarde/", core_views.sauvegarde, {"module": "commercial"}, name="sauvegarde"),
+    path("reprise-dossier/", core_views.reprise_dossier, {"module": "commercial"}, name="reprise_dossier"),
     path("", core_views.accueil_module, {"module": "commercial"}, name="accueil"),
     path("societe/", core_views.SocieteUpdateView.as_view(), name="societe"),
     path("etats/ventes/", reporting_views.ventes, name="etat_ventes"),

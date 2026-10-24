@@ -3,21 +3,39 @@
 Référence : skill `sage100-sql-server-structure-v5-v12` (catalogue documentaire du manuel « Structure des bases
 Sage 100 V12.20 »). **Sage n'est jamais modifié** : on lit, on exporte en CSV, l'ERP importe.
 
-## Ce qui est repris
+## Ce qui est repris (tout le dossier : comptabilité et gestion commerciale)
 
-| Fichier CSV | Table Sage | Dans l'ERP |
+| Données | Table Sage | Dans l'ERP |
 |---|---|---|
-| `depots.csv` | F_DEPOT | Dépôts (le dépôt principal Sage devient le dépôt principal) |
-| `familles.csv` | F_FAMILLE | Familles d'articles (type 0 uniquement) |
-| `comptes.csv` | F_COMPTEG | Plan comptable (comptes créés ou intitulés mis à jour) |
-| `tiers.csv` | F_COMPTET | Clients (CT_Type 0) et fournisseurs (CT_Type 1) ; en sommeil → inactifs |
-| `articles.csv` | F_ARTICLE | Articles, famille, suivi de stock, prix d'achat et de vente |
-| `stocks.csv` | F_ARTSTOCK | Stock d'ouverture par dépôt (mouvement d'entrée « REPRISE SAGE », coût = AS_MontSto / AS_QteSto), stocks mini/maxi |
-| `soldes.csv` | F_ECRITUREC | Soldes d'ouverture par compte et par tiers : une écriture dans le journal AN |
+| `depots` | F_DEPOT | Dépôts (le dépôt principal Sage devient le dépôt principal) |
+| `familles` | F_FAMILLE | Familles d'articles (type 0 uniquement) |
+| `comptes` | F_COMPTEG | Plan comptable (comptes de détail ; comptes de total ignorés) |
+| `journaux` | F_JOURNAUX | Journaux : achats, ventes, trésorerie (avec compte), général → OD ; situation exclue |
+| `sections` | F_COMPTEA | Plans et sections analytiques (même code dans deux plans : préfixé du n° de plan) |
+| `taxes` | F_TAXE | Taux de taxes (sens, taux, compte) |
+| `tiers` | F_COMPTET | Clients et fournisseurs, compte collectif, payeur, catégorie tarifaire, plafond d'encours |
+| `articles` | F_ARTICLE | Articles, famille, suivi de stock, prix |
+| `tarifs` | F_ARTCLIENT | Prix par catégorie tarifaire (tarifs propres à un client signalés, non repris) |
+| `stocks` | F_ARTSTOCK | Stock d'ouverture par dépôt, valorisé au coût Sage, mini / maxi |
+| `ecritures` | F_ECRITUREC | Écritures de l'exercice en cours jusqu'à la bascule, **ligne à ligne** : pièces, libellés, tiers, **lettrage** ; norme nationale, journaux de situation exclus |
+| `analytique` | F_ECRITUREA | Ventilations analytiques (premier plan : l'ERP a une section par ligne) |
+| `documents`, `lignes` | F_DOCENTETE, F_DOCLIGNE | Pièces en cours (devis, commandes, BL non facturés, retours…), factures non soldées, et historique depuis la date choisie ; **n° Sage conservé**, ni stock ni écriture générés |
+| `echeances` | F_DOCREGL | Échéance et reste dû de chaque facture |
+| `reglements`, `imputations` | F_CREGLEMENT, F_REGLECH | Règlements non imputés : « en attente de rattachement » ; part déjà réglée des factures |
+| `soldes` | F_ECRITUREC | Variante : soldes d'ouverture seuls (si les écritures détaillées ne sont pas reprises) |
 
-Non repris : historique des documents, règlements et échéances (F_DOCENTETE, F_DOCLIGNE, F_CREGLEMENT,
-F_DOCREGL), gammes, lots et séries, tarifs par client ou catégorie, analytique. Les factures non soldées sont
-couvertes par le solde de chaque tiers ; à lettrer ensuite dans l'ERP contre les règlements.
+Non repris : gammes, lots et séries, tarifs propres à un client, budgets, pièces archivées, fabrication.
+
+## Deux façons de lire Sage
+
+1. **Lecture directe (recommandée)** : ERP › Fichier › *Reprise d'un dossier existant* (administrateur), ou
+   `python manage.py reprise_sage --serveur .\INSTANCE --base DOSSIER --debut-exercice 2026-01-01 --date-bascule 2026-10-31`.
+   L'ERP lit d'abord les colonnes présentes (INFORMATION_SCHEMA), n'exécute que des SELECT (toute autre instruction est
+   refusée par le code) et se connecte en `ApplicationIntent=ReadOnly`.
+2. **CSV** : `python manage.py reprise_sage --sql` donne le script d'export ; un fichier par donnée, puis `--dossier`.
+
+Jeu de test fictif : `apps/core/reprise_sage/exemple_sql/base_sage_fictive.sql` (base Sage fictive à monter sur un
+SQL Server de test) et `apps/core/reprise_sage/exemple_complet/` (les mêmes données en CSV, utilisées par les tests).
 
 ## Procédure
 

@@ -474,7 +474,7 @@ class DocumentListView(LoginRequiredMixin, ListView):
         elif self.filtre == "en_cours":
             qs = qs.filter(statut__in=(Document.BROUILLON, Document.VALIDE))
         elif self.filtre == "facture":
-            qs = qs.filter(type_document__in=factures, ecriture__isnull=True).exclude(statut=Document.ANNULE)
+            qs = qs.filter(type_document__in=factures, ecriture__isnull=True, reprise_sage="").exclude(statut=Document.ANNULE)
         elif self.filtre == "facture_comptabilisee":
             qs = qs.filter(type_document__in=factures, ecriture__isnull=False)
         elif self.filtre in dict(Document.TYPES):

@@ -132,7 +132,8 @@ class RepriseSageTests(TestCase):
         sortie = StringIO()
         call_command("reprise_sage", correspondance=True, stdout=sortie)
         self.assertIn("CT_Sommeil      facultatif  DOCUMENTÉ V12.20", sortie.getvalue())   # confirmé au catalogue V12.20
-        self.assertNotIn("À CONFIRMER", sortie.getvalue())
+        # Colonnes absentes du catalogue V12.20 : affichées « À CONFIRMER », jamais présentées comme documentées
+        self.assertIn("EC_Lettrage     facultatif  À CONFIRMER", sortie.getvalue())
         call_command("reprise_sage", dossier=str(self.dossier), date_bascule=self.date.isoformat(), stdout=StringIO())
         self.assertFalse(Tiers.objects.exists())
         with self.assertRaises(CommandError):

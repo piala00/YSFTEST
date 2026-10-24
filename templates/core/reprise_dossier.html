@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ titre }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>{{ titre }}</h1></div>
+<div class="alert alert-info small py-2">
+  Reprend tout le dossier de votre ancien logiciel de gestion (base SQL Server) : <strong>comptabilité</strong> (plan comptable,
+  tiers, journaux, plans analytiques, taxes, écritures de l'exercice avec lettrage et analytique) et <strong>gestion commerciale</strong>
+  (dépôts, familles, articles, tarifs, stock, pièces en cours et historique, échéances, règlements en attente).
+  <strong>L'ancien dossier n'est jamais modifié</strong> : l'ERP ne fait que des lectures. Faites d'abord une <strong>simulation</strong>
+  sur une copie du dossier, comparez le rapport avec votre balance, vos soldes clients et votre inventaire, puis importez.
+</div>
+<form method="post" class="card"><div class="card-body">{% csrf_token %}
+  <div class="row g-2 small">
+    <div class="col-md-4"><label class="form-label mb-0" for="serveur">Serveur SQL</label>
+      <input class="form-control form-control-sm" id="serveur" name="serveur" value="{{ valeurs.serveur }}" placeholder="localhost ou .\INSTANCE"></div>
+    <div class="col-md-3"><label class="form-label mb-0" for="authentification">Connexion</label>
+      <select class="form-select form-select-sm" id="authentification" name="authentification">
+        <option value="windows" {% if valeurs.authentification == "windows" %}selected{% endif %}>Compte Windows</option>
+        <option value="sql" {% if valeurs.authentification == "sql" %}selected{% endif %}>Compte SQL</option></select></div>
+    <div class="col-md-2"><label class="form-label mb-0" for="utilisateur">Utilisateur SQL</label>
+      <input class="form-control form-control-sm" id="utilisateur" name="utilisateur" value="{{ valeurs.utilisateur }}" autocomplete="off"></div>
+    <div class="col-md-3"><label class="form-label mb-0" for="mot_de_passe">Mot de passe SQL</label>
+      <input class="form-control form-control-sm" type="password" id="mot_de_passe" name="mot_de_passe" autocomplete="off"
+             placeholder="à ressaisir à chaque action"></div>
+    <div class="col-md-4"><label class="form-label mb-0" for="base">Dossier (base) à reprendre</label>
+      <input class="form-control form-control-sm" id="base" name="base" list="bases" value="{{ valeurs.base }}">
+      <datalist id="bases">{% for b in bases %}<option value="{{ b }}">{% endfor %}</datalist>
+      {% if bases %}<div class="form-text">{{ bases|length }} dossier(s) trouvé(s) : {{ bases|join:", " }}</div>{% endif %}</div>
+    <div class="col-md-2 align-self-end"><button class="btn btn-sm btn-outline-secondary w-100" name="action" value="rechercher">Rechercher les dossiers</button></div>
+    <div class="col-md-2"><label class="form-label mb-0" for="debut_exercice">Début de l'exercice en cours</label>
+      <input class="form-control form-control-sm" type="date" id="debut_exercice" name="debut_exercice" value="{{ valeurs.debut_exercice }}"></div>
+    <div class="col-md-2"><label class="form-label mb-0" for="date_bascule">Date de bascule</label>
+      <input class="form-control form-control-sm" type="date" id="date_bascule" name="date_bascule" value="{{ valeurs.date_bascule }}"></div>
+    <div class="col-md-2"><label class="form-label mb-0" for="historique_depuis">Historique des pièces depuis</label>
+      <input class="form-control form-control-sm" type="date" id="historique_depuis" name="historique_depuis" value="{{ valeurs.historique_depuis }}">
+      <div class="form-text">Vide : début d'exercice. Les pièces en cours et factures non soldées sont toujours reprises.</div></div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-end mt-3">
+    <button class="btn btn-primary btn-sm" name="action" value="simuler"><i class="bi bi-search"></i> Simuler (rien n'est enregistré)</button>
+    <div class="ms-auto d-flex gap-2 align-items-end">
+      <div><label class="form-label small mb-0" for="confirmation">Pour importer, tapez IMPORTER</label>
+        <input class="form-control form-control-sm" id="confirmation" name="confirmation" autocomplete="off"></div>
+      <button class="btn btn-danger btn-sm" name="action" value="importer"><i class="bi bi-box-arrow-in-down"></i> Importer</button>
+    </div>
+  </div>
+</div></form>
+{% if rapport %}
+<div class="card mt-3"><div class="card-header bg-white fw-semibold d-flex justify-content-between">
+  <span>Rapport de {% if rapport.simulation %}simulation{% else %}reprise{% endif %}</span>
+  <span class="{% if rapport.conforme %}text-success{% else %}text-danger{% endif %}">{% if rapport.conforme %}Conforme{% else %}À corriger : rien n'a été enregistré{% endif %}</span></div>
+  <pre class="mb-0 p-3 small" style="white-space:pre-wrap">{{ rapport.texte }}</pre></div>
+{% endif %}
+<div class="small text-muted mt-3">La date de bascule est le dernier jour de travail dans l'ancien logiciel : arrêtez-y la saisie, faites la
+  reprise, puis travaillez uniquement dans l'ERP. Le stock repris est celui du moment de la reprise. Chaque agence reprend son propre dossier
+  sur son propre serveur.</div>
+{% endblock %}

@@ -42,6 +42,27 @@ FICHIERS = {
     "comptes": ("F_COMPTEG", {
         "CG_Num": (True, DOC, "C085", "Numéro de compte"),
         "CG_Intitule": (True, DOC, "M01 V12.20", "Intitulé du compte"),
+        "CG_Type": (False, A_CONFIRMER, "", "1 = compte de total (non repris), 0 = compte de détail"),
+    }),
+    "journaux": ("F_JOURNAUX", {
+        "JO_Num": (True, DOC, "F_JOURNAUX", "Code journal"),
+        "JO_Intitule": (True, A_CONFIRMER, "", "Intitulé"),
+        "JO_Type": (False, A_CONFIRMER, "", "0 achats, 1 ventes, 2 trésorerie, 3 général, 4 situation (non repris)"),
+        "CG_Num": (False, A_CONFIRMER, "", "Compte de trésorerie du journal"),
+    }),
+    "sections": ("F_COMPTEA", {
+        "N_Analytique": (True, A_CONFIRMER, "", "N° du plan analytique"),
+        "CA_Num": (True, A_CONFIRMER, "", "Code de la section analytique"),
+        "CA_Intitule": (True, A_CONFIRMER, "", "Intitulé de la section"),
+        "CA_Type": (False, A_CONFIRMER, "", "1 = section de total (non reprise)"),
+        "CA_Sommeil": (False, A_CONFIRMER, "", "1 = en sommeil (reprise inactive)"),
+    }),
+    "taxes": ("F_TAXE", {
+        "TA_Code": (True, DOC, "F_TAXE", "Code de taxe"),
+        "TA_Intitule": (True, A_CONFIRMER, "", "Intitulé"),
+        "TA_Taux": (True, A_CONFIRMER, "", "Taux (%)"),
+        "TA_Sens": (False, A_CONFIRMER, "", "0 = déductible (achats), 1 = collectée (ventes)"),
+        "CG_Num": (False, A_CONFIRMER, "", "Compte de taxe"),
     }),
     "tiers": ("F_COMPTET", {
         "CT_Num": (True, DOC, "C070", "Code tiers"),
@@ -53,6 +74,8 @@ FICHIERS = {
         "CT_EMail": (False, DOC, "M01 V12.20", "E-mail"),
         "CT_Sommeil": (False, DOC, "M01 V12.20", "1 = en sommeil (repris inactif)"),
         "CT_NumPayeur": (False, DOC, "M01 V12.20", "Tiers payeur (égal à CT_Num quand le tiers règle lui-même)"),
+        "N_CatTarif": (False, A_CONFIRMER, "", "Catégorie tarifaire du client (n°)"),
+        "CT_Encours": (False, A_CONFIRMER, "", "Plafond d'encours (pas un solde)"),
     }),
     "articles": ("F_ARTICLE", {
         "AR_Ref": (True, DOC, "C058", "Référence"),
@@ -62,6 +85,12 @@ FICHIERS = {
         "AR_Sommeil": (False, DOC, "IX006", "1 = en sommeil (repris inactif)"),
         "AR_PrixAch": (False, DOC, "M01 V12.20", "Prix d'achat HT"),
         "AR_PrixVen": (False, DOC, "M01 V12.20", "Prix de vente HT"),
+    }),
+    "tarifs": ("F_ARTCLIENT", {
+        "AR_Ref": (True, DOC, "F_ARTCLIENT", "Article"),
+        "AC_Categorie": (True, DOC, "F_ARTCLIENT", "Catégorie tarifaire (n°)"),
+        "AC_PrixVen": (True, DOC, "F_ARTCLIENT", "Prix de vente HT de la catégorie"),
+        "CT_Num": (False, DOC, "F_ARTCLIENT", "Client particulier (tarif propre au client : signalé, non repris)"),
     }),
     "stocks": ("F_ARTSTOCK", {
         "AR_Ref": (True, DOC, "C061", "Article"),
@@ -78,7 +107,77 @@ FICHIERS = {
         "Credit": (True, DOC, "C077 + C078", "Somme EC_Montant où EC_Sens = 1"),
     }),
 }
-ORDRE = ["depots", "familles", "comptes", "tiers", "articles", "stocks", "soldes"]
+FICHIERS.update({
+    "ecritures": ("F_ECRITUREC", {
+        "EC_No": (True, DOC, "F_ECRITUREC", "Identifiant de la ligne"),
+        "JO_Num": (True, DOC, "F_ECRITUREC", "Journal"),
+        "EC_DateCompta": (True, DOC, "JM_Date + EC_Jour", "Date comptable (période + jour), calculée à l'export"),
+        "EC_Piece": (True, DOC, "F_ECRITUREC", "N° de pièce"),
+        "CG_Num": (True, DOC, "F_ECRITUREC", "Compte général"),
+        "CT_Num": (False, DOC, "F_ECRITUREC", "Compte tiers"),
+        "EC_Sens": (True, DOC, "F_ECRITUREC", "0 = débit, 1 = crédit"),
+        "EC_Montant": (True, DOC, "F_ECRITUREC", "Montant"),
+        "EC_Intitule": (False, A_CONFIRMER, "", "Libellé de la ligne"),
+        "EC_Lettrage": (False, A_CONFIRMER, "", "Code de lettrage"),
+    }),
+    "analytique": ("F_ECRITUREA", {
+        "EC_No": (True, DOC, "RX017", "Ligne d'écriture générale ventilée"),
+        "N_Analytique": (True, A_CONFIRMER, "", "Plan analytique"),
+        "CA_Num": (True, A_CONFIRMER, "", "Section"),
+        "EA_Montant": (True, A_CONFIRMER, "", "Montant ventilé"),
+    }),
+    "documents": ("F_DOCENTETE", {
+        "DO_Domaine": (True, DOC, "F_DOCENTETE", "0 ventes, 1 achats, 2 stocks"),
+        "DO_Type": (True, DOC, "F_DOCENTETE", "Type de pièce (codes 0 à 27)"),
+        "DO_Piece": (True, DOC, "F_DOCENTETE", "N° de pièce (conservé)"),
+        "DO_Date": (True, DOC, "F_DOCENTETE", "Date"),
+        "DO_Tiers": (False, DOC, "F_DOCENTETE", "Tiers (ventes, achats) ou dépôt de destination (stocks)"),
+        "DO_Ref": (False, DOC, "F_DOCENTETE", "Référence"),
+        "DE_No": (False, DOC, "F_DOCENTETE", "Dépôt"),
+        "DO_Provenance": (False, DOC, "F_DOCENTETE", "1 = facture de retour, 2 = facture d'avoir"),
+        "CT_NumPayeur": (False, DOC, "F_DOCENTETE", "Tiers payeur"),
+    }),
+    "lignes": ("F_DOCLIGNE", {
+        "DO_Domaine": (True, DOC, "F_DOCLIGNE", "Pièce"),
+        "DO_Type": (True, DOC, "F_DOCLIGNE", "Pièce"),
+        "DO_Piece": (True, DOC, "F_DOCLIGNE", "Pièce"),
+        "DL_No": (False, DOC, "F_DOCLIGNE", "Identifiant de ligne"),
+        "DL_Ligne": (False, DOC, "F_DOCLIGNE", "Ordre de la ligne"),
+        "AR_Ref": (False, DOC, "F_DOCLIGNE", "Article (vide : ligne de texte)"),
+        "DL_Design": (False, DOC, "F_DOCLIGNE", "Désignation"),
+        "DL_Qte": (True, DOC, "F_DOCLIGNE", "Quantité"),
+        "DL_MontantHT": (True, DOC, "F_DOCLIGNE", "Montant HT (le prix unitaire en est déduit)"),
+        "DL_MontantTTC": (True, DOC, "F_DOCLIGNE", "Montant TTC (la TVA en est déduite)"),
+    }),
+    "echeances": ("F_DOCREGL", {
+        "DR_No": (True, DOC, "F_DOCREGL", "Identifiant d'échéance"),
+        "DO_Domaine": (True, DOC, "F_DOCREGL", "Pièce"),
+        "DO_Type": (True, DOC, "F_DOCREGL", "Pièce"),
+        "DO_Piece": (True, DOC, "F_DOCREGL", "Pièce"),
+        "DR_Date": (True, DOC, "F_DOCREGL", "Date d'échéance"),
+        "DR_Montant": (True, DOC, "F_DOCREGL", "Montant de l'échéance"),
+        "DR_Regle": (False, DOC, "F_DOCREGL", "1 = échéance réglée"),
+    }),
+    "reglements": ("F_CREGLEMENT", {
+        "RG_No": (True, DOC, "F_CREGLEMENT", "Identifiant du règlement"),
+        "CT_NumPayeur": (True, DOC, "F_CREGLEMENT", "Tiers"),
+        "RG_Date": (True, DOC, "F_CREGLEMENT", "Date"),
+        "RG_Montant": (True, DOC, "F_CREGLEMENT", "Montant"),
+        "RG_Impute": (False, DOC, "F_CREGLEMENT", "1 = entièrement imputé"),
+        "RG_Libelle": (False, A_CONFIRMER, "", "Libellé"),
+        "RG_Reference": (False, A_CONFIRMER, "", "Référence"),
+        "JO_Num": (False, A_CONFIRMER, "", "Journal de trésorerie"),
+    }),
+    "imputations": ("F_REGLECH", {
+        "RG_No": (True, DOC, "F_REGLECH", "Règlement"),
+        "DR_No": (True, DOC, "F_REGLECH", "Échéance réglée"),
+        "RC_Montant": (False, A_CONFIRMER, "", "Montant imputé (sans lui : échéance réglée = DR_Regle)"),
+    }),
+})
+ORDRE = ["depots", "familles", "comptes", "journaux", "sections", "taxes", "tiers", "articles", "tarifs", "stocks",
+         "soldes", "ecritures", "analytique", "documents", "lignes", "echeances", "reglements", "imputations"]
+# Données accumulées puis traitées ensemble à la fin (écritures et pièces commerciales)
+ACCUMULEES = {"ecritures", "analytique", "documents", "lignes", "echeances", "reglements", "imputations"}
 
 
 @dataclass
@@ -97,24 +196,27 @@ class Rapport:
     bilans: dict = field(default_factory=dict)
     controles: list = field(default_factory=list)      # (contrôle, source Sage, ERP, conforme)
     erreurs: list = field(default_factory=list)
+    avertissements: list = field(default_factory=list)  # informations à vérifier, non bloquantes
 
     @property
     def conforme(self):
         return not self.erreurs and all(c[3] for c in self.controles)
 
     def texte(self):
-        lignes = [f"Reprise Sage 100 — {'SIMULATION (rien n’est enregistré)' if self.simulation else 'IMPORT ENREGISTRÉ'}", ""]
-        lignes.append(f"{'Fichier':<10} {'lues':>6} {'créées':>7} {'m.à.j.':>7} {'ignorées':>9}")
+        lignes = [f"Reprise du dossier d'origine — {'SIMULATION (rien n’est enregistré)' if self.simulation else 'IMPORT ENREGISTRÉ'}", ""]
+        lignes.append(f"{'Données':<12} {'lues':>7} {'créées':>7} {'m.à.j.':>7} {'ignorées':>9}")
         for b in self.bilans.values():
-            lignes.append(f"{b.fichier:<10} {b.lues:>6} {b.creees:>7} {b.mises_a_jour:>7} {b.ignorees:>9}")
+            lignes.append(f"{b.fichier:<12} {b.lues:>7} {b.creees:>7} {b.mises_a_jour:>7} {b.ignorees:>9}")
         if self.controles:
             lignes += ["", "Rapprochement"]
             for nom, source, erp, ok in self.controles:
-                lignes.append(f"  [{'OK' if ok else 'ÉCART'}] {nom} : Sage {source} · ERP {erp}")
+                lignes.append(f"  [{'OK' if ok else 'ÉCART'}] {nom} : origine {source} · ERP {erp}")
         anomalies = [(b.fichier, a) for b in self.bilans.values() for a in b.anomalies]
         if anomalies:
             lignes += ["", f"Anomalies ({len(anomalies)})"]
             lignes += [f"  {f} : {a}" for f, a in anomalies[:200]]
+        if self.avertissements:
+            lignes += ["", "À vérifier (non bloquant)"] + [f"  {a}" for a in self.avertissements]
         if self.erreurs:
             lignes += ["", "Erreurs bloquantes"] + [f"  {e}" for e in self.erreurs]
         lignes += ["", "Résultat : " + ("conforme" if self.conforme else "à corriger avant import")]
@@ -159,27 +261,36 @@ def controler_colonnes(nom, lignes):
 # ---------------------------------------------------------------------------
 # Import
 # ---------------------------------------------------------------------------
-def importer(dossier, date_bascule, appliquer=False, utilisateur=None):
-    """Lit les CSV du dossier, importe (ou simule) et renvoie le rapport de rapprochement."""
-    dossier = Path(dossier)
+def importer(source, date_bascule, appliquer=False, utilisateur=None, debut_exercice=None):
+    """Lit la source (dossier de CSV, ou SourceSQL : lecture directe de la base Sage), importe ou simule, et renvoie
+    le rapport de rapprochement. Tout ou rien : au moindre écart, rien n'est enregistré."""
+    from .source import SourceCSV
+
+    if isinstance(source, (str, Path)):
+        source = SourceCSV(source)
     rapport = Rapport(simulation=not appliquer)
     donnees = {}
     for nom in ORDRE:
-        chemin = dossier / f"{nom}.csv"
-        if not chemin.exists():
+        try:
+            lignes, manquantes = source.lire(nom)
+        except Exception as exc:                 # table illisible : signalée, la reprise est arrêtée
+            rapport.erreurs.append(f"{nom} ({FICHIERS[nom][0]}) : lecture impossible — {exc}")
             continue
-        lignes = lire_csv(chemin)
-        manquantes = controler_colonnes(nom, lignes)
+        if lignes is None:
+            continue
         if manquantes:
-            rapport.erreurs.append(f"{nom}.csv : colonnes absentes {', '.join(manquantes)}")
+            rapport.erreurs.append(f"{nom} ({FICHIERS[nom][0]}) : colonnes absentes {', '.join(manquantes)}")
         donnees[nom] = lignes
+    if "ecritures" in donnees and "soldes" in donnees:
+        donnees.pop("soldes")
+        rapport.avertissements.append("soldes.csv ignoré : les écritures détaillées (ecritures.csv) le remplacent.")
     if not donnees:
-        rapport.erreurs.append(f"Aucun fichier CSV attendu dans {dossier} ({', '.join(n + '.csv' for n in ORDRE)}).")
+        rapport.erreurs.append("Aucune donnée trouvée dans le dossier d'origine (" + ", ".join(ORDRE) + ").")
     if rapport.erreurs:
         return rapport
     try:
         with transaction.atomic():
-            _Import(donnees, date_bascule, rapport, utilisateur).executer()
+            _Import(donnees, date_bascule, rapport, utilisateur, debut_exercice).executer()
             if not appliquer or not rapport.conforme:
                 transaction.set_rollback(True)
     except ValidationError as exc:
@@ -190,15 +301,31 @@ def importer(dossier, date_bascule, appliquer=False, utilisateur=None):
     return rapport
 
 
-class _Import:
-    def __init__(self, donnees, date_bascule, rapport, utilisateur):
+from .complements import Complements  # noqa: E402  (après les fonctions utilitaires qu'il réutilise)
+
+
+class _Import(Complements):
+    nombre = staticmethod(nombre)
+
+    def __init__(self, donnees, date_bascule, rapport, utilisateur, debut_exercice=None):
         from apps.commercial.models import Depot
 
         self.donnees, self.date, self.rapport, self.utilisateur = donnees, date_bascule, rapport, utilisateur
+        self.debut_exercice = debut_exercice
         self.depots = {d.code: d for d in Depot.objects.all()}
+        self.journaux, self.sections = {}, {}
 
     def executer(self):
+        for nom in ORDRE:                       # bilans créés d'avance, dans l'ordre d'affichage
+            if nom in self.donnees:
+                self.rapport.bilans.setdefault(nom, Bilan(nom, lues=len(self.donnees[nom])))
         for nom in ORDRE:
+            if nom in self.donnees and nom in ACCUMULEES:
+                if nom == "ecritures":
+                    self._ecritures_bloc()
+                elif nom == "documents":
+                    self._pieces_bloc()
+                continue
             if nom in self.donnees:
                 bilan = self.rapport.bilans[nom] = Bilan(nom, lues=len(self.donnees[nom]))
                 for numero, ligne in enumerate(self.donnees[nom], start=2):
@@ -241,8 +368,8 @@ class _Import:
     def _fin_depots(self, bilan):
         principaux = [l["DE_No"] for l in self.donnees["depots"] if vrai(l.get("DE_Principal"))]
         if len(principaux) > 1:      # l'ERP n'en garde qu'un : le dernier lu
-            bilan.anomalies.append(f"plusieurs dépôts principaux dans Sage ({', '.join(principaux)}) : "
-                                   "Sage n'en admet qu'un (règle RGX008), vérifier l'export")
+            bilan.anomalies.append(f"plusieurs dépôts principaux dans le dossier d'origine ({', '.join(principaux)}) : "
+                                   "un seul est admis (règle RGX008), vérifier l'export")
 
     def _familles(self, l, bilan):
         from apps.commercial.models import FamilleArticle
@@ -257,6 +384,9 @@ class _Import:
         from apps.comptabilite.plan_syscohada import LETTRABLES_PREFIXES
 
         numero = l["CG_Num"]
+        if (l.get("CG_Type") or "0").strip() not in ("", "0"):
+            bilan.ignorees += 1          # compte de total (regroupement d'affichage dans Sage)
+            return
         if not numero.isdigit() or numero[0] == "0":
             raise ValueError(f"compte « {numero} » hors plan SYSCOHADA (chiffres, classes 1 à 9)")
         self._maj(Compte, {"numero": numero}, {"intitule": l["CG_Intitule"][:200],
@@ -278,6 +408,11 @@ class _Import:
             valeurs["email"] = email[:254]
         if l.get("CG_NumPrinc"):
             valeurs["compte_collectif"] = Compte.objects.filter(numero=l["CG_NumPrinc"]).first()
+        categorie = int(nombre(l.get("N_CatTarif")))
+        if categorie > 0 and type_tiers == Tiers.CLIENT:
+            valeurs["categorie_tarifaire"] = self._categorie(categorie)
+        if nombre(l.get("CT_Encours")) > 0:
+            valeurs["plafond_credit"] = nombre(l.get("CT_Encours"))
         self._maj(Tiers, {"code": l["CT_Num"][:20]}, valeurs, bilan)
 
     def _fin_tiers(self, bilan):
@@ -328,7 +463,7 @@ class _Import:
             stock.stock_mini, stock.stock_maxi = nombre(l.get("AS_QteMini")), nombre(l.get("AS_QteMaxi"))
             stock.save(update_fields=["stock_mini", "stock_maxi"])
         if quantite < 0:
-            raise ValueError(f"stock négatif ({quantite}) pour {article.reference} au dépôt {depot.code} : à régulariser dans Sage")
+            raise ValueError(f"stock négatif ({quantite}) pour {article.reference} au dépôt {depot.code} : à régulariser dans l'ancien logiciel")
         if quantite == 0:
             bilan.ignorees += 1
             return
@@ -347,7 +482,7 @@ class _Import:
             for depot, lignes in getattr(self, "lignes_stock", {}).items():
                 doc = Document.objects.create(type_document=Document.STOCK_ENTREE, depot=depot, date=self.date,
                                               reference_externe=REFERENCE_REPRISE, cree_par=self.utilisateur,
-                                              notes="Stock d'ouverture repris de Sage 100 (F_ARTSTOCK)")
+                                              notes="Stock d'ouverture repris du dossier d'origine (F_ARTSTOCK)")
                 for article, quantite, cout in lignes:
                     LigneDocument.objects.create(document=doc, article=article, quantite=quantite, prix_unitaire=cout)
                 doc.recalculer()
@@ -383,7 +518,7 @@ class _Import:
         solde = debit - credit
         if solde:
             self.soldes.append({"compte": compte, "tiers": tiers, "debit": max(solde, 0), "credit": max(-solde, 0),
-                                "libelle": "Reprise Sage 100"})
+                                "libelle": "Reprise du dossier d'origine"})
         else:
             bilan.ignorees += 1
 
@@ -392,7 +527,7 @@ class _Import:
         from apps.comptabilite.services import creer_ecriture
 
         debit, credit = getattr(self, "soldes_source", [Decimal(0), Decimal(0)])
-        self.rapport.controles.append(("Équilibre des soldes Sage (débit = crédit)", _fmt(debit), _fmt(credit), debit == credit))
+        self.rapport.controles.append(("Équilibre des soldes d'origine (débit = crédit)", _fmt(debit), _fmt(credit), debit == credit))
         if debit != credit:
             return
         if Ecriture.objects.filter(reference=REFERENCE_REPRISE).exists():
@@ -400,8 +535,8 @@ class _Import:
             return
         if getattr(self, "soldes", None):
             journal = Journal.objects.get(type_journal=Journal.TYPE_AN, code="AN")
-            ecriture = creer_ecriture(journal, self.date, "Reprise des soldes Sage 100", self.soldes,
-                                      reference=REFERENCE_REPRISE, origine="Sage 100")
+            ecriture = creer_ecriture(journal, self.date, "Reprise des soldes du dossier d'origine", self.soldes,
+                                      reference=REFERENCE_REPRISE, origine="Reprise")
             bilan.creees += ecriture.lignes.count()
             total = ecriture.total_debit
             nets = sum((s["debit"] for s in self.soldes), Decimal(0))

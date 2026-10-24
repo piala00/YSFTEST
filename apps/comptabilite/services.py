@@ -443,7 +443,9 @@ def controle_liaison(date_debut, date_fin):
                               "probleme": f"Montant du tiers en comptabilité différent ({ecart:+,.0f})".replace(",", " ")})
         return len(anomalies) == anomalies_avant
 
-    documents = (Document.objects.filter(type_document__in=Document.TYPES_FACTURATION, date__range=(date_debut, date_fin))
+    # Pièces reprises de Sage : leur comptabilité vient des écritures Sage reprises, pas d'une écriture de l'ERP
+    documents = (Document.objects.filter(type_document__in=Document.TYPES_FACTURATION, date__range=(date_debut, date_fin),
+                                         reprise_sage="")
                  .exclude(statut__in=(Document.BROUILLON, Document.ANNULE)).select_related("tiers", "ecriture"))
     for domaine, est_vente in (("Ventes", True), ("Achats", False)):
         docs = [d for d in documents if d.est_vente == est_vente]
@@ -452,7 +454,7 @@ def controle_liaison(date_debut, date_fin):
         ttc = sum((d.total_ttc for d in docs), ZERO)
         flux.append({"flux": domaine, "nombre": len(docs), "conformes": len(passes), "ht": ht,
                      "tva": sum((d.total_tva for d in docs), ZERO), "ttc": ttc})
-    reglements = Reglement.objects.filter(date__range=(date_debut, date_fin)).select_related("tiers", "ecriture")
+    reglements = Reglement.objects.filter(date__range=(date_debut, date_fin), reprise_sage="").select_related("tiers", "ecriture")
     passes = [r for r in reglements if verifier(r, r.montant, f"Règlement {r.numero} - {r.tiers.nom}")]
     total = sum((r.montant for r in reglements), ZERO)
     flux.append({"flux": "Règlements", "nombre": len(reglements), "conformes": len(passes), "ht": None, "tva": None, "ttc": total})

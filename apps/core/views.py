@@ -281,3 +281,55 @@ def sauvegarde(request, module):
                                           "Reconnectez-vous si besoin.")
         return redirect(request.path)
     return render(request, "core/sauvegarde.html")
+
+
+def reprise_dossier(request, module):
+    """Fichier › Reprise d'un dossier existant : lecture directe (SELECT uniquement) de la base SQL Server de l'ancien
+    logiciel, simulation puis import de la comptabilité et de la gestion commerciale (administrateur)."""
+    import datetime
+
+    from . import droits as d, journal
+    from . import reprise_sage
+    from .reprise_sage import source
+
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {
+            "chemin": "Fichier › Reprise d'un dossier existant", "operation": "reprendre un dossier",
+            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    aujourdhui = datetime.date.today()
+    p = request.POST
+    valeurs = {"serveur": p.get("serveur", "localhost"), "base": p.get("base", ""), "utilisateur": p.get("utilisateur", ""),
+               "authentification": p.get("authentification", "windows"),
+               "debut_exercice": p.get("debut_exercice", f"{aujourdhui.year}-01-01"),
+               "date_bascule": p.get("date_bascule", aujourdhui.isoformat()), "historique_depuis": p.get("historique_depuis", "")}
+    contexte = {"valeurs": valeurs, "bases": [], "rapport": None, "titre": "Reprise d'un dossier existant"}
+    action = p.get("action")
+    if request.method == "POST" and action:
+        utilisateur = valeurs["utilisateur"] if valeurs["authentification"] == "sql" else ""
+        mot_de_passe = p.get("mot_de_passe", "") if utilisateur else ""
+        try:
+            if action == "rechercher":
+                connexion = source.connecter(valeurs["serveur"], "master", utilisateur, mot_de_passe)
+                contexte["bases"] = source.bases_sage(connexion)
+                if not contexte["bases"]:
+                    messages.warning(request, "Aucun dossier trouvé sur ce serveur (ou droits de lecture insuffisants).")
+            else:
+                dates = {}
+                for cle in ("debut_exercice", "date_bascule", "historique_depuis"):
+                    dates[cle] = datetime.date.fromisoformat(valeurs[cle]) if valeurs[cle] else None
+                if not valeurs["base"] or not dates["debut_exercice"] or not dates["date_bascule"]:
+                    raise ValueError("Choisissez le dossier, le début d'exercice et la date de bascule.")
+                connexion = source.connecter(valeurs["serveur"], valeurs["base"], utilisateur, mot_de_passe)
+                origine = source.SourceSQL(connexion, dates["debut_exercice"], dates["date_bascule"], dates["historique_depuis"])
+                appliquer = action == "importer" and p.get("confirmation") == "IMPORTER"
+                if action == "importer" and not appliquer:
+                    raise ValueError("Tapez IMPORTER pour confirmer l'import réel (la simulation n'enregistre rien).")
+                rapport = reprise_sage.importer(origine, dates["date_bascule"], appliquer=appliquer, utilisateur=request.user,
+                                                debut_exercice=dates["debut_exercice"])
+                contexte["rapport"] = rapport
+                if appliquer and rapport.conforme:
+                    journal.enregistrer("CREATION", libelle=f"Reprise du dossier {valeurs['base']} au {dates['date_bascule']:%d/%m/%Y}")
+                    messages.success(request, "Reprise enregistrée : vous pouvez travailler dans l'ERP.")
+        except Exception as exc:                 # connexion refusée, date invalide… : message clair, rien n'est enregistré
+            messages.error(request, f"Reprise impossible : {exc}")
+    return render(request, "core/reprise_dossier.html", contexte)

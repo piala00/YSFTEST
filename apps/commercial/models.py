@@ -430,6 +430,10 @@ class Document(models.Model):
     depot_destination = models.ForeignKey(Depot, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
                                           verbose_name="Dépôt de destination")
     reference_externe = models.CharField("Référence", max_length=50, blank=True)
+    reprise_sage = models.CharField(
+        "Pièce reprise", max_length=40, blank=True, db_index=True,
+        help_text="Pièce reprise du dossier d'origine (domaine-type-n°) : ni stock ni écriture générés par l'ERP, "
+                  "la comptabilité vient des écritures reprises")
     statut = models.CharField(max_length=12, choices=STATUTS, default=BROUILLON)
     origine = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="documents_generes")
     notes = models.TextField(blank=True)
@@ -973,6 +977,8 @@ class Reglement(models.Model):
     MOBILE_MONEY = "MOBILE_MONEY"
     MODES = [(ESPECES, "Espèces"), (CHEQUE, "Chèque"), (VIREMENT, "Virement"), (MOBILE_MONEY, "Mobile Money")]
 
+    reprise_sage = models.CharField("Règlement repris", max_length=40, blank=True, db_index=True,
+                                    help_text="Règlement repris du dossier d'origine (déjà comptabilisé dans ce dossier)")
     numero = models.CharField(max_length=30, unique=True, blank=True)
     date = models.DateField(default=timezone.localdate)
     tiers = models.ForeignKey(Tiers, on_delete=models.PROTECT, related_name="reglements")

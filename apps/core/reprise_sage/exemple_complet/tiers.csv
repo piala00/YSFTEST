@@ -1,0 +1,5 @@
+CT_Num;CT_Intitule;CT_Type;CG_NumPrinc;CT_Ville;CT_Telephone;CT_EMail;CT_Sommeil;CT_NumPayeur;N_CatTarif;CT_Encours
+CL001;Client Un;0;411100;Ville A;600000001;un@exemple.test;0;CL001;1;500000.000000
+CL002;Client Deux;0;411100;Ville B;;;0;CL002;0;0.000000
+FR001;Fournisseur Un;1;401100;Ville C;;;0;FR001;0;0.000000
+SA001;Salarié Un;2;421000;;;;0;SA001;0;0.000000
