@@ -13,8 +13,12 @@ ZERO = Decimal("0")
 
 
 def taux_tva_defaut():
-    """Taux proposé à la création d'un article : celui de la fiche société."""
-    return Societe.get().taux_tva_defaut
+    """Taux proposé à la création d'un article : celui de la fiche société.
+
+    Ne lit que ce champ : SQL Server évalue ce défaut pendant les migrations, avant que les nouvelles colonnes
+    de la fiche société n'existent."""
+    taux = Societe.objects.order_by("pk").values_list("taux_tva_defaut", flat=True).first()
+    return taux if taux is not None else Societe._meta.get_field("taux_tva_defaut").default
 
 
 def arrondi(valeur, decimales=0):
