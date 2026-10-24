@@ -9,3 +9,4 @@ build/
 dist/
 *.spec.bak
 db.sqlite3.avant-mise-a-jour
+sortie/
