@@ -22,7 +22,7 @@ Les tests de reproduction de la revue (`review_probes.py`) sont intégrés sous 
 ## Tests exécutés
 
 - **SQLite :** `python manage.py test` donne **164 tests, OK**. Ce sont les 155 tests antérieurs (dont un test de formulaire Société complété du nouveau champ), plus 9 tests de revue (les 8 de GPT, avec A07 adapté, et R18).
-- **SQL Server 2022 (image officielle Microsoft, conteneur local) :** la même suite tourne avec `mssql-django` 2.0 et le pilote Microsoft fourni. Résultat dans la section suivante.
+- **SQL Server 2022 (image officielle Microsoft, conteneur local) :** la même suite donne **164 tests, OK**, avec `mssql-django` 2.0 et le pilote Microsoft fourni. Ce passage a révélé un défaut, corrigé : le défaut du taux de TVA d'un article lisait toute la fiche Société pendant les migrations. Une nouvelle colonne de la Société faisait alors échouer la mise à jour d'une base SQL Server existante ; seul le champ nécessaire est désormais lu.
 - **Écrans :** fiche d'article, rapprochement et rapport commercial affichés avec les données de démonstration (HTTP 200, nouveaux libellés présents).
 
 ## Validation SQL Server et paquet Windows (hors revue, livrés le 24/10)
