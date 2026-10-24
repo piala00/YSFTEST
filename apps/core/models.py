@@ -40,6 +40,10 @@ class Societe(models.Model):
         "Facture à la livraison", max_length=10, choices=FACTURATIONS_AUTO, default=FACTURATION_VALIDEE,
         help_text="Quand le magasin valide le bon de livraison issu d'un bon de commande, la facture des quantités "
                   "livrées est établie le même jour (les avances versées sur la commande y sont imputées)")
+    separation_gros_detail = models.BooleanField(
+        "Vente au détail réservée aux dépôts désignés", default=False,
+        help_text="Les magasins de gros ne vendent que par unités entières (pas de carton ouvert) ; la vente au détail "
+                  "se fait uniquement dans les dépôts désignés (boutiques), approvisionnés par transfert")
     delai_pointage = models.PositiveIntegerField(
         "Délai de pointage des bons (jours)", default=1,
         help_text="Fiche de stock : un bon non pointé par le fichiste au-delà de ce délai est signalé en retard")

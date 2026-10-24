@@ -17,8 +17,8 @@
   {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
   <div class="row g-3">
   {% for field in form %}
-    <div class="{% if field.field.widget.input_type == 'checkbox' %}col-md-3 form-check ms-2 mt-4{% elif field.name == 'pied_facture' or field.name == 'notes' %}col-12{% else %}col-md-4{% endif %}">
-      {% if field.field.widget.input_type == 'checkbox' %}
+    <div class="{% if field.field.widget.input_type == 'checkbox' and not field.field.widget.allow_multiple_selected %}col-md-3 form-check ms-2 mt-4{% elif field.name == 'pied_facture' or field.name == 'notes' %}col-12{% else %}col-md-4{% endif %}">
+      {% if field.field.widget.input_type == 'checkbox' and not field.field.widget.allow_multiple_selected %}
         {{ field }} <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
       {% else %}
         <label class="form-label small" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>

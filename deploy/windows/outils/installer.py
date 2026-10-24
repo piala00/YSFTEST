@@ -107,8 +107,27 @@ def preparer_base():
     if from_zero:
         demo = oui("Ajouter les données de démonstration (clients, articles, pièces fictifs) ?", "O")
         lancer("manage.py", "init_erp", *(["--demo"] if demo else []))
+        configurer_gros_detail()
         (LOGICIEL / ".initialise").write_text("ok", encoding="utf-8")
     print("Base prête.")
+
+
+def configurer_gros_detail():
+    """Gros et détail : la vente au détail est réservée à une ou deux boutiques approvisionnées par transfert."""
+    print("\nVente en gros et au détail")
+    print("Pour ne pas ouvrir les cartons dans les magasins de gros, la vente au détail peut être réservée")
+    print("à un ou deux dépôts (boutiques), approvisionnés par transfert depuis les magasins.")
+    if not oui("Réserver la vente au détail à des boutiques désignées ?", "N"):
+        print("Pas de séparation : modifiable plus tard dans Fichier > Paramètres de la société.")
+        return
+    noms = demander("Nom de la ou des boutiques (séparés par une virgule)", "Boutique")
+    os.environ["ERP_BOUTIQUES"] = noms
+    code = ("import os; from apps.commercial.models import Depot; from apps.core.models import Societe\n"
+            "for i, nom in enumerate([n.strip() for n in os.environ['ERP_BOUTIQUES'].split(',') if n.strip()], 1):\n"
+            "    d = Depot.objects.filter(intitule__iexact=nom).first() or Depot(code=f'BOUT{i}', intitule=nom)\n"
+            "    d.vente_detail = True; d.save(); print('Dépôt de détail :', d.intitule)\n"
+            "Societe.objects.update(separation_gros_detail=True)")
+    lancer("manage.py", "shell", "-c", code)
 
 
 def creer_compte():

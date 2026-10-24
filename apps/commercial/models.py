@@ -165,6 +165,10 @@ class Depot(models.Model):
     ville = models.CharField(max_length=80, blank=True)
     responsable = models.CharField(max_length=100, blank=True)
     principal = models.BooleanField("Dépôt principal", default=False)
+    vente_detail = models.BooleanField(
+        "Vente au détail autorisée", default=False,
+        help_text="Boutique / dépôt de détail : seul type de dépôt où l'on peut vendre au détail quand la société réserve "
+                  "le détail à des dépôts désignés (Paramètres de la société)")
     fiche_debut = models.DateField(
         "Début de la fiche de stock", null=True, blank=True,
         help_text="Le fichiste pointe les bons à partir de cette date ; le stock antérieur sert d'ouverture de la fiche. "
@@ -681,6 +685,7 @@ class Document(models.Model):
         if not self.lignes.exists():
             raise ValidationError("Le document ne contient aucune ligne.")
         self.clean()
+        self.controler_gros_detail()
         for ligne in self.lignes.all():
             ligne.save()            # réapplique le régime de TVA en vigueur à la validation
         self.recalculer(save=False)
@@ -701,6 +706,26 @@ class Document(models.Model):
             self.origine.mettre_a_jour_statut()
         self.facture_auto = self._facturer_livraison()
         return self
+
+    TYPES_CONTROLE_DETAIL = (DEVIS, COMMANDE, PREPARATION, LIVRAISON, RETOUR, FACTURE, FACTURE_RETOUR)
+
+    def controler_gros_detail(self):
+        """Société qui réserve le détail à des dépôts désignés : hors de ces boutiques, on ne vend que par unités
+        entières de l'article (pas de carton ouvert, pour ne pas « brûler » le stock du magasin de gros)."""
+        from apps.core.models import Societe
+
+        if self.type_document not in self.TYPES_CONTROLE_DETAIL or not self.depot_id or self.depot.vente_detail:
+            return
+        if not Societe.get().separation_gros_detail:
+            return
+        fractions = [l for l in self.lignes.select_related("article")
+                     if l.article_id and l.article.suivi_stock and l.quantite != l.quantite.to_integral_value()]
+        if fractions:
+            boutiques = ", ".join(d.intitule for d in Depot.objects.filter(vente_detail=True, actif=True)) or "aucun dépôt désigné"
+            raise ValidationError(
+                f"Vente au détail impossible dans le dépôt « {self.depot.intitule} » (magasin de gros) : "
+                f"{', '.join(f'{l.article.reference} ({l.quantite.normalize():f})' for l in fractions)}. "
+                f"Vendez par unités entières, ou transférez la marchandise vers un dépôt de détail ({boutiques}).")
 
     def _facturer_livraison(self):
         """Livraison validée par le magasin (issue d'un bon de commande) : facture des quantités livrées, le jour même.

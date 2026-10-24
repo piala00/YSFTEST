@@ -19,7 +19,7 @@ Statuts :
 | E04–E05 | Agences dans plusieurs villes ; une société, serveurs locaux sans interconnexion | `core.Agence` (agence locale + autres agences), compte de liaison 185NN créé automatiquement et modifiable | — | `tests_rapport_commercial.test_agence_et_compte_de_liaison` |
 | E06–E07 | Stocks, clients, créances, états par agence | Chaque serveur d'agence tient ses propres données ; balance âgée, états de stock, bilan | Bilan d'agence avec charges communes : D15 | tests reporting |
 | E08 | Vue regroupée | — | **À faire** : export / import des données des agences et consolidation (P04–P06), avec date de fraîcheur | — |
-| E09–E11 | Gros, détail, carton de 15 L, conditionnements | Unité de vente par article | **À faire** : conditionnements (unité de base et conversions, prix par présentation, conversion conservée sur la pièce, P07–P08) ; D01, D14 | — |
+| E09–E11 | Gros, détail, carton de 15 L, conditionnements | **Décision de l'utilisateur (24/10) :** la vente au détail est réservée à un ou deux dépôts désignés (boutiques), approvisionnés par transfert, pour ne pas « brûler » le stock des magasins de gros. Option société « vente au détail réservée aux dépôts désignés », avec la liste des boutiques. Elle se règle dans les Paramètres de la société et dès l'installation Windows. Hors boutique, une vente en quantité fractionnée est refusée (devis, commande, préparation, BL, retour, facture), et le message indique les boutiques. | Conditionnements (unité de base, carton / litre, prix par présentation, P07–P08) : reportés à la demande de l'utilisateur. Alors, le contrôle portera sur les unités de détail. | `tests_gros_detail` |
 | E12 | Options dès la création, évolutives | Paramètres société modifiables | **À faire** : assistant de création | — |
 
 ## Tâche 2 : rapport commercial, liaisons, commandes, fiche de stock
@@ -66,4 +66,4 @@ Statuts :
 
 ## Tests exécutés
 
-Commande : `python manage.py test`. Résultat : **167 tests, tous réussis** (dont les tests de la revue GPT du 24/10) (à la date de la livraison).
+Commande : `python manage.py test`. Résultat : **171 tests, tous réussis** (dont les tests de la revue GPT du 24/10) (à la date de la livraison).

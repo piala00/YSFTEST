@@ -25,10 +25,41 @@ class DateInput(forms.DateInput):
 
 
 class SocieteForm(BootstrapMixin, forms.ModelForm):
+    depots_detail = forms.ModelMultipleChoiceField(
+        queryset=None, required=False, widget=forms.CheckboxSelectMultiple, label="Dépôts de vente au détail (boutiques)",
+        help_text="Un ou deux dépôts où l'on vend au détail ; les autres magasins les approvisionnent par transfert")
+
     class Meta:
         model = Societe
         fields = "__all__"
         widgets = {"pied_facture": forms.Textarea(attrs={"rows": 3})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from apps.commercial.models import Depot
+
+        self.fields["depots_detail"].queryset = Depot.objects.filter(actif=True)
+        self.fields["depots_detail"].initial = Depot.objects.filter(vente_detail=True)
+        self.fields["depots_detail"].widget.attrs.pop("class", None)
+        ordre = [n for n in self.fields if n != "depots_detail"]          # la liste des boutiques juste après l'option
+        ordre.insert(ordre.index("separation_gros_detail") + 1, "depots_detail")
+        self.order_fields(ordre)
+
+    def clean(self):
+        donnees = super().clean()
+        if donnees.get("separation_gros_detail") and not donnees.get("depots_detail"):
+            self.add_error("depots_detail", "Désignez au moins un dépôt de vente au détail.")
+        return donnees
+
+    def save(self, commit=True):
+        from apps.commercial.models import Depot
+
+        societe = super().save(commit)
+        if "depots_detail" in self.cleaned_data:
+            choisis = [d.pk for d in self.cleaned_data["depots_detail"]]
+            Depot.objects.filter(pk__in=choisis).update(vente_detail=True)
+            Depot.objects.exclude(pk__in=choisis).update(vente_detail=False)
+        return societe
 
 
 class ExerciceForm(BootstrapMixin, forms.ModelForm):
