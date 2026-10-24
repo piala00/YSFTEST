@@ -1,0 +1,4 @@
+interface:
+  display_name: "ERP OHADA — agences, caisse et stock"
+  short_description: "Hors ligne, liaisons, rapport commercial et fiche magasin"
+  default_prompt: "Utilise $erp-ohada-agences-hors-ligne-rapport-stock pour comparer les deux tâches à mon code existant et préparer les adaptations vérifiables."

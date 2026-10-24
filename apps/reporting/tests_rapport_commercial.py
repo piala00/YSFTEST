@@ -37,6 +37,52 @@ class RapportCommercialTests(TestCase):
     def regler(self, montant, **kwargs):
         return Reglement(tiers=self.client_, journal=self.caisse, montant=Decimal(montant), **kwargs).enregistrer()
 
+    def test_versement_recu_par_une_autre_agence(self):
+        facture = self.piece(Document.FACTURE, 4)                                    # 4 000 à crédit chez nous
+        recu = Reglement(tiers=self.client_, journal=Journal.objects.get(code="OD"), montant=Decimal("4000"), facture=facture,
+                         agence_encaissement=self.garoua, reference="GBL-R125")
+        recu.enregistrer()
+        facture.refresh_from_db()
+        self.assertEqual(facture.reste_a_payer, 0)
+        lignes = {l.compte.numero: l for l in recu.ecriture.lignes.all()}
+        self.assertEqual(lignes[self.garoua.compte_liaison.numero].debit, Decimal("4000"))   # pas la caisse
+        r = services.rapport_commercial(self.jour)
+        self.assertEqual(r["recus_autres_agences"], [recu])
+        self.assertEqual(r["encaissements"], [])                                     # aucun mouvement de notre caisse
+        autre = self.piece(Document.FACTURE, 1)
+        for erreur, kwargs in (("déjà enregistré", {"reference": "GBL-R125"}),         # même reçu saisi deux fois
+                               ("n° du reçu", {"reference": ""}),
+                               ("pas celle-ci", {"reference": "X1", "agence_encaissement": self.locale})):
+            with self.assertRaisesMessage(ValidationError, erreur):
+                Reglement(tiers=self.client_, journal=Journal.objects.get(code="OD"), montant=Decimal("1000"), facture=autre,
+                          **{"agence_encaissement": self.garoua, **kwargs}).enregistrer()
+
+    def test_client_au_comptant_signale(self):
+        comptant = Tiers.objects.create(code="CCPT", nom="Client comptant", vente_credit=False)
+        doc = Document.objects.create(type_document=Document.FACTURE, tiers=comptant)
+        LigneDocument.objects.create(document=doc, article=self.article, quantite=1, prix_unitaire=1000, taux_tva=0)
+        doc.recalculer()
+        self.assertIn("client au comptant", doc.controler_encours())
+        doc.valider()                                                                # signalé, jamais imposé
+        natures = {l["doc"].pk: l["nature"] for l in services.rapport_commercial(self.jour)["ventes"]["factures"]}
+        self.assertEqual(natures[doc.pk], "En compte · client au comptant non soldé")
+
+    def test_recu_sans_facture_refuse(self):
+        with self.assertRaisesMessage(ValidationError, "rattaché à la facture"):
+            self.regler(1000)
+
+    def test_auteurs_enregistres(self):
+        chef = get_user_model().objects.create_superuser("caissiere", "", "x")
+        self.client.force_login(chef)
+        doc = self.piece(Document.FACTURE, 1, valider=False)
+        self.client.post(reverse("commercial:document_valider", args=[doc.pk]))
+        doc.refresh_from_db()
+        self.assertEqual((doc.statut, doc.valide_par), (Document.VALIDE, chef))
+        self.assertIsNotNone(doc.valide_le)
+        page = self.client.get(reverse("commercial:document_detail", args=[doc.pk]))
+        self.assertContains(page, "Validé le")
+        self.assertContains(page, "par <strong>caissiere</strong>")
+
     def test_agence_et_compte_de_liaison(self):
         self.assertTrue(self.garoua.compte_liaison.numero.startswith("185"))
         self.assertIsNone(Agence.objects.get(code="BTA").compte_liaison)
@@ -45,7 +91,7 @@ class RapportCommercialTests(TestCase):
 
     def test_rapport_complet_du_jour(self):
         comptant = self.piece(Document.FACTURE, 2)                                   # 2 000 payés le jour
-        self.regler(2000)
+        self.regler(2000, facture=comptant)
         credit = self.piece(Document.FACTURE, 3)                                     # 3 000 à crédit
         commande = self.piece(Document.COMMANDE, 5)                                  # 5 000 payés d'avance
         self.regler(5000, commande=commande)

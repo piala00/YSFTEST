@@ -39,6 +39,12 @@
   <tfoot><tr class="total"><td colspan="4">Total hors recettes et autres entrées</td><td class="num">{{ r.total_hors_recettes|add:r.total_autres_entrees|montant }}</td></tr></tfoot>
 </table></div>
 
+<div class="card mb-3"><div class="card-header bg-white fw-semibold small">Versements de nos clients reçus par d'autres agences (hors caisse, compte de liaison)</div><table class="table table-sm mb-0">
+  <tbody>{% for g in r.recus_autres_agences %}<tr><td><a href="{% url 'commercial:reglement_detail' g.pk %}" data-nouvelle-fenetre>{{ g.numero }}</a></td><td>{{ g.agence_encaissement.nom }} · reçu {{ g.reference }}</td>
+    <td>{{ g.tiers.nom }}</td><td>{% if g.facture %}Facture {{ g.facture.numero }}{% endif %}</td><td class="num">{{ g.montant|montant }}</td></tr>
+  {% empty %}<tr><td class="text-muted text-center">Aucun versement reçu par une autre agence.</td></tr>{% endfor %}</tbody>
+</table></div>
+
 <h2>3. Sorties et dépenses du jour</h2>
 <div class="card mb-3"><table class="table table-sm mb-0">
   <thead><tr><th>Pièce</th><th>Nature</th><th>Libellé</th><th>Agence / bénéficiaire</th><th class="num">Montant</th></tr></thead>

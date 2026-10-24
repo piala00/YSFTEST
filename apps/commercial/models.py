@@ -58,6 +58,9 @@ class Tiers(models.Model):
     )
     delai_paiement = models.PositiveIntegerField("Délai de paiement (jours)", default=30)
     plafond_credit = models.DecimalField("Plafond d'encours", max_digits=18, decimal_places=2, default=ZERO)
+    vente_credit = models.BooleanField(
+        "Client à crédit", default=True,
+        help_text="Décoché : client au comptant (pas de compte de crédit) ; une vente non réglée est signalée")
     RISQUE_AUCUN = "AUCUN"
     RISQUE_AVERTIR = "AVERTIR"
     RISQUE_BLOQUER = "BLOQUER"
@@ -397,6 +400,10 @@ class Document(models.Model):
     ecriture = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL, related_name="document")
     cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     cree_le = models.DateTimeField(auto_now_add=True)
+    valide_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    valide_le = models.DateTimeField(null=True, blank=True)
+    annule_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    annule_le = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-date", "-numero"]
@@ -636,6 +643,9 @@ class Document(models.Model):
         if self.type_document not in self.TYPES_CONTROLE_ENCOURS or not self.tiers_id:
             return None
         tiers = self.tiers_payeur               # l'encours se contrôle sur le payeur, qui porte la créance
+        if tiers.type_tiers == Tiers.CLIENT and not tiers.vente_credit:
+            return (f"{tiers.nom} est un client au comptant : encaissez le règlement de la pièce "
+                    f"(ou une avance sur la commande), sans crédit.")
         if tiers.code_risque == Tiers.RISQUE_AUCUN or not tiers.plafond_credit:
             return None
         # Une facture issue d'un BL ou d'une commande ne compte qu'une fois : seule la facture crée la créance
@@ -663,7 +673,10 @@ class Document(models.Model):
         self.avertissement = self.controler_encours()
         if self.est_brouillon_numero:
             self.numero = Sequence.suivant(self.PREFIXES[self.type_document], self.date.year)
+        from apps.core.journal import _utilisateur
+
         self.statut = self.VALIDE
+        self.valide_par, self.valide_le = _utilisateur(), timezone.now()
         self.save()
         if self.mouvemente_stock:
             self._mouvementer_stock()
@@ -747,11 +760,17 @@ class Document(models.Model):
         nouveau.recalculer()
         return nouveau
 
+    def _marquer_annule(self):
+        from apps.core.journal import _utilisateur
+
+        self.statut = self.ANNULE
+        self.annule_par, self.annule_le = _utilisateur(), timezone.now()
+        self.save(update_fields=["statut", "annule_par", "annule_le"])
+
     @transaction.atomic
     def annuler(self):
         if self.statut == self.BROUILLON:
-            self.statut = self.ANNULE
-            self.save(update_fields=["statut"])
+            self._marquer_annule()
             return
         if self.est_facturation:
             raise ValidationError("Une facture validée ne s'annule pas : établissez une facture d'avoir.")
@@ -761,8 +780,7 @@ class Document(models.Model):
             for mvt in self.mouvements_stock.select_related("article", "depot"):
                 StockDepot.ajouter(mvt.article, mvt.depot, -mvt.quantite)
             self.mouvements_stock.all().delete()
-        self.statut = self.ANNULE
-        self.save(update_fields=["statut"])
+        self._marquer_annule()
         if self.origine_id:
             self.origine.mettre_a_jour_statut()
 
@@ -858,7 +876,17 @@ class Reglement(models.Model):
         "Document", null=True, blank=True, on_delete=models.PROTECT, related_name="acomptes",
         verbose_name="Acompte sur commande",
         help_text="Bon de commande payé d'avance : l'acompte sera imputé sur la facture issue de cette commande")
+    facture = models.ForeignKey(
+        "Document", null=True, blank=True, on_delete=models.PROTECT, related_name="recus",
+        verbose_name="Facture réglée", help_text="Obligatoire pour un reçu de règlement de créance client")
+    agence_encaissement = models.ForeignKey(
+        "core.Agence", null=True, blank=True, on_delete=models.PROTECT, related_name="reglements_encaisses",
+        verbose_name="Encaissé par l'agence",
+        help_text="Versement reçu par une autre agence pour ce client (hors recettes chez elle) : sans mouvement de caisse ici, "
+                  "passé par son compte de liaison")
     ecriture = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL, related_name="reglement")
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                 verbose_name="Créé par")
     cree_le = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -885,10 +913,41 @@ class Reglement(models.Model):
             raise ValidationError({"montant": "Le montant doit être positif."})
 
     @transaction.atomic
+    def controler_rattachement(self, factures=None):
+        """Reçu de règlement de créance client : rattaché à UNE facture du client, sans dépasser son reste dû.
+        L'avance sur bon de commande suit son propre circuit (affectée à la facture issue de la commande)."""
+        if factures is not None and not self.facture_id and len(factures) == 1:
+            self.facture = factures[0]
+        if not self.est_encaissement:
+            return
+        if self.commande_id:
+            if self.facture_id:
+                raise ValidationError("Choisissez soit une facture (règlement de créance), soit un bon de commande (avance).")
+            return
+        if not self.facture_id:
+            raise ValidationError({"facture": "Un reçu de règlement de créance doit être rattaché à la facture qu'il règle."})
+        f = self.facture
+        if not f.est_facturation or f.est_avoir or f.statut != Document.VALIDE:
+            raise ValidationError({"facture": "Choisissez une facture validée (pas un avoir)."})
+        if self.tiers_id not in (f.tiers_id, f.tiers_payeur.pk):
+            raise ValidationError({"facture": f"La facture {f.numero} n'est pas celle de {self.tiers.nom}."})
+        if self.montant and self.montant > f.reste_a_payer:
+            raise ValidationError({"montant": f"Le montant dépasse le reste dû de la facture {f.numero} "
+                                              f"({f.reste_a_payer:,.0f}).".replace(",", " ")})
+        if self.agence_encaissement_id:
+            if self.agence_encaissement.locale:
+                raise ValidationError({"agence_encaissement": "Choisissez l'agence qui a reçu le versement (pas celle-ci)."})
+            if not self.reference:
+                raise ValidationError({"reference": "Indiquez le n° du reçu établi par l'agence qui a encaissé."})
+            doublon = Reglement.objects.filter(agence_encaissement=self.agence_encaissement, reference=self.reference)
+            if doublon.exclude(pk=self.pk).exists():
+                raise ValidationError({"reference": f"Le reçu {self.reference} de {self.agence_encaissement.nom} est déjà enregistré."})
+
     def enregistrer(self, factures=None):
         """Numérote, comptabilise et impute le règlement sur les factures (FIFO par défaut)."""
         from apps.comptabilite.services import comptabiliser_reglement
 
+        self.controler_rattachement(factures)
         if self.commande_id:
             commande = self.commande
             if commande.type_document not in (Document.COMMANDE, Document.ACHAT_COMMANDE) or commande.statut == Document.ANNULE:
@@ -904,6 +963,8 @@ class Reglement(models.Model):
             # Acompte : il attend la facture issue de la commande (imputé à sa validation)
             facture = self.commande.facture_issue()
             factures = [facture] if facture else []
+        elif self.facture_id:
+            factures = [self.facture]                     # reçu de créance : la seule facture qu'il règle
         if factures is None:
             types = (Document.FACTURE,) if self.est_encaissement else (Document.ACHAT_FACTURE,)
             factures = self.tiers.factures_a_regler().filter(type_document__in=types).order_by("date", "numero")
@@ -1096,6 +1157,10 @@ class PointageFiche(models.Model):
     statut = models.CharField(max_length=10, choices=STATUTS, default=CONFORME)
     fichiste = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     observation = models.CharField(max_length=200, blank=True)
+    revision = models.PositiveIntegerField(default=1)
+    historique = models.JSONField(default=list, blank=True,
+                                  help_text="Déclarations précédentes du fichiste (corrections) : date, auteur, motif, quantités")
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     cree_le = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1125,6 +1190,15 @@ class PointageFiche(models.Model):
         """saisies : {article_id: quantité lue sur le bon}. Calcule les écarts ligne par ligne."""
         if not self.numero:
             self.numero = Sequence.suivant("PF", self.date.year)
+        if self.pk and self.lignes.exists():
+            if not (self.observation or "").strip():
+                raise ValidationError("Bon déjà pointé : indiquez le motif de la correction.")
+            # Correction : la déclaration précédente est conservée, avec son auteur et le motif
+            self.historique = self.historique + [{
+                "revision": self.revision, "date": timezone.now().isoformat(timespec="seconds"),
+                "fichiste": str(self.fichiste or ""), "statut": self.statut, "motif": self.observation,
+                "quantites": {l.article.reference: str(l.quantite_saisie) for l in self.lignes.select_related("article")}}]
+            self.revision += 1
         self.save()
         machine = self.quantites_machine(self.document, self.depot)
         self.lignes.all().delete()
@@ -1166,6 +1240,7 @@ class Inventaire(models.Model):
                                 help_text="Limiter l'inventaire à une famille (facultatif)")
     statut = models.CharField(max_length=10, choices=STATUTS, default=BROUILLON)
     notes = models.TextField(blank=True)
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     mouvement_entree = models.ForeignKey(Document, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     mouvement_sortie = models.ForeignKey(Document, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     cree_le = models.DateTimeField(auto_now_add=True)

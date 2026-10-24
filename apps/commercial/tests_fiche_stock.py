@@ -69,6 +69,30 @@ class FicheStockTests(TestCase):
         inconnu = self.client.get(reverse("commercial:pointage") + "?numero=XX999")
         self.assertContains(inconnu, "Aucun bon ne porte le numéro")
 
+    def test_correction_avec_motif_et_historique(self):
+        self.client.force_login(self.fichiste)
+        url = reverse("commercial:pointage")
+        donnees = {"numero": self.livraison.numero, "depot": self.depot.pk, f"qte_{self.huile.pk}": "12"}
+        self.client.post(url, donnees)
+        pointage = PointageFiche.objects.get(document=self.livraison)
+        self.assertEqual((pointage.statut, pointage.cree_par, pointage.revision), (PointageFiche.ECART, self.fichiste, 1))
+        refus = self.client.post(url, {**donnees, f"qte_{self.huile.pk}": "10"})        # correction sans motif
+        self.assertContains(refus, "motif de la correction")
+        pointage.refresh_from_db()
+        self.assertEqual(pointage.revision, 1)
+        self.client.post(url, {**donnees, f"qte_{self.huile.pk}": "10", "observation": "Erreur de lecture du bon"})
+        pointage.refresh_from_db()
+        self.assertEqual((pointage.statut, pointage.revision), (PointageFiche.CONFORME, 2))
+        self.assertEqual(pointage.historique[0]["quantites"], {"HUILE15": "12.000"})
+        self.assertEqual(pointage.historique[0]["motif"], "Erreur de lecture du bon")
+        self.assertEqual(PointageFiche.objects.filter(document=self.livraison).count(), 1)  # jamais de double pointage
+        self.assertNotContains(self.client.get(reverse("commercial:pointage_detail", args=[pointage.pk])), "Saisies précédentes")
+        self.client.force_login(get_user_model().objects.create_superuser("controleur", "", "x"))
+        detail = self.client.get(reverse("commercial:pointage_detail", args=[pointage.pk]))
+        self.assertContains(detail, "Saisies précédentes")
+        self.assertContains(detail, "Erreur de lecture du bon")
+        self.assertContains(detail, "par <strong>fichiste</strong>")              # auteur visible à l'ouverture
+
     def test_etats(self):
         self.client.force_login(get_user_model().objects.create_superuser("chef", "", "x"))
         self.assertContains(self.client.get(reverse("commercial:fiche_rapprochement") + "?ok=1"), "Bons à pointer (2)")

@@ -208,6 +208,8 @@ def rapport_commercial(jour, journal=None):
         reste = f.reste_a_payer if not f.est_avoir else ZERO
         nature = ("Avoir" if f.est_avoir else "Comptant" if reste <= 0 and encaisse and not acompte
                   else "Payée d'avance" if reste <= 0 and acompte else "Comptant (partiel)" if encaisse else "En compte")
+        if reste > 0 and f.tiers_id and not f.tiers_payeur.vente_credit:
+            nature += " · client au comptant non soldé"
         factures.append({"doc": f, "ttc": signe * f.total_ttc, "acompte": acompte, "encaisse": encaisse,
                          "reste": reste, "nature": nature})
     commandes = []
@@ -273,4 +275,7 @@ def rapport_commercial(jour, journal=None):
         "autres_sorties": autres_sorties, "total_autres_sorties": total(autres_sorties),
         "fournisseurs": fournisseurs, "total_fournisseurs": total(fournisseurs),
         "solde": solde,
+        # Hors caisse : nos clients ont versé dans une autre agence (compte de liaison), créance soldée ici
+        "recus_autres_agences": list(Reglement.objects.filter(date=jour, agence_encaissement__isnull=False)
+                                     .select_related("tiers", "facture", "agence_encaissement").order_by("numero")),
     }

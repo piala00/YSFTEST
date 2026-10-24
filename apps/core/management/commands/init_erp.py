@@ -209,8 +209,12 @@ class Command(BaseCommand):
         caisse = Journal.objects.get(code="CA")
         banque = Journal.objects.get(code="BQ")
         for client in clients[:2]:
-            Reglement(tiers=client, journal=caisse, mode=Reglement.ESPECES,
-                      montant=Decimal("500000"), date=today).enregistrer()
+            # Chaque reçu de créance règle une facture précise du client
+            facture = next((f for f in client.factures_a_regler().filter(type_document=Document.FACTURE).order_by("date")
+                            if f.reste_a_payer > 0), None)
+            if facture:
+                Reglement(tiers=client, journal=caisse, mode=Reglement.ESPECES, facture=facture,
+                          montant=min(Decimal("500000"), facture.reste_a_payer), date=today).enregistrer()
         Reglement(tiers=fournisseurs[0], journal=banque, mode=Reglement.VIREMENT,
                   montant=Decimal("1500000"), date=today).enregistrer()
         self.log("Données de démonstration créées.")

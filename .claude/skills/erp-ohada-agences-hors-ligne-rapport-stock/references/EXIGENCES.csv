@@ -1,0 +1,71 @@
+id;tache;theme;statut;origine;regle
+E01;T1;Sociétés;CONFIRME_UTILISATEUR;U1;Permettre à plusieurs sociétés distinctes d’utiliser le logiciel.
+E02;T1;Hors ligne;CONFIRME_UTILISATEUR;U1;Préserver le travail hors ligne comme atout principal.
+E03;T1;Profil;CONFIRME_UTILISATEUR;U1;Adapter le logiciel aux petites, moyennes et grandes entreprises.
+E04;T1;Agences;CONFIRME_UTILISATEUR;U1;Permettre à une société d’avoir des agences dans plusieurs villes.
+E05;T1;Autonomie;CONFIRME_UTILISATEUR;U2;Préserver le modèle décrit : une même société, serveurs locaux par agence, absence actuelle d’interconnexion.
+E06;T1;Données locales;CONFIRME_UTILISATEUR;U2;Gérer stocks, clients et créances localement dans chaque agence.
+E07;T1;États;CONFIRME_UTILISATEUR;U2;Préserver états et analyses par agence, dont bilan et créances mensuels.
+E08;T1;Vue globale;CONFIRME_UTILISATEUR;U1;Fournir une vue regroupée des stocks, créances, analyses et bilan.
+E09;T1;Commerce;CONFIRME_UTILISATEUR;U1;Permettre gros et détail dans une même société.
+E10;T1;Organisation;CONFIRME_UTILISATEUR;U1;Couvrir magasin de gros et petites boutiques de détail.
+E11;T1;Conditionnements;CONFIRME_UTILISATEUR;U1;Couvrir carton de 15 litres et ventes fractionnées ou autres conditionnements.
+E12;T1;Paramétrage;CONFIRME_UTILISATEUR;U1;Adapter les options dès la création de société et permettre leur évolution après démarrage.
+E13;T2;Rapport;CONFIRME_UTILISATEUR;U2;Automatiser les ventes du jour dans le rapport commercial.
+E14;T2;Rapport;CONFIRME_UTILISATEUR;U2;Automatiser les encaissements du jour dans le rapport commercial.
+E15;T2;Rapport;CONFIRME_UTILISATEUR;U2;Automatiser les sorties et dépenses journalières dans le rapport commercial.
+E16;T2;Rapport;CONFIRME_UTILISATEUR;U2;Présenter le solde de caisse dans le rapport commercial.
+E17;T2;Versements;CONFIRME_UTILISATEUR;U2;Permettre le versement dans une autre agence pour un client de son agence d’origine.
+E18;T2;Liaisons;CONFIRME_UTILISATEUR;U2;Utiliser un circuit de comptes de liaison pour les opérations interagences.
+E19;T2;Hors-recettes;CONFIRME_UTILISATEUR;U2;Préserver le libellé hors-recettes pour les encaissements pour compte d’autres agences.
+E20;T2;Hors-recettes;CONFIRME_UTILISATEUR;U2;Prévoir une rubrique dédiée dans le rapport de caisse.
+E21;T2;Dépenses;CONFIRME_UTILISATEUR;U2;Gérer les sorties effectuées pour le compte des autres agences.
+E22;T2;Pièces;CONFIRME_UTILISATEUR;U2;Utiliser les factures et les ventes comptant/en compte/à crédit comme sources du reporting.
+E23;T2;Commandes;CONFIRME_UTILISATEUR;U2;Gérer les commandes comptant et en compte.
+E24;T2;Avances;CONFIRME_UTILISATEUR;U2;Accepter le paiement d’une commande avant récupération de la marchandise.
+E25;T2;Facturation;CONFIRME_UTILISATEUR;U2;Transformer automatiquement en facture le même jour une commande établie et livrée ce jour.
+E26;T2;Facturation;CONFIRME_UTILISATEUR;U2;Permettre une transformation ultérieure si la commande n’est pas encore livrée.
+E27;T2;Module magasin;CONFIRME_UTILISATEUR;U2;Créer un espace intégré nommé fiche de stock pour le fichiste.
+E28;T2;Saisie magasin;CONFIRME_UTILISATEUR;U2;Retrouver le BL déjà généré par sa référence.
+E29;T2;Saisie magasin;CONFIRME_UTILISATEUR;U2;Charger automatiquement les articles du BL.
+E30;T2;Saisie magasin;CONFIRME_UTILISATEUR;U2;Ne pas montrer les quantités attendues au fichiste.
+E31;T2;Saisie magasin;CONFIRME_UTILISATEUR;U2;Faire saisir les quantités par le fichiste à partir du BL physique.
+E32;T2;Rapprochement;CONFIRME_UTILISATEUR;U2;Rapprocher automatiquement les saisies magasin et les données de gestion.
+E33;T2;Rapprochement;CONFIRME_UTILISATEUR;U2;Réduire le délai du rapprochement manuel périodique et signaler les écarts immédiatement après saisie.
+E34;T1+T2;Collaboration;CONFIRME_UTILISATEUR;U3;Fournir un Skill pour Claude, qui travaille déjà sur les deux mêmes tâches.
+E35;T2;Clients;CONFIRME_UTILISATEUR;U4;Distinguer les clients achetant au comptant et les clients achetant à crédit.
+E36;T2;Compte client;CONFIRME_UTILISATEUR;U4;Prévoir un compte pour les clients à crédit.
+E37;T2;Crédit;CONFIRME_UTILISATEUR;U4;Enregistrer le plafond de crédit accordé au client.
+E38;T2;Échéance;CONFIRME_UTILISATEUR;U4;Suivre le délai de règlement de chaque facture du client à crédit.
+E39;T2;Versement;CONFIRME_UTILISATEUR;U4;Établir un reçu lors du versement du client.
+E40;T2;Affectation;CONFIRME_UTILISATEUR;U4;La personne créant un reçu de règlement de créance doit obligatoirement le rattacher à une facture.
+E41;T2;Détail reçu;CONFIRME_UTILISATEUR;U4;Conserver les informations et détails du reçu, dont la facture qu’il règle.
+E42;T1+T2;Auteur;CONFIRME_UTILISATEUR;U4;Rendre identifiable la personne ayant généré le reçu.
+E43;T1+T2;Auteur visible;CONFIRME_UTILISATEUR;U4;"Afficher à l’ouverture de chaque document la personne qui l’a généré ; inclure factures et commandes."
+E44;T1+T2;Traçabilité;CONFIRME_UTILISATEUR;U4;Conserver la trace des auteurs pour tous les documents, écritures et opérations.
+P01;T1;Isolation;PROPOSITION_CONCEPTION;A1-A2;Isoler chaque société dans toutes les requêtes, droits, exports et synchronisations.
+P02;T1;Hiérarchie;PROPOSITION_CONCEPTION;A1-A2;Distinguer société, agence, dépôt, boutique, caisse et utilisateur.
+P03;T1;Architecture;PROPOSITION_CONCEPTION;A1-A2;"Utiliser un service et une base locaux pour une agence autonome ; sélectionner la technologie après audit du dépôt."
+P04;T1;Synchronisation;PROPOSITION_CONCEPTION;A1-A2;Utiliser identifiants stables, file de transmission, intégration sans doublons et accusés de réception.
+P05;T1;Fraîcheur;PROPOSITION_CONCEPTION;A1-A2;Afficher par agence la dernière synchronisation et le caractère provisoire des rapports globaux.
+P06;T1;Catalogue;PROPOSITION_CONCEPTION;A1-A2;Maintenir une identité commune des articles et des correspondances explicites pour les clients et comptes.
+P07;T1;Unités;PROPOSITION_CONCEPTION;A1-A2;Définir une unité de référence et des conversions par article, avec prix distincts par présentation.
+P08;T1;Historique;PROPOSITION_CONCEPTION;A1-A2;"Conserver sur les pièces les conversions utilisées ; ne pas modifier rétroactivement les quantités historiques."
+P09;T1;Droits;PROPOSITION_CONCEPTION;A1-A2;"Combiner fonctions activées, agence, rôle et autorisation ; réviser les droits hors ligne selon une politique explicite."
+P10;T2;Reporting;PROPOSITION_CONCEPTION;A1-A2;Séparer activité commerciale, flux monétaires et suivi des commandes pour éviter les doubles comptes.
+P11;T2;Caisse;PROPOSITION_CONCEPTION;A1-A2;"Inclure les espèces hors-recettes dans la caisse d’exécution ; séparer espèces, banque et Mobile Money."
+P12;T2;Règlements;PROPOSITION_CONCEPTION;A1-A2;Affecter un encaissement interagences une seule fois au client bénéficiaire et conserver les pièces des deux côtés.
+P13;T2;Facturation;PROPOSITION_CONCEPTION;A1-A2;"Déclencher la facturation sur une livraison effectivement validée selon le circuit métier ; ne pas utiliser la seule impression du BL."
+P14;T2;Stock;PROPOSITION_CONCEPTION;A1-A2;Ne pas provoquer une deuxième sortie du stock de gestion lors de la déclaration du fichiste.
+P15;T2;Confidentialité;PROPOSITION_CONCEPTION;A1-A2;Ne pas transmettre les quantités attendues, stocks ou montants permettant de les déduire à l’interface du fichiste.
+P16;T2;Audit;PROPOSITION_CONCEPTION;A1-A2;"Conserver déclarations originales, versions de BL et corrections motivées ; limiter les nouvelles tentatives dévoilant l’attendu."
+P17;T2;Inventaire;PROPOSITION_CONCEPTION;A1-A2;"Distinguer rapprochement des mouvements et comptage physique ; conserver des inventaires réels."
+P18;T2;Couverture stock;PROPOSITION_CONCEPTION;A1-A2;Étendre la fiche indépendante à entrées, retours, transferts et ajustements si l’on veut rapprocher le stock complet.
+P19;T1+T2;Périmètre;PROPOSITION_CONCEPTION;A1-A2;Auditer le code existant avant toute modification et rattacher les livraisons aux exigences E/P.
+P20;T1;Transferts;PROPOSITION_CONCEPTION;A1-A2;"Tracer expédition, transit et réception ; compter le stock global une seule fois."
+P21;T1+T2;Sauvegardes;PROPOSITION_CONCEPTION;A1-A2;"Sauvegarder local et central ; préserver les files de synchronisation et tester la restauration sans rejouer les opérations."
+P22;T2;Affectation stricte;PROPOSITION_CONCEPTION;A1-A2;"Par défaut un reçu de créance concerne une facture ; distinguer versement physique, reçu et affectation ; ne pas autoriser un reçu multi-factures sans validation."
+P23;T2;Soldes;PROPOSITION_CONCEPTION;A1-A2;"Calculer le reste dû depuis factures, avoirs et affectations validées ; conserver les règlements partiels et contrôles de suraffectation."
+P24;T2;Avances;PROPOSITION_CONCEPTION;A1-A2;"Distinguer avance sur BC avant facture et reçu réglant une créance ; l’affectation ultérieure ne crée pas de nouvel encaissement."
+P25;T1+T2;Audit;PROPOSITION_CONCEPTION;A1-A2;"Enregistrer l’auteur côté serveur, la date de création, l’agence et le site ; distinguer auteur initial, modificateur, valideur, annulateur, automate et utilisateur de synchronisation."
+P26;T2;Crédit hors ligne;PROPOSITION_CONCEPTION;A1-A2;"Ne pas promettre un plafond global strict avec plusieurs agences déconnectées autorisées à engager le même client ; prévoir quota ou validation selon arbitrage."

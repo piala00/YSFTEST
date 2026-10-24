@@ -37,7 +37,7 @@ class LiaisonComptableTests(TestCase):
 
     def test_flux_conforme(self):
         doc = self.facture()
-        Reglement(tiers=self.client_, journal=Journal.objects.get(code="CA"), montant=doc.total_ttc).enregistrer()
+        Reglement(tiers=self.client_, journal=Journal.objects.get(code="CA"), montant=doc.total_ttc, facture=doc).enregistrer()
         resultat = self.controle()
         self.assertEqual(resultat["anomalies"], [])
         ventes, _, reglements = resultat["flux"]

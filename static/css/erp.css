@@ -337,3 +337,8 @@ html.dans-fenetre .piece-fenetre { min-height: 100vh; }
 /* Rapport commercial journalier */
 .rapport-commercial h2 { font-size: 1.05rem; font-weight: 600; margin: 1.1rem 0 .5rem; color: #2b3540; }
 .rapport-commercial .solde-caisse td:first-child { width: 70%; }
+
+/* Bandeau des auteurs d'une pièce */
+.bandeau-auteurs { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 5px 10px; background: #f6f8fa; border: 1px solid #e1e6eb;
+  border-radius: 4px; color: #4a5561; margin-bottom: 10px; }
+.piece-fenetre .bandeau-auteurs { margin: 0; border-width: 0 0 1px; border-radius: 0; }

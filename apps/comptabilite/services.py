@@ -124,20 +124,28 @@ def comptabiliser_reglement(reglement):
     if reglement.ecriture_id:
         return reglement.ecriture
     journal = reglement.journal
-    if not journal.compte_tresorerie_id:
+    tresorerie = journal.compte_tresorerie
+    if reglement.agence_encaissement_id:
+        # Versement reçu par une autre agence (hors recettes chez elle) : sa caisse a l'argent, on passe par sa liaison
+        tresorerie = reglement.agence_encaissement.compte_liaison
+        if tresorerie is None:
+            raise ValidationError(f"L'agence {reglement.agence_encaissement.nom} n'a pas de compte de liaison.")
+    elif not journal.compte_tresorerie_id:
         raise ValidationError(f"Le journal {journal.code} n'a pas de compte de trésorerie associé.")
     tiers = reglement.tiers
     compte_tiers = tiers.get_compte_collectif()
     libelle = reglement.libelle or f"Règlement {reglement.numero} - {tiers.nom}"
+    if reglement.agence_encaissement_id:
+        libelle = f"{libelle} (reçu {reglement.reference} de {reglement.agence_encaissement.nom})"
     if reglement.est_encaissement:
         lignes = [
-            {"compte": journal.compte_tresorerie, "debit": reglement.montant},
+            {"compte": tresorerie, "debit": reglement.montant},
             {"compte": compte_tiers, "tiers": tiers, "credit": reglement.montant},
         ]
     else:
         lignes = [
             {"compte": compte_tiers, "tiers": tiers, "debit": reglement.montant},
-            {"compte": journal.compte_tresorerie, "credit": reglement.montant},
+            {"compte": tresorerie, "credit": reglement.montant},
         ]
     ecriture = creer_ecriture(journal, reglement.date, libelle, lignes,
                               reference=reglement.reference or reglement.numero, origine=reglement.numero)

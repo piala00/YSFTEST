@@ -7,6 +7,7 @@
     <form method="post" action="{% url 'comptabilite:ecriture_valider' object.pk %}">{% csrf_token %}<button class="btn btn-success btn-sm"><i class="bi bi-check2-circle"></i> Valider</button></form>
     <form method="post" action="{% url 'comptabilite:ecriture_supprimer' object.pk %}" onsubmit="return confirm('Supprimer ?')">{% csrf_token %}<button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button></form>
   </div>{% endif %}</div>
+{% include "core/_auteurs.html" with objet=object %}
 <div class="card p-3 mb-3 small">
   Journal : <strong>{{ object.journal }}</strong> · Date : <strong>{{ object.date|date:"d/m/Y" }}</strong> · Exercice : {{ object.exercice }}<br>
   Libellé : {{ object.libelle }}{% if object.reference %} · Référence : {{ object.reference }}{% endif %}

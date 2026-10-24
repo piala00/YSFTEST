@@ -1,0 +1,21 @@
+id;origine;question;conduite_proposee_sans_bloquer_le_reste;exigences
+D01;U1;Les petits conditionnements cités comme 500 litres/kilos désignent-ils ml/g ou d’autres volumes ?;Paramétrer unités génériques sans figer cet exemple.;E11
+D02;U2;Quels sont les codes et libellés exacts des agences, boutiques et dépôts ?;"Utiliser identifiants configurables ; noms d’exemple non imposés.";E04-E06
+D03;U1/U2;Quel canal et quelle fréquence de transmission sont possibles entre sites sans interconnexion actuelle ?;"Garantir autonomie locale ; ne pas promettre une actualisation globale instantanée.";E02,E08
+D04;U2;En compte et à crédit sont-ils synonymes dans le rapport attendu ? Quelles colonnes exactes ?;"Séparer mode de vente et état de paiement ; conserver les deux termes jusqu’à clarification.";E22
+D05;U2;"Quels totaux sont HT/TTC ; quelles dates et règles pour retours/avoirs et clôture de caisse ?";"Documenter la définition de chaque montant ; afficher les sources.";E13-E16
+D06;U2;Quel événement prouve la livraison et quel niveau de validation automatique de facture ?;"Proposer confirmation de livraison et génération liée ; ne pas facturer sur seule impression.";E25,E26
+D07;A1/A2;Quelle politique pour livraisons partielles, avances partielles, annulations et remboursements ?;"Ne pas facturer une quantité non livrée par défaut ; conserver les liens et soldes.";E24-E26
+D08;U2;Quels comptes de liaison, comptes d’attente, dates et règles de rapprochement comptable ?;"Ne pas imposer un numéro de compte ; paramétrage à valider dans le dossier OHADA.";E18
+D09;U2;Un client peut-il avoir des comptes/encours dans plusieurs agences ? Quelle identification commune ?;"Conserver propriétaire de chaque créance et correspondances explicites ; ne pas fusionner par nom.";E06,E17
+D10;A1/A2;"Le fichiste voit-il le résultat après validation ; qui corrige et selon quel délai ?";Proposer résultat détaillé au contrôleur et historique des corrections.;E30-E33
+D11;A2;La fiche magasin couvre-t-elle au départ seulement les sorties BL ou tous les mouvements ?;"Annoncer la portée réelle ; prévoir ouverture et autres flux pour un solde indépendant complet.";E27-E33
+D12;A1/A2;Qui crée les articles/clients et quels droits peuvent être utilisés ou révoqués hors ligne ?;Conserver les besoins locaux, droits explicites et anomalies de référentiel à résoudre.;E02,E06
+D13;A1/A2;Quelle pile technique locale, synchronisation et isolation selon le dépôt et les volumes ?;"Auditer d’abord le code ; aucune bibliothèque ni base imposée.";E01,E02
+D14;U1;Quels articles relèvent du vrac ou de références emballées/scellées séparées ?;"Configurer par article ; ne pas créer de stock de petits emballages implicitement.";E11
+D15;U1/U2;Comment affecter charges communes, banques, immobilisations et liaisons aux bilans d’agence ?;"Distinguer analyse locale et bilan complet ; faire valider les règles de répartition.";E07,E08
+D16;U4;Comment traiter un versement couvrant plusieurs factures et les règlements partiels ?;"Un reçu de créance cible une facture par défaut ; proposer un versement unique lié à plusieurs reçus distincts sans double entrée de caisse.";E39-E41
+D17;U4;Comment calculer le délai par facture : jours calendaires, ouvrés, fin de mois, échéances multiples ?;"Conserver la condition appliquée et l’échéance historique ; ne pas recalculer les factures anciennes automatiquement.";E38
+D18;U4;"Le plafond est-il local ou global ; quels engagements inclure ; qui peut déroger ?";"Ne pas garantir un plafond global strict entre sites déconnectés ; distinguer encours et engagements, proposer quotas ou agence propriétaire.";E37
+D19;U2/U4;Quel justificatif pour avance avant facture ou versement distant sans facture disponible ?;"Conserver la preuve du versement et le rattachement BC pour l’avance ; ne pas valider un reçu de créance définitif sans facture.";E24,E39-E41
+D20;U4;Quelles informations d’auteur doivent aussi figurer sur les impressions, et qui consulte l’historique complet ?;"Auteur visible à l’ouverture exigé ; proposer bandeau et audit, sans imposer une impression de toutes les données personnelles.";E42-E44

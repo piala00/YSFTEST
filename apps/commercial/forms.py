@@ -120,13 +120,31 @@ LigneDocumentFormSet = inlineformset_factory(
 class ReglementForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Reglement
-        fields = ("tiers", "date", "mode", "journal", "montant", "commande", "reference", "libelle")
+        fields = ("tiers", "facture", "commande", "date", "mode", "journal", "agence_encaissement", "montant", "reference", "libelle")
         widgets = {"date": DateInput()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from apps.core.models import Agence
+
         self.fields["journal"].queryset = Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)
+        self.fields["journal"].required = False
+        self.fields["journal"].help_text = "Caisse, banque ou Mobile Money qui reçoit l'argent (inutile si une autre agence a encaissé)"
         self.fields["tiers"].queryset = Tiers.objects.filter(actif=True)
+        factures = (Document.objects.filter(type_document__in=(Document.FACTURE, Document.ACHAT_FACTURE), statut=Document.VALIDE)
+                    .select_related("tiers").order_by("-date", "-numero"))
+        self.fields["facture"].queryset = factures
+        self.fields["facture"].label_from_instance = (
+            lambda d: f"{d.numero} · {d.tiers.nom if d.tiers else ''} · reste dû {d.reste_a_payer:,.0f}".replace(",", " "))
+        self.fields["agence_encaissement"].queryset = Agence.objects.filter(actif=True, locale=False)
+
+    def clean(self):
+        donnees = super().clean()
+        if donnees.get("agence_encaissement"):
+            donnees["journal"] = Journal.objects.filter(type_journal=Journal.TYPE_OD).first() or donnees.get("journal")
+        elif not donnees.get("journal"):
+            self.add_error("journal", "Choisissez la caisse, la banque ou le compte Mobile Money qui reçoit l'argent.")
+        return donnees
         self.fields["commande"].queryset = (Document.objects.filter(type_document__in=(Document.COMMANDE, Document.ACHAT_COMMANDE))
                                             .exclude(statut=Document.ANNULE).select_related("tiers").order_by("-date"))
         self.fields["commande"].label_from_instance = lambda d: f"{d.numero_affiche} · {d.tiers.nom if d.tiers else ''} · {d.total_ttc:,.0f}".replace(",", " ")

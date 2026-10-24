@@ -188,10 +188,10 @@ class InterModulesTests(BaseCompta):
 
     def test_c07_reglement_partiel_puis_solde_lettre(self):
         doc = self.facture(self.client_).valider()                                 # 11 925 TTC
-        Reglement(tiers=self.client_, journal=Journal.objects.get(code="CA"), montant=Decimal("5000")).enregistrer()
+        Reglement(tiers=self.client_, journal=Journal.objects.get(code="CA"), montant=Decimal("5000"), facture=doc).enregistrer()
         services.lettrage_automatique(tiers=self.client_)
         self.assertEqual(self.ligne(doc.ecriture, "4111").lettrage, "")
-        Reglement(tiers=self.client_, journal=Journal.objects.get(code="BQ"), montant=Decimal("6925")).enregistrer()
+        Reglement(tiers=self.client_, journal=Journal.objects.get(code="BQ"), montant=Decimal("6925"), facture=doc).enregistrer()
         services.lettrage_automatique(tiers=self.client_)
         self.assertTrue(self.ligne(doc.ecriture, "4111").lettrage)
         doc.refresh_from_db()

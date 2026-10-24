@@ -124,8 +124,14 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
     def test_reglement_impute_et_comptabilise(self):
         f1 = self.document(Document.FACTURE, self.client_).valider()
         f2 = self.document(Document.FACTURE, self.client_).valider()
-        reglement = Reglement(tiers=self.client_, journal=Journal.objects.get(code="CA"), montant=Decimal("15000"))
-        reglement.enregistrer()
+        caisse = Journal.objects.get(code="CA")
+        with self.assertRaises(ValidationError):                       # reçu de créance sans facture : refusé
+            Reglement(tiers=self.client_, journal=caisse, montant=Decimal("15000")).enregistrer()
+        with self.assertRaises(ValidationError):                       # plus que le reste dû : refusé
+            Reglement(tiers=self.client_, journal=caisse, montant=Decimal("15000"), facture=f1).enregistrer()
+        # Un versement de 15 000 pour deux factures : un reçu par facture
+        Reglement(tiers=self.client_, journal=caisse, montant=Decimal("11925"), facture=f1).enregistrer()
+        reglement = Reglement(tiers=self.client_, journal=caisse, montant=Decimal("3075"), facture=f2).enregistrer()
         f1.refresh_from_db(); f2.refresh_from_db()
         self.assertEqual(f1.reste_a_payer, 0)
         self.assertEqual(f2.reste_a_payer, Decimal("11925") * 2 - Decimal("15000"))

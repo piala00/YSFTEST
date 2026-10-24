@@ -676,7 +676,7 @@ def reglement_create(request):
     facture = None
     if request.GET.get("document"):
         facture = get_object_or_404(Document, pk=request.GET["document"], type_document__in=Document.TYPES_FACTURATION)
-        initial = {"tiers": facture.tiers, "montant": facture.reste_a_payer,
+        initial = {"tiers": facture.tiers_payeur, "facture": facture, "montant": facture.reste_a_payer,
                    "libelle": f"Règlement {facture.numero}"}
     elif request.GET.get("commande"):
         commande = get_object_or_404(Document, pk=request.GET["commande"], type_document__in=(Document.COMMANDE, Document.ACHAT_COMMANDE))
@@ -691,13 +691,12 @@ def reglement_create(request):
         try:
             with transaction.atomic():
                 reglement = form.save(commit=False)
-                if facture and reglement.tiers_id != facture.tiers_id:
-                    raise ValidationError("Le tiers du règlement doit être celui de la facture.")
-                reglement.enregistrer(factures=[facture] if facture else None)
+                reglement.journal = form.cleaned_data["journal"]
+                reglement.enregistrer()
             messages.success(request, f"Règlement {reglement.numero} enregistré et comptabilisé.")
             return redirect("commercial:reglement_detail", pk=reglement.pk)
         except ValidationError as exc:
-            _erreur(request, exc)
+            form.add_error(None, exc)
     return render(request, "core/form.html", {"form": form, "titre": "Nouveau règlement", "facture": facture})
 
 
@@ -848,8 +847,12 @@ def pointage(request):
             p = existant or PointageFiche(document=document, depot=depot)
             p.fichiste = request.user
             p.observation = request.POST.get("observation", "")[:200]
-            p.enregistrer(saisies)
-            return redirect("commercial:pointage_detail", pk=p.pk)
+            try:
+                p.enregistrer(saisies)
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
+            else:
+                return redirect("commercial:pointage_detail", pk=p.pk)
     return render(request, "commercial/pointage.html", {
         "depots": Depot.objects.filter(actif=True), "depot": depot, "numero": numero, "document": document,
         "articles": articles, "existant": existant})

@@ -75,6 +75,9 @@ def enregistrer(action, objet=None, details=None, libelle=""):
 def _avant(sender, instance, raw=False, **kwargs):
     if raw:                                  # chargement d'une sauvegarde : pas une action d'utilisateur
         return
+    # Auteur d'origine : l'utilisateur connecté, enregistré côté serveur (jamais choisi dans une liste)
+    if instance._state.adding and hasattr(instance, "cree_par_id") and instance.cree_par_id is None:
+        instance.cree_par = _utilisateur()
     if instance.pk:
         ancien = sender.objects.filter(pk=instance.pk).first()
         instance._journal_avant = _photo(ancien) if ancien else None
@@ -120,11 +123,11 @@ def connecter():
     from apps.commercial import models as c
     from apps.comptabilite import models as k
 
-    from .models import DroitAcces, Exercice, Societe
+    from .models import Agence, DroitAcces, Exercice, Societe
 
     suivre(Societe, Exercice, DroitAcces, get_user_model(), Group,
            c.Tiers, c.Article, c.FamilleArticle, c.Depot, c.CategorieTarifaire, c.Document, c.Reglement, c.Inventaire,
-           k.Compte, k.Journal, k.Ecriture, k.Taxe, k.Banque, k.SectionAnalytique)
+           c.OperationCaisse, c.PointageFiche, Agence, k.Compte, k.Journal, k.Ecriture, k.Taxe, k.Banque, k.SectionAnalytique)
     user_logged_in.connect(lambda sender, request, user, **kw: enregistrer("CONNEXION", user, libelle=user.username),
                            dispatch_uid="journal_connexion", weak=False)
     user_login_failed.connect(

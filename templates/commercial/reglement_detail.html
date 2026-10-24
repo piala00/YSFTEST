@@ -1,7 +1,9 @@
 {% extends "base.html" %}{% load erp %}
 {% block title %}{{ object.numero }}{% endblock %}
 {% block content %}
-<div class="page-title"><h1>Règlement {{ object.numero }}</h1></div>
+<div class="page-title"><h1>{% if object.commande %}Avance sur commande{% elif object.est_encaissement %}Reçu de règlement{% else %}Règlement{% endif %} {{ object.numero }}</h1>
+  <a class="btn btn-sm btn-outline-dark" href="javascript:window.print()"><i class="bi bi-printer"></i> Imprimer le reçu</a></div>
+{% include "core/_auteurs.html" with objet=object %}
 <div class="row g-3">
 <div class="col-md-5"><div class="card p-3">
   <dl class="row mb-0 small">
@@ -12,6 +14,10 @@
     <dt class="col-5">Journal</dt><dd class="col-7">{{ object.journal }}</dd>
     <dt class="col-5">Référence</dt><dd class="col-7">{{ object.reference|default:"—" }}</dd>
     <dt class="col-5">Montant</dt><dd class="col-7 fw-bold">{{ object.montant|montant }}</dd>
+    {% if object.facture %}<dt class="col-5">Facture réglée</dt><dd class="col-7"><a href="{% url 'commercial:document_detail' object.facture.pk %}">{{ object.facture.numero }}</a>
+      · reste dû {{ object.facture.reste_a_payer|montant }}</dd>{% endif %}
+    {% if object.commande %}<dt class="col-5">Bon de commande</dt><dd class="col-7"><a href="{% url 'commercial:document_detail' object.commande.pk %}">{{ object.commande.numero_affiche }}</a></dd>{% endif %}
+    {% if object.agence_encaissement %}<dt class="col-5">Encaissé par</dt><dd class="col-7">{{ object.agence_encaissement.nom }} (reçu {{ object.reference }})</dd>{% endif %}
     <dt class="col-5">Non imputé</dt><dd class="col-7">{{ object.montant_non_impute|montant }}</dd>
     {% if object.ecriture %}<dt class="col-5">Écriture</dt><dd class="col-7"><a href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}">{{ object.ecriture.numero }}</a></dd>{% endif %}
   </dl></div></div>

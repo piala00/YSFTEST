@@ -42,7 +42,7 @@ class TiersPayeurTests(TestCase):
     def test_reglement_du_payeur_solde_la_facture_de_l_agence(self):
         doc = self.facture(self.agence)
         doc.valider()
-        Reglement(tiers=self.siege, journal=Journal.objects.get(code="CA"), montant=Decimal("1000")).enregistrer()
+        Reglement(tiers=self.siege, journal=Journal.objects.get(code="CA"), montant=Decimal("1000"), facture=doc).enregistrer()
         doc.refresh_from_db()
         self.assertEqual(doc.reste_a_payer, 0)
 

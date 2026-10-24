@@ -54,3 +54,14 @@ def cellule(ligne, colonne):
 @register.filter
 def valeur(dictionnaire, cle):
     return dictionnaire.get(cle) if isinstance(dictionnaire, dict) else None
+
+
+@register.simple_tag
+def derniere_modification(objet):
+    """Dernière modification d'une pièce d'après le journal des événements (auteur et date), ou None."""
+    from apps.core.models import JournalEvenement
+
+    if objet is None or not getattr(objet, "pk", None):
+        return None
+    return (JournalEvenement.objects.filter(action="MODIFICATION", objet_type=objet._meta.verbose_name.capitalize()[:60],
+                                            objet_id=str(objet.pk)).select_related("utilisateur").order_by("-date").first())

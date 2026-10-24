@@ -40,10 +40,11 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ["id", "type_document", "type_libelle", "numero", "date", "date_echeance", "tiers", "tiers_nom",
+        fields = ["id", "type_document", "type_libelle", "numero", "date", "date_echeance", "tiers", "tiers_nom", "payeur",
                   "depot", "depot_nom", "depot_destination",
-                  "reference_externe", "statut", "notes", "total_ht", "total_tva", "total_ttc", "reste_a_payer", "lignes"]
-        read_only_fields = ["numero", "statut", "total_ht", "total_tva", "total_ttc"]
+                  "reference_externe", "statut", "notes", "total_ht", "total_tva", "total_ttc", "reste_a_payer", "lignes",
+                  "cree_par", "cree_le", "valide_par", "valide_le"]
+        read_only_fields = ["numero", "statut", "total_ht", "total_tva", "total_ttc", "cree_par", "cree_le", "valide_par", "valide_le"]
 
     def validate(self, attrs):
         from django.core.exceptions import ValidationError as DjangoValidationError
@@ -84,11 +85,18 @@ class ReglementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Reglement
-        fields = ["id", "numero", "date", "tiers", "tiers_nom", "mode", "journal", "montant", "reference", "libelle"]
-        read_only_fields = ["numero"]
+        fields = ["id", "numero", "date", "tiers", "tiers_nom", "mode", "journal", "montant", "facture", "commande",
+                  "agence_encaissement", "reference", "libelle", "cree_par"]
+        read_only_fields = ["numero", "cree_par"]
 
     def create(self, validated_data):
-        return Reglement(**validated_data).enregistrer()
+        from django.core.exceptions import ValidationError as ErreurModele
+        from rest_framework.exceptions import ValidationError
+
+        try:
+            return Reglement(**validated_data).enregistrer()
+        except ErreurModele as exc:                     # ex. reçu de créance sans facture
+            raise ValidationError(exc.message_dict if hasattr(exc, "error_dict") else exc.messages)
 
 
 class CompteSerializer(serializers.ModelSerializer):

@@ -170,6 +170,8 @@ class Ecriture(models.Model):
     statut = models.CharField(max_length=12, choices=STATUTS, default=STATUT_BROUILLARD)
     origine = models.CharField(max_length=50, blank=True, help_text="Document commercial à l'origine")
     cree_le = models.DateTimeField(auto_now_add=True)
+    cree_par = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                 verbose_name="Créé par")
 
     class Meta:
         ordering = ["-date", "-numero"]

@@ -40,6 +40,7 @@
     {% endwith %}
   </div>
 
+  {% include "core/_auteurs.html" with objet=object %}
   <div class="piece-entete">
     <div class="piece-champs">
       {% if object.tiers %}
@@ -104,7 +105,7 @@
     </div>
   </div>
   <div class="piece-boutons">
-    <span class="piece-cree small text-muted">Créé le {{ object.cree_le|date:"d/m/y" }}{% if object.cree_par %} par {{ object.cree_par }}{% endif %}</span>
+    <span class="piece-cree small text-muted">Créé le {{ object.cree_le|date:"d/m/y" }} par {{ object.cree_par|default:"auteur inconnu" }}</span>
     <a class="btn btn-sm btn-outline-secondary" data-nouvelle-fenetre href="{% url 'commercial:document_create' object.type_document %}">Nouveau</a>
     <button type="button" class="btn btn-sm btn-outline-secondary piece-fermer">OK</button>
     <button type="button" class="btn btn-sm btn-outline-secondary piece-fermer">Annuler</button>

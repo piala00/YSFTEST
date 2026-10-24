@@ -20,7 +20,7 @@
     {% if object.payeur %}<br>Tiers payeur : <a href="{% url 'commercial:tiers_detail' object.payeur.pk %}">{{ object.payeur }}</a>{% endif %}
     {% with payes=object.tiers_payes.all %}{% if payes %}<br>Paie pour : {% for t in payes %}<a href="{% url 'commercial:tiers_detail' t.pk %}">{{ t.nom }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% endwith %}
     {% if object.est_client %}<br>Catégorie tarifaire : {{ object.categorie_tarifaire|default:"—" }}
-    <br>Plafond d'encours : {% if object.plafond_credit %}{{ object.plafond_credit|montant }} · {{ object.get_code_risque_display }}{% else %}aucun{% endif %}{% endif %}</div></div>
+    <br>{% if object.type_tiers == "CLIENT" %}Mode de vente : <strong>{% if object.vente_credit %}à crédit{% else %}au comptant{% endif %}</strong> · {% endif %}Plafond d'encours : {% if object.plafond_credit %}{{ object.plafond_credit|montant }} · {{ object.get_code_risque_display }}{% else %}aucun{% endif %}{% endif %}</div></div>
 </div>
 <div class="row g-3">
 <div class="col-lg-7"><div class="card"><div class="card-header bg-white fw-semibold">Documents</div>
