@@ -22,7 +22,7 @@ Les tests de reproduction de la revue (`review_probes.py`) sont intégrés sous 
 ## Tests exécutés
 
 - **SQLite :** `python manage.py test` donne **167 tests, OK** (après application des décisions ci-dessus). On y trouve les 8 tests de GPT (A07 adapté), ainsi que des tests pour R18, le début de la fiche, le reçu multi-factures et le rattachement (modèle et formulaire). Les tests antérieurs qui supposaient l'ancienne règle sont mis à jour : refus d'un montant supérieur au reste dû, facture transformée à la main après le BL.
-- **SQL Server 2022 (image officielle Microsoft, conteneur local) :** la même suite donne **164 tests, OK**, avec `mssql-django` 2.0 et le pilote Microsoft fourni. Ce passage a révélé un défaut, corrigé : le défaut du taux de TVA d'un article lisait toute la fiche Société pendant les migrations. Une nouvelle colonne de la Société faisait alors échouer la mise à jour d'une base SQL Server existante ; seul le champ nécessaire est désormais lu.
+- **SQL Server 2022 (image officielle Microsoft, conteneur local) :** la même suite donne **167 tests, OK** (après application des décisions), avec `mssql-django` 2.0 et le pilote Microsoft fourni. Ce passage a révélé un défaut, corrigé : le défaut du taux de TVA d'un article lisait toute la fiche Société pendant les migrations. Une nouvelle colonne de la Société faisait alors échouer la mise à jour d'une base SQL Server existante ; seul le champ nécessaire est désormais lu.
 - **Écrans :** fiche d'article, rapprochement et rapport commercial affichés avec les données de démonstration (HTTP 200, nouveaux libellés présents).
 
 ## Validation SQL Server et paquet Windows (hors revue, livrés le 24/10)
