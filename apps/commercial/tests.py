@@ -139,6 +139,19 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
         self.assertEqual(soldes["5711"], Decimal("15000"))
         self.assertEqual(self.client_.solde_comptable(), Decimal("11925") * 2 - Decimal("15000"))
 
+    def test_reglement_partiel_et_facture_d_un_autre_client(self):
+        f = self.document(Document.FACTURE, self.client_).valider()
+        caisse = Journal.objects.get(code="CA")
+        autre = Tiers.objects.create(code="CAUTRE", nom="Autre client")
+        with self.assertRaisesMessage(ValidationError, "n'est pas celle de"):          # facture d'un autre client
+            Reglement(tiers=autre, journal=caisse, montant=Decimal("100"), facture=f).enregistrer()
+        Reglement(tiers=self.client_, journal=caisse, montant=Decimal("10000"), facture=f).enregistrer()
+        Reglement(tiers=self.client_, journal=caisse, montant=f.total_ttc - Decimal("10000"), facture=f).enregistrer()
+        f.refresh_from_db()
+        self.assertEqual((f.reste_a_payer, f.recus.count()), (0, 2))                  # deux reçus, facture soldée
+        with self.assertRaises(ValidationError):                                       # facture déjà soldée
+            Reglement(tiers=self.client_, journal=caisse, montant=Decimal("1"), facture=f).enregistrer()
+
     def test_facture_de_retour_remet_le_stock(self):
         facture = self.document(Document.FACTURE, self.client_).valider()
         retour = facture.transformer(Document.FACTURE_RETOUR)

@@ -66,4 +66,4 @@ Statuts :
 
 ## Tests exécutés
 
-Commande : `python manage.py test`. Résultat : **154 tests, tous réussis** (à la date de la livraison).
+Commande : `python manage.py test`. Résultat : **155 tests, tous réussis** (à la date de la livraison).
