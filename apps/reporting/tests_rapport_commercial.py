@@ -65,10 +65,10 @@ class RapportCommercialTests(TestCase):
         self.assertIn("client au comptant", doc.controler_encours())
         doc.valider()                                                                # signalé, jamais imposé
         natures = {l["doc"].pk: l["nature"] for l in services.rapport_commercial(self.jour)["ventes"]["factures"]}
-        self.assertEqual(natures[doc.pk], "En compte · client au comptant non soldé")
+        self.assertEqual(natures[doc.pk], "À crédit · client au comptant non soldé")
 
     def test_recu_sans_facture_refuse(self):
-        with self.assertRaisesMessage(ValidationError, "rattaché à la facture"):
+        with self.assertRaisesMessage(ValidationError, "rattaché à au moins une facture"):
             self.regler(1000)
 
     def test_auteurs_enregistres(self):
@@ -103,7 +103,7 @@ class RapportCommercialTests(TestCase):
                         agence=self.garoua).enregistrer()
         r = services.rapport_commercial(self.jour)
         natures = {l["doc"].pk: l["nature"] for l in r["ventes"]["factures"]}
-        self.assertEqual((natures[comptant.pk], natures[credit.pk]), ("Comptant", "En compte"))
+        self.assertEqual((natures[comptant.pk], natures[credit.pk]), ("Comptant", "À crédit"))
         self.assertEqual((r["ventes"]["comptant"], r["ventes"]["credit"]), (Decimal("2000"), Decimal("3000")))
         self.assertEqual(r["ventes"]["commandes"][0]["nature"], "Payé d'avance")
         self.assertEqual(sorted(e["nature"] for e in r["encaissements"]), ["Acompte sur commande", "Vente du jour"])
@@ -120,8 +120,7 @@ class RapportCommercialTests(TestCase):
         self.assertEqual(acompte.montant_non_impute, Decimal("4000"))               # attend la facture
         livraison = commande.transformer(Document.LIVRAISON)
         livraison.valider()
-        facture = livraison.transformer(Document.FACTURE)
-        facture.valider()
+        facture = livraison.facture_auto                                            # facturée à la livraison
         facture.refresh_from_db()
         self.assertEqual(facture.reste_a_payer, 0)
         r = services.rapport_commercial(self.jour)

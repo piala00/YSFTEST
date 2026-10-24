@@ -114,7 +114,7 @@ class CasPratiquesTests(SahelDistribution):
         releve.append(("commande", self.stock(self.jus, self.principal)))
         bl = commande.transformer(Document.LIVRAISON); bl.valider()
         releve.append(("livraison", self.stock(self.jus, self.principal)))
-        facture = bl.transformer(Document.FACTURE); facture.valider()
+        facture = bl.facture_auto                                    # facturé automatiquement à la livraison
         releve.append(("facture", self.stock(self.jus, self.principal)))
         # Seul le bon de livraison mouvemente le stock
         self.assertEqual([q for _, q in releve], [D("100"), D("100"), D("90"), D("90")])

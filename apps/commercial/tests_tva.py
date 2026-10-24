@@ -110,7 +110,7 @@ class RegimeTvaTests(TestCase):
         user = get_user_model().objects.create_superuser("conf", "", "x")
         self.client.force_login(user)
         donnees = {"raison_sociale": "Test", "devise": "XAF", "taux_tva_defaut": "19.25", "regime_tva": "MANUELLE",
-                   "delai_pointage": 1}
+                   "delai_pointage": 1, "facturation_auto_livraison": "VALIDEE"}
         self.client.post(reverse("commercial:societe"), donnees)
         self.assertEqual(Societe.get().taux_tva_defaut, 0)
         self.assertFalse(Taxe.objects.exists())

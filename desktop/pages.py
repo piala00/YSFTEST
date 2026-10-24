@@ -289,7 +289,7 @@ class FenetreReglement(ctk.CTkToplevel):
             messagebox.showerror("Erreur", f"Journal {journal} introuvable.", parent=self)
             return
         try:
-            r = self.api.creer_reglement({"tiers": self.document.get("payeur") or self.document["tiers"], "facture": self.document["id"],
+            r = self.api.creer_reglement({"tiers": self.document.get("payeur") or self.document["tiers"], "factures": [self.document["id"]],
                                           "mode": mode, "journal": self.journaux[journal],
                                           "montant": float(self.montant.get().replace(" ", "").replace(",", ".")),
                                           "reference": self.reference.get(), "libelle": f"Règlement {self.document['numero']}"})

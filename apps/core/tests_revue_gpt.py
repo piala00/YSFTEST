@@ -96,6 +96,18 @@ class StockReview(TestCase):
         self.assertEqual(fiche_stock.bons_en_retard(self.depot, apres, 1), [self.livraison])  # la livraison seule
         self.assertEqual(fiche_stock.bons_en_retard(self.depot, apres, 3), [])
 
+    def test_debut_de_la_fiche_stock_d_ouverture(self):
+        demain = self.jour + datetime.timedelta(days=1)
+        self.depot.fiche_debut = demain                          # fiche ouverte après ces deux bons : ouverture
+        self.depot.save()
+        self.assertEqual(list(fiche_stock.bons_a_pointer(self.depot, self.jour, demain)), [])
+        f = fiche_stock.fiche_article(self.huile, self.depot, self.jour, demain)
+        self.assertEqual((f["solde_fiche"], f["attente"], f["ecart"]), (Decimal("90"), 0, 0))
+        self.assertEqual(fiche_stock.rapprochement(self.depot), [])
+        self.depot.fiche_debut = None                            # vide : dès la première entrée de stock
+        self.depot.save()
+        self.assertEqual(len(fiche_stock.bons_a_pointer(self.depot, self.jour, self.jour)), 2)
+
     def test_R13_livraison_partielle_puis_facture(self):
         commande = self.piece(Document.COMMANDE, 10, self.client_)
         livraison = commande.transformer(Document.LIVRAISON)
@@ -104,8 +116,7 @@ class StockReview(TestCase):
         ligne.save()
         livraison.recalculer()
         livraison.valider()
-        facture = livraison.transformer(Document.FACTURE)
-        facture.valider()
+        facture = livraison.facture_auto                                      # facture des 4 livrés, automatique
         commande.refresh_from_db()
         self.assertEqual(commande.lignes.get().reste_a_transformer, Decimal("6"))
         self.assertEqual(facture.lignes.get().quantite, Decimal("4"))

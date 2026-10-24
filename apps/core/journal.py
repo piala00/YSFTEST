@@ -126,7 +126,7 @@ def connecter():
     from .models import Agence, DroitAcces, Exercice, Societe
 
     suivre(Societe, Exercice, DroitAcces, get_user_model(), Group,
-           c.Tiers, c.Article, c.FamilleArticle, c.Depot, c.CategorieTarifaire, c.Document, c.Reglement, c.Inventaire,
+           c.Tiers, c.Article, c.FamilleArticle, c.Depot, c.CategorieTarifaire, c.Document, c.Reglement, c.Imputation, c.Inventaire,
            c.OperationCaisse, c.PointageFiche, Agence, k.Compte, k.Journal, k.Ecriture, k.Taxe, k.Banque, k.SectionAnalytique)
     user_logged_in.connect(lambda sender, request, user, **kw: enregistrer("CONNEXION", user, libelle=user.username),
                            dispatch_uid="journal_connexion", weak=False)

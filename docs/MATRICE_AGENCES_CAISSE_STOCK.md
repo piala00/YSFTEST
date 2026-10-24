@@ -26,7 +26,7 @@ Statuts :
 
 | Id | Exigence (résumé) | Existant / adaptation | Écart restant | Preuve |
 |---|---|---|---|---|
-| E13 | Ventes du jour automatiques | `reporting.services.rapport_commercial` : factures (comptant, payée d'avance, en compte, client au comptant non soldé) et bons de commande | Sens de « en compte » / « à crédit » : D04 | `test_rapport_complet_du_jour` |
+| E13 | Ventes du jour automatiques | `reporting.services.rapport_commercial` : factures (comptant, payée d'avance, **à crédit**, client au comptant non soldé) et bons de commande. **Décision de l'utilisateur (24/10) :** « en compte », « à terme » et « à crédit » sont synonymes, d'où le libellé unique « À crédit ». | — | `test_rapport_complet_du_jour` |
 | E14 | Encaissements du jour | Reçus de la caisse du jour, nature (créance / avance) ; encaissements des autres trésoreries (banque, Mobile Money) montrés à part, par journal et par mode | — | `tests_revue_gpt.test_A07…` |
 | E15 | Sorties et dépenses | `OperationCaisse` : dépense, sortie pour agence, autre sortie, plus règlements fournisseurs | — | idem |
 | E16 | Solde de caisse | Ouverture + entrées − sorties, contrôle contre le compte de trésorerie ; virement et Mobile Money refusés sur une caisse espèces (compte 57) — A07 ; rapport d'un jour passé figé à sa date (règlements ultérieurs exclus) — A05 | Photographie de clôture et réouverture : D05 | `test_A05…`, `test_A07…` |
@@ -35,7 +35,7 @@ Statuts :
 | E21 | Sorties pour d'autres agences | `OperationCaisse SORTIE_AGENCE` (liaison au débit) | — | `test_rapport_complet_du_jour` |
 | E22 | Sources : factures, comptant / en compte / crédit | Voir E13 | D04 | idem |
 | E23–E24 | Commandes comptant / en compte, payées avant enlèvement | Avance `Reglement.commande`, imputée à la facture issue de la commande à sa validation (pas de double encaissement) | Remboursement ou annulation d'avance : D07 | tests acomptes |
-| E25 | BC livré le jour → facture le jour | Transformation BC → BL → facture en un clic ; le rapport indique « livré et facturé ce jour » | **Décision D06** : quel événement prouve la livraison avant la facturation automatique | — |
+| E25 | BC livré → facture le jour même | **Décision de l'utilisateur (24/10) :** c'est le magasin qui transforme le BC en BL, et la validation du BL prouve la livraison. À cette validation, la facture des quantités livrées est établie automatiquement et validée, avec imputation des avances. Option de la fiche Société : validée, brouillon ou aucune. Si la facture ne peut pas être validée (plafond bloquant), elle reste en brouillon et la livraison reste validée. | Droits du magasin à configurer par groupe (transformation BC → BL) | `test_chaine_devis_commande_livraison_facture`, `test_R13…`, `test_acompte_impute…` |
 | E26 | Transformation ultérieure | Transformation possible à tout moment ; avance reportée sur la facture | — | tests transformation |
 | P10 | Pas de double compte BC + facture | Le rapport sépare bons de commande (suivi) et factures (ventes) | — | `test_rapport_complet_du_jour` |
 | E27–E31 | Fiche de stock : n° de BL, articles chargés sans quantité, saisie par le fichiste | `PointageFiche` : recherche du bon par numéro complet ou fin de numéro non ambiguë ; quantités de l'ordinateur jamais envoyées à la page du fichiste | — | `test_saisie_a_l_aveugle_par_le_fichiste` |
@@ -43,7 +43,7 @@ Statuts :
 | P14 | Pas de deuxième sortie de stock | Le pointage ne crée aucun mouvement de stock | — | idem (stock ordinateur inchangé) |
 | P15 | Rien qui permette de déduire l'attendu | Écran : conforme / écart seulement. API : listes de pièces et de tiers filtrées par droits effectifs (un type interdit n'apparaît ni en liste ni en détail) ; états de l'API (balance, bilan, balance âgée, tableau de bord) soumis aux droits des pages — A01 | Exports d'états à revoir avec le même contrôle | `test_A01…` |
 | P16 | Déclarations originales, corrections motivées | Vide ≠ 0 (le zéro doit être saisi), négatif refusé, 3 décimales au plus, contrôlés dans le modèle — A02/A03 ; correction motivée ; l'ancienne déclaration garde SON fichiste, le correcteur est noté à part (`corrige_par`) — A04 ; historique visible des contrôleurs | Versions d'un BL modifié : non gérées (BL validé non modifiable) | `test_A02…`, `test_A03…`, `test_A04…` |
-| P17–P18 | Mouvements ≠ comptage ; tous les flux ; registre indépendant | Le pointage couvre tout bon qui fait bouger le stock ; la fiche ne contient que les déclarations du fichiste (et les inventaires physiques) : les bons non pointés sont montrés « en attente » avec un solde projeté distinct, jamais recopiés — A06 | Date d'ouverture de la fiche par dépôt (aujourd'hui tout l'historique non pointé est en attente) : D11 | `test_A06…` |
+| P17–P18 | Mouvements ≠ comptage ; tous les flux ; registre indépendant | Le pointage couvre tout bon qui fait bouger le stock ; la fiche ne contient que les déclarations du fichiste (et les inventaires physiques) : les bons non pointés sont montrés « en attente » avec un solde projeté distinct, jamais recopiés — A06 | **Décision de l'utilisateur (24/10) :** la fiche commence à l'entrée des stocks dans le logiciel (champ « Début de la fiche de stock » du dépôt, vide = première entrée ; le stock antérieur sert d'ouverture) — `test_debut_de_la_fiche…` | `test_A06…` |
 
 ## Complément U4 : crédit, reçus et auteurs
 
@@ -53,7 +53,7 @@ Statuts :
 | E36 | Compte pour les clients à crédit | Compte tiers (collectif 411) et compte de liaison client | — | tests comptabilité |
 | E37 | Plafond accordé | `plafond_credit` et code risque (avertir / bloquer), contrôlés sur le tiers payeur | Plafond global entre agences : D18 / P26 (non garanti hors ligne) | `tests_payeur.test_encours_controle_sur_le_payeur` |
 | E38 | Délai par facture | `date_echeance` de chaque facture (délai du client, modifiable) ; balance âgée | Fin de mois, échéances multiples : D17 | tests reporting |
-| E39–E41 | Reçu au versement, rattaché obligatoirement à une facture, détails conservés | `Reglement.facture` obligatoire pour un reçu de créance client (facture validée, du client ou de son payeur, pas d'avoir, montant ≤ reste dû) ; l'avance sur BC reste un circuit séparé ; reçu imprimable avec la facture réglée | Plusieurs factures par versement : D16 (un reçu par facture) | `commercial.tests` (reçu sans facture, dépassement), `test_recu_sans_facture_refuse` |
+| E39–E41 | Reçu rattaché à des factures, détails conservés | **Décision de l'utilisateur (24/10) :** un reçu se rattache à une ou plusieurs factures du client (ou de son payeur), réglées de la plus ancienne à la plus récente, totalement ou partiellement. Le reste éventuel est **en attente de rattachement** à une prochaine facture (bouton « Rattacher » sur le reçu, rappel sur la facture), et l'auteur du rattachement est conservé. Une facture déjà soldée, d'un autre client ou un avoir est refusé ; l'avance sur BC reste un circuit distinct. | — | `test_reglement_impute_et_comptabilise`, `test_reste_du_recu_en_attente_puis_rattache`, `test_formulaire_recu_plusieurs_factures_et_rattachement` |
 | E42–E44 | Auteur identifiable, visible à l'ouverture, traçabilité | `cree_par` posé côté serveur (jamais choisi dans une liste) sur pièces, reçus, écritures, opérations de caisse, inventaires, pointages ; `valide_par/le`, `annule_par/le` sur les pièces ; bandeau « Créé / Validé / Annulé / Modifié par » à l'ouverture ; journal des événements pour les modifications | Auteur sur les impressions : D20 | `test_auteurs_enregistres`, `test_correction_avec_motif_et_historique`, `core.tests_journal` |
 | P22–P24 | Un reçu → une facture ; reste dû calculé ; avance ≠ reçu | Voir E39–E41 | — | idem |
 | P25 | Auteur côté serveur, agence, site | Auteur et date côté serveur | Agence d'exécution sur chaque pièce : à ajouter avec la synchronisation | — |
@@ -66,4 +66,4 @@ Statuts :
 
 ## Tests exécutés
 
-Commande : `python manage.py test`. Résultat : **164 tests, tous réussis** (dont les 8 tests de la revue GPT du 24/10) (à la date de la livraison).
+Commande : `python manage.py test`. Résultat : **167 tests, tous réussis** (dont les tests de la revue GPT du 24/10) (à la date de la livraison).

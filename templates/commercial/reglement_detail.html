@@ -14,17 +14,19 @@
     <dt class="col-5">Journal</dt><dd class="col-7">{{ object.journal }}</dd>
     <dt class="col-5">Référence</dt><dd class="col-7">{{ object.reference|default:"—" }}</dd>
     <dt class="col-5">Montant</dt><dd class="col-7 fw-bold">{{ object.montant|montant }}</dd>
-    {% if object.facture %}<dt class="col-5">Facture réglée</dt><dd class="col-7"><a href="{% url 'commercial:document_detail' object.facture.pk %}">{{ object.facture.numero }}</a>
-      · reste dû {{ object.facture.reste_a_payer|montant }}</dd>{% endif %}
     {% if object.commande %}<dt class="col-5">Bon de commande</dt><dd class="col-7"><a href="{% url 'commercial:document_detail' object.commande.pk %}">{{ object.commande.numero_affiche }}</a></dd>{% endif %}
     {% if object.agence_encaissement %}<dt class="col-5">Encaissé par</dt><dd class="col-7">{{ object.agence_encaissement.nom }} (reçu {{ object.reference }})</dd>{% endif %}
-    <dt class="col-5">Non imputé</dt><dd class="col-7">{{ object.montant_non_impute|montant }}</dd>
+    {% if object.commande %}<dt class="col-5">Avance non imputée</dt><dd class="col-7">{{ object.montant_non_impute|montant }}{% if object.montant_non_impute %} <span class="text-muted">(attend la facture de la commande)</span>{% endif %}</dd>
+    {% else %}<dt class="col-5">En attente de rattachement</dt><dd class="col-7 {% if object.en_attente_de_rattachement %}fw-semibold text-warning-emphasis{% endif %}">{{ object.en_attente_de_rattachement|montant }}
+      {% if object.en_attente_de_rattachement %}<a class="btn btn-sm btn-outline-primary ms-2" href="{% url 'commercial:reglement_rattacher' object.pk %}">Rattacher à une facture</a>{% endif %}</dd>{% endif %}
     {% if object.ecriture %}<dt class="col-5">Écriture</dt><dd class="col-7"><a href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}">{{ object.ecriture.numero }}</a></dd>{% endif %}
   </dl></div></div>
 <div class="col-md-7"><div class="card"><div class="card-header bg-white fw-semibold">Factures réglées</div>
 <table class="table table-sm mb-0"><tbody>
+<tr class="small text-muted"><th>Facture</th><th>Date</th><th class="num">Total TTC</th><th class="num">Réglé par ce reçu</th><th class="num">Reste dû</th><th>Rattaché par</th></tr>
 {% for i in object.imputations.all %}<tr><td><a href="{% url 'commercial:document_detail' i.document.pk %}">{{ i.document.numero }}</a></td><td>{{ i.document.date|date:"d/m/Y" }}</td>
-<td class="num">{{ i.document.total_ttc|montant }}</td><td class="num fw-semibold">{{ i.montant|montant }}</td></tr>
+<td class="num">{{ i.document.total_ttc|montant }}</td><td class="num fw-semibold">{{ i.montant|montant }}</td><td class="num">{{ i.document.reste_a_payer|montant_ou_vide }}</td>
+<td class="small">{{ i.cree_par|default:"" }}{% if i.cree_le %} · {{ i.cree_le|date:"d/m/Y H:i" }}{% endif %}</td></tr>
 {% empty %}<tr><td class="text-muted">Aucune imputation (acompte / avance).</td></tr>{% endfor %}
 </tbody></table></div></div>
 </div>

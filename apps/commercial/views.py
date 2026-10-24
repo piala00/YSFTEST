@@ -8,6 +8,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.html import format_html
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
@@ -615,6 +616,12 @@ def document_valider(request, pk):
     try:
         document.valider()
         messages.success(request, f"Document {document.numero} validé.")
+        facture = getattr(document, "facture_auto", None)
+        if facture is not None:
+            lien = reverse("commercial:document_detail", args=[facture.pk])
+            etat = "validée" if facture.statut == Document.VALIDE else "en brouillon"
+            messages.info(request, format_html('Facture <a href="{}" data-nouvelle-fenetre>{}</a> établie automatiquement ({}).',
+                                               lien, facture.numero_affiche, etat))
         if getattr(document, "avertissement", None):
             messages.warning(request, document.avertissement)
         if document.mentions_manquantes():
@@ -676,7 +683,7 @@ def reglement_create(request):
     facture = None
     if request.GET.get("document"):
         facture = get_object_or_404(Document, pk=request.GET["document"], type_document__in=Document.TYPES_FACTURATION)
-        initial = {"tiers": facture.tiers_payeur, "facture": facture, "montant": facture.reste_a_payer,
+        initial = {"tiers": facture.tiers_payeur, "factures": [facture], "montant": facture.reste_a_payer,
                    "libelle": f"Règlement {facture.numero}"}
     elif request.GET.get("commande"):
         commande = get_object_or_404(Document, pk=request.GET["commande"], type_document__in=(Document.COMMANDE, Document.ACHAT_COMMANDE))
@@ -692,7 +699,8 @@ def reglement_create(request):
             with transaction.atomic():
                 reglement = form.save(commit=False)
                 reglement.journal = form.cleaned_data["journal"]
-                reglement.enregistrer()
+                factures = list(form.cleaned_data.get("factures") or [])
+                reglement.enregistrer(factures if factures else None)
             messages.success(request, f"Règlement {reglement.numero} enregistré et comptabilisé.")
             return redirect("commercial:reglement_detail", pk=reglement.pk)
         except ValidationError as exc:
@@ -703,6 +711,25 @@ def reglement_create(request):
 class ReglementDetailView(LoginRequiredMixin, DetailView):
     model = Reglement
     template_name = "commercial/reglement_detail.html"
+
+
+@login_required
+def reglement_rattacher(request, pk):
+    """Rattacher le reste en attente d'un reçu à une nouvelle facture du client."""
+    from .forms import RattachementForm
+
+    reglement = get_object_or_404(Reglement, pk=pk)
+    form = RattachementForm(reglement, request.POST or None, initial={"facture": request.GET.get("facture")})
+    if request.method == "POST" and form.is_valid():
+        try:
+            imputation = reglement.rattacher(form.cleaned_data["facture"], form.cleaned_data.get("montant"))
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            messages.success(request, f"{imputation.montant:,.0f} rattachés à la facture {imputation.document.numero}.".replace(",", " "))
+            return redirect("commercial:reglement_detail", pk=reglement.pk)
+    return render(request, "core/form.html", {"form": form, "titre": f"Rattacher le reste du reçu {reglement.numero} "
+                                                                     f"({reglement.en_attente_de_rattachement:,.0f})".replace(",", " ")})
 
 
 # ---------------------------------------------------------------- Recherche de documents

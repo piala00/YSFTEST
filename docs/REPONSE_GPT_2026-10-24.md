@@ -21,7 +21,7 @@ Les tests de reproduction de la revue (`review_probes.py`) sont intégrés sous 
 
 ## Tests exécutés
 
-- **SQLite :** `python manage.py test` donne **164 tests, OK**. Ce sont les 155 tests antérieurs (dont un test de formulaire Société complété du nouveau champ), plus 9 tests de revue (les 8 de GPT, avec A07 adapté, et R18).
+- **SQLite :** `python manage.py test` donne **167 tests, OK** (après application des décisions ci-dessus). On y trouve les 8 tests de GPT (A07 adapté), ainsi que des tests pour R18, le début de la fiche, le reçu multi-factures et le rattachement (modèle et formulaire). Les tests antérieurs qui supposaient l'ancienne règle sont mis à jour : refus d'un montant supérieur au reste dû, facture transformée à la main après le BL.
 - **SQL Server 2022 (image officielle Microsoft, conteneur local) :** la même suite donne **164 tests, OK**, avec `mssql-django` 2.0 et le pilote Microsoft fourni. Ce passage a révélé un défaut, corrigé : le défaut du taux de TVA d'un article lisait toute la fiche Société pendant les migrations. Une nouvelle colonne de la Société faisait alors échouer la mise à jour d'une base SQL Server existante ; seul le champ nécessaire est désormais lu.
 - **Écrans :** fiche d'article, rapprochement et rapport commercial affichés avec les données de démonstration (HTTP 200, nouveaux libellés présents).
 
@@ -37,19 +37,27 @@ La revue notait « pas de validation PostgreSQL/SQL Server, pas d'installation W
 - **Installation et suite complète validées sur SQL Server 2022.** Deux défauts révélés et corrigés : une recherche par expression régulière (non supportée) et un code de dépôt trop long pour la colonne (jeu « Sahel »).
 - **Non testé :** les lanceurs `.bat` sur un vrai poste Windows et l'authentification Windows intégrée.
 
+## Décisions de l'utilisateur (24/10, après la revue) et leur application
+
+| Question | Décision | Ce qui est appliqué |
+|---|---|---|
+| D06 / R11 | Le magasin transforme le BC en BL, puisque c'est lui qui livre physiquement. | À la validation du BL issu d'un BC, la facture des quantités livrées est établie et validée le jour même ; les avances sont imputées. Option `Societe.facturation_auto_livraison` : validée (par défaut), brouillon ou aucune. Une facture refusée (plafond bloquant) reste en brouillon sans annuler la livraison. |
+| D16 / R31 | Un reçu peut régler plusieurs factures, totalement ou partiellement ; le reste attend une nouvelle facture. | `Reglement.enregistrer(factures)` impute de la plus ancienne à la plus récente. Le reste reste en attente (`en_attente_de_rattachement`) puis se rattache par `Reglement.rattacher(facture, montant)`. `Imputation` porte désormais un auteur et une date. Un rapport passé ne change pas après un rattachement ultérieur. |
+| D04 | « En compte », « à terme » et « à crédit » veulent dire la même chose : le client a acheté à crédit. | Libellé unique « À crédit » dans le rapport. |
+| D11 | La fiche de stock commence quand les stocks sont saisis dans le logiciel. | Champ `Depot.fiche_debut` : vide = première entrée de stock ; une date rend le stock antérieur stock d'ouverture, sans bons « en attente ». |
+| D01 / D14 | Les conditionnements seront traités plus tard. | Rien n'est commencé. |
+
+**Migrations :** `commercial/0015_recus_multi_factures`, `commercial/0016_fiche_debut`, `core/0014_facturation_auto_livraison`.
+
 ## Décisions encore attendues de l'utilisateur
 
 Les avis de GPT (`AVIS_DECISIONS.csv`) sont transmis tels quels, comme propositions :
 
 | Question | Proposition de GPT | Ce qui reste à décider |
 |---|---|---|
-| D06 | Confirmation explicite de livraison avant la facture automatique | Qui confirme, quand, et le cas des livraisons partielles |
-| D04 | « En compte » et « à crédit » forment une catégorie commune, avec un état de paiement séparé | Libellés et colonnes du rapport |
 | E35 | Alerte à la saisie et blocage de la sortie magasin pour un client au comptant non payé, avec dérogation nominative motivée | Valider, et indiquer qui peut déroger |
-| D16 | Versement unique ventilé, avec sous-reçus par facture | Sous-reçus ou reçu multi-factures |
 | D01 / D14 | Unité de base, présentations configurables et prix distincts | Quelques articles réels anonymisés (facteurs, prix, déconditionnement) |
 | D03 / D09 / D13 | Lots authentifiés, envoyés par HTTPS quand Internet est disponible | Fréquence de transmission, poste central, codes clients communs |
-| D11 (nouveau) | — | Date d'ouverture de la fiche de stock par dépôt, pour ne pas mettre tout l'historique « en attente » |
 
 ## Suite proposée
 

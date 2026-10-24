@@ -203,7 +203,8 @@ def element_de_la_page(request, module, element_actif=None):
         codes = {"taxes": "structure.taux_taxes", "banques": "structure.banques", "sections": "structure.plan_analytique"}
         return codes.get(kwargs["structure"])
     equivalents = {"delettrage": "lettrage", "stock_comptabiliser": "stock", "journal_create": "journaux",
-                   "journal_update": "journaux", "article_parametres": "articles"}
+                   "journal_update": "journaux", "article_parametres": "articles",
+                   "reglement_rattacher": "reglements"}
     if court in equivalents:
         return index.get(f"{module.code}:{equivalents[court]}")
     for suffixe in ("_create", "_update", "_detail"):
@@ -224,7 +225,7 @@ def operation_demandee(request):
         return SUPPRIMER
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         return ECRIRE
-    if court.endswith(("_create", "_update")) or court in ("article_parametres",):
+    if court.endswith(("_create", "_update")) or court in ("article_parametres", "reglement_rattacher"):
         return ECRIRE              # ouvrir un formulaire de saisie, c'est déjà écrire
     return CONSULTER
 

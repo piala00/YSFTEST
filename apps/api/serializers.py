@@ -80,21 +80,33 @@ class DocumentSerializer(serializers.ModelSerializer):
         return instance
 
 
+class ImputationSerializer(serializers.Serializer):
+    facture = serializers.IntegerField(source="document_id")
+    numero = serializers.CharField(source="document.numero")
+    montant = serializers.DecimalField(max_digits=18, decimal_places=2)
+
+
 class ReglementSerializer(serializers.ModelSerializer):
     tiers_nom = serializers.CharField(source="tiers.nom", read_only=True)
+    factures = serializers.PrimaryKeyRelatedField(
+        many=True, write_only=True, required=False,
+        queryset=Document.objects.filter(type_document__in=(Document.FACTURE, Document.ACHAT_FACTURE)))
+    imputations = ImputationSerializer(many=True, read_only=True)
+    en_attente_de_rattachement = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
 
     class Meta:
         model = Reglement
-        fields = ["id", "numero", "date", "tiers", "tiers_nom", "mode", "journal", "montant", "facture", "commande",
-                  "agence_encaissement", "reference", "libelle", "cree_par"]
+        fields = ["id", "numero", "date", "tiers", "tiers_nom", "mode", "journal", "montant", "facture", "factures", "commande",
+                  "agence_encaissement", "reference", "libelle", "cree_par", "imputations", "en_attente_de_rattachement"]
         read_only_fields = ["numero", "cree_par"]
 
     def create(self, validated_data):
         from django.core.exceptions import ValidationError as ErreurModele
         from rest_framework.exceptions import ValidationError
 
+        factures = validated_data.pop("factures", None) or None
         try:
-            return Reglement(**validated_data).enregistrer()
+            return Reglement(**validated_data).enregistrer(factures)
         except ErreurModele as exc:                     # ex. reçu de créance sans facture
             raise ValidationError(exc.message_dict if hasattr(exc, "error_dict") else exc.messages)
 

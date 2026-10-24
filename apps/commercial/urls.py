@@ -61,6 +61,7 @@ urlpatterns = [
     path("reglements/", views.ReglementListView.as_view(), name="reglements"),
     path("reglements/nouveau/", views.reglement_create, name="reglement_create"),
     path("reglements/<int:pk>/", views.ReglementDetailView.as_view(), name="reglement_detail"),
+    path("reglements/<int:pk>/rattacher/", views.reglement_rattacher, name="reglement_rattacher"),
     path("caisse/", views.operations_caisse, name="operations_caisse"),
     path("fiche-stock/pointage/", views.pointage, name="pointage"),
     path("fiche-stock/pointages/", views.pointages, name="pointages"),

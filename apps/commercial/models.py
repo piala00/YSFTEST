@@ -145,6 +145,12 @@ class Tiers(models.Model):
         return Document.objects.filter(Q(payeur=self) | Q(payeur__isnull=True, tiers=self),
                                        type_document__in=Document.TYPES_FACTURATION, statut=Document.VALIDE)
 
+    def recus_en_attente(self):
+        """Reçus de ce client dont une partie attend d'être rattachée à une facture (hors avances sur commande)."""
+        recus = (Reglement.objects.filter(tiers=self, commande__isnull=True).annotate(impute=Sum("imputations__montant"))
+                 .order_by("date", "numero"))
+        return [r for r in recus if r.montant > (r.impute or ZERO)]
+
     def encours(self):
         """Montant restant dû sur les factures validées dont il est le payeur."""
         return sum((d.reste_a_payer for d in self.factures_a_regler()), ZERO)
@@ -159,6 +165,10 @@ class Depot(models.Model):
     ville = models.CharField(max_length=80, blank=True)
     responsable = models.CharField(max_length=100, blank=True)
     principal = models.BooleanField("Dépôt principal", default=False)
+    fiche_debut = models.DateField(
+        "Début de la fiche de stock", null=True, blank=True,
+        help_text="Le fichiste pointe les bons à partir de cette date ; le stock antérieur sert d'ouverture de la fiche. "
+                  "Vide : dès la première entrée de stock du dépôt dans le logiciel")
     actif = models.BooleanField(default=True)
 
     class Meta:
@@ -689,7 +699,30 @@ class Document(models.Model):
             self.imputer_acomptes()
         if self.origine_id:
             self.origine.mettre_a_jour_statut()
+        self.facture_auto = self._facturer_livraison()
         return self
+
+    def _facturer_livraison(self):
+        """Livraison validée par le magasin (issue d'un bon de commande) : facture des quantités livrées, le jour même.
+
+        Si la facture ne peut pas être validée (plafond d'encours bloquant…), elle reste en brouillon : la livraison,
+        qui a eu lieu physiquement, reste validée."""
+        from apps.core.models import Societe
+
+        option = Societe.get().facturation_auto_livraison
+        if (self.type_document != self.LIVRAISON or option == Societe.FACTURATION_AUCUNE
+                or not self._chaine_contient((self.COMMANDE,))):
+            return None
+        facture = self.transformer(self.FACTURE)
+        if option == Societe.FACTURATION_VALIDEE:
+            try:
+                with transaction.atomic():
+                    facture.valider()
+            except ValidationError as exc:
+                facture.refresh_from_db()
+                self.avertissement = " ".join(filter(None, [getattr(self, "avertissement", None),
+                                                            f"Facture {facture.numero} laissée en brouillon : {' '.join(exc.messages)}"]))
+        return facture
 
     def mettre_a_jour_statut(self):
         """Transformé quand toutes les lignes ont été reprises ; sinon reste validé (reliquat)."""
@@ -931,29 +964,35 @@ class Reglement(models.Model):
                                               f"espèces {self.journal.code}. Choisissez le journal correspondant"
                                               f"{' (' + conseil + ')' if conseil else ''}."})
 
-    @transaction.atomic
-    def controler_rattachement(self, factures=None):
-        """Reçu de règlement de créance client : rattaché à UNE facture du client, sans dépasser son reste dû.
-        L'avance sur bon de commande suit son propre circuit (affectée à la facture issue de la commande)."""
-        if factures is not None and not self.facture_id and len(factures) == 1:
-            self.facture = factures[0]
-        self.controler_mode_journal()
-        if not self.est_encaissement:
-            return
-        if self.commande_id:
-            if self.facture_id:
-                raise ValidationError("Choisissez soit une facture (règlement de créance), soit un bon de commande (avance).")
-            return
-        if not self.facture_id:
-            raise ValidationError({"facture": "Un reçu de règlement de créance doit être rattaché à la facture qu'il règle."})
-        f = self.facture
+    def _controler_facture(self, f):
         if not f.est_facturation or f.est_avoir or f.statut != Document.VALIDE:
-            raise ValidationError({"facture": "Choisissez une facture validée (pas un avoir)."})
+            raise ValidationError({"factures": f"{f.numero} : choisissez une facture validée (pas un avoir)."})
         if self.tiers_id not in (f.tiers_id, f.tiers_payeur.pk):
-            raise ValidationError({"facture": f"La facture {f.numero} n'est pas celle de {self.tiers.nom}."})
-        if self.montant and self.montant > f.reste_a_payer:
-            raise ValidationError({"montant": f"Le montant dépasse le reste dû de la facture {f.numero} "
-                                              f"({f.reste_a_payer:,.0f}).".replace(",", " ")})
+            raise ValidationError({"factures": f"La facture {f.numero} n'est pas celle de {self.tiers.nom}."})
+        if f.reste_a_payer <= 0:
+            raise ValidationError({"factures": f"La facture {f.numero} est déjà soldée."})
+
+    def controler_rattachement(self, factures=None):
+        """Reçu de règlement de créance client : rattaché à une ou plusieurs factures du client, réglées dans l'ordre
+        (de la plus ancienne à la plus récente), totalement ou partiellement. Le reste éventuel du reçu reste en attente
+        de rattachement à une prochaine facture. L'avance sur bon de commande suit son propre circuit."""
+        cibles = list(factures) if factures is not None else ([self.facture] if self.facture_id else [])
+        self.controler_mode_journal()
+        if self.commande_id:
+            if cibles and self.est_encaissement:
+                raise ValidationError("Choisissez soit des factures (règlement de créance), soit un bon de commande (avance).")
+            self._cibles = None
+            return
+        if self.est_encaissement and not cibles:
+            raise ValidationError({"factures": "Un reçu de règlement de créance doit être rattaché à au moins une facture."})
+        if len({f.pk for f in cibles}) != len(cibles):
+            raise ValidationError({"factures": "Une même facture est choisie deux fois."})
+        for f in cibles:
+            self._controler_facture(f)
+        cibles.sort(key=lambda f: (f.date, f.numero))
+        if cibles:
+            self.facture = cibles[0]                          # première facture réglée (affichage, listes)
+        self._cibles = cibles or None
         if self.agence_encaissement_id:
             if self.agence_encaissement.locale:
                 raise ValidationError({"agence_encaissement": "Choisissez l'agence qui a reçu le versement (pas celle-ci)."})
@@ -963,8 +1002,10 @@ class Reglement(models.Model):
             if doublon.exclude(pk=self.pk).exists():
                 raise ValidationError({"reference": f"Le reçu {self.reference} de {self.agence_encaissement.nom} est déjà enregistré."})
 
+    @transaction.atomic
     def enregistrer(self, factures=None):
-        """Numérote, comptabilise et impute le règlement sur les factures (FIFO par défaut)."""
+        """Numérote, comptabilise et impute le règlement : sur les factures choisies (reçu client), sur la facture issue
+        de la commande (avance), ou en FIFO (fournisseur sans facture désignée). Le reste non imputé reste en attente."""
         from apps.comptabilite.services import comptabiliser_reglement
 
         self.controler_rattachement(factures)
@@ -982,14 +1023,14 @@ class Reglement(models.Model):
         if self.commande_id:
             # Acompte : il attend la facture issue de la commande (imputé à sa validation)
             facture = self.commande.facture_issue()
-            factures = [facture] if facture else []
-        elif self.facture_id:
-            factures = [self.facture]                     # reçu de créance : la seule facture qu'il règle
-        if factures is None:
+            cibles = [facture] if facture else []
+        elif self._cibles is not None:
+            cibles = self._cibles
+        else:
             types = (Document.FACTURE,) if self.est_encaissement else (Document.ACHAT_FACTURE,)
-            factures = self.tiers.factures_a_regler().filter(type_document__in=types).order_by("date", "numero")
+            cibles = self.tiers.factures_a_regler().filter(type_document__in=types).order_by("date", "numero")
         disponible = self.montant_non_impute
-        for facture in factures:
+        for facture in cibles:
             if disponible <= 0:
                 break
             reste = facture.reste_a_payer
@@ -1000,11 +1041,31 @@ class Reglement(models.Model):
             disponible -= montant
         return self
 
+    @property
+    def en_attente_de_rattachement(self):
+        """Reste du reçu non encore affecté à une facture (hors avance sur commande, qui attend sa propre facture)."""
+        return ZERO if self.commande_id else self.montant_non_impute
+
+    @transaction.atomic
+    def rattacher(self, facture, montant=None):
+        """Rattache (tout ou partie de) le reste en attente du reçu à une nouvelle facture du client."""
+        reste_recu = self.en_attente_de_rattachement
+        if reste_recu <= 0:
+            raise ValidationError("Ce reçu n'a plus de reste à rattacher.")
+        self._controler_facture(facture)
+        montant = min(reste_recu, facture.reste_a_payer) if montant is None else Decimal(montant)
+        if montant <= 0 or montant > reste_recu or montant > facture.reste_a_payer:
+            raise ValidationError(f"Montant incorrect : au plus {min(reste_recu, facture.reste_a_payer):,.0f}.".replace(",", " "))
+        return Imputation.objects.create(reglement=self, document=facture, montant=montant)
+
 
 class Imputation(models.Model):
     reglement = models.ForeignKey(Reglement, on_delete=models.CASCADE, related_name="imputations")
     document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="imputations")
     montant = models.DecimalField(max_digits=18, decimal_places=2)
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                 verbose_name="Rattaché par")
+    cree_le = models.DateTimeField("Rattaché le", auto_now_add=True, null=True)
 
     class Meta:
         verbose_name = "Imputation de règlement"

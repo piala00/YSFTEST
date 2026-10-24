@@ -31,6 +31,15 @@ class Societe(models.Model):
     telephone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
     devise = models.CharField(max_length=10, default="XAF")
+    FACTURATION_AUCUNE = "AUCUNE"
+    FACTURATION_BROUILLON = "BROUILLON"
+    FACTURATION_VALIDEE = "VALIDEE"
+    FACTURATIONS_AUTO = [(FACTURATION_VALIDEE, "Facture créée et validée"), (FACTURATION_BROUILLON, "Facture créée en brouillon"),
+                         (FACTURATION_AUCUNE, "Pas de facture automatique")]
+    facturation_auto_livraison = models.CharField(
+        "Facture à la livraison", max_length=10, choices=FACTURATIONS_AUTO, default=FACTURATION_VALIDEE,
+        help_text="Quand le magasin valide le bon de livraison issu d'un bon de commande, la facture des quantités "
+                  "livrées est établie le même jour (les avances versées sur la commande y sont imputées)")
     delai_pointage = models.PositiveIntegerField(
         "Délai de pointage des bons (jours)", default=1,
         help_text="Fiche de stock : un bon non pointé par le fichiste au-delà de ce délai est signalé en retard")

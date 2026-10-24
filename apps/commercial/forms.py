@@ -2,7 +2,7 @@ from functools import reduce
 from operator import or_
 
 from django import forms
-from django.db.models import Q
+from django.db.models import F, Q
 from django.forms import inlineformset_factory
 
 from apps.comptabilite.models import Journal
@@ -121,10 +121,25 @@ LigneDocumentFormSet = inlineformset_factory(
 )
 
 
+def non_soldees(factures):
+    """Factures dont le reste dû est positif (total TTC > règlements imputés)."""
+    from django.db.models import DecimalField, Sum, Value
+    from django.db.models.functions import Coalesce
+
+    return factures.annotate(regle=Coalesce(Sum("imputations__montant"), Value(0), output_field=DecimalField())).filter(
+        total_ttc__gt=F("regle"))
+
+
 class ReglementForm(BootstrapMixin, forms.ModelForm):
+    factures = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.none(), required=False, label="Factures réglées",
+        widget=forms.SelectMultiple(attrs={"size": 6}),
+        help_text="Une ou plusieurs factures (Ctrl + clic), réglées de la plus ancienne à la plus récente. "
+                  "Si le montant dépasse leur reste dû, l'excédent reste en attente de rattachement à une prochaine facture.")
+
     class Meta:
         model = Reglement
-        fields = ("tiers", "facture", "commande", "date", "mode", "journal", "agence_encaissement", "montant", "reference", "libelle")
+        fields = ("tiers", "factures", "commande", "date", "mode", "journal", "agence_encaissement", "montant", "reference", "libelle")
         widgets = {"date": DateInput()}
 
     def __init__(self, *args, **kwargs):
@@ -136,10 +151,17 @@ class ReglementForm(BootstrapMixin, forms.ModelForm):
         self.fields["journal"].help_text = "Caisse, banque ou Mobile Money qui reçoit l'argent (inutile si une autre agence a encaissé)"
         self.fields["tiers"].queryset = Tiers.objects.filter(actif=True)
         factures = (Document.objects.filter(type_document__in=(Document.FACTURE, Document.ACHAT_FACTURE), statut=Document.VALIDE)
-                    .select_related("tiers").order_by("-date", "-numero"))
-        self.fields["facture"].queryset = factures
-        self.fields["facture"].label_from_instance = (
-            lambda d: f"{d.numero} · {d.tiers.nom if d.tiers else ''} · reste dû {d.reste_a_payer:,.0f}".replace(",", " "))
+                    .select_related("tiers").order_by("date", "numero"))
+        tiers = self.data.get("tiers") or self.initial.get("tiers")
+        tiers = getattr(tiers, "pk", tiers)
+        if tiers:                                       # factures du client (ou de ceux dont il est le payeur)
+            factures = factures.filter(Q(tiers_id=tiers) | Q(payeur_id=tiers))
+        self.fields["factures"].queryset = non_soldees(factures)
+        self.fields["factures"].label_from_instance = (
+            lambda d: f"{d.numero} du {d.date:%d/%m/%Y} · {d.tiers.nom if d.tiers else ''} · reste dû {d.reste_a_payer:,.0f}".replace(",", " "))
+        self.fields["commande"].queryset = (Document.objects.filter(type_document__in=(Document.COMMANDE, Document.ACHAT_COMMANDE))
+                                            .exclude(statut=Document.ANNULE).select_related("tiers").order_by("-date"))
+        self.fields["commande"].label_from_instance = lambda d: f"{d.numero_affiche} · {d.tiers.nom if d.tiers else ''} · {d.total_ttc:,.0f}".replace(",", " ")
         self.fields["agence_encaissement"].queryset = Agence.objects.filter(actif=True, locale=False)
 
     def clean(self):
@@ -149,9 +171,20 @@ class ReglementForm(BootstrapMixin, forms.ModelForm):
         elif not donnees.get("journal"):
             self.add_error("journal", "Choisissez la caisse, la banque ou le compte Mobile Money qui reçoit l'argent.")
         return donnees
-        self.fields["commande"].queryset = (Document.objects.filter(type_document__in=(Document.COMMANDE, Document.ACHAT_COMMANDE))
-                                            .exclude(statut=Document.ANNULE).select_related("tiers").order_by("-date"))
-        self.fields["commande"].label_from_instance = lambda d: f"{d.numero_affiche} · {d.tiers.nom if d.tiers else ''} · {d.total_ttc:,.0f}".replace(",", " ")
+
+
+class RattachementForm(BootstrapMixin, forms.Form):
+    facture = forms.ModelChoiceField(queryset=Document.objects.none(), label="Facture à régler")
+    montant = forms.DecimalField(max_digits=18, decimal_places=2, required=False, label="Montant",
+                                 help_text="Vide : le plus petit du reste du reçu et du reste dû de la facture")
+
+    def __init__(self, reglement, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tiers = reglement.tiers_id
+        self.fields["facture"].queryset = non_soldees(Document.objects.filter(type_document=Document.FACTURE, statut=Document.VALIDE)
+                                                      .filter(Q(tiers_id=tiers) | Q(payeur_id=tiers)).order_by("date", "numero"))
+        self.fields["facture"].label_from_instance = (
+            lambda d: f"{d.numero} du {d.date:%d/%m/%Y} · reste dû {d.reste_a_payer:,.0f}".replace(",", " "))
 
 
 class AgenceForm(BootstrapMixin, forms.ModelForm):

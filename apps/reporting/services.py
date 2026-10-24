@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncMonth
+from django.utils import timezone
 
 from apps.commercial.models import Article, Document, LigneDocument, Tiers
 from apps.comptabilite import etats, services
@@ -203,12 +204,13 @@ def rapport_commercial(jour, journal=None):
               .exclude(statut__in=(D.BROUILLON, D.ANNULE)).select_related("tiers").order_by("numero")):
         signe = -1 if f.est_avoir else 1
         # Photographie du jour du rapport : les règlements postérieurs ne modifient pas un rapport passé
-        imputations = Imputation.objects.filter(document=f, reglement__date__lte=jour).select_related("reglement")
+        imputations = (Imputation.objects.filter(document=f, reglement__date__lte=jour)
+                       .filter(Q(cree_le__isnull=True) | Q(cree_le__date__lte=jour)).select_related("reglement"))
         acompte = sum((i.montant for i in imputations if i.reglement.commande_id and i.reglement.date < jour), ZERO)
         encaisse = sum((i.montant for i in imputations if i.reglement.date == jour), ZERO)
         reste = ZERO if f.est_avoir else f.total_ttc - sum((i.montant for i in imputations), ZERO)
         nature = ("Avoir" if f.est_avoir else "Comptant" if reste <= 0 and encaisse and not acompte
-                  else "Payée d'avance" if reste <= 0 and acompte else "Comptant (partiel)" if encaisse else "En compte")
+                  else "Payée d'avance" if reste <= 0 and acompte else "Comptant (partiel)" if encaisse else "À crédit")
         if reste > 0 and f.tiers_id and not f.tiers_payeur.vente_credit:
             nature += " · client au comptant non soldé"
         factures.append({"doc": f, "ttc": signe * f.total_ttc, "acompte": acompte, "encaisse": encaisse,
@@ -221,7 +223,7 @@ def rapport_commercial(jour, journal=None):
         if facture and facture.date > jour:                # facturée plus tard : pas encore au jour du rapport
             facture = None
         commandes.append({"doc": c, "ttc": c.total_ttc, "avance": avance,
-                          "nature": "Payé d'avance" if avance >= c.total_ttc > 0 else "Acompte" if avance else "En compte",
+                          "nature": "Payé d'avance" if avance >= c.total_ttc > 0 else "Acompte" if avance else "À crédit",
                           "facture": facture, "facturee_jour": bool(facture and facture.date == jour)})
     ventes = {
         "factures": factures, "commandes": commandes,
@@ -236,10 +238,16 @@ def rapport_commercial(jour, journal=None):
     encaissements = []
     for r in (Reglement.objects.filter(date=jour, journal=journal, tiers__type_tiers=Tiers.CLIENT)
               .select_related("tiers", "commande").order_by("numero")):
-        docs = [i.document for i in r.imputations.select_related("document")]
+        # Rattachements connus au jour du rapport (un rattachement ultérieur ne change pas un rapport passé)
+        imputations = [i for i in r.imputations.select_related("document")
+                       if i.cree_le is None or timezone.localdate(i.cree_le) <= jour]
+        docs = [i.document for i in imputations]
         nature = ("Acompte sur commande" if r.commande_id else "Vente du jour" if docs and all(d.date == jour for d in docs)
                   else "Recouvrement de créance" if docs else "Avance (non imputée)")
-        encaissements.append({"reglement": r, "nature": nature, "montant": r.montant})
+        attente = ZERO if r.commande_id else r.montant - sum((i.montant for i in imputations), ZERO)
+        if docs and attente > 0:
+            nature += f" · reste en attente de rattachement {attente:,.0f}".replace(",", " ")
+        encaissements.append({"reglement": r, "nature": nature, "montant": r.montant, "attente": attente})
     operations = OperationCaisse.objects.filter(date=jour, journal=journal).select_related("agence", "compte")
     hors_recettes = [o for o in operations if o.nature == OperationCaisse.HORS_RECETTE]
     autres_entrees = [o for o in operations if o.nature == OperationCaisse.AUTRE_ENTREE]

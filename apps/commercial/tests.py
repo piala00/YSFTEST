@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.comptabilite.models import Journal
@@ -73,8 +74,8 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
         self.assertEqual(devis.statut, Document.TRANSFORME)
         bl = commande.transformer(Document.LIVRAISON)
         bl.valider()
-        facture = bl.transformer(Document.FACTURE)
-        facture.valider()
+        facture = bl.facture_auto                     # le magasin a livré : facture établie et validée le jour même
+        self.assertEqual((facture.statut, facture.date), (Document.VALIDE, bl.date))
         # Le stock n'est mouvementé qu'une fois (par le BL)
         self.assertEqual(self.stock(), Decimal("90"))
         self.assertIsNotNone(facture.ecriture)
@@ -101,6 +102,7 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
         self.assertEqual(self.stock(), Decimal("90"))
 
     def test_annulation_bl_remet_le_stock_et_le_reliquat(self):
+        Societe.objects.update(facturation_auto_livraison=Societe.FACTURATION_AUCUNE)   # BL non encore facturé
         commande = self.document(Document.COMMANDE, self.client_, quantite=10).valider()
         bl = commande.transformer(Document.LIVRAISON)
         bl.valider()
@@ -127,17 +129,58 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
         caisse = Journal.objects.get(code="CA")
         with self.assertRaises(ValidationError):                       # reçu de créance sans facture : refusé
             Reglement(tiers=self.client_, journal=caisse, montant=Decimal("15000")).enregistrer()
-        with self.assertRaises(ValidationError):                       # plus que le reste dû : refusé
-            Reglement(tiers=self.client_, journal=caisse, montant=Decimal("15000"), facture=f1).enregistrer()
-        # Un versement de 15 000 pour deux factures : un reçu par facture
-        Reglement(tiers=self.client_, journal=caisse, montant=Decimal("11925"), facture=f1).enregistrer()
-        reglement = Reglement(tiers=self.client_, journal=caisse, montant=Decimal("3075"), facture=f2).enregistrer()
+        # Un versement de 15 000 pour deux factures : un seul reçu, réglant f1 en totalité et f2 en partie
+        reglement = Reglement(tiers=self.client_, journal=caisse, montant=Decimal("15000")).enregistrer([f2, f1])
+        self.assertEqual([(i.document, i.montant) for i in reglement.imputations.order_by("id")],
+                         [(f1, Decimal("11925")), (f2, Decimal("3075"))])          # la plus ancienne d'abord
+        self.assertEqual(reglement.en_attente_de_rattachement, 0)
         f1.refresh_from_db(); f2.refresh_from_db()
         self.assertEqual(f1.reste_a_payer, 0)
         self.assertEqual(f2.reste_a_payer, Decimal("11925") * 2 - Decimal("15000"))
         soldes = soldes_par_compte(reglement.date)
         self.assertEqual(soldes["5711"], Decimal("15000"))
         self.assertEqual(self.client_.solde_comptable(), Decimal("11925") * 2 - Decimal("15000"))
+
+    def test_reste_du_recu_en_attente_puis_rattache(self):
+        f1 = self.document(Document.FACTURE, self.client_).valider()               # 11 925
+        caisse = Journal.objects.get(code="CA")
+        recu = Reglement(tiers=self.client_, journal=caisse, montant=Decimal("20000"), facture=f1).enregistrer()
+        f1.refresh_from_db()
+        self.assertEqual((f1.reste_a_payer, recu.en_attente_de_rattachement), (0, Decimal("8075")))
+        self.assertEqual(self.client_.recus_en_attente(), [recu])
+        self.assertEqual(self.client_.solde_comptable(), Decimal("-8075"))       # avance du client en comptabilité
+        f2 = self.document(Document.FACTURE, self.client_).valider()
+        with self.assertRaises(ValidationError):                                   # pas plus que le reste du reçu
+            recu.rattacher(f2, Decimal("9000"))
+        recu.rattacher(f2)
+        f2.refresh_from_db()
+        self.assertEqual((f2.reste_a_payer, recu.en_attente_de_rattachement), (Decimal("3850"), 0))
+        self.assertEqual(self.client_.recus_en_attente(), [])
+        with self.assertRaisesMessage(ValidationError, "plus de reste"):
+            recu.rattacher(f2)
+
+    def test_formulaire_recu_plusieurs_factures_et_rattachement(self):
+        from django.contrib.auth import get_user_model
+
+        self.client.force_login(get_user_model().objects.create_superuser("caisse", "", "x"))
+        f1 = self.document(Document.FACTURE, self.client_).valider()
+        f2 = self.document(Document.FACTURE, self.client_).valider()
+        caisse = Journal.objects.get(code="CA")
+        page = self.client.get(reverse("commercial:reglement_create") + f"?document={f1.pk}")
+        self.assertContains(page, f2.numero)                                       # autres factures du client proposées
+        reponse = self.client.post(reverse("commercial:reglement_create"), {
+            "tiers": self.client_.pk, "factures": [f1.pk, f2.pk], "date": f1.date.isoformat(), "mode": "ESPECES",
+            "journal": caisse.pk, "montant": "30000", "libelle": "Versement"})
+        recu = Reglement.objects.get(libelle="Versement")
+        self.assertRedirects(reponse, reverse("commercial:reglement_detail", args=[recu.pk]))
+        self.assertEqual((recu.imputations.count(), recu.en_attente_de_rattachement), (2, Decimal("30000") - 2 * Decimal("11925")))
+        self.assertContains(self.client.get(reverse("commercial:reglement_detail", args=[recu.pk])), "Rattacher à une facture")
+        f3 = self.document(Document.FACTURE, self.client_).valider()
+        self.assertContains(self.client.get(reverse("commercial:document_detail", args=[f3.pk])), "en attente de rattachement")
+        self.client.post(reverse("commercial:reglement_rattacher", args=[recu.pk]), {"facture": f3.pk})
+        f3.refresh_from_db()
+        self.assertEqual((f3.reste_a_payer, recu.en_attente_de_rattachement), (Decimal("11925") - Decimal("6150"), 0))
+        self.assertEqual(recu.imputations.get(document=f3).cree_par.username, "caisse")   # qui a rattaché
 
     def test_reglement_partiel_et_facture_d_un_autre_client(self):
         f = self.document(Document.FACTURE, self.client_).valider()

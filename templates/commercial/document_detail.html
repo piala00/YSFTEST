@@ -41,6 +41,10 @@
   </div>
 
   {% include "core/_auteurs.html" with objet=object %}
+  {% if object.statut == "VALIDE" and object.type_document == "FACTURE" and object.reste_a_payer > 0 %}{% with recus=object.tiers_payeur.recus_en_attente %}{% if recus %}
+  <div class="alert alert-info py-1 px-2 small mb-1"><i class="bi bi-cash-coin"></i> Reçus de ce client en attente de rattachement :
+    {% for r in recus %}<a href="{% url 'commercial:reglement_rattacher' r.pk %}?facture={{ object.pk }}" data-nouvelle-fenetre>{{ r.numero }} ({{ r.en_attente_de_rattachement|montant }})</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+    — cliquez pour l'affecter à cette facture.</div>{% endif %}{% endwith %}{% endif %}
   <div class="piece-entete">
     <div class="piece-champs">
       {% if object.tiers %}

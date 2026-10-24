@@ -23,7 +23,10 @@ def trouver_bon(numero):
 
 
 def bons_a_pointer(depot, debut, fin):
-    """Bons qui ont fait bouger le stock du dépôt sur la période et que le fichiste n'a pas encore pointés."""
+    """Bons qui ont fait bouger le stock du dépôt sur la période et que le fichiste n'a pas encore pointés
+    (à partir du début de la fiche du dépôt)."""
+    if depot.fiche_debut:
+        debut = max(debut, depot.fiche_debut)
     pointes = PointageFiche.objects.filter(depot=depot).values_list("document_id", flat=True)
     ids = (MouvementStock.objects.filter(depot=depot, date__range=(debut, fin), document__isnull=False)
            .exclude(document_id__in=pointes).values_list("document_id", flat=True).distinct())
@@ -54,8 +57,10 @@ def _attente(depot):
     """{article: quantité signée} des bons qui ont fait bouger le stock du dépôt et que le fichiste n'a pas pointés."""
     pointes = PointageFiche.objects.filter(depot=depot).values_list("document_id", flat=True)
     attente = {}
-    for m in (MouvementStock.objects.filter(depot=depot, document__isnull=False).exclude(document_id__in=pointes)
-              .select_related("article")):
+    mouvements = MouvementStock.objects.filter(depot=depot, document__isnull=False).exclude(document_id__in=pointes)
+    if depot.fiche_debut:                                      # avant le début de la fiche : stock d'ouverture
+        mouvements = mouvements.filter(date__gte=depot.fiche_debut)
+    for m in mouvements.select_related("article"):
         attente[m.article] = attente.get(m.article, ZERO) + m.quantite
     return attente
 
@@ -89,7 +94,7 @@ def fiche_article(article, depot, debut, fin):
 
     Un bon pas encore pointé n'entre pas dans le solde de la fiche : sa quantité (celle de l'ordinateur) est montrée
     dans la colonne « en attente » et dans un solde projeté distinct. Les mouvements sans bon (inventaire physique)
-    sont des comptages : ils comptent dans la fiche."""
+    sont des comptages : ils comptent dans la fiche, comme ceux antérieurs au début de la fiche du dépôt (ouverture)."""
     saisies = {(l.pointage.document_id): l for l in LignePointage.objects.filter(
         article=article, pointage__depot=depot).select_related("pointage")}
     par_bon = {}
@@ -102,7 +107,8 @@ def fiche_article(article, depot, debut, fin):
     ouverture, lignes = None, []
     for ligne in par_bon.values():
         pointage = saisies.get(ligne["document"].pk) if ligne["document"] else None
-        a_pointer = ligne["document"] is not None and pointage is None
+        a_pointer = (ligne["document"] is not None and pointage is None
+                     and not (depot.fiche_debut and ligne["date"] < depot.fiche_debut))   # antérieur : ouverture
         signe = 1 if ligne["machine"] >= 0 else -1
         fiche = ZERO if a_pointer else signe * pointage.quantite_saisie if pointage else ligne["machine"]
         en_attente = ligne["machine"] if a_pointer else ZERO
