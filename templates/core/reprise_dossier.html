@@ -21,22 +21,31 @@
 </div>
 <form method="post" class="card"><div class="card-body">{% csrf_token %}
   <div class="row g-2 small">
-    <div class="col-md-4"><label class="form-label mb-0" for="serveur">Serveur SQL</label>
-      <input class="form-control form-control-sm" id="serveur" name="serveur" value="{{ valeurs.serveur }}" placeholder="localhost ou .\INSTANCE"></div>
-    <div class="col-md-3"><label class="form-label mb-0" for="authentification">Connexion</label>
+    <div class="col-md-3"><label class="form-label mb-0" for="machine">1. Serveur (ordinateur)</label>
+      <input class="form-control form-control-sm" id="machine" name="machine" value="{{ valeurs.machine }}" placeholder="localhost, nom ou adresse IP"></div>
+    <div class="col-md-3"><label class="form-label mb-0" for="instance">2. Instance SQL</label>
+      <div class="input-group input-group-sm">
+        {% if instances %}<select class="form-select" id="instance" name="instance">
+          {% for i in instances %}<option value="{{ i.nom }}" {% if i.nom == valeurs.instance %}selected{% endif %}>{{ i.nom|default:"(instance par défaut)" }}{% if i.version %} · v{{ i.version }}{% endif %}{% if i.port %} · port {{ i.port }}{% endif %}</option>{% endfor %}
+        </select>{% else %}<input class="form-control" id="instance" name="instance" value="{{ valeurs.instance }}" placeholder="vide : instance par défaut">{% endif %}
+        <button class="btn btn-outline-secondary" name="action" value="instances" title="Détecter les instances de cet ordinateur"><i class="bi bi-search"></i></button></div>
+      <div class="form-text">Connexion à : {{ valeurs.serveur }}</div></div>
+    <div class="col-md-2"><label class="form-label mb-0" for="authentification">Connexion</label>
       <select class="form-select form-select-sm" id="authentification" name="authentification">
         <option value="windows" {% if valeurs.authentification == "windows" %}selected{% endif %}>Compte Windows</option>
         <option value="sql" {% if valeurs.authentification == "sql" %}selected{% endif %}>Compte SQL</option></select></div>
     <div class="col-md-2"><label class="form-label mb-0" for="utilisateur">Utilisateur SQL</label>
       <input class="form-control form-control-sm" id="utilisateur" name="utilisateur" value="{{ valeurs.utilisateur }}" autocomplete="off"></div>
-    <div class="col-md-3"><label class="form-label mb-0" for="mot_de_passe">Mot de passe SQL</label>
+    <div class="col-md-2"><label class="form-label mb-0" for="mot_de_passe">Mot de passe SQL</label>
       <input class="form-control form-control-sm" type="password" id="mot_de_passe" name="mot_de_passe" autocomplete="off"
              placeholder="à ressaisir à chaque action"></div>
-    <div class="col-md-4"><label class="form-label mb-0" for="base">Dossier (base) à reprendre</label>
-      <input class="form-control form-control-sm" id="base" name="base" list="bases" value="{{ valeurs.base }}">
-      <datalist id="bases">{% for b in bases %}<option value="{{ b }}">{% endfor %}</datalist>
-      {% if bases %}<div class="form-text">{{ bases|length }} dossier(s) trouvé(s) : {{ bases|join:", " }}</div>{% endif %}</div>
-    <div class="col-md-2 align-self-end"><button class="btn btn-sm btn-outline-secondary w-100" name="action" value="rechercher">Rechercher les dossiers</button></div>
+    <div class="col-md-5"><label class="form-label mb-0" for="base">3. Base de données (dossier) à synchroniser</label>
+      <div class="input-group input-group-sm">
+        {% if bases %}<select class="form-select" id="base" name="base">
+          {% for b in bases %}<option value="{{ b.nom }}" {% if b.nom == valeurs.base %}selected{% endif %}>{{ b.nom }}{% if b.societe %} — {{ b.societe }}{% endif %}</option>{% endfor %}
+        </select>{% else %}<input class="form-control" id="base" name="base" value="{{ valeurs.base }}" placeholder="cliquez sur Lister les bases">{% endif %}
+        <button class="btn btn-outline-secondary" name="action" value="rechercher">Lister les bases</button></div>
+      {% if bases %}<div class="form-text">{{ bases|length }} dossier(s) sur l'instance {{ valeurs.serveur }}</div>{% endif %}</div>
     <div class="col-md-2"><label class="form-label mb-0" for="debut_exercice">Début de l'exercice en cours</label>
       <input class="form-control form-control-sm" type="date" id="debut_exercice" name="debut_exercice" value="{{ valeurs.debut_exercice }}"></div>
     <div class="col-md-2"><label class="form-label mb-0" for="date_bascule">Données jusqu'au</label>

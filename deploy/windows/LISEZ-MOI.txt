@@ -133,14 +133,20 @@ Pour passer de SQLite à SQL Server (ou l'inverse), lancez
 
 Reprendre un dossier Sage existant (transition, puis bascule) :
   - Dans l'ERP : Fichier > Reprise d'un dossier existant (administrateur).
+    Choisissez 1. le serveur (ordinateur), 2. l'instance SQL (bouton loupe :
+    instances détectées, ex. SAGE100 ; vide = instance par défaut), puis
+    3. la base de données du dossier (bouton « Lister les bases » : chaque
+    base est présentée avec le nom de sa société).
     La base Sage est seulement LUE (aucune écriture). Simulez d'abord,
     puis tapez SYNCHRONISER : l'ERP devient une copie synchronisée, en
     consultation ; la saisie continue dans Sage.
   - Synchronisez aussi souvent que voulu (bouton, ou automatiquement avec
-    6-SYNCHRONISATION-AUTOMATIQUE.bat : toutes les heures, paramètres
-    SYNCHRO_SERVEUR, SYNCHRO_BASE, SYNCHRO_UTILISATEUR,
-    SYNCHRO_MOT_DE_PASSE dans logiciel\.env ; utilisez de préférence un
-    compte SQL en lecture seule).
+    6-SYNCHRONISATION-AUTOMATIQUE.bat : toutes les heures, sur le même
+    serveur, la même instance et la même base ; avec un compte SQL, mettez
+    SYNCHRO_UTILISATEUR et SYNCHRO_MOT_DE_PASSE dans logiciel\.env ;
+    utilisez de préférence un compte SQL en lecture seule).
+    Si la détection ne trouve pas l'instance : démarrez le service
+    « SQL Server Browser » sur le serveur, ou tapez le nom de l'instance.
   - Le jour de la bascule : arrêtez la saisie dans Sage, synchronisez une
     dernière fois, vérifiez le rapport, puis tapez BASCULER. L'ERP devient
     le seul logiciel de saisie ; la synchronisation s'arrête.

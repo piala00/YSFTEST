@@ -21,6 +21,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--serveur", help="Serveur SQL de Sage (lecture directe), ex. .\\SAGE100 ou localhost")
+        parser.add_argument("--instance", default="", help="Instance SQL nommée (ex. SAGE100) ; vide : instance par défaut")
         parser.add_argument("--base", help="Base SQL du dossier Sage à reprendre")
         parser.add_argument("--utilisateur", default="", help="Compte SQL (vide : authentification Windows)")
         parser.add_argument("--dossier", help="Ou : dossier contenant les CSV exportés (depots.csv, …)")
@@ -54,6 +55,7 @@ class Command(BaseCommand):
         if options["serveur"]:
             if not options["base"] or not debut:
                 raise CommandError("Lecture directe : indiquez aussi --base et --debut-exercice.")
+            options["serveur"] = source.adresse_serveur(options["serveur"], options["instance"])
             mot_de_passe = getpass.getpass("Mot de passe SQL : ") if options["utilisateur"] else ""
             try:
                 connexion = source.connecter(options["serveur"], options["base"], options["utilisateur"], mot_de_passe)

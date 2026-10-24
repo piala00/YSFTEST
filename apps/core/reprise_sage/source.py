@@ -125,6 +125,73 @@ def script_export(debut_exercice, date_bascule, historique_depuis=None):
 # ---------------------------------------------------------------------------
 # Connexion en lecture seule
 # ---------------------------------------------------------------------------
+INSTANCE_PAR_DEFAUT = "MSSQLSERVER"
+LOCAUX = {"", ".", "localhost", "127.0.0.1", "(local)"}
+
+
+def adresse_serveur(machine, instance=""):
+    """Adresse de connexion : ORDINATEUR pour l'instance par défaut, ORDINATEUR\\INSTANCE pour une instance nommée."""
+    machine = (machine or "").strip() or "localhost"
+    instance = (instance or "").strip()
+    return machine if not instance or instance.upper() == INSTANCE_PAR_DEFAUT else f"{machine}\\{instance}"
+
+
+def separer_serveur(adresse):
+    """« ORDINATEUR\\INSTANCE » → (ORDINATEUR, INSTANCE) ; instance vide = instance par défaut."""
+    machine, _, instance = (adresse or "").partition("\\")
+    return machine, instance
+
+
+def instances_sql(machine):
+    """Instances SQL Server d'un ordinateur : registre Windows (ordinateur local) et service SQL Server Browser
+    (UDP 1434, ordinateur du réseau). Renvoie [{nom, version, port}] ; nom vide = instance par défaut."""
+    import socket
+
+    trouvees = {}
+    machine = (machine or "").strip()
+    if machine.lower() in LOCAUX or machine.lower() == socket.gethostname().lower():
+        try:
+            import winreg
+
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL") as cle:
+                i = 0
+                while True:
+                    try:
+                        nom = winreg.EnumValue(cle, i)[0]
+                    except OSError:
+                        break
+                    trouvees[nom.upper()] = {"nom": "" if nom.upper() == INSTANCE_PAR_DEFAUT else nom, "version": "", "port": ""}
+                    i += 1
+        except (ImportError, OSError):
+            pass                                   # pas sous Windows, ou aucune instance installée
+    hote = "127.0.0.1" if machine.lower() in LOCAUX else machine
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(2)
+            s.sendto(b"\x03", (hote, 1434))       # demande au service SQL Server Browser la liste des instances
+            reponse = s.recv(65535)
+        for nom, version, port in _lire_reponse_browser(reponse):
+            trouvees[(nom or INSTANCE_PAR_DEFAUT).upper()] = {"nom": "" if nom.upper() == INSTANCE_PAR_DEFAUT else nom,
+                                                              "version": version, "port": port}
+    except OSError:
+        pass                                       # service Browser arrêté ou pare-feu : saisie manuelle possible
+    return sorted(trouvees.values(), key=lambda x: (x["nom"] != "", x["nom"].upper()))
+
+
+def _lire_reponse_browser(reponse):
+    """Réponse SQL Server Browser : 0x05, longueur, puis « ServerName;X;InstanceName;Y;…;tcp;1433;; » par instance."""
+    if len(reponse) < 3 or reponse[0] != 0x05:
+        return []
+    texte = reponse[3:].decode("ascii", "replace")
+    resultat = []
+    for bloc in texte.split(";;"):
+        champs = bloc.split(";")
+        valeurs = dict(zip(champs[0::2], champs[1::2]))
+        if valeurs.get("InstanceName"):
+            resultat.append((valeurs["InstanceName"], valeurs.get("Version", ""), valeurs.get("tcp", "")))
+    return resultat
+
+
 def connecter(serveur, base, utilisateur="", mot_de_passe=""):
     """Connexion au serveur SQL de Sage : pilote ODBC 18/17 s'il est installé, sinon pilote Microsoft fourni."""
     authentification = (f"UID={utilisateur};PWD={{{mot_de_passe.replace('}', '}}')}}}" if utilisateur
@@ -222,7 +289,8 @@ def texte(valeur):
 
 
 def bases_sage(connexion):
-    """Bases du serveur qui contiennent un dossier Sage 100 (table F_COMPTET), lues dans sys.databases."""
+    """Bases de l'instance qui contiennent un dossier (table F_COMPTET), lues dans sys.databases :
+    [{nom, societe}] — la raison sociale vient de P_DOSSIER quand elle est lisible."""
     curseur = connexion.cursor()
     curseur.execute("SELECT name FROM sys.databases WHERE database_id > 4 AND state = 0 ORDER BY name")
     noms = [r[0] for r in curseur.fetchall()]
@@ -231,9 +299,17 @@ def bases_sage(connexion):
         try:
             curseur.execute(f"SELECT 1 FROM [{nom.replace(']', ']]')}].INFORMATION_SCHEMA.TABLES "
                             "WHERE TABLE_NAME = 'F_COMPTET'")
-            if curseur.fetchone():
-                trouvees.append(nom)
+            if not curseur.fetchone():
+                continue
         except Exception:
             continue                           # base inaccessible avec ce compte
+        societe = ""
+        try:
+            curseur.execute(f"SELECT TOP 1 D_RaisonSoc FROM [{nom.replace(']', ']]')}].dbo.P_DOSSIER")
+            ligne = curseur.fetchone()
+            societe = (ligne[0] or "").strip() if ligne else ""
+        except Exception:
+            pass                               # table ou colonne absente : le nom de la base suffit
+        trouvees.append({"nom": nom, "societe": societe})
     curseur.close()
     return trouvees

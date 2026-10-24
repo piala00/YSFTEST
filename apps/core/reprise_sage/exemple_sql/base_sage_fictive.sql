@@ -2,6 +2,9 @@
    Ne contient que les tables et colonnes lues par la reprise de l'ERP ; à créer dans une base de TEST vide,
    jamais dans un dossier Sage. Exercice 2026, bascule au 31/10/2026. */
 
+CREATE TABLE P_DOSSIER (D_RaisonSoc varchar(69));
+INSERT INTO P_DOSSIER VALUES ('Société Fictive SARL');
+
 CREATE TABLE F_DEPOT (DE_No int, DE_Intitule varchar(35), DE_Principal smallint, DE_Ville varchar(35));
 CREATE TABLE F_FAMILLE (FA_CodeFamille varchar(10), FA_Intitule varchar(69), FA_Type smallint);
 CREATE TABLE F_COMPTEG (CG_Num varchar(13), CG_Intitule varchar(35), CG_Type smallint);

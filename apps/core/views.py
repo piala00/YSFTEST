@@ -302,22 +302,37 @@ def reprise_dossier(request, module):
     aujourdhui = datetime.date.today()
     societe = Societe.get()
     p = request.POST
-    serveur_base = (societe.source_dossier or "/").split("/", 1)
-    valeurs = {"serveur": p.get("serveur", serveur_base[0] or "localhost"), "base": p.get("base", serveur_base[1]),
+    # Dossier déjà synchronisé : « ORDINATEUR[\\INSTANCE]/BASE », proposé d'office (un autre dossier serait refusé)
+    adresse, _, base_suivie = (societe.source_dossier or "").rpartition("/")
+    machine_suivie, instance_suivie = source.separer_serveur(adresse)
+    valeurs = {"machine": p.get("machine", machine_suivie or "localhost"), "instance": p.get("instance", instance_suivie),
+               "base": p.get("base", base_suivie),
                "utilisateur": p.get("utilisateur", ""), "authentification": p.get("authentification", "windows"),
                "debut_exercice": p.get("debut_exercice", (societe.source_debut_exercice or aujourdhui.replace(month=1, day=1)).isoformat()),
                "date_bascule": p.get("date_bascule", aujourdhui.isoformat()), "historique_depuis": p.get("historique_depuis", "")}
-    contexte = {"valeurs": valeurs, "bases": [], "rapport": None, "titre": "Reprise d'un dossier existant", "societe_sync": societe}
+    valeurs["serveur"] = source.adresse_serveur(valeurs["machine"], valeurs["instance"])
+    contexte = {"valeurs": valeurs, "bases": [], "instances": [], "rapport": None, "titre": "Reprise d'un dossier existant", "societe_sync": societe}
     action = p.get("action")
     if request.method == "POST" and action:
         utilisateur = valeurs["utilisateur"] if valeurs["authentification"] == "sql" else ""
         mot_de_passe = p.get("mot_de_passe", "") if utilisateur else ""
         try:
-            if action == "rechercher":
+            if action == "instances":
+                contexte["instances"] = source.instances_sql(valeurs["machine"])
+                if not contexte["instances"]:
+                    messages.warning(request, "Aucune instance détectée sur cet ordinateur (service SQL Server Browser arrêté "
+                                              "ou pare-feu) : saisissez le nom de l'instance, par exemple SAGE100 ou SQLEXPRESS.")
+                elif len(contexte["instances"]) == 1 and not valeurs["instance"]:
+                    valeurs["instance"] = contexte["instances"][0]["nom"]
+                    valeurs["serveur"] = source.adresse_serveur(valeurs["machine"], valeurs["instance"])
+            elif action == "rechercher":
                 connexion = source.connecter(valeurs["serveur"], "master", utilisateur, mot_de_passe)
                 contexte["bases"] = source.bases_sage(connexion)
                 if not contexte["bases"]:
-                    messages.warning(request, "Aucun dossier trouvé sur ce serveur (ou droits de lecture insuffisants).")
+                    messages.warning(request, f"Aucun dossier trouvé sur l'instance {valeurs['serveur']} "
+                                              "(ou droits de lecture insuffisants).")
+                elif not valeurs["base"]:
+                    valeurs["base"] = contexte["bases"][0]["nom"]
             elif action == "basculer":
                 if p.get("confirmation_bascule") != "BASCULER":
                     raise ValueError("Tapez BASCULER pour confirmer la bascule (elle est définitive).")
@@ -328,7 +343,7 @@ def reprise_dossier(request, module):
                 for cle in ("debut_exercice", "date_bascule", "historique_depuis"):
                     dates[cle] = datetime.date.fromisoformat(valeurs[cle]) if valeurs[cle] else None
                 if not valeurs["base"] or not dates["debut_exercice"] or not dates["date_bascule"]:
-                    raise ValueError("Choisissez le dossier, le début d'exercice et la date des données.")
+                    raise ValueError("Choisissez la base de données (dossier), le début d'exercice et la date des données.")
                 appliquer = action == "synchroniser"
                 if appliquer and p.get("confirmation") != "SYNCHRONISER":
                     raise ValueError("Tapez SYNCHRONISER pour confirmer (la simulation n'enregistre rien).")

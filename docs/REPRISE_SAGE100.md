@@ -30,14 +30,19 @@ Non repris : gammes, lots et séries, tarifs propres à un client, budgets, piè
 
 Ce n'est pas un import unique : l'ERP devient une **copie synchronisée** du dossier Sage, puis le remplace.
 
-1. **Simulation** (ERP › Fichier › *Reprise d'un dossier existant*) : rapport complet, rien n'est enregistré.
+1. **Choix du dossier** (ERP › Fichier › *Reprise d'un dossier existant*) : **serveur** (ordinateur), puis **instance
+   SQL** (détectée par le registre Windows sur le poste local et par le service SQL Server Browser, UDP 1434, sur le
+   réseau ; vide = instance par défaut ; saisie libre si la détection échoue), puis **base de données** (liste des bases
+   de l'instance qui contiennent un dossier, avec la raison sociale lue dans P_DOSSIER). Le dossier synchronisé est
+   mémorisé (`ORDINATEUR\INSTANCE/BASE`) et reproposé ; un autre est refusé.
+   **Simulation** : rapport complet, rien n'est enregistré.
 2. **Première synchronisation** (taper `SYNCHRONISER`) : la société passe en mode *copie synchronisée* (badge orange
    dans la barre du haut, avec l'heure de la dernière synchronisation). La saisie continue dans Sage ; l'ERP refuse
    les validations de pièces, règlements, opérations de caisse, inventaires et écritures, pour éviter les doubles
    saisies. Consultation, états et contrôles sont disponibles.
 3. **Synchronisations suivantes** : à la main (même bouton) ou automatiquement toutes les heures
-   (`6-SYNCHRONISATION-AUTOMATIQUE.bat`, commande `python manage.py synchroniser_dossier`, paramètres
-   `SYNCHRO_SERVEUR`, `SYNCHRO_BASE`, `SYNCHRO_UTILISATEUR`, `SYNCHRO_MOT_DE_PASSE` dans `.env`). Chaque passage
+   (`6-SYNCHRONISATION-AUTOMATIQUE.bat`, commande `python manage.py synchroniser_dossier` : même serveur, instance et
+   base que la première synchronisation ; compte SQL éventuel : `SYNCHRO_UTILISATEUR`, `SYNCHRO_MOT_DE_PASSE` dans `.env`). Chaque passage
    reporte les **créations, modifications et suppressions** : fiches mises à jour ; écritures et pièces comparées par
    clé d'origine et empreinte (seules celles qui ont changé sont refaites, le n° ERP est conservé) ; stock aligné
    par des ajustements tracés ; une facture qui a disparu de la liste des non soldées est soldée, une pièce en cours

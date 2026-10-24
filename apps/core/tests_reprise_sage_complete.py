@@ -269,16 +269,64 @@ class EcranRepriseTests(TestCase):
         self.assertNotContains(page, "Terminer la bascule")
 
     def test_synchronisation_planifiee(self):
-        import os
         from io import StringIO
         from unittest import mock
 
         from django.core.management.base import CommandError
 
+        from apps.core.models import Societe
+        from apps.core.reprise_sage import source as source_mod
+
         sortie = StringIO()
         call_command("synchroniser_dossier", stdout=sortie)                     # rien à faire avant la première synchro
         self.assertIn("rien à faire", sortie.getvalue())
         self.assertTrue(reprise_sage.importer(EXEMPLE, BASCULE, appliquer=True, debut_exercice=DEBUT).conforme)
-        with mock.patch.dict(os.environ, {"SYNCHRO_SERVEUR": "", "SYNCHRO_BASE": ""}):
-            with self.assertRaisesMessage(CommandError, "SYNCHRO_SERVEUR"):
+        with self.assertRaisesMessage(CommandError, "pas une base SQL Server"):   # dossier CSV : pas d'automatique
+            call_command("synchroniser_dossier", stdout=StringIO())
+        Societe.objects.update(source_dossier="serveur-inexistant.invalid\\SAGE100/DOSSIER")
+        with mock.patch.object(source_mod, "connecter", side_effect=OSError("injoignable")) as connecter:
+            with self.assertRaisesMessage(CommandError, "Connexion au dossier d'origine impossible"):
                 call_command("synchroniser_dossier", stdout=StringIO())
+        self.assertEqual(connecter.call_args.args[:2], ("serveur-inexistant.invalid\\SAGE100", "DOSSIER"))
+
+
+class InstancesSqlTests(TestCase):
+    def test_adresse_serveur_et_instance(self):
+        from apps.core.reprise_sage import source
+
+        self.assertEqual(source.adresse_serveur("SRV", ""), "SRV")
+        self.assertEqual(source.adresse_serveur("SRV", "MSSQLSERVER"), "SRV")             # instance par défaut
+        self.assertEqual(source.adresse_serveur("SRV", "SAGE100"), "SRV\\SAGE100")
+        self.assertEqual(source.separer_serveur("SRV\\SAGE100"), ("SRV", "SAGE100"))
+
+    def test_reponse_sql_server_browser(self):
+        from apps.core.reprise_sage import source
+
+        texte = (b"ServerName;SRV;InstanceName;MSSQLSERVER;IsClustered;No;Version;16.0.1000.6;tcp;1433;;"
+                 b"ServerName;SRV;InstanceName;SAGE100;IsClustered;No;Version;15.0.2000.5;tcp;49712;;")
+        reponse = b"\x05" + len(texte).to_bytes(2, "little") + texte
+        self.assertEqual(source._lire_reponse_browser(reponse),
+                         [("MSSQLSERVER", "16.0.1000.6", "1433"), ("SAGE100", "15.0.2000.5", "49712")])
+
+    def test_ecran_detecte_instances_puis_bases(self):
+        from unittest import mock
+
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        from apps.core.reprise_sage import source
+
+        call_command("init_erp", verbosity=0)
+        url = reverse("commercial:reprise_dossier") + "?seul=1"
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "", "x"))
+        instances = [{"nom": "", "version": "16.0", "port": "1433"}, {"nom": "SAGE100", "version": "15.0", "port": "49712"}]
+        with mock.patch.object(source, "instances_sql", return_value=instances):
+            page = self.client.post(url, {"action": "instances", "machine": "SRV"})
+        self.assertContains(page, "(instance par défaut)")
+        self.assertContains(page, '<option value="SAGE100"')
+        bases = [{"nom": "BIJOU", "societe": "Société Exemple"}, {"nom": "AUTRE", "societe": ""}]
+        with mock.patch.object(source, "connecter") as connecter, mock.patch.object(source, "bases_sage", return_value=bases):
+            page = self.client.post(url, {"action": "rechercher", "machine": "SRV", "instance": "SAGE100"})
+        self.assertEqual(connecter.call_args.args[:2], ("SRV\\SAGE100", "master"))
+        self.assertContains(page, "BIJOU — Société Exemple")
+        self.assertContains(page, "Connexion à : SRV\\SAGE100")

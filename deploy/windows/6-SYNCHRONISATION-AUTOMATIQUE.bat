@@ -15,16 +15,11 @@ if not errorlevel 1 (
   pause
   exit /b 0
 )
-findstr /b "SYNCHRO_SERVEUR=" logiciel\.env >nul || (
-  echo Indiquez d abord dans logiciel\.env les lignes suivantes, puis relancez ce fichier :
-  echo   SYNCHRO_SERVEUR=nom du serveur SQL de l ancien logiciel, ex. .\SQLEXPRESS
-  echo   SYNCHRO_BASE=nom de la base du dossier
-  echo   SYNCHRO_UTILISATEUR=compte SQL en lecture seule ^(vide : authentification Windows^)
-  echo   SYNCHRO_MOT_DE_PASSE=
-  echo La premiere synchronisation se fait a l ecran : Fichier ^> Reprise d un dossier existant.
-  pause
-  exit /b 1
-)
+echo Le serveur, l instance SQL et la base sont ceux choisis a l ecran pour la premiere synchronisation
+echo (Fichier ^> Reprise d un dossier existant). Avec un compte SQL plutot que Windows, ajoutez dans logiciel\.env :
+echo   SYNCHRO_UTILISATEUR=compte SQL en lecture seule
+echo   SYNCHRO_MOT_DE_PASSE=son mot de passe
+echo.
 > "%~dp0outils\synchroniser.bat" echo @echo off
 >> "%~dp0outils\synchroniser.bat" echo cd /d "%~dp0logiciel"
 >> "%~dp0outils\synchroniser.bat" echo "..\python\python.exe" manage.py synchroniser_dossier ^> "%~dp0logiciel\derniere-synchronisation.txt" 2^>^&1
