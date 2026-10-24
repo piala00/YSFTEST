@@ -1,4 +1,8 @@
+from functools import reduce
+from operator import or_
+
 from django import forms
+from django.db.models import Q
 from django.forms import inlineformset_factory
 
 from apps.comptabilite.models import Journal
@@ -170,7 +174,8 @@ class OperationCaisseForm(BootstrapMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["journal"].queryset = Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)
         self.fields["agence"].queryset = Agence.objects.filter(actif=True, locale=False)
-        self.fields["compte"].queryset = Compte.objects.filter(numero__regex=r"^[1-8]").exclude(numero__startswith="57")
+        self.fields["compte"].queryset = Compte.objects.filter(  # classes 1 à 8 (sans expression régulière : compatible SQL Server)
+            reduce(or_, (Q(numero__startswith=str(c)) for c in range(1, 9)))).exclude(numero__startswith="57")
 
 
 class InventaireForm(BootstrapMixin, forms.ModelForm):

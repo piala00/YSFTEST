@@ -1,0 +1,122 @@
+ERP OHADA : installation sur votre ordinateur Windows
+====================================================
+
+Tout est dans ce dossier : le logiciel, Python et les composants.
+Il n'y a rien à télécharger et aucune connexion Internet n'est nécessaire.
+
+Il faut Windows 10 ou 11 en 64 bits.
+Pour la base SQL Server (facultatif), il faut SQL Server 2017 ou plus récent.
+
+
+1. PREMIÈRE INSTALLATION (une seule fois)
+------------------------------------------
+
+1. Décompressez le zip dans un dossier simple, par exemple C:\ERP-OHADA.
+   Clic droit sur le zip > « Extraire tout… ».
+   Ne lancez rien depuis l'intérieur du zip.
+
+2. Double-cliquez sur 1-INSTALLER.bat.
+   Si Windows affiche « Windows a protégé votre ordinateur », cliquez sur
+   « Informations complémentaires » puis « Exécuter quand même ».
+
+3. Répondez aux questions :
+
+   - Base de données :
+       1 = SQLite : un simple fichier, rien à configurer.
+           C'est le choix conseillé pour un premier essai.
+       2 = SQL Server : sur votre serveur SQL déjà installé (voir partie 3).
+
+   - Données de démonstration : clients, articles et pièces fictifs pour
+     essayer. Répondez N pour partir d'un dossier vide.
+
+   - Compte administrateur : choisissez votre identifiant et votre mot de
+     passe. Notez-les.
+
+4. À la fin, le message « Installation terminée » s'affiche.
+
+
+2. UTILISER LE LOGICIEL (chaque jour)
+--------------------------------------
+
+Double-cliquez sur 2-DEMARRER-ERP.bat.
+Le navigateur s'ouvre sur http://127.0.0.1:8000.
+Connectez-vous avec le compte créé à l'installation.
+
+Gardez la fenêtre noire ouverte pendant l'utilisation.
+Fermez-la pour arrêter le logiciel.
+
+Si la page ne s'ouvre pas tout de suite, actualisez-la (touche F5) après
+quelques secondes.
+
+Pour travailler depuis les autres ordinateurs de l'agence, lancez plutôt
+4-DEMARRER-EN-RESEAU.bat :
+  - les autres postes ouvrent http://NOM-DE-CE-PC:8000 ;
+  - autorisez le pare-feu Windows si la question est posée.
+
+
+3. UTILISER SQL SERVER
+-----------------------
+
+IMPORTANT : l'ERP crée et utilise SA PROPRE base, par exemple ERP_OHADA.
+Ne donnez JAMAIS le nom d'une base Sage. Le programme d'installation
+refuse d'ailleurs une base existante qui contient d'autres tables que
+celles de l'ERP. Vos dossiers Sage ne sont ni lus ni modifiés.
+
+Pendant l'installation, choisissez 2 puis indiquez :
+
+  - Serveur SQL : le nom affiché dans SQL Server Management Studio à la
+    connexion. Exemples : localhost   .\SQLEXPRESS   MONPC\SAGE100
+
+  - Nom de la nouvelle base : ERP_OHADA (proposé par défaut).
+    Elle est créée automatiquement.
+
+  - Authentification Windows (O) : votre compte Windows doit avoir le droit
+    de créer une base sur ce serveur (c'est le cas de l'administrateur
+    du PC en général).
+    Sinon, répondez N et donnez un compte SQL, par exemple sa, avec son
+    mot de passe.
+
+Pilote : si le pilote « ODBC Driver 17 » ou « 18 for SQL Server » de
+Microsoft est installé, il est utilisé. Sinon, le logiciel utilise le pilote
+Microsoft fourni dans ce dossier : il n'y a rien à installer.
+
+Pour passer de SQLite à SQL Server (ou l'inverse), lancez
+3-CHANGER-DE-BASE.bat. L'ancienne base n'est pas effacée.
+
+
+4. EN CAS DE PROBLÈME
+----------------------
+
+- Pour réparer, relancez 1-INSTALLER.bat. Il ne détruit rien : la
+  configuration, la base et les comptes sont conservés.
+
+- « Login failed » ou « Cannot open server » :
+    vérifiez le nom du serveur et que le service SQL Server est démarré
+    (Services Windows > SQL Server (NOM)) ;
+    avec un compte SQL, vérifiez que l'authentification « SQL Server et
+    Windows » est activée sur le serveur.
+
+- « Port 8000 déjà utilisé » : une autre fenêtre de l'ERP est déjà
+  ouverte. Fermez-la.
+
+- Sauvegarde de vos saisies : dans le logiciel, Fichier > Sauvegarde et
+  restauration. Avec SQL Server, vous pouvez aussi sauvegarder la base
+  ERP_OHADA depuis Management Studio.
+
+- La configuration se trouve dans logiciel\.env (fichier texte).
+  Ne le partagez pas : il contient la clé secrète du logiciel et, le cas
+  échéant, le mot de passe SQL.
+
+
+5. CONTENU DU DOSSIER
+----------------------
+
+1-INSTALLER.bat         installation ou réparation
+2-DEMARRER-ERP.bat      démarrer le logiciel sur ce poste
+3-CHANGER-DE-BASE.bat   passer de SQLite à SQL Server ou l'inverse
+4-DEMARRER-EN-RESEAU.bat  démarrer pour tous les postes de l'agence
+logiciel\               le programme ERP
+python\                 Python 3.12 (Python Software Foundation), utilisé
+                        uniquement par l'ERP
+paquets\                composants installés par 1-INSTALLER.bat
+outils\                 programme d'installation

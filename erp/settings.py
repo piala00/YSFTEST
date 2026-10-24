@@ -127,14 +127,16 @@ elif DB_ENGINE == "mssql":
         "default": {
             "ENGINE": "mssql",
             "NAME": env("DB_NAME", "ERP"),
-            "USER": env("DB_USER", "sa"),
+            "USER": env("DB_USER", ""),               # vide : authentification Windows
             "PASSWORD": env("DB_PASSWORD", ""),
             "HOST": env("DB_HOST", "localhost"),
-            "PORT": env("DB_PORT", "1433"),
-            "OPTIONS": {
-                "driver": env("DB_DRIVER", "ODBC Driver 18 for SQL Server"),
+            "PORT": env("DB_PORT", ""),               # vide : port de l'instance nommée
+            "OPTIONS": {k: v for k, v in {
+                # pyodbc avec le pilote ODBC 17/18 installé, ou « mssql_python » (pilote fourni, rien à installer)
+                "python_driver": env("DB_PYTHON_DRIVER", ""),
+                "driver": env("DB_DRIVER", ""),
                 "extra_params": env("DB_EXTRA_PARAMS", "TrustServerCertificate=yes"),
-            },
+            }.items() if v},
         }
     }
 else:
