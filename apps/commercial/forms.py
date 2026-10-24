@@ -4,7 +4,11 @@ from django.forms import inlineformset_factory
 from apps.comptabilite.models import Journal
 from apps.core.forms import BootstrapMixin, DateInput
 
-from .models import Article, Depot, Document, FamilleArticle, Inventaire, LigneDocument, LigneInventaire, Reglement, Tiers
+from apps.comptabilite.models import Compte
+from apps.core.models import Agence
+
+from .models import (Article, Depot, Document, FamilleArticle, Inventaire, LigneDocument, LigneInventaire, OperationCaisse,
+                     Reglement, Tiers)
 
 
 class TiersForm(BootstrapMixin, forms.ModelForm):
@@ -116,13 +120,39 @@ LigneDocumentFormSet = inlineformset_factory(
 class ReglementForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Reglement
-        fields = ("tiers", "date", "mode", "journal", "montant", "reference", "libelle")
+        fields = ("tiers", "date", "mode", "journal", "montant", "commande", "reference", "libelle")
         widgets = {"date": DateInput()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["journal"].queryset = Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)
         self.fields["tiers"].queryset = Tiers.objects.filter(actif=True)
+        self.fields["commande"].queryset = (Document.objects.filter(type_document__in=(Document.COMMANDE, Document.ACHAT_COMMANDE))
+                                            .exclude(statut=Document.ANNULE).select_related("tiers").order_by("-date"))
+        self.fields["commande"].label_from_instance = lambda d: f"{d.numero_affiche} · {d.tiers.nom if d.tiers else ''} · {d.total_ttc:,.0f}".replace(",", " ")
+
+
+class AgenceForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = Agence
+        fields = ("code", "nom", "ville", "locale", "compte_liaison", "actif")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["compte_liaison"].queryset = Compte.objects.filter(numero__startswith="18")
+
+
+class OperationCaisseForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = OperationCaisse
+        fields = ("date", "nature", "journal", "montant", "libelle", "agence", "tiers_libre", "compte", "reference")
+        widgets = {"date": DateInput()}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["journal"].queryset = Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)
+        self.fields["agence"].queryset = Agence.objects.filter(actif=True, locale=False)
+        self.fields["compte"].queryset = Compte.objects.filter(numero__regex=r"^[1-8]").exclude(numero__startswith="57")
 
 
 class InventaireForm(BootstrapMixin, forms.ModelForm):

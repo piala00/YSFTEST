@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Agences{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Agences</h1><a class="btn btn-primary btn-sm" href="{% url 'commercial:agence_create' %}"><i class="bi bi-plus"></i> Nouvelle agence</a></div>
+<p class="small text-muted">Chaque agence travaille sur son propre serveur. Déclarez ici l'agence de ce dossier et les autres agences :
+  les versements reçus pour leur compte (hors recettes) et les sorties faites pour elles passent sur leur compte de liaison.</p>
+<div class="card"><table class="table table-sm mb-0">
+  <thead><tr><th>Code</th><th>Agence</th><th>Ville</th><th>Compte de liaison</th><th></th></tr></thead>
+  <tbody>{% for a in agences %}<tr><td><a href="{% url 'commercial:agence_update' a.pk %}">{{ a.code }}</a></td><td>{{ a.nom }}{% if not a.actif %} <span class="badge text-bg-secondary">inactive</span>{% endif %}</td>
+    <td>{{ a.ville }}</td><td>{% if a.locale %}<span class="badge text-bg-success">Agence de ce dossier</span>{% else %}{{ a.compte_liaison|default:"" }}{% endif %}</td>
+    <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'commercial:agence_update' a.pk %}">Modifier</a></td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center p-4">Aucune agence : commencez par celle de ce dossier (cochez « Agence de ce dossier »).</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

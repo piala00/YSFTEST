@@ -569,6 +569,41 @@ class Document(models.Model):
         """Tiers dont le compte porte la créance ou la dette de la pièce."""
         return self.payeur or self.tiers
 
+    def commandes_d_origine(self):
+        """Bons de commande dont la pièce est issue (en remontant livraison, préparation…)."""
+        commandes, doc, vus = [], self.origine, set()
+        while doc and doc.pk not in vus:
+            vus.add(doc.pk)
+            if doc.type_document in (self.COMMANDE, self.ACHAT_COMMANDE):
+                commandes.append(doc)
+            doc = doc.origine
+        return commandes
+
+    def facture_issue(self):
+        """Facture validée issue de cette commande (en descendant les transformations), ou None."""
+        a_voir, vus = list(self.documents_generes.all()), set()
+        while a_voir:
+            doc = a_voir.pop(0)
+            if doc.pk in vus:
+                continue
+            vus.add(doc.pk)
+            if doc.est_facturation and not doc.est_avoir and doc.statut == self.VALIDE:
+                return doc
+            a_voir.extend(doc.documents_generes.all())
+        return None
+
+    def imputer_acomptes(self):
+        """Facture validée : les acomptes versés sur la commande d'origine viennent en déduction."""
+        if not self.est_facturation or self.est_avoir:
+            return
+        for commande in self.commandes_d_origine():
+            for acompte in commande.acomptes.all():
+                reste, disponible = self.reste_a_payer, acompte.montant_non_impute
+                if reste <= 0:
+                    return
+                if disponible > 0:
+                    Imputation.objects.create(reglement=acompte, document=self, montant=min(reste, disponible))
+
     # --- Cycle de vie ---------------------------------------------------
     def clean(self):
         if self.est_stock:
@@ -634,6 +669,7 @@ class Document(models.Model):
             self._mouvementer_stock()
         if self.est_facturation:
             comptabiliser_document(self)
+            self.imputer_acomptes()
         if self.origine_id:
             self.origine.mettre_a_jour_statut()
         return self
@@ -818,6 +854,10 @@ class Reglement(models.Model):
     montant = models.DecimalField(max_digits=18, decimal_places=2)
     reference = models.CharField("Référence (n° chèque, transaction...)", max_length=60, blank=True)
     libelle = models.CharField(max_length=200, blank=True)
+    commande = models.ForeignKey(
+        "Document", null=True, blank=True, on_delete=models.PROTECT, related_name="acomptes",
+        verbose_name="Acompte sur commande",
+        help_text="Bon de commande payé d'avance : l'acompte sera imputé sur la facture issue de cette commande")
     ecriture = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL, related_name="reglement")
     cree_le = models.DateTimeField(auto_now_add=True)
 
@@ -849,11 +889,21 @@ class Reglement(models.Model):
         """Numérote, comptabilise et impute le règlement sur les factures (FIFO par défaut)."""
         from apps.comptabilite.services import comptabiliser_reglement
 
+        if self.commande_id:
+            commande = self.commande
+            if commande.type_document not in (Document.COMMANDE, Document.ACHAT_COMMANDE) or commande.statut == Document.ANNULE:
+                raise ValidationError("Un acompte se rattache à un bon de commande non annulé.")
+            if commande.tiers_payeur.pk != self.tiers_id and commande.tiers_id != self.tiers_id:
+                raise ValidationError("Le tiers de l'acompte doit être celui du bon de commande (ou son payeur).")
         if not self.numero:
             prefixe = "RC" if self.est_encaissement else "RF"
             self.numero = Sequence.suivant(prefixe, self.date.year)
         self.save()
         comptabiliser_reglement(self)
+        if self.commande_id:
+            # Acompte : il attend la facture issue de la commande (imputé à sa validation)
+            facture = self.commande.facture_issue()
+            factures = [facture] if facture else []
         if factures is None:
             types = (Document.FACTURE,) if self.est_encaissement else (Document.ACHAT_FACTURE,)
             factures = self.tiers.factures_a_regler().filter(type_document__in=types).order_by("date", "numero")
@@ -877,6 +927,93 @@ class Imputation(models.Model):
 
     class Meta:
         verbose_name = "Imputation de règlement"
+
+
+class OperationCaisse(models.Model):
+    """Entrée ou sortie de caisse qui n'est pas un règlement de facture : dépense du jour, versement hors recettes
+    (reçu pour le compte d'une autre agence), sortie faite pour le compte d'une autre agence, autre mouvement.
+    Comptabilisée à l'enregistrement dans le journal de caisse choisi."""
+
+    DEPENSE = "DEPENSE"
+    HORS_RECETTE = "HORS_RECETTE"
+    SORTIE_AGENCE = "SORTIE_AGENCE"
+    AUTRE_ENTREE = "AUTRE_ENTREE"
+    AUTRE_SORTIE = "AUTRE_SORTIE"
+    NATURES = [
+        (DEPENSE, "Dépense"),
+        (HORS_RECETTE, "Versement hors recettes (pour une autre agence)"),
+        (SORTIE_AGENCE, "Sortie pour le compte d'une autre agence"),
+        (AUTRE_ENTREE, "Autre entrée de caisse"),
+        (AUTRE_SORTIE, "Autre sortie de caisse"),
+    ]
+    ENTREES = (HORS_RECETTE, AUTRE_ENTREE)
+    AVEC_AGENCE = (HORS_RECETTE, SORTIE_AGENCE)
+
+    numero = models.CharField(max_length=30, unique=True, blank=True)
+    date = models.DateField(default=timezone.localdate)
+    nature = models.CharField(max_length=15, choices=NATURES, default=DEPENSE)
+    journal = models.ForeignKey("comptabilite.Journal", on_delete=models.PROTECT, limit_choices_to={"type_journal": "TRESORERIE"},
+                                verbose_name="Caisse")
+    montant = models.DecimalField(max_digits=18, decimal_places=2)
+    libelle = models.CharField("Libellé", max_length=200)
+    agence = models.ForeignKey("core.Agence", null=True, blank=True, on_delete=models.PROTECT, related_name="operations_caisse",
+                               help_text="Agence pour le compte de laquelle l'opération est faite")
+    tiers_libre = models.CharField("Client / bénéficiaire", max_length=150, blank=True,
+                                   help_text="Ex. client de l'autre agence qui a versé (code et nom)")
+    compte = models.ForeignKey("comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+                               verbose_name="Compte de contrepartie",
+                               help_text="Compte de charge pour une dépense (ex. 6xx) ; inutile pour une opération d'agence")
+    reference = models.CharField("Pièce justificative", max_length=60, blank=True)
+    ecriture = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL, related_name="operation_caisse")
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-numero"]
+        verbose_name = "Opération de caisse"
+        verbose_name_plural = "Opérations de caisse"
+
+    def __str__(self):
+        return f"{self.numero} - {self.libelle}"
+
+    @property
+    def est_entree(self):
+        return self.nature in self.ENTREES
+
+    def clean(self):
+        if self.montant is not None and self.montant <= 0:
+            raise ValidationError({"montant": "Le montant doit être positif."})
+        if self.nature in self.AVEC_AGENCE:
+            if not self.agence_id:
+                raise ValidationError({"agence": "Indiquez l'agence pour le compte de laquelle l'opération est faite."})
+            if self.agence.locale:
+                raise ValidationError({"agence": "Choisissez une autre agence que celle de ce dossier."})
+        elif not self.compte_id:
+            raise ValidationError({"compte": "Indiquez le compte de contrepartie (ex. compte de charge pour une dépense)."})
+
+    def contrepartie(self):
+        return self.agence.compte_liaison if self.nature in self.AVEC_AGENCE else self.compte
+
+    @transaction.atomic
+    def enregistrer(self):
+        """Numérote et comptabilise : entrée D caisse / C contrepartie ; sortie D contrepartie / C caisse."""
+        from apps.comptabilite.services import creer_ecriture
+
+        self.full_clean(exclude=["numero", "ecriture"])
+        if not self.journal.compte_tresorerie_id:
+            raise ValidationError(f"Le journal {self.journal.code} n'a pas de compte de trésorerie associé.")
+        if not self.numero:
+            self.numero = Sequence.suivant("OC", self.date.year)
+        self.save()
+        if not self.ecriture_id:
+            libelle = self.libelle + (f" - {self.tiers_libre}" if self.tiers_libre else "") + (f" ({self.agence.nom})" if self.agence_id else "")
+            caisse, autre = self.journal.compte_tresorerie, self.contrepartie()
+            lignes = ([{"compte": caisse, "debit": self.montant}, {"compte": autre, "credit": self.montant}] if self.est_entree
+                      else [{"compte": autre, "debit": self.montant}, {"compte": caisse, "credit": self.montant}])
+            self.ecriture = creer_ecriture(self.journal, self.date, libelle, lignes, reference=self.reference or self.numero,
+                                           origine=self.numero)
+            self.save(update_fields=["ecriture"])
+        return self
 
 
 class TarifCategorie(models.Model):

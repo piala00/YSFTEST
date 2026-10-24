@@ -182,3 +182,95 @@ def tableau_de_bord(exercice=None):
         "factures_impayees": sum(1 for d in Document.objects.filter(type_document=Document.FACTURE, statut=Document.VALIDE)
                                  if d.reste_a_payer > 0),
     }
+
+
+# ---------------------------------------------------------------------------
+# Rapport commercial journalier (rapport de caisse d'une agence)
+# ---------------------------------------------------------------------------
+def rapport_commercial(jour, journal=None):
+    """Rapport du jour d'une caisse : ventes (factures et bons de commande), encaissements, versements hors
+    recettes, sorties et dépenses, puis solde de caisse (ouverture, mouvements, clôture) rapproché du compte."""
+    from apps.commercial.models import Imputation, OperationCaisse, Reglement
+    from apps.comptabilite.models import Ecriture, Journal, LigneEcriture
+
+    journal = journal or Journal.objects.filter(code="CA").first() or Journal.objects.filter(
+        type_journal=Journal.TYPE_TRESORERIE).first()
+    D = Document
+
+    # 1. Ventes du jour : factures (comptant, payées d'avance, en compte) et bons de commande
+    factures = []
+    for f in (Document.objects.filter(type_document__in=(D.FACTURE, D.FACTURE_RETOUR, D.AVOIR), date=jour)
+              .exclude(statut__in=(D.BROUILLON, D.ANNULE)).select_related("tiers").order_by("numero")):
+        signe = -1 if f.est_avoir else 1
+        imputations = Imputation.objects.filter(document=f).select_related("reglement")
+        acompte = sum((i.montant for i in imputations if i.reglement.commande_id and i.reglement.date < jour), ZERO)
+        encaisse = sum((i.montant for i in imputations if i.reglement.date == jour), ZERO)
+        reste = f.reste_a_payer if not f.est_avoir else ZERO
+        nature = ("Avoir" if f.est_avoir else "Comptant" if reste <= 0 and encaisse and not acompte
+                  else "Payée d'avance" if reste <= 0 and acompte else "Comptant (partiel)" if encaisse else "En compte")
+        factures.append({"doc": f, "ttc": signe * f.total_ttc, "acompte": acompte, "encaisse": encaisse,
+                         "reste": reste, "nature": nature})
+    commandes = []
+    for c in (Document.objects.filter(type_document=D.COMMANDE, date=jour).exclude(statut=D.ANNULE)
+              .select_related("tiers").order_by("numero")):
+        avance = c.acomptes.aggregate(s=Sum("montant"))["s"] or ZERO
+        facture = c.facture_issue()
+        commandes.append({"doc": c, "ttc": c.total_ttc, "avance": avance,
+                          "nature": "Payé d'avance" if avance >= c.total_ttc > 0 else "Acompte" if avance else "En compte",
+                          "facture": facture, "facturee_jour": bool(facture and facture.date == jour)})
+    ventes = {
+        "factures": factures, "commandes": commandes,
+        "total_factures": sum((l["ttc"] for l in factures), ZERO),
+        "comptant": sum((l["ttc"] for l in factures if l["nature"] in ("Comptant", "Payée d'avance")), ZERO),
+        "credit": sum((l["reste"] for l in factures), ZERO),
+        "total_commandes": sum((l["ttc"] for l in commandes), ZERO),
+        "avances_commandes": sum((l["avance"] for l in commandes), ZERO),
+    }
+
+    # 2. Encaissements du jour sur cette caisse
+    encaissements = []
+    for r in (Reglement.objects.filter(date=jour, journal=journal, tiers__type_tiers=Tiers.CLIENT)
+              .select_related("tiers", "commande").order_by("numero")):
+        docs = [i.document for i in r.imputations.select_related("document")]
+        nature = ("Acompte sur commande" if r.commande_id else "Vente du jour" if docs and all(d.date == jour for d in docs)
+                  else "Recouvrement de créance" if docs else "Avance (non imputée)")
+        encaissements.append({"reglement": r, "nature": nature, "montant": r.montant})
+    operations = OperationCaisse.objects.filter(date=jour, journal=journal).select_related("agence", "compte")
+    hors_recettes = [o for o in operations if o.nature == OperationCaisse.HORS_RECETTE]
+    autres_entrees = [o for o in operations if o.nature == OperationCaisse.AUTRE_ENTREE]
+
+    # 3. Sorties du jour
+    depenses = [o for o in operations if o.nature == OperationCaisse.DEPENSE]
+    sorties_agences = [o for o in operations if o.nature == OperationCaisse.SORTIE_AGENCE]
+    autres_sorties = [o for o in operations if o.nature == OperationCaisse.AUTRE_SORTIE]
+    fournisseurs = list(Reglement.objects.filter(date=jour, journal=journal, tiers__type_tiers=Tiers.FOURNISSEUR)
+                        .select_related("tiers").order_by("numero"))
+
+    total = lambda objets, champ="montant": sum((getattr(o, champ) if not isinstance(o, dict) else o[champ] for o in objets), ZERO)
+    entrees = total(encaissements) + total(hors_recettes) + total(autres_entrees)
+    sorties = total(depenses) + total(sorties_agences) + total(autres_sorties) + total(fournisseurs)
+
+    # 4. Solde de caisse, rapproché du compte de trésorerie
+    solde = {"ouverture": ZERO, "entrees": entrees, "sorties": sorties, "cloture": entrees - sorties, "compte": None,
+             "cloture_comptable": None, "ecart": ZERO}
+    compte = journal.compte_tresorerie if journal else None
+    if compte:
+        lignes = LigneEcriture.objects.filter(compte=compte, ecriture__statut=Ecriture.STATUT_VALIDEE)
+        avant = lignes.filter(ecriture__date__lt=jour).aggregate(d=Sum("debit"), c=Sum("credit"))
+        ouverture = (avant["d"] or ZERO) - (avant["c"] or ZERO)
+        jusqua = lignes.filter(ecriture__date__lte=jour).aggregate(d=Sum("debit"), c=Sum("credit"))
+        cloture_comptable = (jusqua["d"] or ZERO) - (jusqua["c"] or ZERO)
+        cloture = ouverture + entrees - sorties
+        solde.update(ouverture=ouverture, cloture=cloture, compte=compte, cloture_comptable=cloture_comptable,
+                     ecart=cloture_comptable - cloture)
+    return {
+        "jour": jour, "journal": journal, "ventes": ventes,
+        "encaissements": encaissements, "total_encaissements": total(encaissements),
+        "hors_recettes": hors_recettes, "total_hors_recettes": total(hors_recettes),
+        "autres_entrees": autres_entrees, "total_autres_entrees": total(autres_entrees),
+        "depenses": depenses, "total_depenses": total(depenses),
+        "sorties_agences": sorties_agences, "total_sorties_agences": total(sorties_agences),
+        "autres_sorties": autres_sorties, "total_autres_sorties": total(autres_sorties),
+        "fournisseurs": fournisseurs, "total_fournisseurs": total(fournisseurs),
+        "solde": solde,
+    }

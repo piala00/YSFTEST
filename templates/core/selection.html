@@ -33,9 +33,9 @@
       {% for nom, libelle in delais %}<div class="selection-ligne"><label for="sel-{{ nom }}">{{ libelle }}</label>
         <input type="number" min="1" id="sel-{{ nom }}" name="{{ nom }}" value="{{ valeurs|valeur:nom }}" class="form-control form-control-sm" style="max-width:7rem" required></div>{% endfor %}
       {% else %}
-      <div class="selection-ligne"><label for="sel-{{ c.critere }}">{% if c.critere == "journal" %}Code journal{% elif c.critere == "tiers" %}Tiers{% elif c.critere == "depot" %}Dépôt{% elif c.critere == "famille" %}Famille{% else %}Article{% endif %}</label>
+      <div class="selection-ligne"><label for="sel-{{ c.critere }}">{% if c.critere == "journal" %}Code journal{% elif c.critere == "tiers" %}Tiers{% elif c.critere == "depot" %}Dépôt{% elif c.critere == "famille" %}Famille{% elif c.critere == "caisse" %}Caisse{% else %}Article{% endif %}</label>
         <select name="{{ c.critere }}" id="sel-{{ c.critere }}" class="form-select form-select-sm">
-          <option value="">{% if c.critere == "journal" %}Tous{% elif c.critere == "tiers" %}Tous{% elif c.critere == "depot" %}Tous{% elif c.critere == "famille" %}Toutes{% else %}Tous{% endif %}</option>
+          <option value="">{% if c.critere == "famille" %}Toutes{% elif c.critere == "caisse" %}Caisse principale (CA){% else %}Tous{% endif %}</option>
           {% for valeur, libelle, type_tiers in c.choix %}<option value="{{ valeur }}" {% if type_tiers %}data-type="{{ type_tiers }}"{% endif %} {% if valeurs|valeur:c.critere == valeur %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
         </select></div>
       {% endif %}

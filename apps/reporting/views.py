@@ -85,3 +85,17 @@ def statistique(request, code):
         from apps.core.templatetags.erp import cellule
         return _export_csv(code, [c[1] for c in cles], [[cellule(l, c) for c in cles] for l in etat["lignes"]])
     return render(request, "reporting/statistique.html", {"form": form, "p": p, "etat": etat, "code": code})
+
+
+@login_required
+def rapport_commercial(request):
+    """Rapport commercial journalier : ventes, encaissements, hors recettes, sorties, solde de caisse."""
+    import datetime
+
+    from django.utils.dateparse import parse_date
+
+    from apps.comptabilite.models import Journal
+
+    jour = parse_date(request.GET.get("date") or "") or datetime.date.today()
+    journal = Journal.objects.filter(pk=request.GET.get("caisse")).first() if request.GET.get("caisse") else None
+    return render(request, "reporting/rapport_commercial.html", {"r": services.rapport_commercial(jour, journal)})

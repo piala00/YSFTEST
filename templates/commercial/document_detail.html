@@ -15,6 +15,9 @@
         {% if object.est_facturation and not object.est_avoir and object.statut == 'VALIDE' and object.reste_a_payer > 0 %}
         <li><a class="dropdown-item" data-nouvelle-fenetre href="{% url 'commercial:reglement_create' %}?document={{ object.pk }}"><i class="bi bi-cash"></i> Saisir un règlement</a></li>
         {% endif %}
+        {% if object.type_document == 'COMMANDE' or object.type_document == 'ACHAT_COMMANDE' %}{% if object.statut == 'VALIDE' %}
+        <li><a class="dropdown-item" data-nouvelle-fenetre href="{% url 'commercial:reglement_create' %}?commande={{ object.pk }}"><i class="bi bi-cash-coin"></i> Saisir un acompte (paiement d'avance)</a></li>
+        {% endif %}{% endif %}
         {% if object.statut == 'BROUILLON' or object.statut == 'VALIDE' and not object.est_facturation %}
         <li><form method="post" action="{% url 'commercial:document_annuler' object.pk %}" onsubmit="return confirm('Annuler ce document ?')">{% csrf_token %}
           <button class="dropdown-item text-danger"><i class="bi bi-x-circle"></i> Annuler la pièce</button></form></li>

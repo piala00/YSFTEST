@@ -169,6 +169,49 @@ class AccesLogiciel(models.Model):
         return f"{self.utilisateur} · {self.module} : {self.get_acces_display()}"
 
 
+class Agence(models.Model):
+    """Agence de la société. Chaque agence travaille sur son propre serveur ; ce dossier est celui de l'agence
+    « locale ». Les autres agences servent aux opérations faites pour leur compte (versements hors recettes,
+    sorties pour une autre agence), passées sur leur compte de liaison."""
+
+    code = models.CharField(max_length=10, unique=True)
+    nom = models.CharField(max_length=100)
+    ville = models.CharField(max_length=80, blank=True)
+    locale = models.BooleanField("Agence de ce dossier", default=False,
+                                 help_text="L'agence qui travaille sur ce serveur (une seule)")
+    compte_liaison = models.ForeignKey(
+        "comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Compte de liaison", help_text="Compte de liaison de l'agence (classe 18). Vide : créé automatiquement.")
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-locale", "nom"]
+        verbose_name = "Agence"
+
+    def __str__(self):
+        return f"{self.code} - {self.nom}"
+
+    @classmethod
+    def locale_ou_none(cls):
+        return cls.objects.filter(locale=True).first()
+
+    def save(self, *args, **kwargs):
+        if self.locale:
+            Agence.objects.exclude(pk=self.pk).filter(locale=True).update(locale=False)
+        if not self.locale and not self.compte_liaison_id:
+            self.compte_liaison = self._creer_compte_liaison()
+        super().save(*args, **kwargs)
+
+    def _creer_compte_liaison(self):
+        """185 « Comptes permanents non bloqués des établissements et succursales » + numéro d'ordre."""
+        from apps.comptabilite.models import Compte
+
+        rang = 1
+        while Compte.objects.filter(numero=f"185{rang:02d}").exists():
+            rang += 1
+        return Compte.objects.create(numero=f"185{rang:02d}", intitule=f"Liaison agence {self.nom}"[:200])
+
+
 class JournalEvenement(models.Model):
     """Journal des événements : trace de chaque création, modification, validation, suppression et connexion."""
 

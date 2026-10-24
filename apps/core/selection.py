@@ -24,7 +24,8 @@ CHAMPS = {
     "depot": ("depot",),
     "famille": ("famille",),
     "article": ("article",),
-    "anciennete": ("d_apres", "delai1", "delai2", "delai3"),   # balance âgée (Sage P008)
+    "anciennete": ("d_apres", "delai1", "delai2", "delai3"),
+    "caisse": ("caisse",),   # balance âgée (Sage P008)
 }
 
 TIERS = ["type_tiers", "tiers"]
@@ -52,6 +53,8 @@ ETATS = {
     # Reporting
     "reporting:ventes": (["periode"], None),
     "reporting:balance_agee": (["date"] + TIERS + ["anciennete"], None),
+    "reporting:rapport_commercial": (["date", "caisse"], None),
+    "commercial:rapport_commercial": (["date", "caisse"], None),
     "reporting:bilan": (["periode"], None),
     "reporting:compte_resultat": (["periode"], None),
 }
@@ -99,6 +102,10 @@ def _choix(critere, valeurs):
         from apps.comptabilite.models import Journal
 
         return [(j.code, f"{j.code} - {j.intitule}", "") for j in Journal.objects.all()]
+    if critere == "caisse":
+        from apps.comptabilite.models import Journal
+
+        return [(str(j.pk), f"{j.code} - {j.intitule}", "") for j in Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)]
     if critere == "tiers":
         from apps.commercial.models import Tiers
 
@@ -175,11 +182,11 @@ def resume(request):
                             f"délais {g.get('delai1')} / {g.get('delai2')} / {g.get('delai3')} j")
         elif c == "type_tiers" and g.get("type"):
             morceaux.append("clients" if g["type"] == "CLIENT" else "fournisseurs")
-        elif c in ("journal", "tiers", "depot", "famille", "article"):
+        elif c in ("journal", "tiers", "depot", "famille", "article", "caisse"):
             valeur = g.get(c)
             libelle = {v: lib for v, lib, _ in _choix(c, g)}.get(valeur) if valeur else None
             vides = {"journal": "tous les journaux", "tiers": "tous les tiers", "depot": "tous les dépôts",
-                     "famille": "toutes les familles", "article": "tous les articles"}
+                     "famille": "toutes les familles", "article": "tous les articles", "caisse": "caisse principale"}
             morceaux.append(libelle or vides[c])
     modifier = g.copy()
     modifier.pop("ok", None)

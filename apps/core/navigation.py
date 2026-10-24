@@ -306,6 +306,7 @@ GESTION_COMMERCIALE = Module(
                 E("fichier.parametres.contacts_types", "Contacts"),
                 E("fichier.parametres.international", "International"),
                 E("fichier.parametres.banques", "Banques"),
+                E("fichier.parametres.agences", "Agences", "commercial:agences", preuve="AJOUT-ERP"),
                 E("fichier.parametres.documents", "Documents"),
                 E("fichier.parametres.logistique", "Logistique", "commercial:societe", section="logistique"),
                 E("fichier.parametres.comptabilisation", "Comptabilisation"),
@@ -416,6 +417,8 @@ GESTION_COMMERCIALE = Module(
             E("reglements", "Gestion des règlements", icone="bi-cash-coin", enfants=[
                 E("reglements.clients", "Gestion des règlements clients", "commercial:reglements", sens="E"),
                 E("reglements.fournisseurs", "Gestion des règlements fournisseurs", "commercial:reglements", sens="D"),
+                E("reglements.caisse", "Opérations de caisse (dépenses, hors recettes)", "commercial:operations_caisse",
+                  preuve="AJOUT-ERP"),
                 E("reglements.generation", "Génération des règlements"),
                 E("reglements.paiements_ligne", "Intégration des paiements en ligne"),
             ]),
@@ -454,6 +457,8 @@ GESTION_COMMERCIALE = Module(
         ]),
         Onglet("etat", "Etat", "bi-printer", [
             E("etats.personnalises", "Etats personnalisés"),
+            E("etats.rapport_commercial", "Rapport commercial journalier", "commercial:rapport_commercial",
+              icone="bi-cash-stack", preuve="AJOUT-ERP"),
             SEP(),
             E("etats.analyse_clients", "Analyse clients", icone="bi-person-check", enfants=[
                 E("etats.clients.activite", "Activité clients", "commercial:statistique", "activite_clients"),
@@ -674,6 +679,7 @@ REPORTING = Module(
         menu_edition(),
         Onglet("etat", "Etat", "bi-printer", [
             E("synthese.dashboard", "Tableau de bord", "reporting:dashboard", icone="bi-speedometer2"),
+            E("synthese.rapport_commercial", "Rapport commercial journalier", "reporting:rapport_commercial", icone="bi-cash-stack"),
             SEP(),
             E("ventes.analyses", "Statistiques des ventes", icone="bi-graph-up", enfants=[
                 E("ventes.mois", "Évolution mensuelle", "reporting:ventes", vue="mois"),

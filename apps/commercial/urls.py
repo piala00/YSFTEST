@@ -17,6 +17,7 @@ urlpatterns = [
     path("etats/ventes/", reporting_views.ventes, name="etat_ventes"),
     path("etats/balance-agee/", reporting_views.balance_agee, name="etat_balance_agee"),
     path("etats/achats/", reporting_views.achats, name="etat_achats"),
+    path("etats/rapport-commercial/", reporting_views.rapport_commercial, name="rapport_commercial"),
     path("etats/<str:code>/", reporting_views.statistique, name="statistique"),
     path("recherche/entetes/", views.recherche_entetes, name="recherche_entetes"),
     path("recherche/lignes/", views.recherche_lignes, name="recherche_lignes"),
@@ -60,4 +61,9 @@ urlpatterns = [
     path("reglements/", views.ReglementListView.as_view(), name="reglements"),
     path("reglements/nouveau/", views.reglement_create, name="reglement_create"),
     path("reglements/<int:pk>/", views.ReglementDetailView.as_view(), name="reglement_detail"),
+    path("caisse/", views.operations_caisse, name="operations_caisse"),
+    path("caisse/nouvelle/", views.operation_caisse_create, name="operation_caisse_create"),
+    path("agences/", views.agences, name="agences"),
+    path("agences/nouvelle/", views.agence_form, name="agence_create"),
+    path("agences/<int:pk>/", views.agence_form, name="agence_update"),
 ]

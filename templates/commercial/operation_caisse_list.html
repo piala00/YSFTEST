@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Opérations de caisse{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Opérations de caisse</h1>
+  <div class="dropdown"><button class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus"></i> Nouvelle opération</button>
+    <ul class="dropdown-menu dropdown-menu-end">{% for code, lib in natures %}<li><a class="dropdown-item" href="{% url 'commercial:operation_caisse_create' %}?nature={{ code }}">{{ lib }}</a></li>{% endfor %}</ul></div></div>
+<form class="d-flex gap-2 align-items-end mb-3"><div><label class="form-label small mb-0" for="op-date">Date</label>
+  <input type="date" id="op-date" name="date" value="{{ jour }}" class="form-control form-control-sm" onchange="this.form.submit()"></div>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'commercial:rapport_commercial' %}?date={{ jour }}&amp;ok=1"><i class="bi bi-cash-stack"></i> Rapport commercial du jour</a></form>
+<div class="card"><table class="table table-sm mb-0">
+  <thead><tr><th>N°</th><th>Nature</th><th>Caisse</th><th>Libellé</th><th>Agence / bénéficiaire</th><th class="num">Entrée</th><th class="num">Sortie</th><th>Écriture</th></tr></thead>
+  <tbody>{% for o in operations %}<tr><td>{{ o.numero }}</td><td>{{ o.get_nature_display }}</td><td>{{ o.journal.code }}</td><td>{{ o.libelle }}</td>
+    <td>{% if o.agence %}{{ o.agence.nom }}{% endif %}{% if o.tiers_libre %} · {{ o.tiers_libre }}{% endif %}{% if o.compte %}<span class="text-muted"> {{ o.compte.numero }}</span>{% endif %}</td>
+    <td class="num">{% if o.est_entree %}{{ o.montant|montant }}{% endif %}</td><td class="num">{% if not o.est_entree %}{{ o.montant|montant }}{% endif %}</td>
+    <td>{% if o.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' o.ecriture.pk %}">{{ o.ecriture.numero }}</a>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="8" class="text-muted text-center p-4">Aucune opération ce jour.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="5">Total</td><td class="num">{{ total_entrees|montant }}</td><td class="num">{{ total_sorties|montant }}</td><td></td></tr></tfoot>
+</table></div>
+{% endblock %}

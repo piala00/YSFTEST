@@ -13,9 +13,11 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.comptabilite.models import Journal
 
-from .forms import (ArticleForm, DepotForm, DocumentForm, FamilleArticleForm, InventaireForm, LigneDocumentFormSet,
+from .forms import (AgenceForm, ArticleForm, DepotForm, DocumentForm, FamilleArticleForm, InventaireForm, LigneDocumentFormSet,
+                    OperationCaisseForm,
                     LigneInventaireFormSet, ReglementForm, TiersForm)
-from .models import (Article, CategorieTarifaire, Depot, Document, FamilleArticle, Inventaire, MouvementStock, Reglement,
+from .models import (Article, CategorieTarifaire, Depot, Document, FamilleArticle, Inventaire, MouvementStock, OperationCaisse,
+                     Reglement,
                      StockDepot, TarifCategorie, Tiers, ZERO)
 
 
@@ -676,6 +678,10 @@ def reglement_create(request):
         facture = get_object_or_404(Document, pk=request.GET["document"], type_document__in=Document.TYPES_FACTURATION)
         initial = {"tiers": facture.tiers, "montant": facture.reste_a_payer,
                    "libelle": f"Règlement {facture.numero}"}
+    elif request.GET.get("commande"):
+        commande = get_object_or_404(Document, pk=request.GET["commande"], type_document__in=(Document.COMMANDE, Document.ACHAT_COMMANDE))
+        initial = {"tiers": commande.tiers_payeur, "commande": commande, "montant": commande.total_ttc,
+                   "libelle": f"Acompte {commande.numero_affiche}"}
     elif request.GET.get("tiers"):
         initial = {"tiers": request.GET["tiers"]}
     initial.setdefault("journal", Journal.objects.filter(code="CA").first())
@@ -749,3 +755,55 @@ def recherche_lignes(request):
             lignes = lignes.filter(Q(article__reference__icontains=a) | Q(designation__icontains=a))
         lignes = lignes.order_by("-document__date")[:500]
     return render(request, "commercial/recherche.html", {**_contexte_recherche(), "lignes": lignes, "mode": "lignes"})
+
+
+# ---------------------------------------------------------------- Agences et opérations de caisse
+@login_required
+def agences(request):
+    """Fichier › Paramètres société › Agences : l'agence de ce dossier et les autres agences (comptes de liaison)."""
+    from apps.core.models import Agence
+
+    return render(request, "commercial/agence_list.html", {"agences": Agence.objects.select_related("compte_liaison")})
+
+
+@login_required
+def agence_form(request, pk=None):
+    from apps.core.models import Agence
+
+    agence = get_object_or_404(Agence, pk=pk) if pk else None
+    form = AgenceForm(request.POST or None, instance=agence)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Agence enregistrée.")
+        return redirect("commercial:agences")
+    return render(request, "core/form.html", {"form": form, "titre": "Agence" if agence else "Nouvelle agence"})
+
+
+@login_required
+def operations_caisse(request):
+    """Opérations de caisse du jour (ou de la période) : dépenses, hors recettes, sorties pour une autre agence."""
+    g = request.GET
+    jour = g.get("date") or timezone.localdate().isoformat()
+    qs = OperationCaisse.objects.filter(date=jour).select_related("journal", "agence", "compte", "ecriture")
+    if g.get("nature"):
+        qs = qs.filter(nature=g["nature"])
+    return render(request, "commercial/operation_caisse_list.html", {
+        "operations": qs, "jour": jour, "natures": OperationCaisse.NATURES,
+        "total_entrees": sum((o.montant for o in qs if o.est_entree), 0),
+        "total_sorties": sum((o.montant for o in qs if not o.est_entree), 0)})
+
+
+@login_required
+def operation_caisse_create(request):
+    initial = {"journal": Journal.objects.filter(code="CA").first(), "nature": request.GET.get("nature", OperationCaisse.DEPENSE)}
+    form = OperationCaisseForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        operation = form.save(commit=False)
+        operation.cree_par = request.user
+        try:
+            operation.enregistrer()
+            messages.success(request, f"Opération {operation.numero} enregistrée et comptabilisée.")
+            return redirect(f"{reverse('commercial:operations_caisse')}?date={operation.date.isoformat()}")
+        except ValidationError as exc:
+            _erreur(request, exc)
+    return render(request, "core/form.html", {"form": form, "titre": "Nouvelle opération de caisse"})

@@ -1,0 +1,68 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Rapport commercial{% endblock %}
+{% block content %}
+<div class="rapport-commercial">
+<div class="page-title"><h1>Rapport commercial du {{ r.jour|date:"d/m/Y" }}</h1>
+  <span class="text-muted">{{ societe.raison_sociale }}{% if r.journal %} · caisse {{ r.journal.code }} - {{ r.journal.intitule }}{% endif %}</span></div>
+
+<h2>1. Ventes du jour</h2>
+<div class="card mb-2"><table class="table table-sm mb-0">
+  <thead><tr><th>Facture</th><th>Client</th><th>Nature</th><th class="num">Montant TTC</th><th class="num">Acompte déjà versé</th><th class="num">Encaissé ce jour</th><th class="num">Reste (crédit)</th></tr></thead>
+  <tbody>{% for l in r.ventes.factures %}<tr><td><a href="{% url 'commercial:document_detail' l.doc.pk %}" data-nouvelle-fenetre>{{ l.doc.numero }}</a></td><td>{{ l.doc.tiers.nom }}</td><td>{{ l.nature }}</td>
+    <td class="num">{{ l.ttc|montant }}</td><td class="num">{{ l.acompte|montant_ou_vide }}</td><td class="num">{{ l.encaisse|montant_ou_vide }}</td><td class="num">{{ l.reste|montant_ou_vide }}</td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted text-center">Aucune facture ce jour.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="3">Total factures</td><td class="num">{{ r.ventes.total_factures|montant }}</td><td></td><td></td><td class="num">{{ r.ventes.credit|montant }}</td></tr></tfoot>
+</table></div>
+<div class="small mb-3">Ventes comptant (ou payées d'avance) : <strong>{{ r.ventes.comptant|montant }}</strong> · Ventes à crédit (reste dû) : <strong>{{ r.ventes.credit|montant }}</strong></div>
+
+<div class="card mb-3"><table class="table table-sm mb-0">
+  <thead><tr><th>Bon de commande</th><th>Client</th><th>Paiement</th><th class="num">Montant TTC</th><th class="num">Avance versée</th><th>Facture</th></tr></thead>
+  <tbody>{% for l in r.ventes.commandes %}<tr><td><a href="{% url 'commercial:document_detail' l.doc.pk %}" data-nouvelle-fenetre>{{ l.doc.numero_affiche }}</a></td><td>{{ l.doc.tiers.nom }}</td><td>{{ l.nature }}</td>
+    <td class="num">{{ l.ttc|montant }}</td><td class="num">{{ l.avance|montant_ou_vide }}</td>
+    <td>{% if l.facture %}{{ l.facture.numero }}{% if l.facturee_jour %} (livré et facturé ce jour){% endif %}{% else %}<span class="text-muted">à livrer</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center">Aucun bon de commande ce jour.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="3">Total bons de commande</td><td class="num">{{ r.ventes.total_commandes|montant }}</td><td class="num">{{ r.ventes.avances_commandes|montant }}</td><td></td></tr></tfoot>
+</table></div>
+
+<h2>2. Encaissements du jour</h2>
+<div class="card mb-2"><table class="table table-sm mb-0">
+  <thead><tr><th>Reçu</th><th>Client</th><th>Nature</th><th>Mode</th><th class="num">Montant</th></tr></thead>
+  <tbody>{% for e in r.encaissements %}<tr><td><a href="{% url 'commercial:reglement_detail' e.reglement.pk %}" data-nouvelle-fenetre>{{ e.reglement.numero }}</a></td><td>{{ e.reglement.tiers.nom }}</td>
+    <td>{{ e.nature }}{% if e.reglement.commande %} ({{ e.reglement.commande.numero_affiche }}){% endif %}</td><td>{{ e.reglement.get_mode_display }}</td><td class="num">{{ e.montant|montant }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center">Aucun encaissement ce jour.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="4">Total encaissements</td><td class="num">{{ r.total_encaissements|montant }}</td></tr></tfoot>
+</table></div>
+<div class="card mb-3"><div class="card-header bg-white fw-semibold small">Versements hors recettes (reçus pour le compte d'autres agences)</div><table class="table table-sm mb-0">
+  <tbody>{% for o in r.hors_recettes %}<tr><td>{{ o.numero }}</td><td>{{ o.agence.nom }}</td><td>{{ o.tiers_libre }}</td><td>{{ o.libelle }}</td><td class="num">{{ o.montant|montant }}</td></tr>
+  {% empty %}<tr><td class="text-muted text-center">Aucun versement hors recettes.</td></tr>{% endfor %}
+  {% for o in r.autres_entrees %}<tr><td>{{ o.numero }}</td><td colspan="3">Autre entrée : {{ o.libelle }}</td><td class="num">{{ o.montant|montant }}</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="4">Total hors recettes et autres entrées</td><td class="num">{{ r.total_hors_recettes|add:r.total_autres_entrees|montant }}</td></tr></tfoot>
+</table></div>
+
+<h2>3. Sorties et dépenses du jour</h2>
+<div class="card mb-3"><table class="table table-sm mb-0">
+  <thead><tr><th>Pièce</th><th>Nature</th><th>Libellé</th><th>Agence / bénéficiaire</th><th class="num">Montant</th></tr></thead>
+  <tbody>
+  {% for o in r.depenses %}<tr><td>{{ o.numero }}</td><td>Dépense</td><td>{{ o.libelle }}</td><td>{{ o.tiers_libre }}{% if o.compte %} <span class="text-muted">{{ o.compte.numero }}</span>{% endif %}</td><td class="num">{{ o.montant|montant }}</td></tr>{% endfor %}
+  {% for o in r.sorties_agences %}<tr><td>{{ o.numero }}</td><td>Pour une autre agence</td><td>{{ o.libelle }}</td><td>{{ o.agence.nom }}{% if o.tiers_libre %} · {{ o.tiers_libre }}{% endif %}</td><td class="num">{{ o.montant|montant }}</td></tr>{% endfor %}
+  {% for o in r.autres_sorties %}<tr><td>{{ o.numero }}</td><td>Autre sortie</td><td>{{ o.libelle }}</td><td>{{ o.tiers_libre }}</td><td class="num">{{ o.montant|montant }}</td></tr>{% endfor %}
+  {% for f in r.fournisseurs %}<tr><td>{{ f.numero }}</td><td>Règlement fournisseur</td><td>{{ f.libelle }}</td><td>{{ f.tiers.nom }}</td><td class="num">{{ f.montant|montant }}</td></tr>{% endfor %}
+  {% if not r.depenses and not r.sorties_agences and not r.autres_sorties and not r.fournisseurs %}<tr><td colspan="5" class="text-muted text-center">Aucune sortie ce jour.</td></tr>{% endif %}
+  </tbody>
+  <tfoot><tr class="total"><td colspan="4">Total sorties</td><td class="num">{{ r.solde.sorties|montant }}</td></tr></tfoot>
+</table></div>
+
+<h2>4. Solde de caisse</h2>
+<div class="card mb-3"><table class="table table-sm mb-0 solde-caisse">
+  <tbody>
+    <tr><td>Solde d'ouverture</td><td class="num">{{ r.solde.ouverture|montant }}</td></tr>
+    <tr><td>+ Encaissements, hors recettes et autres entrées</td><td class="num">{{ r.solde.entrees|montant }}</td></tr>
+    <tr><td>− Sorties et dépenses</td><td class="num">{{ r.solde.sorties|montant }}</td></tr>
+    <tr class="total"><td>Solde de clôture</td><td class="num">{{ r.solde.cloture|montant }}</td></tr>
+    {% if r.solde.compte %}<tr><td class="small text-muted">Solde du compte {{ r.solde.compte.numero }} en comptabilité</td><td class="num small text-muted">{{ r.solde.cloture_comptable|montant }}</td></tr>
+    {% if r.solde.ecart %}<tr><td class="text-danger">Écart avec la comptabilité (écritures de caisse saisies hors de ce rapport)</td><td class="num text-danger">{{ r.solde.ecart|montant }}</td></tr>{% endif %}{% endif %}
+  </tbody>
+</table></div>
+<div class="small text-muted">Brouillard de caisse : <a href="{% url 'commercial:operations_caisse' %}?date={{ r.jour|date:'Y-m-d' }}">opérations de caisse du jour</a></div>
+</div>
+{% endblock %}
