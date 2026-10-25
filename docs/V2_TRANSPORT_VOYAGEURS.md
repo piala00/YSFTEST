@@ -83,10 +83,11 @@ les prix étant toutes taxes comprises, l'écriture sépare alors le hors taxe e
 
 ## Points à confirmer avec l'utilisateur
 
-1. **Logistique** : fret et flotte seulement, ou aussi location de véhicules, transit, entreposage ?
-2. **Gares dans plusieurs agences** (serveurs séparés hors ligne) : un colis enregistré à Douala et remis à Yaoundé
-   concerne deux dossiers. Il faudra l'échange entre agences (identifiants stables, comptes de liaison 185) prévu
-   pour la version 1. Aujourd'hui, toutes les gares sont dans le même dossier (un serveur central ou réseau local).
+1. **Logistique** : précisé par l'utilisateur (25/10) — le fret est rare, les colis sont l'activité secondaire ;
+   le fret reste une nature d'envoi, sans module dédié.
+2. **Gares dans plusieurs agences** (serveurs séparés hors ligne) : **fait** (25/10) — échanges par fichiers signés
+   envoyés par WhatsApp ou Telegram, consolidation au siège, colis remis dans une autre agence avec comptes de
+   liaison 185 ; voir `docs/ECHANGES_AGENCES.md`.
 3. **Comptabilisation des billets vendus d'avance** : produit constaté à la vente (actuel) ; à la clôture, les billets
    d'un départ de l'exercice suivant pourraient passer en produits constatés d'avance (477).
 4. **Fiscalité du transport de voyageurs** (TVA, droits, taxes communales, assurance voyageurs) : rien n'est imposé ;

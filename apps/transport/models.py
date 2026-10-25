@@ -11,6 +11,7 @@ Schémas comptables (comptes réglables dans Paramètres transport, à valider p
   Dépense de véhicule           D 6xx (section du véhicule)   / C caisse
 """
 import secrets
+import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
@@ -77,6 +78,33 @@ def _ventiler(montant_ttc, compte_produit, taxe, sens_credit=True):
     return [{"compte": l["compte"], cle: l["montant"]} for l in lignes]
 
 
+def _site_local():
+    from apps.echanges.publication import site_local
+
+    return site_local()
+
+
+def _proprietaire(objet, quoi):
+    """Une copie reçue d'un autre site ne se modifie que dans son site d'origine."""
+    if objet.site_origine:
+        raise ValidationError(f"{quoi} appartient à l'agence {objet.site_origine} : seule cette agence peut le modifier.")
+
+
+def _gare_ici(gare):
+    """La gare est-elle tenue par ce dossier ? (sans échanges entre sites : toutes les gares le sont)"""
+    local = _site_local()
+    return local is None or gare.agence_id is None or gare.agence_id == local.pk
+
+
+def _compte_liaison(code_site):
+    from apps.core.models import Agence
+
+    agence = Agence.objects.filter(code=code_site).first()
+    if agence is None or not agence.compte_liaison_id:
+        raise ValidationError(f"Agence {code_site} inconnue ou sans compte de liaison : recevez d'abord les lots du siège.")
+    return agence.compte_liaison
+
+
 def _caisse_par_defaut():
     from apps.comptabilite.models import Journal
 
@@ -86,6 +114,9 @@ def _caisse_par_defaut():
 class Gare(models.Model):
     """Gare routière / point de vente de l'agence (une ville peut avoir plusieurs gares)."""
 
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
+                                    help_text="Vide : créé dans ce dossier ; sinon copie reçue d'un autre site")
     code = models.CharField(max_length=10, unique=True)
     nom = models.CharField(max_length=100)
     ville = models.CharField(max_length=80)
@@ -119,6 +150,9 @@ class Gare(models.Model):
 class Ligne(models.Model):
     """Ligne régulière (trajet) entre deux gares, avec ses tarifs."""
 
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
+                                    help_text="Vide : créé dans ce dossier ; sinon copie reçue d'un autre site")
     code = models.CharField(max_length=20, unique=True)
     gare_depart = models.ForeignKey(Gare, on_delete=models.PROTECT, related_name="lignes_depart", verbose_name="Gare de départ")
     gare_arrivee = models.ForeignKey(Gare, on_delete=models.PROTECT, related_name="lignes_arrivee", verbose_name="Gare d'arrivée")
@@ -148,6 +182,9 @@ class Vehicule(models.Model):
     CAR, MINIBUS, CAMION, AUTRE = "CAR", "MINIBUS", "CAMION", "AUTRE"
     TYPES = [(CAR, "Car / autocar"), (MINIBUS, "Minibus"), (CAMION, "Camion (fret)"), (AUTRE, "Autre")]
 
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
+                                    help_text="Vide : créé dans ce dossier ; sinon copie reçue d'un autre site")
     immatriculation = models.CharField(max_length=20, unique=True)
     designation = models.CharField("Désignation", max_length=100, blank=True, help_text="Marque, modèle, n° de parc")
     type_vehicule = models.CharField("Type", max_length=10, choices=TYPES, default=CAR)
@@ -173,6 +210,9 @@ class Vehicule(models.Model):
 
 
 class Chauffeur(models.Model):
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
+                                    help_text="Vide : créé dans ce dossier ; sinon copie reçue d'un autre site")
     nom = models.CharField(max_length=100)
     telephone = models.CharField("Téléphone", max_length=30, blank=True)
     permis = models.CharField("N° de permis", max_length=40, blank=True)
@@ -191,6 +231,9 @@ class Depart(models.Model):
     PROGRAMME, PARTI, ARRIVE, ANNULE = "PROGRAMME", "PARTI", "ARRIVE", "ANNULE"
     STATUTS = [(PROGRAMME, "Programmé"), (PARTI, "Parti"), (ARRIVE, "Arrivé"), (ANNULE, "Annulé")]
 
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
+                                    help_text="Vide : créé dans ce dossier ; sinon copie reçue d'un autre site")
     numero = models.CharField(max_length=30, unique=True, blank=True)
     ligne = models.ForeignKey(Ligne, on_delete=models.PROTECT, related_name="departs")
     date = models.DateField(default=timezone.localdate)
@@ -243,11 +286,13 @@ class Depart(models.Model):
         return sum((d.montant for d in self.depenses_vehicule.all()), ZERO)
 
     def ouvert_a_la_vente(self):
+        _proprietaire(self, f"Le départ {self.numero}")
         if self.statut != self.PROGRAMME:
             raise ValidationError(f"Le départ {self.numero} est {self.get_statut_display().lower()} : vente impossible.")
 
     @transaction.atomic
     def partir(self):
+        _proprietaire(self, f"Le départ {self.numero}")
         if self.statut != self.PROGRAMME:
             raise ValidationError("Seul un départ programmé peut partir.")
         if not self.vehicule_id or not self.chauffeur_id:
@@ -259,14 +304,23 @@ class Depart(models.Model):
 
     @transaction.atomic
     def arriver(self):
+        """Arrivée en gare : faite par l'agence de départ ou par celle d'arrivée (qui reçoit les colis)."""
         if self.statut != self.PARTI:
             raise ValidationError("Seul un départ parti peut arriver.")
+        if self.site_origine and not _gare_ici(self.ligne.gare_arrivee):
+            raise ValidationError("L'arrivée se constate dans la gare d'arrivée.")
         self.statut, self.arrive_le = self.ARRIVE, timezone.now()
         self.save(update_fields=["statut", "arrive_le"])
         self.colis.filter(statut=Colis.EN_ROUTE).update(statut=Colis.ARRIVE)
+        if self.site_origine:                              # copie : l'agence de départ l'apprendra par le siège
+            from apps.echanges.publication import publier
+
+            publier("depart_arrivee", self.uid, {"v": 1, "depart": str(self.uid), "arrive_le": self.arrive_le.isoformat()},
+                    "ARRIVE", self.date)
 
     @transaction.atomic
     def annuler(self):
+        _proprietaire(self, f"Le départ {self.numero}")
         if self.statut != self.PROGRAMME:
             raise ValidationError("Seul un départ programmé peut être annulé.")
         if self.billets_actifs.exists():
@@ -282,6 +336,9 @@ class Billet(models.Model):
     ESPECES, MOBILE_MONEY, COMPTE = "ESPECES", "MOBILE_MONEY", "COMPTE"
     PAIEMENTS = [(ESPECES, "Espèces"), (MOBILE_MONEY, "Mobile Money"), (COMPTE, "En compte (client)")]
 
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
+                                    help_text="Vide : créé dans ce dossier ; sinon copie reçue d'un autre site")
     numero = models.CharField(max_length=30, unique=True, blank=True)
     date_vente = models.DateField(default=timezone.localdate)
     gare = models.ForeignKey(Gare, null=True, blank=True, on_delete=models.PROTECT, related_name="billets",
@@ -369,6 +426,7 @@ class Billet(models.Model):
     @transaction.atomic
     def reporter(self, nouveau_depart, siege=None):
         """Change de départ (même ligne), sans écriture : le prix déjà payé reste acquis."""
+        _proprietaire(self, f"Le billet {self.numero}")
         if self.statut != self.VENDU:
             raise ValidationError("Seul un billet vendu (non embarqué, non annulé) peut être reporté.")
         nouveau = Depart.objects.select_for_update().get(pk=nouveau_depart.pk)
@@ -388,6 +446,7 @@ class Billet(models.Model):
         """Annule le billet : rembourse le prix moins la retenue (qui reste un produit de l'agence)."""
         from apps.comptabilite.services import creer_ecriture
 
+        _proprietaire(self, f"Le billet {self.numero}")
         if self.statut != self.VENDU:
             raise ValidationError("Seul un billet vendu (non embarqué) peut être annulé.")
         parametres = ParametresTransport.get()
@@ -425,6 +484,9 @@ class Colis(models.Model):
     STATUTS = [(ENREGISTRE, "Enregistré"), (CHARGE, "Chargé"), (EN_ROUTE, "En route"), (ARRIVE, "Arrivé"),
                (LIVRE, "Livré"), (ANNULE, "Annulé")]
 
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
+                                    help_text="Vide : créé dans ce dossier ; sinon copie reçue d'un autre site")
     numero = models.CharField(max_length=30, unique=True, blank=True)
     nature = models.CharField(max_length=10, choices=NATURES, default=COLIS)
     date = models.DateField(default=timezone.localdate)
@@ -452,6 +514,8 @@ class Colis(models.Model):
     code_retrait = models.CharField("Code de retrait", max_length=6, blank=True)
     livre_le = models.DateTimeField(null=True, blank=True)
     retire_par = models.CharField("Retiré par (nom, pièce)", max_length=150, blank=True)
+    livre_site = models.CharField("Remis dans l'agence", max_length=10, blank=True,
+                                  help_text="Agence qui a remis l'envoi, si ce n'est pas celle d'expédition")
     cr_reverse_le = models.DateTimeField("Contre-remboursement reversé le", null=True, blank=True)
     ecriture = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     ecriture_livraison = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL,
@@ -515,6 +579,7 @@ class Colis(models.Model):
 
     @transaction.atomic
     def charger(self, depart):
+        _proprietaire(self, f"L'envoi {self.numero}")
         if self.statut != self.ENREGISTRE:
             raise ValidationError(f"Le colis {self.numero} est {self.get_statut_display().lower()} : chargement impossible.")
         if depart.statut != Depart.PROGRAMME:
@@ -540,6 +605,8 @@ class Colis(models.Model):
             raise ValidationError("Code de retrait incorrect.")
         if not (retire_par or "").strip():
             raise ValidationError("Indiquez qui retire le colis (nom et pièce d'identité).")
+        if not _gare_ici(self.gare_arrivee):
+            raise ValidationError(f"L'envoi se remet à {self.gare_arrivee.nom}, dans l'agence de destination.")
         date = date or timezone.localdate()
         if self.a_encaisser:
             parametres = ParametresTransport.get()
@@ -549,12 +616,23 @@ class Colis(models.Model):
                 lignes += [{**l, "section": self.gare_arrivee.section}
                            for l in _ventiler(self.prix, self.compte_produit(parametres), parametres.taxe_colis)]
             if self.contre_remboursement:
-                lignes.append({"compte": parametres.compte_contre_remboursement, "credit": self.contre_remboursement,
+                # Envoi d'une autre agence : la somme est due à cette agence (qui la reverse à l'expéditeur)
+                compte_cr = _compte_liaison(self.site_origine) if self.site_origine else parametres.compte_contre_remboursement
+                lignes.append({"compte": compte_cr, "credit": self.contre_remboursement,
                                "libelle": f"Contre-remboursement {self.numero} pour {self.expediteur}"})
             self.ecriture_livraison = creer_ecriture(caisse, date, f"Livraison {self.numero} - {self.destinataire}", lignes,
                                                      reference=self.numero, origine=self.numero)
+        local = _site_local()
         self.statut, self.livre_le, self.retire_par, self.livre_par = self.LIVRE, timezone.now(), retire_par.strip(), utilisateur
-        self.save(update_fields=["statut", "livre_le", "retire_par", "livre_par", "ecriture_livraison"])
+        self.livre_site = local.code if local is not None and self.site_origine else ""
+        self.save(update_fields=["statut", "livre_le", "retire_par", "livre_par", "livre_site", "ecriture_livraison"])
+        if self.site_origine:                              # l'agence d'expédition l'apprendra par le siège
+            from apps.echanges.publication import publier
+
+            publier("colis_livraison", self.uid, {"v": 1, "colis": str(self.uid), "livre_le": self.livre_le.isoformat(),
+                                                  "retire_par": self.retire_par, "site": self.livre_site,
+                                                  "contre_remboursement": str(self.contre_remboursement)},
+                    "LIVRE", date, utilisateur or "")
         return self
 
     @transaction.atomic
@@ -568,11 +646,14 @@ class Colis(models.Model):
             raise ValidationError("Le contre-remboursement n'est reversé qu'après la livraison (somme encaissée).")
         if self.cr_reverse_le:
             raise ValidationError("Contre-remboursement déjà reversé.")
+        _proprietaire(self, f"L'envoi {self.numero}")
         parametres = ParametresTransport.get()
         caisse = self.gare_depart.journal_caisse()
+        # Remis dans une autre agence : c'est elle qui a encaissé, la somme est sur son compte de liaison
+        compte_cr = _compte_liaison(self.livre_site) if self.livre_site else parametres.compte_contre_remboursement
         self.ecriture_reversement = creer_ecriture(
             caisse, date or timezone.localdate(), f"Reversement contre-remboursement {self.numero} - {self.expediteur}",
-            [{"compte": parametres.compte_contre_remboursement, "debit": self.contre_remboursement},
+            [{"compte": compte_cr, "debit": self.contre_remboursement},
              {"compte": caisse.compte_tresorerie, "credit": self.contre_remboursement}],
             reference=self.numero, origine=self.numero)
         self.cr_reverse_le = timezone.now()
@@ -584,6 +665,7 @@ class Colis(models.Model):
         """Annule un envoi non chargé : rembourse le port payé (écriture inverse)."""
         from apps.comptabilite.services import creer_ecriture
 
+        _proprietaire(self, f"L'envoi {self.numero}")
         if self.statut != self.ENREGISTRE:
             raise ValidationError("Seul un envoi enregistré (non chargé) peut être annulé.")
         if self.ecriture_id:
@@ -606,6 +688,9 @@ class DepenseVehicule(models.Model):
     # Compte proposé par nature (SYSCOHADA ; modifiable à la saisie)
     COMPTES = {CARBURANT: "6053", ENTRETIEN: "624", REPARATION: "624", ASSURANCE: "625"}
 
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
+                                    help_text="Vide : créé dans ce dossier ; sinon copie reçue d'un autre site")
     numero = models.CharField(max_length=30, unique=True, blank=True)
     date = models.DateField(default=timezone.localdate)
     vehicule = models.ForeignKey(Vehicule, on_delete=models.PROTECT, related_name="depenses", verbose_name="Véhicule")

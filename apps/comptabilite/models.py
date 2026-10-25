@@ -1,3 +1,4 @@
+import uuid
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -171,6 +172,9 @@ class Ecriture(models.Model):
     origine = models.CharField(max_length=50, blank=True, help_text="Document commercial à l'origine")
     source_cle = models.CharField("Clé dans le dossier d'origine", max_length=80, blank=True, db_index=True)
     source_empreinte = models.CharField(max_length=64, blank=True)
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True,
+                                    help_text="Vide : écriture de ce dossier ; sinon reçue d'une agence (consolidation)")
     cree_le = models.DateTimeField(auto_now_add=True)
     cree_par = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
                                  verbose_name="Créé par")
@@ -213,6 +217,9 @@ class Ecriture(models.Model):
         self.journal.verifier_periode(self.date)
         self.statut = self.STATUT_VALIDEE
         self.save(update_fields=["statut"])
+        from apps.echanges.publication import publier_ecriture
+
+        publier_ecriture(self)
 
 
 class LigneEcriture(models.Model):

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.core import views as core_views
+from apps.echanges import views as echanges_views
 
 from . import views
 
@@ -8,6 +9,7 @@ app_name = "transport"
 
 urlpatterns = [
     path("", core_views.accueil_module, {"module": "transport"}, name="accueil"),
+    path("echanges/", echanges_views.echanges, {"module": "transport"}, name="echanges"),
     path("a-propos/", core_views.a_propos, name="a_propos"),
     path("autorisations/", core_views.autorisations, {"module": "transport"}, name="autorisations"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "transport"}, name="journal_evenements"),

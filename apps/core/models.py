@@ -51,6 +51,8 @@ class Societe(models.Model):
     ACTIVITES = [(ACTIVITE_COMMERCE, "Commerce (achat-revente, stocks)"),
                  (ACTIVITE_TRANSPORT, "Transport de voyageurs (billetterie, colis, logistique)"),
                  (ACTIVITE_MIXTE, "Commerce et transport")]
+    uid = models.UUIDField("Identifiant de la société", null=True, blank=True, editable=False,
+                           help_text="Le même dans tous les sites de la société (siège et agences)")
     activite = models.CharField("Activité", max_length=10, choices=ACTIVITES, default=ACTIVITE_COMMERCE,
                                 help_text="Choisit les logiciels proposés dans le portail (la comptabilité est commune)")
     # Synchronisation avec le dossier de l'ancien logiciel (transition), puis bascule vers l'ERP
@@ -219,6 +221,17 @@ class Agence(models.Model):
         "comptabilite.Compte", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
         verbose_name="Compte de liaison", help_text="Compte de liaison de l'agence (classe 18). Vide : créé automatiquement.")
     actif = models.BooleanField(default=True)
+    # Échanges entre sites (serveurs hors ligne) : lots signés transmis par WhatsApp, Telegram, clé USB…
+    SIEGE, AGENCE = "SIEGE", "AGENCE"
+    ROLES = [(SIEGE, "Siège (consolidation)"), (AGENCE, "Agence")]
+    uid = models.UUIDField("Identifiant de site", null=True, blank=True, unique=True, editable=False)
+    role = models.CharField("Rôle", max_length=10, choices=ROLES, default=AGENCE)
+    rang = models.PositiveIntegerField("N° d'ordre", null=True, blank=True, unique=True,
+                                       help_text="Attribué par le siège ; donne le compte de liaison 185NN, le même dans tous les dossiers")
+    cle_echange = models.CharField("Clé d'échange", max_length=64, blank=True, editable=False,
+                                   help_text="Secret partagé entre ce site et le siège (signature des lots)")
+    sequence_integree = models.PositiveIntegerField("Dernier événement intégré", default=0, editable=False)
+    derniere_reception = models.DateTimeField("Dernier lot reçu le", null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ["-locale", "nom"]
@@ -239,9 +252,13 @@ class Agence(models.Model):
         super().save(*args, **kwargs)
 
     def _creer_compte_liaison(self):
-        """185 « Comptes permanents non bloqués des établissements et succursales » + numéro d'ordre."""
+        """185 « Comptes permanents non bloqués des établissements et succursales » + numéro d'ordre (celui du siège
+        s'il est connu, pour que le même compte désigne la même agence dans tous les dossiers)."""
         from apps.comptabilite.models import Compte
 
+        if self.rang:
+            return Compte.objects.get_or_create(numero=f"185{self.rang:02d}",
+                                                defaults={"intitule": f"Liaison agence {self.nom}"[:200]})[0]
         rang = 1
         while Compte.objects.filter(numero=f"185{rang:02d}").exists():
             rang += 1
