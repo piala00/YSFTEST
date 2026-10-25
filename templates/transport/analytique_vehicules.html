@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Analytique — Véhicules{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Comptabilité analytique — Véhicules <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% with avec_agence=True %}{% include "transport/_filtres_analytiques.html" %}{% endwith %}
+<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Véhicule</th><th>Flotte</th>{% for c, l in produits %}<th class="num">{{ l }}</th>{% endfor %}<th class="num">Total produits</th>
+    <th class="num">Total charges</th><th class="num">Résultat d'exploitation</th><th class="num">Part du propriétaire</th><th class="num">Résultat pour la société</th></tr></thead>
+  <tbody>{% for g in lignes %}<tr>
+    <td><a href="{% url 'comptabilite:analytique_vehicule' g.vehicule.pk %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}">{{ g.vehicule.immatriculation }}</a> <span class="text-muted">{{ g.vehicule.designation }}</span></td>
+    <td>{{ g.gamme|title }}</td>
+    <td class="num">{{ g.billetterie|montant_ou_vide }}</td><td class="num">{{ g.bagages|montant_ou_vide }}</td><td class="num">{{ g.colis|montant_ou_vide }}</td><td class="num">{{ g.autres_produits|montant_ou_vide }}</td>
+    <td class="num fw-semibold">{{ g.produits|montant }}</td><td class="num fw-semibold">{{ g.charges|montant }}</td>
+    <td class="num fw-semibold {% if g.resultat < 0 %}text-danger{% endif %}">{{ g.resultat|montant }}</td>
+    <td class="num">{{ g.proprietaire|montant_ou_vide }}</td><td class="num fw-semibold {% if g.resultat_societe < 0 %}text-danger{% endif %}">{{ g.resultat_societe|montant }}</td></tr>
+  {% empty %}<tr><td colspan="11" class="text-muted text-center p-4">Aucun véhicule.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="2">Total des véhicules</td><td class="num">{{ total.billetterie|montant }}</td><td class="num">{{ total.bagages|montant }}</td>
+    <td class="num">{{ total.colis|montant }}</td><td class="num">{{ total.autres_produits|montant }}</td><td class="num">{{ total.produits|montant }}</td>
+    <td class="num">{{ total.charges|montant }}</td><td class="num">{{ total.resultat|montant }}</td><td class="num">{{ total.proprietaire|montant }}</td><td class="num">{{ total.resultat_societe|montant }}</td></tr></tfoot>
+</table></div>
+
+<h6>Rapprochement avec la comptabilité générale (écritures validées de la période)</h6>
+<div class="card mb-2" style="max-width:46rem"><table class="table table-sm mb-0 small">
+  <thead><tr><th></th><th class="num">Comptabilité générale</th><th class="num">Affecté aux véhicules</th><th class="num">Non affecté</th></tr></thead>
+  <tbody><tr><td>Produits (classe 7)</td><td class="num">{{ controle.produits_gl|montant }}</td><td class="num">{{ controle.produits_affectes|montant }}</td><td class="num">{{ controle.produits_non_affectes|montant }}</td></tr>
+  <tr><td>Charges (classe 6)</td><td class="num">{{ controle.charges_gl|montant }}</td><td class="num">{{ controle.charges_affectees|montant }}</td><td class="num">{{ controle.charges_non_affectees|montant }}</td></tr></tbody></table></div>
+<p class="small text-muted">Chaque montant vient d'une ligne d'écriture générale validée qui porte le véhicule : rien n'est saisi deux fois.
+  Le non affecté (charges du siège, produits sans véhicule…) reste en comptabilité générale ; il n'est pas forcé sur les véhicules.
+  Le total des véhicules suit le filtre de flotte ; le rapprochement porte sur toute la comptabilité{% if agence %} de l'agence choisie{% endif %}.
+  Part du propriétaire : décomptes approuvés (compte 622, à valider par l'expert-comptable).</p>
+{% endblock %}

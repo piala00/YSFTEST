@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Analytique — Propriétaires{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Comptabilité analytique — Propriétaires <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "transport/_filtres_analytiques.html" %}
+{% for pf in portefeuilles %}
+<h6 class="mt-3">{% if pf.partenaire %}{{ pf.partenaire.nom }} <span class="text-muted small">({{ pf.partenaire.code }})</span>{% else %}Véhicules de la société{% endif %}</h6>
+<div class="card mb-2"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Véhicule</th><th>Flotte</th><th>Contrat(s)</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat d'exploitation</th><th class="num">Part du propriétaire</th><th class="num">Résultat pour la société</th></tr></thead>
+  <tbody>{% for v in pf.vehicules %}<tr><td><a href="{% url 'comptabilite:analytique_vehicule' v.vehicule.pk %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}">{{ v.vehicule.immatriculation }}</a></td>
+    <td>{{ v.gamme|title }}</td><td>{{ v.contrats|default:"—" }}</td><td class="num">{{ v.produits|montant }}</td><td class="num">{{ v.charges|montant }}</td>
+    <td class="num">{{ v.resultat|montant }}</td><td class="num">{{ v.proprietaire|montant_ou_vide }}</td><td class="num">{{ v.resultat_societe|montant }}</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="3">TOTAL {% if pf.partenaire %}PARTENAIRE{% else %}SOCIÉTÉ{% endif %}</td><td class="num">{{ pf.total.produits|montant }}</td><td class="num">{{ pf.total.charges|montant }}</td>
+    <td class="num">{{ pf.total.resultat|montant }}</td><td class="num">{{ pf.total.proprietaire|montant }}</td><td class="num">{{ pf.total.resultat_societe|montant }}</td></tr></tfoot></table></div>
+{% if pf.finance %}<div class="card mb-3" style="max-width:40rem"><table class="table table-sm mb-0 small"><thead><tr><th>Situation financière du propriétaire (séparée du résultat)</th><th class="num">Montant</th></tr></thead><tbody>
+  <tr><td>Droits calculés, pas encore approuvés (provisoire, non comptabilisé)</td><td class="num">{{ pf.finance.droits_provisoires|montant }}</td></tr>
+  <tr><td>Dû comptabilisé sur la période (décomptes approuvés : 622 / 401)</td><td class="num">{{ pf.finance.comptabilise|montant }}</td></tr>
+  <tr><td>Règlements de la période</td><td class="num">{{ pf.finance.reglements|montant }}</td></tr>
+  <tr class="total"><td>Solde de son compte en comptabilité générale au {{ au|date:"d/m/Y" }} (crédit = dû par la société)</td><td class="num">{{ pf.finance.solde|montant }}</td></tr>
+</tbody></table></div>
+<p class="small"><a href="{% url 'partenaires:releve' pf.partenaire.pk %}">Relevé détaillé et règlements</a></p>{% endif %}
+{% empty %}<p class="text-muted">Aucune écriture affectée à un véhicule sur la période.</p>{% endfor %}
+<p class="small text-muted">Les résultats d'un véhicule ne sont attribués au propriétaire que pour les jours couverts par son contrat (jamais d'après le propriétaire actuel).
+  Le résultat d'exploitation n'est pas une dette : seul le solde de son compte en comptabilité générale dit ce que la société lui doit.</p>
+{% endblock %}

@@ -32,7 +32,7 @@ class LigneForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Ligne
         fields = ("code", "gare_depart", "gare_arrivee", "arrets", "distance_km", "duree", "prix_billet", "colis_forfait",
-                  "colis_prix_kg", "actif")
+                  "colis_prix_kg", "gamme", "actif")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -75,7 +75,7 @@ class LigneForm(BootstrapMixin, forms.ModelForm):
 class VehiculeForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Vehicule
-        fields = ("immatriculation", "designation", "type_vehicule", "nombre_places", "proprietaire", "carte_grise",
+        fields = ("immatriculation", "designation", "type_vehicule", "gamme", "nombre_places", "proprietaire", "carte_grise",
                   "mise_en_service", "assurance_echeance", "visite_technique_echeance", "actif")
         widgets = {"mise_en_service": DateInput(), "assurance_echeance": DateInput(), "visite_technique_echeance": DateInput()}
 

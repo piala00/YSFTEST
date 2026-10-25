@@ -3,7 +3,13 @@ name: erp-transport-afrique-centrale
 description: Référentiel de conception, audit et développement d'un ERP modulaire de transport interurbain et messagerie multi-agences en Afrique centrale (Cameroun/OHADA), avec billetterie, colis, garage, voyages, véhicules partenaires, RH-paie, comptabilité et synchronisation offline-first. À utiliser pour toute modification de ce projet dans Claude Code.
 ---
 
+> **DÉCISION COMPTABLE PRIORITAIRE (25/10/2026) :** toute ligne analytique MONÉTAIRE doit obligatoirement dériver d'une ligne comptable GÉNÉRALE préalablement validée/postée, avec référence traçable. La comptabilité analytique ne peut créer des recettes, dépenses, dettes ni créances indépendantes. Voir `/erp-transport-comptabilite-source-unique` ; il prévaut sur les anciennes formulations contraires. Les KPI non monétaires restent issus de l'exploitation.
+
+
 # ERP Transport Afrique Centrale — référentiel directeur pour Claude Code
+
+> **Décision comptable la plus récente :** Gestion comptable propose deux sous-modules visibles — **Comptabilité générale** (toute la société) et **Comptabilité analytique** (états et analyses exclusivement centrés sur **Véhicules** et **Propriétaires**). Les agences, services, voyages, Classique/VIP et autres critères restent des dimensions internes/filtres. Voir le skill `/erp-transport-comptabilite-generale-analytique`.
+
 
 ## 1. Mission du skill
 
@@ -87,3 +93,8 @@ La comptabilité peut appliquer la validation requise avant comptabilisation dé
 ## 7. Interdits
 
 Aucune écriture SQL directe dans la base Sage ou une base tierce sans mandat et protocole explicites ; aucune réinitialisation des données ; aucun montant payé sans trace ; aucune réutilisation d'un `tenant_id` d'une autre compagnie ; aucun « dernier arrivé écrase tout » pour les montants, soldes, sièges ou propriétés ; aucune balance partenaire obtenue en confondant revenus, droits contractuels et trésorerie ; aucun résumé global qui masque les opérations en attente de synchronisation.
+
+
+## Mise à jour : moteur de reporting et analyses comparatives
+
+Le module **Reporting et Analyses** est une restitution décisionnelle du plan analytique partagé avec la comptabilité générale et les faits opérationnels, pas une troisième comptabilité. Les états analytiques principaux restent Véhicules et Propriétaires ; rapports et comparaisons peuvent filtrer par agences, périodes, gamme Classique/VIP, lignes, voyages, propriétaires et véhicules. Référence spécialisée : `/erp-transport-reporting-analytique` (`../erp-transport-reporting-analytique/SKILL.md`). Respecter réconciliation et statut de synchronisation.

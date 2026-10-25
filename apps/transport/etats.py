@@ -40,37 +40,68 @@ def recette_journaliere(jour):
     return resultat
 
 
+def _depart_des_pieces(departs):
+    """Pièce comptable (référence) → départ : recettes du départ, colis transportés, dépenses, pleins et avances de
+    mission rattachés au voyage."""
+    from apps.garage.models import PleinCarburant
+
+    from .models_exploitation import AvanceMission
+
+    ids = [d.pk for d in departs]
+    pieces = {d.numero: d.pk for d in departs}
+    for modele in (Colis, DepenseVehicule, PleinCarburant, AvanceMission):
+        pieces.update(dict(modele.objects.filter(depart_id__in=ids).values_list("numero", "depart_id")))
+    return pieces
+
+
 def rentabilite(debut, fin, axe="ligne"):
-    """Recettes (billets non annulés + retenues, colis chargés) et dépenses de véhicules, regroupées par axe."""
+    """Rentabilité par ligne, véhicule ou départ. Montants : écritures générales validées portant le véhicule (source
+    unique), rattachées au départ par leur pièce ; voyageurs, places et remplissage : données d'exploitation."""
+    from apps.comptabilite.models import Ecriture, LigneEcriture
+
     groupes = OrderedDict()
 
     def groupe(cle, libelle):
         return groupes.setdefault(cle, {"libelle": libelle, "departs": 0, "voyageurs": 0, "places": 0, "billets": ZERO,
-                                        "colis": ZERO, "depenses": ZERO})
+                                        "colis": ZERO, "autres": ZERO, "depenses": ZERO})
 
-    departs = Depart.objects.filter(date__range=(debut, fin)).exclude(statut=Depart.ANNULE).select_related("ligne", "vehicule")
-    for d in departs:
+    def cle_depart(d):
         if axe == "vehicule":
-            g = groupe(d.vehicule_id, str(d.vehicule) if d.vehicule else "Sans véhicule")
-        elif axe == "depart":
-            g = groupe(d.pk, str(d))
-        else:
-            g = groupe(d.ligne_id, str(d.ligne))
+            return d.vehicule_id, str(d.vehicule) if d.vehicule else "Sans véhicule"
+        if axe == "depart":
+            return d.pk, str(d)
+        return ("ligne", d.ligne_id), str(d.ligne)
+
+    departs = list(Depart.objects.filter(date__range=(debut, fin)).exclude(statut=Depart.ANNULE).select_related("ligne", "vehicule"))
+    for d in departs:
+        g = groupe(*cle_depart(d))
         g["departs"] += 1
         g["voyageurs"] += d.places_vendues
         g["places"] += d.places
-        g["billets"] += d.recette_billets() + sum((b.retenue for b in d.billets.filter(statut=Billet.ANNULE)), ZERO)
-        g["colis"] += d.recette_colis()
-        if axe == "depart":
-            g["depenses"] += d.depenses()
-    if axe == "vehicule":
-        for dv in DepenseVehicule.objects.filter(date__range=(debut, fin)).select_related("vehicule"):
-            groupe(dv.vehicule_id, str(dv.vehicule))["depenses"] += dv.montant
-    elif axe == "ligne":
-        for dv in DepenseVehicule.objects.filter(date__range=(debut, fin), depart__isnull=False).select_related("depart__ligne"):
-            groupe(dv.depart.ligne_id, str(dv.depart.ligne))["depenses"] += dv.montant
+    par_pk = {d.pk: d for d in departs}
+    pieces = _depart_des_pieces(departs)
+    from .models import ParametresTransport
+
+    p = ParametresTransport.get()
+    for l in (LigneEcriture.objects.filter(vehicule__isnull=False, ecriture__statut=Ecriture.STATUT_VALIDEE,
+                                           ecriture__date__range=(debut, fin))
+              .filter(compte__numero__regex=r"^[67]").select_related("compte", "ecriture", "vehicule")):
+        d = par_pk.get(pieces.get(l.ecriture.reference) or pieces.get(l.ecriture.origine))
+        if d is not None:
+            g = groupe(*cle_depart(d))
+        elif axe == "vehicule":
+            g = groupe(l.vehicule_id, str(l.vehicule))
+        else:
+            g = groupe("hors", "Hors voyage (véhicule sans départ rattaché)")
+        numero = l.compte.numero
+        if numero.startswith("7"):
+            cle = ("billets" if numero == p.compte_billets.numero else
+                   "colis" if numero in (p.compte_colis.numero, p.compte_fret.numero) else "autres")
+            g[cle] += l.credit - l.debit
+        else:
+            g["depenses"] += l.debit - l.credit
     for g in groupes.values():
-        g["recettes"] = g["billets"] + g["colis"]
+        g["recettes"] = g["billets"] + g["colis"] + g["autres"]
         g["marge"] = g["recettes"] - g["depenses"]
         g["remplissage"] = round(100 * g["voyageurs"] / g["places"]) if g["places"] else None
     return list(groupes.values())

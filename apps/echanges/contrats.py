@@ -66,11 +66,11 @@ def serialiser(o):
         return "ligne", {"v": VERSION, "uid": str(o.uid), "code": o.code, "gare_depart": _uid(o.gare_depart),
                          "gare_arrivee": _uid(o.gare_arrivee), "distance_km": o.distance_km, "duree": o.duree,
                          "prix_billet": _d(o.prix_billet), "colis_forfait": _d(o.colis_forfait),
-                         "colis_prix_kg": _d(o.colis_prix_kg), "actif": o.actif,
+                         "colis_prix_kg": _d(o.colis_prix_kg), "actif": o.actif, "gamme": o.gamme,
                          "arrets": [_uid(a.gare) for a in o.arrets.select_related("gare")]}, None, ""
     if isinstance(o, Vehicule):
         return "vehicule", {"v": VERSION, "uid": str(o.uid), "immatriculation": o.immatriculation, "designation": o.designation,
-                            "type": o.type_vehicule, "places": o.nombre_places, "actif": o.actif,
+                            "type": o.type_vehicule, "places": o.nombre_places, "actif": o.actif, "gamme": o.gamme,
                             "carte_grise": o.carte_grise, "mise_en_service": _date(o.mise_en_service),
                             "assurance_echeance": _date(o.assurance_echeance),
                             "visite_technique_echeance": _date(o.visite_technique_echeance)}, None, ""
@@ -180,6 +180,7 @@ def _ligne(p, origine, local):
     l.code, l.distance_km, l.duree, l.actif = p["code"], p.get("distance_km"), p.get("duree", ""), p.get("actif", True)
     l.gare_depart, l.gare_arrivee = _par_uid(Gare, p["gare_depart"], "gare"), _par_uid(Gare, p["gare_arrivee"], "gare")
     l.prix_billet, l.colis_forfait, l.colis_prix_kg = Decimal(p["prix_billet"]), Decimal(p["colis_forfait"]), Decimal(p["colis_prix_kg"])
+    l.gamme = p.get("gamme", l.gamme)
     _enregistrer(l, "Code de ligne", p["code"])
     if "arrets" in p:                                       # arrêts intermédiaires, dans l'ordre (absents en v1)
         from apps.transport.models import ArretLigne
@@ -197,6 +198,7 @@ def _vehicule(p, origine, local):
     v.immatriculation, v.designation, v.type_vehicule, v.nombre_places, v.actif = (
         p["immatriculation"], p.get("designation", ""), p.get("type", "CAR"), p.get("places") or 0, p.get("actif", True))
     v.carte_grise = p.get("carte_grise", "")
+    v.gamme = p.get("gamme", v.gamme)
     for champ in ("mise_en_service", "assurance_echeance", "visite_technique_echeance"):
         setattr(v, champ, datetime.date.fromisoformat(p[champ]) if p.get(champ) else None)
     _enregistrer(v, "Immatriculation", p["immatriculation"])

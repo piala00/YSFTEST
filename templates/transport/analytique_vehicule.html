@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Compte d'exploitation {{ vehicule.immatriculation }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Compte d'exploitation — {{ vehicule.immatriculation }} <small class="text-muted fs-6">{{ vehicule.designation }} · flotte {{ vehicule.get_gamme_display }} · du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1>
+  <a class="btn btn-sm btn-outline-secondary d-print-none" href="{% url 'comptabilite:analytique_vehicules' %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}">Tous les véhicules</a></div>
+{% include "transport/_filtres_analytiques.html" %}
+<div class="row g-3">
+<div class="col-lg-5"><div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>Rubrique</th><th class="num">Montant</th></tr></thead><tbody>
+  {% for cle, libelle, total, lignes in rubriques %}{% if cle == "carburant" %}<tr class="total"><td>TOTAL PRODUITS</td><td class="num">{{ totaux.produits|montant }}</td></tr>{% endif %}
+  {% if cle == "proprietaire" %}<tr class="total"><td>TOTAL CHARGES IMPUTÉES</td><td class="num">{{ totaux.charges|montant }}</td></tr>
+  <tr class="total"><td>RÉSULTAT D'EXPLOITATION DU VÉHICULE</td><td class="num">{{ totaux.resultat|montant }}</td></tr>{% endif %}
+  <tr><td><a href="#r-{{ cle }}">{{ libelle }}</a></td><td class="num">{{ total|montant }}</td></tr>{% endfor %}
+  <tr class="total"><td>RÉSULTAT POUR LA SOCIÉTÉ</td><td class="num">{{ totaux.resultat_societe|montant }}</td></tr></tbody></table></div>
+  <div class="card mt-3"><div class="card-header bg-white small fw-semibold">Propriétaire et flotte (historique daté)</div><div class="card-body small">
+    {% for c in contrats %}<div>{{ c.debut|date:"d/m/Y" }} → {{ c.fin|date:"d/m/Y"|default:"…" }} : {{ c.partenaire.nom }} ({{ c.get_modele_display|lower }}, {{ c.numero }} v{{ c.version }})</div>{% empty %}<div>Véhicule de la société (aucun contrat de partenaire).</div>{% endfor %}
+    {% for h in historique_gamme %}<div class="text-muted">Flotte {{ h.get_gamme_display }} à partir du {{ h.debut|date:"d/m/Y" }}</div>{% endfor %}</div></div>
+  <div class="card mt-3"><div class="card-header bg-white small fw-semibold">Voyages (exploitation, non comptable)</div><table class="table table-sm mb-0 small">
+    {% for d in voyages %}<tr><td>{{ d.date|date:"d/m" }} {{ d.heure|time:"H:i" }}</td><td>{{ d.numero }}</td><td>{{ d.ligne.code }}</td><td class="num">{{ d.places_vendues }} voy.</td><td class="num">{{ d.km_parcourus|default:"" }}{% if d.km_parcourus %} km{% endif %}</td></tr>
+    {% empty %}<tr><td class="text-muted">Aucun voyage.</td></tr>{% endfor %}</table></div></div>
+<div class="col-lg-7">{% for cle, libelle, total, lignes in rubriques %}{% if lignes %}
+  <div class="card mb-2" id="r-{{ cle }}"><div class="card-header bg-white small fw-semibold">{{ libelle }}</div><table class="table table-sm mb-0 small">
+  <thead><tr><th>Date</th><th>Pièce</th><th>Journal</th><th>Compte</th><th>Libellé</th><th class="num">Montant</th></tr></thead><tbody>
+  {% for x in lignes %}<tr><td>{{ x.ligne.ecriture.date|date:"d/m/Y" }}</td><td><a href="{% url 'comptabilite:ecriture_detail' x.ligne.ecriture_id %}">{{ x.ligne.ecriture.numero }}</a></td>
+    <td>{{ x.ligne.ecriture.journal.code }}</td><td>{{ x.ligne.compte.numero }}</td><td>{{ x.ligne.libelle }}</td><td class="num">{{ x.montant|montant }}</td></tr>{% endfor %}</tbody></table></div>
+{% endif %}{% endfor %}</div></div>
+<p class="small text-muted mt-2">Chaque montant renvoie à l'écriture générale validée d'origine (cliquez sur la pièce). Les voyages et kilomètres sont des données d'exploitation, hors montants.</p>
+{% endblock %}

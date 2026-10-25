@@ -195,8 +195,13 @@ class Gare(models.Model):
         return self.mobile_money or Journal.objects.filter(code="MM").first() or self.journal_caisse()
 
 
+CLASSIQUE, VIP = "CLASSIQUE", "VIP"
+GAMMES = [(CLASSIQUE, "Classique"), (VIP, "VIP")]
+
+
 class Ligne(models.Model):
-    """Ligne régulière (trajet) entre deux gares, avec ses tarifs."""
+    """Ligne régulière (trajet) entre deux gares, avec ses tarifs. Une ligne VIP est une ligne à part (tarif propre),
+    desservie seulement par les véhicules de la flotte VIP."""
 
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
@@ -210,6 +215,8 @@ class Ligne(models.Model):
     colis_forfait = models.DecimalField("Colis : forfait", max_digits=12, decimal_places=0, default=ZERO,
                                         help_text="Prix minimum d'un colis sur cette ligne")
     colis_prix_kg = models.DecimalField("Colis : prix par kg", max_digits=12, decimal_places=0, default=ZERO)
+    gamme = models.CharField("Gamme", max_length=10, choices=GAMMES, default=CLASSIQUE,
+                             help_text="Classique ou VIP : seuls les véhicules de cette flotte font ses départs")
     actif = models.BooleanField(default=True)
 
     class Meta:
@@ -234,6 +241,19 @@ class Ligne(models.Model):
         rangs = [g.pk for g in self.gares()]
         return (gare_depart.pk in rangs and gare_arrivee.pk in rangs
                 and rangs.index(gare_depart.pk) < rangs.index(gare_arrivee.pk))
+
+
+class ChangementGamme(models.Model):
+    """Historique daté de la flotte (Classique / VIP) d'un véhicule."""
+
+    vehicule = models.ForeignKey("transport.Vehicule", on_delete=models.CASCADE, related_name="changements_gamme")
+    gamme = models.CharField(max_length=10, choices=GAMMES)
+    debut = models.DateField("À partir du")
+    enregistre_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["vehicule", "debut", "pk"]
+        verbose_name = "Changement de flotte"
 
 
 class ArretLigne(models.Model):
@@ -265,6 +285,8 @@ class Vehicule(models.Model):
     designation = models.CharField("Désignation", max_length=100, blank=True, help_text="Marque, modèle, n° de parc")
     type_vehicule = models.CharField("Type", max_length=10, choices=TYPES, default=CAR)
     nombre_places = models.PositiveIntegerField("Places voyageurs", default=0)
+    gamme = models.CharField("Flotte", max_length=10, choices=GAMMES, default=CLASSIQUE,
+                             help_text="Classique ou VIP : flottes distinctes ; un changement est daté dans l'historique")
     proprietaire = models.ForeignKey("commercial.Tiers", null=True, blank=True, on_delete=models.PROTECT,
                                      related_name="vehicules", verbose_name="Propriétaire",
                                      help_text="Vide : véhicule de la société ; sinon le partenaire qui le met à disposition")
@@ -289,7 +311,16 @@ class Vehicule(models.Model):
 
             self.section = SectionAnalytique.objects.get_or_create(
                 code=f"V-{self.immatriculation}"[:20], defaults={"plan": "Véhicules", "intitule": f"Véhicule {self}"[:100]})[0]
+        ancienne = Vehicule.objects.filter(pk=self.pk).values_list("gamme", flat=True).first() if self.pk else None
         super().save(*args, **kwargs)
+        if ancienne != self.gamme:                       # changement de flotte : daté, jamais rétroactif
+            ChangementGamme.objects.create(vehicule=self, gamme=self.gamme, debut=timezone.localdate())
+
+    def gamme_le(self, jour):
+        """Flotte du véhicule à une date (historique des changements)."""
+        c = (self.changements_gamme.filter(debut__lte=jour).order_by("-debut", "-pk").first()
+             or self.changements_gamme.order_by("debut", "pk").first())         # avant le 1er relevé : flotte d'origine
+        return c.gamme if c else self.gamme
 
     def alertes(self, jour=None):
         """Papiers expirés ou à renouveler dans les 30 jours."""
@@ -367,8 +398,15 @@ class Depart(models.Model):
             return self.km_arrivee - self.km_depart
         return None
 
+    def controler_gamme(self):
+        if self.vehicule_id and self.ligne_id and self.vehicule.gamme_le(self.date) != self.ligne.gamme:
+            raise ValidationError({"vehicule": f"{self.vehicule.immatriculation} est de la flotte "
+                                               f"{self.vehicule.get_gamme_display()} : il ne fait pas les départs "
+                                               f"{self.ligne.get_gamme_display()} de la ligne {self.ligne.code}."})
+
     def clean(self):
-        """Un véhicule ne peut pas être programmé deux fois au même moment."""
+        """Un véhicule ne peut pas être programmé deux fois au même moment ; il ne sert que sa flotte (Classique/VIP)."""
+        self.controler_gamme()
         if self.vehicule_id and self.statut != self.ANNULE:
             doublon = (Depart.objects.filter(vehicule_id=self.vehicule_id, date=self.date, heure=self.heure)
                        .exclude(pk=self.pk).exclude(statut=self.ANNULE).first())
@@ -493,6 +531,7 @@ class Depart(models.Model):
             raise ValidationError("Seul un départ programmé peut partir.")
         if not self.vehicule_id or not self.chauffeur_id:
             raise ValidationError("Indiquez le véhicule et le chauffeur avant le départ.")
+        self.controler_gamme()
         en_route = Depart.objects.filter(vehicule_id=self.vehicule_id, statut=self.PARTI).exclude(pk=self.pk).first()
         if en_route:
             raise ValidationError(f"Ce véhicule est encore sur la route (départ {en_route.numero}) : constatez d'abord son arrivée.")
@@ -596,8 +635,9 @@ class Depart(models.Model):
         self.save(update_fields=["statut"])
 
 
-def _tarif(gare_depart, gare_arrivee):
-    return Ligne.objects.filter(gare_depart=gare_depart, gare_arrivee=gare_arrivee, actif=True).first()
+def _tarif(gare_depart, gare_arrivee, gamme=CLASSIQUE):
+    """Tarif entre deux gares dans la gamme du voyage (une ligne VIP a son propre prix)."""
+    return Ligne.objects.filter(gare_depart=gare_depart, gare_arrivee=gare_arrivee, gamme=gamme, actif=True).first()
 
 
 class Billet(models.Model):
@@ -727,9 +767,9 @@ class Billet(models.Model):
                 if (depart_correspondance.date, depart_correspondance.heure) < (depart.date, depart.heure):
                     raise ValidationError("La correspondance part avant le premier véhicule.")
             segments.append((correspondance, destination, depart_correspondance, siege_correspondance))
-        tarifs = [_tarif(a, b) for a, b, _, _ in segments]
+        tarifs = [_tarif(a, b, d.ligne.gamme if d is not None else depart.ligne.gamme) for a, b, d, _ in segments]
         if self.prix is None:
-            direct = _tarif(origine, destination)
+            direct = _tarif(origine, destination, depart.ligne.gamme)
             if direct is not None:
                 self.prix = direct.prix_billet
             elif all(tarifs):

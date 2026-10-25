@@ -599,3 +599,55 @@ def cloture_journee(request, perimetre=""):
         etats.append({"code": code, "libelle": libelle, "bloquants": bloquants, "signales": signales,
                       "cloture": ClotureJournee.objects.filter(date=jour, perimetre=code).select_related("cloture_par").first()})
     return render(request, "transport/cloture.html", {"jour": jour, "etats": etats})
+
+
+# ---------------------------------------------------------------- Comptabilité analytique : Véhicules, Propriétaires
+def _filtres_analytiques(request):
+    from apps.core.models import Agence
+    from apps.echanges.publication import site_local
+
+    from .models import GAMMES
+
+    debut, fin = _periode(request)
+    gamme = request.GET.get("gamme", "") if request.GET.get("gamme", "") in dict(GAMMES) else ""
+    local = site_local()
+    agences = Agence.objects.filter(locale=False).order_by("rang", "code") if local is not None and local.role == local.SIEGE else []
+    agence = request.GET.get("agence", "")
+    site = None if not agences or agence == "" else ("" if agence == "SIEGE" else agence)
+    return {"du": debut, "au": fin, "gamme": gamme, "gammes": GAMMES, "agences": agences, "agence": agence}, site
+
+
+@login_required
+def analytique_vehicules(request):
+    from . import analytique
+
+    filtres, site = _filtres_analytiques(request)
+    return render(request, "transport/analytique_vehicules.html", {
+        **filtres, **analytique.vehicules(filtres["du"], filtres["au"], filtres["gamme"], site),
+        "produits": analytique.PRODUITS, "charges": analytique.CHARGES})
+
+
+@login_required
+def analytique_vehicule(request, pk):
+    from . import analytique
+
+    vehicule = get_object_or_404(Vehicule, pk=pk)
+    filtres, _ = _filtres_analytiques(request)
+    compte = analytique.compte_vehicule(vehicule, filtres["du"], filtres["au"])
+    rubriques = [(cle, libelle, compte["totaux"][cle], compte["details"].get(cle, [])) for cle, libelle in
+                 analytique.PRODUITS + analytique.CHARGES + [("proprietaire", "Part du propriétaire (contrat)")]]
+    return render(request, "transport/analytique_vehicule.html", {
+        **filtres, "vehicule": vehicule, "totaux": compte["totaux"], "rubriques": rubriques,
+        "voyages": vehicule.departs.filter(date__range=(filtres["du"], filtres["au"]))
+        .exclude(statut__in=[Depart.ANNULE, Depart.PROGRAMME]).select_related("ligne").order_by("date", "heure"),
+        "historique_gamme": vehicule.changements_gamme.all(),
+        "contrats": vehicule.contrats_partenaire.exclude(statut="BROUILLON").select_related("partenaire")})
+
+
+@login_required
+def analytique_proprietaires(request):
+    from . import analytique
+
+    filtres, _ = _filtres_analytiques(request)
+    return render(request, "transport/analytique_proprietaires.html", {
+        **filtres, "portefeuilles": analytique.proprietaires(filtres["du"], filtres["au"], filtres["gamme"])})

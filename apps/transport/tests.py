@@ -656,7 +656,7 @@ class BilletterieAvanceeTests(TestCase):
         from .forms import LigneForm
 
         form = LigneForm({"code": "DLA-BFS", "gare_depart": self.dla.pk, "gare_arrivee": self.yde.pk, "arrets": "ede",
-                          "prix_billet": 7000, "colis_forfait": 0, "colis_prix_kg": 0, "actif": "on"})
+                          "prix_billet": 7000, "colis_forfait": 0, "colis_prix_kg": 0, "gamme": "CLASSIQUE", "actif": "on"})
         self.assertTrue(form.is_valid(), form.errors)
         ligne = form.save()
         self.assertEqual([g.code for g in ligne.gares()], ["DLA", "EDE", "YDE"])
@@ -742,3 +742,117 @@ class RapportJournalierA4Tests(TestCase):
         self.assertContains(r, "PROVISOIRE")
         self.assertContains(r, "Aucune opération")
         self.assertContains(self.client.get(reverse("transport:rapport_journalier")), "Imprimer (A4 portrait)")
+
+
+class ComptabiliteAnalytiqueTests(TestCase):
+    """Comptabilité analytique Véhicules / Propriétaires : montants tirés des seules écritures générales validées,
+    flottes Classique / VIP distinctes, propriétaire selon le contrat daté, rapprochement avec la générale."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        cls.dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        cls.yde = Gare.objects.create(code="YDE", nom="Gare de Yaoundé", ville="Yaoundé")
+        cls.ligne = Ligne.objects.create(code="DLA-YDE", gare_depart=cls.dla, gare_arrivee=cls.yde, prix_billet=6000)
+        cls.ligne_vip = Ligne.objects.create(code="DLA-YDE-VIP", gare_depart=cls.dla, gare_arrivee=cls.yde, prix_billet=10000,
+                                             gamme="VIP")
+        cls.car = Vehicule.objects.create(immatriculation="LT 900 CL", nombre_places=30)
+        cls.vip = Vehicule.objects.create(immatriculation="LT 901 VP", nombre_places=20, gamme="VIP")
+        cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur")
+        cls.jour = datetime.date.today()
+        cls.debut = cls.jour - datetime.timedelta(days=10)
+
+    def voyage(self, vehicule, ligne, billets, jour=None):
+        d = Depart.objects.create(ligne=ligne, date=jour or self.jour, heure=datetime.time(7), vehicule=vehicule,
+                                  chauffeur=self.chauffeur)
+        for n in range(billets):
+            Billet(depart=d, voyageur=f"V{n}").vendre()
+        d.partir()
+        return d
+
+    def test_flottes_classique_et_vip_distinctes(self):
+        d = Depart(ligne=self.ligne_vip, date=self.jour, heure=datetime.time(9), vehicule=self.car, chauffeur=self.chauffeur)
+        with self.assertRaisesMessage(ValidationError, "flotte Classique"):
+            d.full_clean()
+        d.vehicule = self.vip
+        d.full_clean()
+        self.vip.gamme = "CLASSIQUE"                                   # changement de flotte : daté, pas rétroactif
+        self.vip.save()
+        hier = self.jour - datetime.timedelta(days=1)
+        self.assertEqual((self.vip.gamme_le(hier), self.vip.gamme_le(self.jour)), ("VIP", "CLASSIQUE"))
+
+    def test_vehicules_source_unique_et_rapprochement(self):
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+
+        from . import analytique
+
+        self.voyage(self.car, self.ligne, 2)                           # 12 000
+        self.voyage(self.vip, self.ligne_vip, 1)                       # 10 000
+        DepenseVehicule(vehicule=self.car, nature=DepenseVehicule.CARBURANT, montant=3000,
+                        caisse=Journal.objects.get(code="CA")).enregistrer()
+        loyer = Compte.objects.get_or_create(numero="6222", defaults={"intitule": "Locations de bâtiments"})[0]
+        creer_ecriture(Journal.objects.get(code="CA"), self.jour, "Loyer du siège",            # sans véhicule
+                       [{"compte": loyer, "debit": 50000}, {"compte": Compte.objects.get(numero="5711"), "credit": 50000}])
+        brouillard = creer_ecriture(Journal.objects.get(code="OD"), self.jour, "Brouillard",   # non validée : exclue
+                                    [{"compte": Compte.objects.get(numero="6053"), "debit": 999, "vehicule": self.car},
+                                     {"compte": Compte.objects.get(numero="5711"), "credit": 999}], valider=False)
+        self.assertEqual(brouillard.statut, "BROUILLARD")
+        r = analytique.vehicules(self.debut, self.jour)
+        g = {l["vehicule"].immatriculation: l for l in r["lignes"]}
+        self.assertEqual((g["LT 900 CL"]["billetterie"], g["LT 900 CL"]["carburant"], g["LT 900 CL"]["resultat"]), (12000, 3000, 9000))
+        self.assertEqual((g["LT 901 VP"]["gamme"], g["LT 901 VP"]["produits"]), ("VIP", 10000))
+        c = r["controle"]
+        self.assertEqual((c["produits_gl"], c["produits_affectes"], c["produits_non_affectes"]), (22000, 22000, 0))
+        self.assertEqual((c["charges_gl"], c["charges_affectees"], c["charges_non_affectees"]), (53000, 3000, 50000))
+        vip = analytique.vehicules(self.debut, self.jour, gamme="VIP")
+        self.assertEqual([l["vehicule"].immatriculation for l in vip["lignes"]], ["LT 901 VP"])
+        compte = analytique.compte_vehicule(self.car, self.debut, self.jour)
+        self.assertEqual(len(compte["details"]["billetterie"]), 1)       # drill-down vers l'écriture du départ
+
+    def test_proprietaires_selon_le_contrat_date(self):
+        from apps.commercial.models import Tiers
+        from apps.partenaires.models import ContratPartenaire, Decompte
+
+        from . import analytique
+
+        from apps.comptabilite.services import creer_ecriture
+
+        avant = self.jour - datetime.timedelta(days=5)                 # avant le contrat : à la société
+        creer_ecriture(Journal.objects.get(code="OD"), avant, "Recette antérieure",
+                       [{"compte": ParametresTransport.get().compte_billets_a_voyager, "debit": 6000},
+                        {"compte": ParametresTransport.get().compte_billets, "credit": 6000, "vehicule": self.car}])
+        proprio = Tiers.objects.create(code="PROP9", nom="Propriétaire Neuf", type_tiers=Tiers.FOURNISSEUR)
+        contrat = ContratPartenaire.objects.create(vehicule=self.car, partenaire=proprio, debut=self.jour,
+                                                   taux_commission=Decimal("20")).activer()
+        self.voyage(self.car, self.ligne, 2)                            # sous contrat : au propriétaire
+        Decompte.calculer(contrat, self.jour, self.jour).approuver()     # 12 000 − 20 % = 9 600 dû
+        r = {(p["partenaire"].nom if p["partenaire"] else None): p for p in analytique.proprietaires(self.debut, self.jour)}
+        self.assertEqual(r[None]["total"]["produits"], 6000)
+        pf = r["Propriétaire Neuf"]
+        self.assertEqual((pf["total"]["produits"], pf["total"]["proprietaire"], pf["total"]["resultat_societe"]), (12000, 9600, 2400))
+        self.assertEqual((pf["finance"]["comptabilise"], pf["finance"]["solde"], pf["finance"]["droits_provisoires"]), (9600, 9600, 0))
+
+    def test_rentabilite_tiree_de_la_comptabilite(self):
+        from . import etats
+
+        d = self.voyage(self.car, self.ligne, 2)
+        DepenseVehicule(vehicule=self.car, depart=d, nature=DepenseVehicule.CARBURANT, montant=4000,
+                        caisse=Journal.objects.get(code="CA")).enregistrer()
+        Billet(depart=self.voyage(self.vip, self.ligne_vip, 1), voyageur="x")       # non vendu : rien
+        lignes = {l["libelle"]: l for l in etats.rentabilite(self.debut, self.jour, "depart")}
+        l = lignes[str(d)]
+        self.assertEqual((l["billets"], l["depenses"], l["marge"], l["voyageurs"]), (12000, 4000, 8000, 2))
+
+    def test_ecrans(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        self.voyage(self.car, self.ligne, 1)
+        for url in (reverse("comptabilite:analytique_vehicules"), reverse("comptabilite:analytique_vehicule", args=[self.car.pk]),
+                    reverse("comptabilite:analytique_proprietaires"), reverse("comptabilite:analytique_releves"),
+                    reverse("comptabilite:analytique_vehicules") + "?gamme=VIP"):
+            self.assertEqual(self.client.get(url).status_code, 200, url)
+        self.assertContains(self.client.get(reverse("comptabilite:analytique_vehicules")), "Rapprochement avec la comptabilité générale")
+        self.assertContains(self.client.get(reverse("comptabilite:analytique_vehicule", args=[self.car.pk])), "RÉSULTAT D'EXPLOITATION")

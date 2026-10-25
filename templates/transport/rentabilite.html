@@ -15,6 +15,7 @@
     <td class="num">{{ l.recettes|montant }}</td><td class="num">{{ l.depenses|montant }}</td><td class="num fw-semibold {% if l.marge < 0 %}text-danger{% endif %}">{{ l.marge|montant }}</td></tr>
   {% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucun départ sur la période.</td></tr>{% endfor %}</tbody>
 </table></div>
-<p class="small text-muted mt-2">Recettes : billets non annulés et retenues sur annulations, colis et fret chargés sur les départs. Dépenses : dépenses de véhicules
-  (par ligne : seulement celles rattachées à un départ). Hors amortissements, salaires et frais de structure (voir la comptabilité analytique).</p>
+<p class="small text-muted mt-2">Montants : écritures comptables validées portant le véhicule (recettes constatées au départ, colis transportés,
+  dépenses, carburant, avances de mission justifiées), rattachées au départ par leur pièce ; le reste du véhicule est « hors voyage ».
+  Voyageurs, places et remplissage : données d'exploitation. Les salaires et frais de structure sont dans la comptabilité analytique.</p>
 {% endblock %}

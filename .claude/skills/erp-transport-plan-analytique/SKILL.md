@@ -3,7 +3,14 @@ name: erp-transport-plan-analytique
 description: Auditer et mettre à jour dans le projet ERP Transport Afrique Centrale les plans/sections analytiques, les imputations automatiques entre billetterie Classique/VIP, colis, garage, voyages, paie et comptes partenaires, avec reporting agence/véhicule, OHADA et synchronisation offline-first. Utiliser pour toute demande de comptabilité analytique, rentabilité ou ventilation dans ce projet.
 ---
 
+> **DÉCISION COMPTABLE PRIORITAIRE (25/10/2026) :** toute ligne analytique MONÉTAIRE doit obligatoirement dériver d'une ligne comptable GÉNÉRALE préalablement validée/postée, avec référence traçable. La comptabilité analytique ne peut créer des recettes, dépenses, dettes ni créances indépendantes. Voir `/erp-transport-comptabilite-source-unique` ; il prévaut sur les anciennes formulations contraires. Les KPI non monétaires restent issus de l'exploitation.
+
+
 # Skill opérationnel — Plan analytique ERP Transport Afrique Centrale
+
+> **Mise à jour métier ultérieure — à appliquer prioritairement :** la navigation Gestion comptable est séparée en Comptabilité générale (société entière) et Comptabilité analytique (restitution exclusivement par **Véhicules** et **Propriétaires**). Les 10 axes décrits ci-dessous demeurent dans le moteur d'imputation et les filtres, mais ne créent plus dix rubriques majeures de reporting. Voir `/erp-transport-comptabilite-generale-analytique` et ses références.
+
+
 
 ## Objectif concret
 

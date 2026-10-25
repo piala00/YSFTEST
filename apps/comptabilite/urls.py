@@ -2,6 +2,7 @@ from django.urls import path
 
 from apps.core import views as core_views
 from apps.echanges import views as echanges_views
+from apps.partenaires import views as partenaires_views
 from apps.transport import views as transport_views
 from apps.reporting import views as reporting_views
 
@@ -16,6 +17,11 @@ urlpatterns = [
     path("vehicules/balance/", transport_views.balance_vehicules, name="balance_vehicules"),
     path("vehicules/grand-livre/", transport_views.grand_livre_vehicules, name="grand_livre_vehicules"),
     path("vehicules/<int:pk>/", transport_views.vehicule_fiche, name="vehicule_fiche"),
+    path("analytique/vehicules/", transport_views.analytique_vehicules, name="analytique_vehicules"),
+    path("analytique/vehicules/<int:pk>/", transport_views.analytique_vehicule, name="analytique_vehicule"),
+    path("analytique/proprietaires/", transport_views.analytique_proprietaires, name="analytique_proprietaires"),
+    path("analytique/proprietaires/releves/", partenaires_views.releve, name="analytique_releves"),
+    path("analytique/proprietaires/releves/<int:pk>/", partenaires_views.releve, name="analytique_releve"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "comptabilite"}, name="journal_evenements"),
     path("sauvegarde/", core_views.sauvegarde, {"module": "comptabilite"}, name="sauvegarde"),
     path("reprise-dossier/", core_views.reprise_dossier, {"module": "comptabilite"}, name="reprise_dossier"),

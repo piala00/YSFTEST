@@ -658,16 +658,26 @@ COMPTABILITE = Module(
                 E("etats.tiers.rappels", "Historique des rappels", preuve="DOC-V12"),
             ]),
             SEP(),
-            E("etats.analytique", "Etats analytiques", icone="bi-diagram-2", preuve="ERG-CLASSIQUE", enfants=[
+            E("etats.analytique", "Sections analytiques (contrôle)", icone="bi-diagram-2", preuve="ERG-CLASSIQUE", enfants=[
                 E("etats.analytique.journal", "Journal analytique", preuve="ERG-CLASSIQUE"),
                 E("etats.analytique.grand_livre", "Grand-livre analytique", preuve="ERG-CLASSIQUE"),
                 E("etats.analytique.balance", "Balance analytique", "comptabilite:balance_analytique", preuve="ERG-CLASSIQUE"),
             ]),
-            E("etats.vehicules", "Etats des véhicules", icone="bi-bus-front", preuve="AJOUT-ERP", enfants=[
-                E("etats.vehicules.grand_livre", "Grand-livre des véhicules", "comptabilite:grand_livre_vehicules",
+            SEP(),
+            E("analytique.vehicules", "Comptabilité analytique : Véhicules", icone="bi-bus-front", preuve="AJOUT-ERP", enfants=[
+                E("analytique.vehicules.comptes", "Comptes d'exploitation des véhicules", "comptabilite:analytique_vehicules",
                   preuve="AJOUT-ERP"),
-                E("etats.vehicules.balance", "Balance des véhicules", "comptabilite:balance_vehicules", preuve="AJOUT-ERP"),
+                E("analytique.vehicules.grand_livre", "Grand-livre des véhicules", "comptabilite:grand_livre_vehicules",
+                  preuve="AJOUT-ERP"),
+                E("analytique.vehicules.balance", "Balance des véhicules", "comptabilite:balance_vehicules", preuve="AJOUT-ERP"),
             ]),
+            E("analytique.proprietaires", "Comptabilité analytique : Propriétaires", icone="bi-people", preuve="AJOUT-ERP", enfants=[
+                E("analytique.proprietaires.portefeuilles", "Portefeuilles et résultats", "comptabilite:analytique_proprietaires",
+                  preuve="AJOUT-ERP"),
+                E("analytique.proprietaires.releves", "Relevés et règlements", "comptabilite:analytique_releves",
+                  preuve="AJOUT-ERP"),
+            ]),
+            SEP(),
             E("etats.budgetaires", "Etats budgétaires", icone="bi-bullseye", preuve="INDICATIF"),
             SEP(),
             E("etats.financiers", "Bilan / Compte de résultat", icone="bi-bank", preuve="ERG-CLASSIQUE", enfants=[

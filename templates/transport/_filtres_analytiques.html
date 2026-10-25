@@ -1,0 +1,11 @@
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3 d-print-none">
+  <div><label class="form-label small mb-0" for="fa-du">Du</label><input type="date" id="fa-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="fa-au">Au</label><input type="date" id="fa-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="fa-g">Flotte</label><select id="fa-g" name="gamme" class="form-select form-select-sm"><option value="">Classique et VIP</option>
+    {% for code, libelle in gammes %}<option value="{{ code }}" {% if code == gamme %}selected{% endif %}>{{ libelle }}</option>{% endfor %}</select></div>
+  {% if agences and avec_agence %}<div><label class="form-label small mb-0" for="fa-a">Agence</label><select id="fa-a" name="agence" class="form-select form-select-sm"><option value="">Toutes</option>
+    <option value="SIEGE" {% if agence == "SIEGE" %}selected{% endif %}>Siège</option>
+    {% for a in agences %}<option value="{{ a.code }}" {% if a.code == agence %}selected{% endif %}>{{ a.code }} — {{ a.nom }}</option>{% endfor %}</select></div>{% endif %}
+  <button class="btn btn-sm btn-outline-secondary">Afficher</button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+</form>

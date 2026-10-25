@@ -276,9 +276,11 @@ class ReglementPartenaire(models.Model):
         return self
 
 
-def solde_partenaire(partenaire):
-    """Solde du compte du partenaire (crédit = l'agence lui doit)."""
+def solde_partenaire(partenaire, jusqua=None):
+    """Solde du compte du partenaire en comptabilité générale (crédit = l'agence lui doit), à une date si donnée."""
     from apps.comptabilite.models import LigneEcriture
 
     lignes = LigneEcriture.objects.filter(tiers=partenaire, compte=partenaire.get_compte_collectif())
+    if jusqua is not None:
+        lignes = lignes.filter(ecriture__date__lte=jusqua)
     return sum((l.credit - l.debit for l in lignes), ZERO)
