@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Relevé partenaire{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Relevés des partenaires{% if partenaire %} : {{ partenaire.nom }}{% endif %}</h1></div>
+<div class="row g-3">
+<div class="col-md-3"><div class="list-group small">{% for p in partenaires %}
+  <a class="list-group-item list-group-item-action d-flex justify-content-between {% if p.tiers == partenaire %}active{% endif %}" href="{% url 'partenaires:releve' p.tiers.pk %}">
+  <span>{{ p.tiers.nom }}</span><span>{{ p.solde|montant }}</span></a>
+{% empty %}<div class="list-group-item text-muted">Aucun partenaire sous contrat.</div>{% endfor %}</div></div>
+<div class="col-md-9">{% if partenaire %}
+  <p class="small">Véhicules : {% for c in contrats %}{{ c.vehicule.immatriculation }} ({{ c.get_modele_display|lower }}, v{{ c.version }}, {{ c.get_statut_display|lower }}){% if not forloop.last %} · {% endif %}{% endfor %}</p>
+  <div class="card mb-3"><table class="table table-sm mb-0 small"><thead><tr><th>Date</th><th>Pièce</th><th>Libellé</th><th class="num">Dû</th><th class="num">Payé</th><th class="num">Reste à payer</th></tr></thead>
+  <tbody>{% for m in mouvements %}<tr><td>{{ m.date|date:"d/m/Y" }}</td><td>{{ m.piece }}</td><td>{{ m.libelle }}</td><td class="num">{{ m.du|montant_ou_vide }}</td><td class="num">{{ m.paye|montant_ou_vide }}</td><td class="num">{{ m.reste|montant }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center p-3">Aucun décompte approuvé ni règlement.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="fw-bold"><td colspan="5">Reste à payer au partenaire</td><td class="num">{{ reste|montant }}</td></tr>
+  {% if solde_comptable != reste %}<tr class="text-warning"><td colspan="5">Solde de son compte en comptabilité (autres opérations comprises)</td><td class="num">{{ solde_comptable|montant }}</td></tr>{% endif %}</tfoot></table></div>
+  <form method="post" class="card card-body d-flex flex-row flex-wrap gap-2 align-items-end">{% csrf_token %}
+    <div><label class="form-label small mb-0" for="r-d">Pour le décompte</label><select id="r-d" name="decompte" class="form-select form-select-sm"><option value="">(acompte, sans décompte)</option>{% for d in decomptes %}<option value="{{ d.pk }}">{{ d.numero }} – {{ d.montant_du|montant }}</option>{% endfor %}</select></div>
+    <div><label class="form-label small mb-0" for="r-m">Montant</label><input id="r-m" name="montant" type="number" min="1" required class="form-control form-control-sm"></div>
+    <div><label class="form-label small mb-0" for="r-c">Payé par</label><select id="r-c" name="caisse" class="form-select form-select-sm">{% for c in caisses %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select></div>
+    <div><label class="form-label small mb-0" for="r-dt">Date</label><input id="r-dt" type="date" name="date" class="form-control form-control-sm"></div>
+    <div><label class="form-label small mb-0" for="r-r">Référence (reçu, chèque)</label><input id="r-r" name="reference" class="form-control form-control-sm"></div>
+    <button class="btn btn-sm btn-primary">Payer</button>
+    <div class="form-text w-100">Paiement partiel possible : le reste à payer se met à jour.</div></form>
+{% else %}<p class="text-muted">Choisissez un partenaire.</p>{% endif %}</div></div>
+{% endblock %}

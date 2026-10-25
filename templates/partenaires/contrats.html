@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Contrats des partenaires{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Véhicules des partenaires : contrats</h1></div>
+<div class="alert alert-info small py-2">Chaque contrat est daté et versionné : une modification (avenant) crée une nouvelle version, l'ancienne
+reste dans l'historique et sert aux décomptes déjà faits. Comptes proposés (622 / 401) <strong>à valider par l'expert-comptable</strong>.</div>
+<form method="post" class="card card-body mb-3">{% csrf_token %}
+  <div class="row g-2">
+    {% for champ in form %}{% if champ.field.widget.input_type != "checkbox" %}
+    <div class="col-md-3"><label class="form-label small mb-0" for="{{ champ.id_for_label }}">{{ champ.label }}</label>{{ champ }}
+      {% for e in champ.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+    {% endif %}{% endfor %}
+  </div>
+  <div class="mt-2 small"><span class="text-muted">Dépenses à la charge du propriétaire (déduites de ce qui lui revient) :</span>
+    {% for champ in form %}{% if champ.field.widget.input_type == "checkbox" %}
+    <span class="form-check form-check-inline">{{ champ }}<label class="form-check-label" for="{{ champ.id_for_label }}">{{ champ.label }}</label></span>
+    {% endif %}{% endfor %}</div>
+  {% for e in form.non_field_errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+  <div class="mt-2"><button class="btn btn-sm btn-primary">Préparer le contrat</button>
+    <span class="form-text">Commission : l'agence garde le % indiqué des recettes du véhicule. Location : l'agence paie le forfait (par jour, ou par mois au prorata).</span></div>
+</form>
+<div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>Contrat</th><th>Véhicule</th><th>Propriétaire</th><th>Modèle</th><th>Période</th><th>Dépenses à sa charge</th><th>Statut</th><th></th></tr></thead>
+<tbody>{% for c in contrats %}<tr>
+  <td>{{ c.numero|default:"—" }} v{{ c.version }}</td><td>{{ c.vehicule.immatriculation }}</td>
+  <td><a href="{% url 'partenaires:releve' c.partenaire.pk %}">{{ c.partenaire.nom }}</a></td>
+  <td>{% if c.modele == "COMMISSION" %}Commission {{ c.taux_commission }} %{% else %}Location {{ c.montant_location|montant }} {{ c.get_periodicite_display|lower }}{% endif %}</td>
+  <td>{{ c.debut|date:"d/m/Y" }} → {{ c.fin|date:"d/m/Y"|default:"…" }}</td>
+  <td>{{ c.categories_a_sa_charge|join:", "|default:"aucune" }}</td><td>{{ c.get_statut_display }}</td>
+  <td>{% if c.statut == "BROUILLON" %}<form method="post">{% csrf_token %}<input type="hidden" name="contrat" value="{{ c.pk }}"><button class="btn btn-sm btn-outline-success py-0" name="action" value="activer">Mettre en vigueur</button></form>
+  {% elif c.statut == "ACTIF" %}<form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="contrat" value="{{ c.pk }}">
+    <input type="date" name="a_partir_du" required class="form-control form-control-sm py-0" title="Avenant à partir du">
+    {% if c.modele == "COMMISSION" %}<input name="taux_commission" type="number" step="0.01" min="0" max="100" placeholder="Nouveau %" class="form-control form-control-sm py-0" style="width:7em">
+    {% else %}<input name="montant_location" type="number" min="1" placeholder="Nouveau montant" class="form-control form-control-sm py-0" style="width:9em">{% endif %}
+    <button class="btn btn-sm btn-outline-secondary py-0" name="action" value="avenant">Avenant</button></form>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="8" class="text-muted text-center p-4">Aucun contrat de partenaire.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

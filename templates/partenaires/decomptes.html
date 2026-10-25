@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Décomptes des partenaires{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Décomptes des partenaires</h1></div>
+<form method="post" class="card card-body mb-3 d-flex flex-row flex-wrap gap-2 align-items-end">{% csrf_token %}
+  <div><label class="form-label small mb-0" for="d-c">Contrat</label><select id="d-c" name="contrat" class="form-select form-select-sm">{% for c in contrats %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="d-d">Du</label><input id="d-d" type="date" name="debut" value="{{ debut|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="d-f">Au</label><input id="d-f" type="date" name="fin" value="{{ fin|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <button class="btn btn-sm btn-primary" name="action" value="calculer">Calculer</button>
+  <div class="form-text w-100">Calcul à partir des comptes du véhicule (recettes constatées au départ, dépenses imputées). Faites-le au siège, une fois les fichiers
+  de toutes les agences importés. Le décompte garde les règles du contrat appliquées ; une période ne peut être décomptée qu'une fois.</div></form>
+<div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>N°</th><th>Véhicule</th><th>Propriétaire</th><th>Période</th><th class="num">Recettes</th><th class="num">Commission</th><th class="num">Location</th><th class="num">Dépenses à sa charge</th><th class="num">Dû au propriétaire</th><th>Statut</th><th></th></tr></thead>
+<tbody>{% for d in decomptes %}<tr><td>{{ d.numero }}</td><td>{{ d.contrat.vehicule.immatriculation }}</td><td><a href="{% url 'partenaires:releve' d.contrat.partenaire.pk %}">{{ d.contrat.partenaire.nom }}</a></td>
+  <td>{{ d.debut|date:"d/m" }} → {{ d.fin|date:"d/m/Y" }} <span class="text-muted">(v{{ d.detail.version }})</span></td>
+  <td class="num">{{ d.recettes|montant }}</td><td class="num">{{ d.commission|montant }}</td><td class="num">{{ d.location|montant }}</td><td class="num">{{ d.depenses|montant }}</td>
+  <td class="num fw-bold {% if d.montant_du < 0 %}text-danger{% endif %}">{{ d.montant_du|montant }}</td><td>{{ d.get_statut_display }}</td>
+  <td>{% if d.statut == "BROUILLON" %}<form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="decompte" value="{{ d.pk }}">
+    <button class="btn btn-sm btn-outline-success py-0" name="action" value="approuver">Approuver</button>
+    <button class="btn btn-sm btn-outline-danger py-0" name="action" value="supprimer">Supprimer</button></form>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="11" class="text-muted text-center p-4">Aucun décompte.</td></tr>{% endfor %}</tbody></table></div>
+<p class="small text-muted mt-2">Un montant négatif signifie que les dépenses à la charge du propriétaire dépassent ce qui lui revient : il doit la différence à l'agence.</p>
+{% endblock %}

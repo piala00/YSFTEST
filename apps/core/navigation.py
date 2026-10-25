@@ -835,6 +835,12 @@ TRANSPORT = Module(
             E("traitement.transferts", "Transferts de fonds (banque, siège)", "transport:transferts", icone="bi-arrow-left-right"),
             E("traitement.cloture", "Clôture de la journée", "transport:cloture", icone="bi-lock"),
             SEP(),
+            E("traitement.partenaires", "Véhicules des partenaires", icone="bi-people", enfants=[
+                E("traitement.partenaires.contrats", "Contrats (commission, location)", "partenaires:contrats"),
+                E("traitement.partenaires.decomptes", "Décomptes de période", "partenaires:decomptes"),
+                E("traitement.partenaires.releves", "Relevés et règlements", "partenaires:releves"),
+            ]),
+            SEP(),
             E("traitement.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
             E("traitement.reglement", "Règlement d'un client en compte", "commercial:reglement_create", icone="bi-wallet2"),
         ]),

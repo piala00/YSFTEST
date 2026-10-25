@@ -16,6 +16,7 @@ urlpatterns = [
     path("transport/billetterie/", include((urls_communes("billetterie"), "billetterie"))),
     path("transport/colis/", include((urls_communes("colis"), "colis"))),
     path("transport/garage/", include("apps.garage.urls")),
+    path("transport/partenaires/", include("apps.partenaires.urls")),
     path("transport/", include("apps.transport.urls")),
     path("personnel/", include("apps.personnel.urls")),
     path("api/", include("apps.api.urls")),

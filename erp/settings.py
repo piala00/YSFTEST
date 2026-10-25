@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "apps.echanges",
     "apps.garage",
     "apps.personnel",
+    "apps.partenaires",
     "apps.api",
 ]
 
