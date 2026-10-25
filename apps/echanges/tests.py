@@ -33,7 +33,7 @@ class ScenarioTroisDossiersTests(SimpleTestCase):
         self.assertEqual(c["journaux"], ["CA-BTA", "CA-DLA", "CA-YDE", "OD-BTA", "OD-DLA"])
         self.assertEqual(c["liaisons_185"], "0.00")                            # liaisons neutralisées
         self.assertEqual(c["billets_a_voyager"], "0.00")                       # tous les voyages faits
-        self.assertEqual((c["recette_LT101"], c["recette_EN202"]), ("19333.00", "3667.00"))
+        self.assertEqual((c["recette_LT101"], c["recette_LT303"], c["recette_EN202"]), ("12000.00", "7333.00", "3667.00"))
         self.assertEqual((c["produits_70611"], c["produits_70612"], c["caisse"]), ("-23000.00", "-2000.00", "-101000.00"))
         self.assertEqual(c["billets"], 3)
         self.assertEqual(c["carburant_EN202"], "126000.00")                    # plein de Bertoua sur son car, au siège

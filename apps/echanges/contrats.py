@@ -212,14 +212,14 @@ def _suivre_statut_depart(d, statut):
     """Reproduit chez le destinataire les effets d'un départ ou d'une arrivée sur les billets et les colis copiés."""
     from apps.transport.models import Billet, Colis, Depart
 
-    if statut in (Depart.PARTI, Depart.ARRIVE):
+    if statut in (Depart.PARTI, Depart.ARRIVE, Depart.CLOTURE):
         d.billets.filter(statut=Billet.VENDU).update(statut=Billet.EMBARQUE)
         d.colis.filter(statut=Colis.CHARGE).update(statut=Colis.EN_ROUTE)
-    if statut == Depart.ARRIVE:
+    if statut in (Depart.ARRIVE, Depart.CLOTURE):
         d.colis.filter(statut=Colis.EN_ROUTE).update(statut=Colis.ARRIVE)
 
 
-ORDRE_DEPART = {"PROGRAMME": 0, "PARTI": 1, "ARRIVE": 2, "ANNULE": 3}
+ORDRE_DEPART = {"PROGRAMME": 0, "PARTI": 1, "ARRIVE": 2, "CLOTURE": 3, "ANNULE": 4}
 
 
 def _depart(p, origine, local):

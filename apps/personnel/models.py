@@ -48,6 +48,12 @@ class Employe(models.Model):
                                      related_name="employe", help_text="Fiche chauffeur utilisée sur les départs")
     salaire_base = models.DecimalField("Salaire de base mensuel", max_digits=12, decimal_places=0, default=ZERO)
     date_embauche = models.DateField("Date d'embauche", null=True, blank=True)
+    HABITUEL, VOYAGES, JOURS, AGENCE = "HABITUEL", "VOYAGES", "JOURS", "AGENCE"
+    VENTILATIONS = [(HABITUEL, "Sur le véhicule affecté"), (VOYAGES, "Au prorata des voyages effectués dans le mois"),
+                    (JOURS, "Au prorata des jours passés sur chaque véhicule"), (AGENCE, "Charge de l'agence (aucun véhicule)")]
+    ventilation = models.CharField("Salaire imputé", max_length=10, choices=VENTILATIONS, default=HABITUEL,
+                                   help_text="Selon l'accord avec la société ; voyages et jours : départs où l'employé est "
+                                             "chauffeur ou convoyeur (à défaut : véhicule affecté)")
     numero_cnps = models.CharField("N° CNPS", max_length=30, blank=True)
     mode_paiement = models.CharField("Paiement du salaire", max_length=15, choices=PAIEMENTS, default="ESPECES")
     actif = models.BooleanField(default=True)
@@ -61,6 +67,33 @@ class Employe(models.Model):
 
     def avances_a_reprendre(self):
         return sum((a.montant for a in self.avances.filter(bulletin__isnull=True, ecriture__isnull=False)), ZERO)
+
+    def repartition(self, debut, fin):
+        """[(véhicule, fraction)] du coût de l'employé sur la période, selon son mode d'imputation (total = 1)."""
+        from collections import Counter
+
+        from django.db.models import Q
+
+        from apps.transport.models import Depart
+
+        habituel = [(self.vehicule, Decimal(1))] if self.vehicule_id else []
+        if self.ventilation == self.AGENCE:
+            return []
+        if self.ventilation == self.HABITUEL:
+            return habituel
+        filtre = Q(convoyeur=self)
+        if self.chauffeur_id:
+            filtre |= Q(chauffeur_id=self.chauffeur_id)
+        departs = (Depart.objects.filter(filtre, date__range=(debut, fin), vehicule__isnull=False)
+                   .filter(statut__in=[Depart.PARTI, Depart.ARRIVE, Depart.CLOTURE]).select_related("vehicule"))
+        if self.ventilation == self.VOYAGES:
+            poids = Counter(d.vehicule for d in departs)
+        else:
+            poids = Counter(v for v, _ in {(d.vehicule, d.date) for d in departs})
+        total = sum(poids.values())
+        if not total:
+            return habituel
+        return [(v, Decimal(n) / total) for v, n in sorted(poids.items(), key=lambda x: x[0].immatriculation)]
 
 
 class RubriquePaie(models.Model):
@@ -190,19 +223,29 @@ class PeriodePaie(models.Model):
         salaires, net_du, avances = _compte("661", "Rémunérations directes versées au personnel national"), \
             _compte("422", "Personnel, rémunérations dues"), _compte("421", "Personnel, avances et acomptes")
         lignes = []
+        debut = self.fin_de_mois.replace(day=1)
         for b in bulletins:
             b.calculer()
-            vehicule = b.employe.vehicule
-            impute = {"vehicule": vehicule, "section": vehicule.section if vehicule else None}
-            lignes.append({"compte": salaires, "debit": b.salaire_base, **impute, "libelle": f"Salaire {b.employe.nom}"})
+            repartition = b.employe.repartition(debut, self.fin_de_mois)
+
+            def charges(compte, montant, libelle):
+                """Charge répartie sur les véhicules selon le mode d'imputation de l'employé (reste : agence)."""
+                if not repartition:
+                    return [{"compte": compte, "debit": montant, "libelle": libelle}]
+                parts = [_arrondi(montant * f) for _, f in repartition[:-1]]
+                parts.append(montant - sum(parts, ZERO))
+                return [{"compte": compte, "debit": m, "vehicule": v, "section": v.section, "libelle": libelle}
+                        for (v, _), m in zip(repartition, parts) if m]
+
+            lignes += charges(salaires, b.salaire_base, f"Salaire {b.employe.nom}")
             for l in b.lignes.select_related("rubrique"):
                 r = l.rubrique
                 if r.nature == RubriquePaie.GAIN:
-                    lignes.append({"compte": r.compte, "debit": l.montant, **impute, "libelle": f"{r.libelle} {b.employe.nom}"})
+                    lignes += charges(r.compte, l.montant, f"{r.libelle} {b.employe.nom}")
                 elif r.nature == RubriquePaie.RETENUE:
                     lignes.append({"compte": r.compte, "credit": l.montant})
                 else:
-                    lignes.append({"compte": r.compte, "debit": l.montant, **impute})
+                    lignes += charges(r.compte, l.montant, f"{r.libelle} {b.employe.nom}")
                     lignes.append({"compte": r.compte_contrepartie, "credit": l.montant})
             if b.avances:
                 lignes.append({"compte": avances, "credit": b.avances})

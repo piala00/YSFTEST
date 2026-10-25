@@ -19,7 +19,7 @@
     <td>{{ d.ligne.gare_depart.ville }} → {{ d.ligne.gare_arrivee.ville }}</td><td>{{ d.vehicule.immatriculation|default:"—" }}</td>
     <td>{{ d.chauffeur|default:"—" }}</td><td class="num">{{ d.places_vendues }} / {{ d.places }}</td>
     <td class="num {% if not d.places_libres %}text-danger{% endif %}">{{ d.places_libres }}</td><td class="num">{{ d.recette_billets|montant }}</td>
-    <td><span class="badge text-bg-{% if d.statut == 'PROGRAMME' %}primary{% elif d.statut == 'PARTI' %}warning{% elif d.statut == 'ARRIVE' %}success{% else %}secondary{% endif %}">{{ d.get_statut_display }}</span></td>
+    <td><span class="badge text-bg-{% if d.statut == 'PROGRAMME' %}primary{% elif d.statut == 'PARTI' %}warning{% elif d.statut == 'ARRIVE' or d.statut == 'CLOTURE' %}success{% else %}secondary{% endif %}">{{ d.get_statut_display }}</span></td>
     <td>{% if d.statut == "PROGRAMME" and d.places_libres %}<a class="btn btn-sm btn-outline-primary py-0" href="{% url 'transport:billet_vente' %}?depart={{ d.pk }}">Vendre</a>{% endif %}</td></tr>
   {% empty %}<tr><td colspan="10" class="text-muted text-center p-4">Aucun départ programmé ce jour.</td></tr>{% endfor %}</tbody>
 </table></div>

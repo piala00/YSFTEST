@@ -45,7 +45,7 @@ class ChauffeurForm(BootstrapMixin, forms.ModelForm):
 class DepartForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Depart
-        fields = ("ligne", "date", "heure", "vehicule", "chauffeur", "places")
+        fields = ("ligne", "date", "heure", "vehicule", "chauffeur", "convoyeur", "places", "km_depart")
         widgets = {"date": DateInput(), "heure": forms.TimeInput(attrs={"type": "time"}, format="%H:%M")}
 
     def __init__(self, *args, **kwargs):
@@ -53,6 +53,9 @@ class DepartForm(BootstrapMixin, forms.ModelForm):
         self.fields["ligne"].queryset = Ligne.objects.filter(actif=True)
         self.fields["vehicule"].queryset = Vehicule.objects.filter(actif=True)
         self.fields["chauffeur"].queryset = Chauffeur.objects.filter(actif=True)
+        from apps.personnel.models import Employe
+
+        self.fields["convoyeur"].queryset = Employe.objects.filter(actif=True)
 
 
 class BilletForm(BootstrapMixin, forms.ModelForm):

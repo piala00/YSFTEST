@@ -23,6 +23,7 @@ urlpatterns = [
     path("caisses/sessions/", views.sessions_caisse, name="sessions_caisse"),
     path("caisses/transferts/", views.transferts, name="transferts"),
     path("cloture/", views.cloture_journee, name="cloture"),
+    path("voyages-a-cloturer/", views.voyages_a_cloturer, name="voyages_a_cloturer"),
     path("billetterie/caisse/", views.ma_caisse, {"service": "BILLETTERIE"}, name="ma_caisse_billetterie"),
     path("billetterie/cloture/", views.cloture_journee, {"perimetre": "BILLETTERIE"}, name="cloture_billetterie"),
     path("colis/caisse/", views.ma_caisse, {"service": "COLIS"}, name="ma_caisse_colis"),

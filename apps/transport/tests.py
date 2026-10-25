@@ -485,3 +485,73 @@ class CaissesEtCloturesTests(TestCase):
                     "transport:cloture_colis", "transport:ma_caisse_colis"):
             self.assertEqual(self.client.get(reverse(url)).status_code, 200, url)
         self.assertContains(self.client.get(reverse("transport:rapport_journalier")), "Provisoire")
+
+
+class ExploitationTests(TestCase):
+    """P2 : contrôles du départ, avance de mission justifiée, clôture du voyage, salaire réparti selon l'accord."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", "--demo", verbosity=0)
+
+    def test_controles_avance_et_cloture(self):
+        from .models_exploitation import AvanceMission, JustificatifMission
+
+        caisse = Journal.objects.get(code="CA")
+        car = Vehicule.objects.get(immatriculation="LT 101 DEMO")
+        d = Depart.objects.get(vehicule=car)
+        d.km_depart = 40000
+        d.save()
+        doublon = Depart(ligne=d.ligne, date=d.date, heure=d.heure, vehicule=car)
+        with self.assertRaisesMessage(ValidationError, "déjà programmé"):
+            doublon.full_clean()
+        car.assurance_echeance = d.date - datetime.timedelta(days=1)
+        car.save()
+        with self.assertRaisesMessage(ValidationError, "Assurance expirée"):
+            Depart.objects.get(pk=d.pk).partir()
+        car.assurance_echeance = None
+        car.save()
+        a = AvanceMission(depart=d, beneficiaire="Chauffeur 1", montant=20000, caisse=caisse).remettre()
+        d.partir()
+        autre = Depart.objects.create(ligne=d.ligne, date=d.date, heure=datetime.time(18), vehicule=car, chauffeur=d.chauffeur)
+        with self.assertRaisesMessage(ValidationError, "encore sur la route"):
+            autre.partir()
+        d.arriver()
+        JustificatifMission.objects.create(avance=a, nature=JustificatifMission.PEAGE, libelle="Péage Édéa", montant=5000)
+        JustificatifMission.objects.create(avance=a, nature=JustificatifMission.FRAIS_ROUTE, montant=8000)
+        with self.assertRaisesMessage(ValidationError, "pas encore justifiée"):
+            d.cloturer(40250)
+        with self.assertRaisesMessage(ValidationError, "Il manque"):
+            a.justifier(restitue=0)
+        a.justifier(restitue=7000)
+        charges = a.ecriture_justification.lignes.filter(debit__gt=0, vehicule=car)
+        self.assertEqual(sorted((l.compte.numero, l.debit) for l in charges), [("6181", 8000), ("638", 5000)])
+        self.assertEqual(sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero="47121")), Decimal(0)), 0)
+        with self.assertRaisesMessage(ValidationError, "inférieur"):
+            d.cloturer(39000)
+        d.cloturer(40250, "RAS")
+        self.assertEqual((d.statut, d.km_parcourus), (Depart.CLOTURE, 250))
+
+    def test_salaire_reparti_selon_l_accord(self):
+        from apps.personnel.models import Employe, PeriodePaie
+
+        car1, car2 = Vehicule.objects.get(immatriculation="LT 101 DEMO"), Vehicule.objects.get(immatriculation="LT 102 DEMO")
+        e = Employe.objects.get(vehicule=car1)
+        e.ventilation = Employe.VOYAGES
+        e.save()
+        jour = datetime.date.today()
+        for car, heure in ((car1, 20), (car2, 21), (car2, 22)):                 # 1 voyage sur car1, 2 sur car2
+            Depart.objects.create(ligne=Ligne.objects.first(), date=jour, heure=datetime.time(heure), vehicule=car,
+                                  chauffeur=e.chauffeur, statut=Depart.CLOTURE)
+        Employe.objects.exclude(pk=e.pk).update(actif=False)
+        paie = PeriodePaie.objects.create(annee=jour.year, mois=jour.month)
+        paie.generer()
+        paie.valider(date=jour)
+
+        def salaire(car):
+            return sum((l.debit for l in paie.ecriture.lignes.filter(compte__numero="661", vehicule=car)), Decimal(0))
+        self.assertEqual((salaire(car1), salaire(car2)), (40000, 80000))
+        e.ventilation = Employe.JOURS                                           # 1 jour sur chaque car
+        self.assertEqual([f for _, f in e.repartition(jour.replace(day=1), jour)], [Decimal("0.5"), Decimal("0.5")])
+        e.ventilation = Employe.AGENCE
+        self.assertEqual(e.repartition(jour, jour), [])

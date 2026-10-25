@@ -60,6 +60,8 @@ class ParametresTransport(models.Model):
                                       verbose_name="Garage : pièces et fournitures")
     compte_main_oeuvre = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
                                            verbose_name="Garage : main d'œuvre extérieure")
+    bloquer_papiers_expires = models.BooleanField(
+        "Refuser le départ si l'assurance ou la visite technique est expirée", default=True)
     sessions_caisse_obligatoires = models.BooleanField(
         "Caisse ouverte obligatoire pour encaisser", default=False,
         help_text="Chaque guichetier ou agent colis ouvre sa caisse (fonds de départ) avant d'encaisser, et la ferme le soir")
@@ -291,8 +293,8 @@ class Chauffeur(models.Model):
 class Depart(models.Model):
     """Un voyage programmé : ligne, date et heure, véhicule, chauffeur. Porte les tronçons de billets et les colis."""
 
-    PROGRAMME, PARTI, ARRIVE, ANNULE = "PROGRAMME", "PARTI", "ARRIVE", "ANNULE"
-    STATUTS = [(PROGRAMME, "Programmé"), (PARTI, "Parti"), (ARRIVE, "Arrivé"), (ANNULE, "Annulé")]
+    PROGRAMME, PARTI, ARRIVE, CLOTURE, ANNULE = "PROGRAMME", "PARTI", "ARRIVE", "CLOTURE", "ANNULE"
+    STATUTS = [(PROGRAMME, "Programmé"), (PARTI, "Parti"), (ARRIVE, "Arrivé"), (CLOTURE, "Clôturé"), (ANNULE, "Annulé")]
 
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
@@ -304,7 +306,13 @@ class Depart(models.Model):
     vehicule = models.ForeignKey(Vehicule, null=True, blank=True, on_delete=models.PROTECT, related_name="departs",
                                  verbose_name="Véhicule")
     chauffeur = models.ForeignKey(Chauffeur, null=True, blank=True, on_delete=models.PROTECT, related_name="departs")
+    convoyeur = models.ForeignKey("personnel.Employe", null=True, blank=True, on_delete=models.PROTECT, related_name="convoyages")
     places = models.PositiveIntegerField("Places à vendre", default=0, help_text="0 : places du véhicule")
+    km_depart = models.PositiveIntegerField("Compteur au départ (km)", null=True, blank=True)
+    km_arrivee = models.PositiveIntegerField("Compteur à l'arrivée (km)", null=True, blank=True)
+    observations = models.CharField("Observations, incidents", max_length=250, blank=True)
+    cloture_le = models.DateTimeField(null=True, blank=True)
+    cloture_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     statut = models.CharField(max_length=10, choices=STATUTS, default=PROGRAMME)
     parti_le = models.DateTimeField(null=True, blank=True)
     arrive_le = models.DateTimeField(null=True, blank=True)
@@ -318,6 +326,20 @@ class Depart(models.Model):
 
     def __str__(self):
         return f"{self.numero} {self.ligne.code} {self.date:%d/%m/%Y} {self.heure:%H:%M}"
+
+    @property
+    def km_parcourus(self):
+        if self.km_depart is not None and self.km_arrivee is not None and self.km_arrivee >= self.km_depart:
+            return self.km_arrivee - self.km_depart
+        return None
+
+    def clean(self):
+        """Un véhicule ne peut pas être programmé deux fois au même moment."""
+        if self.vehicule_id and self.statut != self.ANNULE:
+            doublon = (Depart.objects.filter(vehicule_id=self.vehicule_id, date=self.date, heure=self.heure)
+                       .exclude(pk=self.pk).exclude(statut=self.ANNULE).first())
+            if doublon:
+                raise ValidationError({"vehicule": f"Ce véhicule est déjà programmé à cette heure (départ {doublon.numero})."})
 
     def save(self, *args, **kwargs):
         if not self.numero:
@@ -377,6 +399,12 @@ class Depart(models.Model):
             raise ValidationError("Seul un départ programmé peut partir.")
         if not self.vehicule_id or not self.chauffeur_id:
             raise ValidationError("Indiquez le véhicule et le chauffeur avant le départ.")
+        en_route = Depart.objects.filter(vehicule_id=self.vehicule_id, statut=self.PARTI).exclude(pk=self.pk).first()
+        if en_route:
+            raise ValidationError(f"Ce véhicule est encore sur la route (départ {en_route.numero}) : constatez d'abord son arrivée.")
+        expires = [a for a in self.vehicule.alertes() if "expirée" in a]
+        if expires and ParametresTransport.get().bloquer_papiers_expires:
+            raise ValidationError(f"Départ refusé : {', '.join(expires)} ({self.vehicule.immatriculation}).")
         self.statut, self.parti_le = self.PARTI, timezone.now()
         self.save(update_fields=["statut", "parti_le"])
         troncons = list(self.troncons.filter(statut=Troncon.A_VOYAGER).select_related("billet"))
@@ -432,6 +460,25 @@ class Depart(models.Model):
 
             publier("depart_arrivee", self.uid, {"v": 1, "depart": str(self.uid), "arrive_le": self.arrive_le.isoformat()},
                     "ARRIVE", self.date)
+
+    @transaction.atomic
+    def cloturer(self, km_arrivee=None, observations="", utilisateur=None):
+        """Fin du voyage : compteur, observations, avances de l'équipage justifiées."""
+        from .models_exploitation import AvanceMission
+
+        _proprietaire(self, f"Le départ {self.numero}")
+        if self.statut != self.ARRIVE:
+            raise ValidationError("Le voyage se clôture après l'arrivée.")
+        if km_arrivee is not None:
+            if self.km_depart is not None and int(km_arrivee) < self.km_depart:
+                raise ValidationError(f"Compteur à l'arrivée inférieur au départ ({self.km_depart} km).")
+            self.km_arrivee = int(km_arrivee)
+        if self.avances_mission.filter(statut=AvanceMission.REMISE).exists():
+            raise ValidationError("Une avance de mission n'est pas encore justifiée.")
+        self.observations = observations or self.observations
+        self.statut, self.cloture_le, self.cloture_par = self.CLOTURE, timezone.now(), utilisateur
+        self.save(update_fields=["km_arrivee", "observations", "statut", "cloture_le", "cloture_par"])
+        return self
 
     @transaction.atomic
     def annuler(self):
@@ -1007,3 +1054,4 @@ class DepenseVehicule(models.Model):
 
 
 from .models_caisse import ClotureJournee, SessionCaisse, TransfertFonds  # noqa: E402,F401
+from .models_exploitation import AvanceMission, JustificatifMission  # noqa: E402,F401

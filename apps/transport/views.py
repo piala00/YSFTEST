@@ -112,6 +112,10 @@ def depart_form(request, pk=None):
 
 @login_required
 def depart_detail(request, pk):
+    from apps.comptabilite.models import Journal
+
+    from .models_exploitation import JustificatifMission
+
     depart = get_object_or_404(Depart.objects.select_related("ligne__gare_depart", "ligne__gare_arrivee", "vehicule", "chauffeur"), pk=pk)
     if request.method == "POST":
         action = request.POST.get("action")
@@ -129,13 +133,37 @@ def depart_detail(request, pk):
                 colis = get_object_or_404(Colis, pk=request.POST.get("colis"))
                 colis.charger(depart)
                 messages.success(request, f"Colis {colis.numero} chargé.")
+            elif action == "cloturer":
+                depart.cloturer(request.POST.get("km_arrivee") or None, request.POST.get("observations", ""), request.user)
+                messages.success(request, "Voyage clôturé.")
+            elif action == "avance":
+                from apps.comptabilite.models import Journal
+
+                from .models_exploitation import AvanceMission
+
+                AvanceMission(depart=depart, beneficiaire=request.POST.get("beneficiaire", "").strip() or str(depart.chauffeur or ""),
+                              montant=Decimal(request.POST.get("montant") or 0),
+                              caisse=get_object_or_404(Journal, pk=request.POST.get("caisse"))).remettre(request.user)
+                messages.success(request, "Avance de mission remise : à justifier au retour.")
+            elif action == "justificatif":
+                from .models_exploitation import AvanceMission, JustificatifMission
+
+                avance = get_object_or_404(AvanceMission, pk=request.POST.get("avance"), depart=depart, statut=AvanceMission.REMISE)
+                JustificatifMission.objects.create(avance=avance, nature=request.POST.get("nature", JustificatifMission.PEAGE),
+                                                   libelle=request.POST.get("libelle", ""), montant=Decimal(request.POST.get("montant") or 0))
+            elif action == "justifier":
+                from .models_exploitation import AvanceMission
+
+                get_object_or_404(AvanceMission, pk=request.POST.get("avance"), depart=depart).justifier(
+                    Decimal(request.POST.get("restitue") or 0), utilisateur=request.user)
+                messages.success(request, "Avance justifiée.")
             elif action == "affecter":
                 from .models import Troncon
 
                 troncon = get_object_or_404(Troncon, pk=request.POST.get("troncon"))
                 troncon.affecter(depart, int(request.POST["siege"]) if request.POST.get("siege") else None)
                 messages.success(request, f"{troncon.billet.voyageur} placé sur ce départ (correspondance).")
-        except ValidationError as exc:
+        except (ValidationError, ArithmeticError, ValueError) as exc:
             _erreur(request, exc)
         return redirect("transport:depart_detail", depart.pk)
     billets = depart.troncons.select_related("billet__gare_arrivee", "billet__vendu_par").order_by("siege", "billet__numero")
@@ -147,7 +175,20 @@ def depart_detail(request, pk):
         "correspondances": depart.correspondances_a_affecter() if depart.statut == Depart.PROGRAMME else [],
         "sieges": [(n, n in occupes) for n in range(1, depart.places + 1)],
         "recette_billets": depart.recette_billets(), "recette_colis": depart.recette_colis(), "depenses": depart.depenses(),
-        "depenses_liste": depart.depenses_vehicule.all()})
+        "depenses_liste": depart.depenses_vehicule.all(),
+        "avances": depart.avances_mission.prefetch_related("justificatifs"), "natures_justificatif": JustificatifMission.NATURES,
+        "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)})
+
+
+@login_required
+def voyages_a_cloturer(request):
+    """Départs arrivés à clôturer, et avances de mission encore à justifier."""
+    from .models_exploitation import AvanceMission
+
+    return render(request, "transport/voyages_a_cloturer.html", {
+        "departs": Depart.objects.filter(statut__in=[Depart.PARTI, Depart.ARRIVE], site_origine="")
+                                 .select_related("ligne", "vehicule", "chauffeur").order_by("date", "heure"),
+        "avances": AvanceMission.objects.filter(statut=AvanceMission.REMISE).select_related("depart__vehicule")})
 
 
 @login_required

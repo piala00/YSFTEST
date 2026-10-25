@@ -259,6 +259,12 @@ def anomalies_du_jour(jour, perimetre=ClotureJournee.AGENCE):
     if perimetre in (ClotureJournee.BILLETTERIE, ClotureJournee.AGENCE):
         for d in Depart.objects.filter(date=jour, statut=Depart.PROGRAMME, site_origine=""):
             signales.append(f"Départ {d.numero} {d.heure:%H:%M} {d.ligne.code} pas parti")
+        for d in Depart.objects.filter(date__lte=jour, statut=Depart.ARRIVE, site_origine=""):
+            signales.append(f"Voyage {d.numero} arrivé mais pas clôturé")
+        from .models_exploitation import AvanceMission
+
+        for a in AvanceMission.objects.filter(statut=AvanceMission.REMISE, date__lte=jour):
+            signales.append(f"Avance de mission {a.numero} ({a.beneficiaire}, {a.montant:,.0f}) pas encore justifiée".replace(",", " "))
         n = Troncon.objects.filter(depart__isnull=True, statut=Troncon.A_VOYAGER, billet__statut=Billet.VENDU,
                                    site_origine="").count()
         if n:

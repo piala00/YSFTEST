@@ -63,6 +63,7 @@ Ligne.objects.create(code="BTA-GBL", gare_depart=bta, gare_arrivee=gbl, prix_bil
 Ligne.objects.create(code="DLA-GBL", gare_depart=dla, gare_arrivee=gbl, prix_billet=11000)
 Vehicule.objects.create(immatriculation="LT 101 AA", nombre_places=30)
 Vehicule.objects.create(immatriculation="EN 202 BB", nombre_places=30)
+Vehicule.objects.create(immatriculation="LT 303 CC", nombre_places=30)
 Chauffeur.objects.create(nom="Chauffeur Un")
 print("null")""")
     inst_dla = lots_de(siege.manage("echanges", "installation", "--agence", "DLA", "--dossier", str(travail)))[0]
@@ -90,7 +91,7 @@ c = Colis(gare_depart=Gare.objects.get(code="DLA"), gare_arrivee=Gare.objects.ge
 c.charger(d); d.partir()
 # Voyageur Douala -> Garoua-Boulaï : car LT 101 AA jusqu'à Bertoua, correspondance choisie à Bertoua
 d2 = Depart.objects.create(ligne=Ligne.objects.get(code="DLA-BTA"), date=datetime.date.today(), heure=datetime.time(6),
-                           vehicule=Vehicule.objects.get(immatriculation="LT 101 AA"), chauffeur=Chauffeur.objects.first())
+                           vehicule=Vehicule.objects.get(immatriculation="LT 303 CC"), chauffeur=Chauffeur.objects.first())
 b = Billet(depart=d2, gare_arrivee=Gare.objects.get(code="GBL"), voyageur="Voyageur en correspondance").vendre()
 d2.partir()
 print(json.dumps({"code": c.code_retrait, "colis": c.numero, "billet_corr": b.numero,
@@ -162,6 +163,7 @@ def vehicule(immat):
     return str(-sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero="70611", vehicule__immatriculation=immat)), Decimal(0)))
 print(json.dumps({"ecritures": Ecriture.objects.filter(site_origine__in=["DLA", "YDE", "BTA"]).count(),
                   "billets_a_voyager": solde("41911"), "recette_LT101": vehicule("LT 101 AA"), "recette_EN202": vehicule("EN 202 BB"),
+                  "recette_LT303": vehicule("LT 303 CC"),
                   "journaux": sorted(set(Ecriture.objects.exclude(site_origine="").values_list("journal__code", flat=True))),
                   "liaisons_185": solde("185"), "produits_70611": solde("70611"), "produits_70612": solde("70612"),
                   "caisse": solde("57"), "billets": Billet.objects.count(),
