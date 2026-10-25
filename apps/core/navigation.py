@@ -848,6 +848,7 @@ TRANSPORT = Module(
         ]),
         Onglet("etat", "Etat", "bi-printer", [
             E("etat.rapport", "Rapport journalier de l'agence", "transport:rapport_journalier", icone="bi-clipboard-data"),
+            E("etat.rapport_a4", "Rapport journalier à imprimer (A4)", "transport:rapport_journalier_imprimer", icone="bi-printer"),
             E("etat.recette", "Recette journalière par gare", "transport:recette", icone="bi-cash-stack"),
             E("etat.vehicules", "Comptes des véhicules", icone="bi-bus-front", enfants=[
                 E("etat.vehicules.balance", "Balance des véhicules", "transport:balance_vehicules"),

@@ -407,6 +407,42 @@ def rapport_journalier(request):
 
 
 @login_required
+def rapport_journalier_imprimer(request):
+    """Rapport journalier de l'agence en tableaux simples, mis en page pour une feuille A4 portrait."""
+    from django.utils import timezone
+
+    from apps.core.models import Agence
+    from apps.echanges.models import Evenement, LotEmis
+    from apps.echanges.publication import site_local
+
+    from . import etats
+    from .models_caisse import ClotureJournee
+
+    jour = _jour(request)
+    local = site_local()
+    siege = local is None or local.role == local.SIEGE
+    agences = Agence.objects.filter(locale=False).order_by("rang", "code") if siege else Agence.objects.none()
+    agence = agences.filter(code=request.GET.get("agence", "")).first()   # au siège seulement : données reçues
+    site = agence.code if agence else ""
+    code = site or (local.code if local else "AG")
+    contexte = {"jour": jour, "agences": agences, "agence": agence, "local": local, "genere_le": timezone.now(),
+                "numero": f"RJ-{code}-{jour:%Y%m%d}", **etats.rapport_agence_a4(jour, site)}
+    if agence:
+        contexte["etat"] = "Données reçues de l'agence par les échanges"
+        contexte["synchro"] = (f"dernière réception le {timezone.localtime(agence.derniere_reception):%d/%m/%Y %H:%M}"
+                               if agence.derniere_reception else "aucun fichier reçu de cette agence")
+    else:
+        cloture = ClotureJournee.objects.filter(date=jour, perimetre=ClotureJournee.AGENCE).select_related("cloture_par").first()
+        contexte["etat"] = (f"CLÔTURÉ le {timezone.localtime(cloture.cloture_le):%d/%m/%Y %H:%M} par {cloture.cloture_par or '—'}"
+                            if cloture else "PROVISOIRE — journée non clôturée")
+        if local is not None:
+            dernier = max(LotEmis.objects.values_list("sequence_a", flat=True), default=0)
+            n = Evenement.objects.filter(sequence__gt=dernier).count()
+            contexte["synchro"] = f"{n} fait(s) pas encore envoyé(s) au siège" if n else "tout est envoyé au siège"
+    return render(request, "transport/rapport_journalier_a4.html", contexte)
+
+
+@login_required
 def rentabilite(request):
     from . import etats
 

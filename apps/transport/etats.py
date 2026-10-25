@@ -226,3 +226,141 @@ def models_q_sortie(debut):
     from django.db.models import Q
 
     return Q(date_sortie__isnull=True) | Q(date_sortie__gte=debut)
+
+
+def rapport_agence_a4(jour, site=""):
+    """Rapport journalier simple de l'agence, en tableaux (skill rapport journalier d'agence), imprimable en A4 portrait.
+
+    site : "" = ce dossier ; au siège, code d'une agence = ses données reçues par les échanges.
+    Deux vues distinctes, jamais additionnées :
+      - exploitation (date de départ) : départs effectués, voyageurs et part du prix revenant à chaque car ;
+      - trésorerie (date de paiement) : ce qui est réellement entré et sorti des caisses, banques et Mobile Money,
+        lu sur les comptes de trésorerie (une pièce comptable = un mouvement : pas de double compte).
+    """
+    from collections import defaultdict
+
+    from apps.comptabilite.models import Ecriture, Journal, LigneEcriture
+
+    from .models import ParametresTransport, Troncon
+
+    p = ParametresTransport.get()
+
+    def num(compte):
+        return getattr(compte, "numero", None)
+
+    # A. Billetterie : départs effectués, une ligne par trajet et par prix réellement pratiqué
+    billetterie = []
+    for d in (Depart.objects.filter(date=jour, site_origine=site, statut__in=[Depart.PARTI, Depart.ARRIVE, Depart.CLOTURE])
+              .select_related("vehicule", "ligne").order_by("heure", "numero")):
+        groupes = OrderedDict()
+        for t in (d.troncons.filter(statut=Troncon.EFFECTUE).select_related("gare_depart", "gare_arrivee")
+                  .order_by("gare_depart__ville", "gare_arrivee__ville", "-part")):
+            g = groupes.setdefault((t.gare_depart.ville, t.gare_arrivee.ville, t.part), {"places": 0})
+            g["places"] += 1
+        if not groupes:
+            groupes[(d.ligne.gare_depart.ville, d.ligne.gare_arrivee.ville, None)] = {"places": 0}
+        for (a, b, prix), g in groupes.items():
+            billetterie.append({"depart": d, "vehicule": d.vehicule, "trajet": f"{a} → {b}", "places": g["places"],
+                                "prix": prix, "montant": (prix or ZERO) * g["places"]})
+    non_partis = Depart.objects.filter(date=jour, site_origine=site, statut=Depart.PROGRAMME).count()
+
+    # B. Trésorerie : lignes des comptes de trésorerie de la journée
+    journaux = Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__isnull=False).select_related(
+        "compte_tresorerie")
+    comptes = OrderedDict()
+    for j in journaux.order_by("compte_tresorerie__numero", "code"):
+        c = comptes.setdefault(j.compte_tresorerie_id, {"compte": j.compte_tresorerie, "journaux": []})
+        c["journaux"].append(j.code)
+    colis_comptes = {num(p.compte_colis_a_transporter), num(p.compte_contre_remboursement), num(p.compte_colis), num(p.compte_fret)}
+
+    def especes(compte):
+        return compte.numero.startswith("57")
+
+    lignes = (LigneEcriture.objects.filter(compte_id__in=comptes, ecriture__date=jour, ecriture__site_origine=site,
+                                           ecriture__statut=Ecriture.STATUT_VALIDEE)
+              .select_related("compte", "ecriture", "ecriture__journal").order_by("ecriture__numero", "pk"))
+    autres_lignes = defaultdict(list)
+    for l in LigneEcriture.objects.filter(ecriture__in={l.ecriture_id for l in lignes}).select_related("compte", "vehicule"):
+        autres_lignes[l.ecriture_id].append(l)
+    totaux = defaultdict(lambda: {"especes": ZERO, "electronique": ZERO})
+    colis, sorties, par_compte = [], [], defaultdict(lambda: defaultdict(lambda: ZERO))
+    for l in lignes:
+        e, entree = l.ecriture, l.debit - l.credit
+        autres = [o for o in autres_lignes[e.pk] if o.compte_id not in comptes]
+        numeros = {o.compte.numero for o in autres}
+        if e.libelle.startswith("Écart de caisse"):
+            nature = "ecart"
+        elif any(n.startswith("585") for n in numeros):
+            nature = "transfert"
+        elif num(p.compte_remboursements) in numeros or (num(p.compte_billets_a_voyager) in numeros and entree < 0):
+            nature = "remboursement"
+        elif num(p.compte_billets_a_voyager) in numeros:
+            nature = "billets"
+        elif numeros & colis_comptes and entree > 0:
+            nature = "colis"
+        else:
+            nature = "autres_entrees" if entree > 0 else "sorties"
+        moyen = "especes" if especes(l.compte) else "electronique"
+        totaux[nature][moyen] += entree if nature in ("billets", "colis", "autres_entrees") else -entree
+        if nature == "transfert":                     # entre caisses, banque, siège : ni recette ni dépense
+            par_compte[l.compte_id]["transferts"] += entree
+        elif entree > 0:
+            par_compte[l.compte_id]["entrees"] += entree
+        else:
+            par_compte[l.compte_id]["sorties"] -= entree
+        if nature == "colis":
+            from .models import Colis as ColisModele
+
+            c = ColisModele.objects.filter(numero=e.reference).select_related("gare_arrivee").first()
+            colis.append({"piece": e.reference or e.numero, "designation": (f"{c.get_nature_display()} {c.description}".strip()
+                                                                           if c else e.libelle),
+                          "destination": c.gare_arrivee.ville if c else "—", "moyen": e.journal.code, "montant": entree})
+        elif nature == "sorties":
+            vehicules = sorted({o.vehicule.immatriculation for o in autres if o.vehicule_id})
+            sorties.append({"piece": e.reference or e.numero, "designation": e.libelle,
+                            "affectation": ", ".join(vehicules) or "Agence",
+                            "moyen": "Espèces" if moyen == "especes" else e.journal.intitule, "montant": -entree})
+
+    def t(nature, moyen=None):
+        v = totaux[nature] if nature in totaux else {"especes": ZERO, "electronique": ZERO}
+        return v[moyen] if moyen else v["especes"] + v["electronique"]
+
+    encaissements = {m: t("billets", m) + t("colis", m) + t("autres_entrees", m) for m in ("especes", "electronique")}
+
+    # Situation par caisse / banque / Mobile Money
+    caisses = []
+    for cid, c in comptes.items():
+        avant = LigneEcriture.objects.filter(compte_id=cid, ecriture__date__lt=jour, ecriture__site_origine=site,
+                                             ecriture__statut=Ecriture.STATUT_VALIDEE)
+        ouverture = sum((x.debit - x.credit for x in avant), ZERO)
+        m = par_compte.get(cid, {})
+        entrees, sorties_c, transferts = m.get("entrees", ZERO), m.get("sorties", ZERO), m.get("transferts", ZERO)
+        if not (ouverture or entrees or sorties_c or transferts):
+            continue
+        caisses.append({"compte": c["compte"], "journaux": ", ".join(c["journaux"]), "especes": especes(c["compte"]),
+                        "ouverture": ouverture, "entrees": entrees, "sorties": sorties_c, "transferts": transferts,
+                        "solde": ouverture + entrees - sorties_c + transferts})
+    total_caisses = {k: sum((c[k] for c in caisses), ZERO) for k in ("ouverture", "entrees", "sorties", "transferts", "solde")}
+    especes_caisses = [c for c in caisses if c["especes"]]
+    total_sorties = sum((s["montant"] for s in sorties), ZERO)
+    return {
+        "billetterie": billetterie, "non_partis": non_partis,
+        "total_billetterie": {"places": sum(l["places"] for l in billetterie),
+                              "montant": sum((l["montant"] for l in billetterie), ZERO)},
+        "colis": colis, "total_colis": sum((c["montant"] for c in colis), ZERO),
+        "sorties": sorties, "total_sorties": total_sorties,
+        "caisse": {
+            "billets": t("billets"), "colis": t("colis"), "autres": t("autres_entrees"),
+            "total": encaissements["especes"] + encaissements["electronique"],
+            "especes": encaissements["especes"], "electronique": encaissements["electronique"],
+            "remboursements": t("remboursement"), "sorties": total_sorties,
+            "nette": encaissements["especes"] + encaissements["electronique"] - t("remboursement") - total_sorties,
+            "ouverture_especes": sum((c["ouverture"] for c in especes_caisses), ZERO),
+            "remboursements_especes": t("remboursement", "especes"), "sorties_especes": t("sorties", "especes"),
+            "decaissements_especes": t("remboursement", "especes") + t("sorties", "especes"),
+            "transferts_especes": sum((c["transferts"] for c in especes_caisses), ZERO),
+            "ecarts": -t("ecart"),
+            "solde_especes": sum((c["solde"] for c in especes_caisses), ZERO),
+        },
+        "caisses": caisses, "total_caisses": total_caisses,
+    }

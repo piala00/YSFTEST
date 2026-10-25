@@ -230,3 +230,24 @@ voyage se clôture quand l'avance est justifiée.
 
 Reste du plan : quotas de sièges pour vendre sur les départs d'une autre agence (P4, à faire avec la synchronisation),
 magasin du garage (P5), RH (P6), socle de sécurité et de contrôle (P7).
+
+## Rapport journalier à imprimer (A4 portrait)
+
+Direction › Etat › *Rapport journalier à imprimer (A4)*, ou bouton « Imprimer (A4 portrait) » du rapport journalier.
+Mise en page A4 portrait, en tableaux simples (skill `erp-transport-rapport-journalier-agence`) :
+
+1. **Billetterie — départs effectués** : véhicule, trajet, départ, places, prix unitaire, montant ; une ligne par
+   trajet et par prix réellement pratiqué (part du billet revenant au car).
+2. **Bagages payants** : tableau présent, « Aucune opération » tant que la saisie des bagages n'existe pas.
+3. **Colis, courriers et fret encaissés**, par bordereau.
+4. **Sorties payées** ce jour (pièce, désignation, véhicule ou agence, moyen de paiement).
+5. **Caisse et montant à reverser** : encaissements (billets, colis, autres ; dont espèces / Mobile Money et banque),
+   remboursements, sorties, recette nette tous moyens, puis le calcul des espèces (ouverture, entrées, sorties,
+   versements, écarts, solde de fin).
+6. **Situation par caisse** (une ligne par caisse, Mobile Money, banque) et total agence ; signatures.
+
+Les tableaux 1 (date de départ) et 5 (date de paiement) ne s'additionnent pas : un billet payé la veille est dans les
+départs du jour, pas dans la caisse du jour. La caisse est lue sur les comptes de trésorerie : chaque paiement compte
+une fois ; les versements à la banque ou au siège ne sont ni recettes ni dépenses. En-tête : n° `RJ-agence-date`,
+état (provisoire / clôturé), synchronisation ; pied de page : n° et « Page x / y ». Au siège, choix de l'agence
+(données reçues par les échanges).

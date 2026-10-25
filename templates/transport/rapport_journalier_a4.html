@@ -1,0 +1,117 @@
+{% load erp %}<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rapport journalier {{ numero }}</title>
+<style>
+@page { size: A4 portrait; margin: 12mm 11mm 14mm;
+  @bottom-left { content: "{{ numero }} — {{ etat|escapejs }}"; font: 7.5pt Arial, sans-serif; color: #333; }
+  @bottom-right { content: "Page " counter(page) " / " counter(pages); font: 7.5pt Arial, sans-serif; } }
+* { box-sizing: border-box; }
+body { font: 9pt/1.3 Arial, Helvetica, sans-serif; color: #000; background: #fff; margin: 0 auto; max-width: 190mm; padding: 6mm 0; }
+header { border: 1px solid #000; padding: 2.5mm 3mm; margin-bottom: 3mm; }
+h1 { font-size: 13pt; margin: 0; text-align: center; letter-spacing: .3px; }
+.societe { text-align: center; font-weight: bold; margin-bottom: 1.5mm; }
+.meta { display: grid; grid-template-columns: 1fr 1fr; gap: .5mm 6mm; font-size: 8.5pt; }
+h2 { font-size: 9.5pt; margin: 4mm 0 1.2mm; text-transform: uppercase; break-after: avoid; page-break-after: avoid; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 1mm; table-layout: auto; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th, td { border: .6pt solid #555; padding: 1mm 1.5mm; vertical-align: top; }
+th { background: #eee; text-align: left; font-weight: bold; font-size: 8.3pt; }
+.num { text-align: right; white-space: nowrap; }
+tr.total td { font-weight: bold; background: #f2f2f2; }
+tr.sous td { font-weight: bold; }
+td.vide { text-align: center; font-style: italic; color: #333; }
+.petit { font-size: 7.8pt; color: #333; }
+.note { font-size: 7.8pt; margin: 1mm 0 0; }
+.signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8mm; margin-top: 12mm; break-inside: avoid; }
+.signatures div { border-top: .8pt solid #000; padding-top: 1.5mm; text-align: center; font-size: 8.5pt; min-height: 16mm; }
+.outils { display: flex; flex-wrap: wrap; gap: 6px; align-items: end; border: 1px solid #ccc; padding: 6px; margin-bottom: 6mm; font-size: 9pt; }
+.outils label { display: block; font-size: 8pt; }
+.outils button, .outils a { font: inherit; padding: 4px 10px; }
+@media print { body { padding: 0; max-width: none; } .outils { display: none; } }
+@media screen and (max-width: 600px) { body { padding: 4px 16px; } .meta { grid-template-columns: 1fr; } }
+</style></head>
+<body>
+<form class="outils" method="get">
+  <div><label for="r-date">Date</label><input id="r-date" type="date" name="date" value="{{ jour|date:'Y-m-d' }}"></div>
+  {% if agences %}<div><label for="r-ag">Agence</label><select id="r-ag" name="agence"><option value="">Ce dossier</option>
+    {% for a in agences %}<option value="{{ a.code }}" {% if a == agence %}selected{% endif %}>{{ a.code }} — {{ a.nom }}</option>{% endfor %}</select></div>{% endif %}
+  <button type="submit">Afficher</button>
+  <button type="button" onclick="window.print()">Imprimer (A4 portrait)</button>
+  <a href="{% url 'transport:rapport_journalier' %}?date={{ jour|date:'Y-m-d' }}">Rapport détaillé à l'écran</a>
+</form>
+
+<header>
+  <div class="societe">{{ societe.raison_sociale }}{% if societe.ville %} — {{ societe.ville }}{% endif %}</div>
+  <h1>RAPPORT JOURNALIER D'AGENCE</h1>
+  <div class="meta">
+    <span><b>Agence :</b> {% if agence %}{{ agence.nom }} ({{ agence.code }}){% elif local %}{{ local.nom }} ({{ local.code }}){% else %}{{ societe.raison_sociale }}{% endif %}</span>
+    <span><b>N° rapport :</b> {{ numero }}</span>
+    <span><b>Date d'activité :</b> {{ jour|date:"d/m/Y" }}</span>
+    <span><b>État :</b> {{ etat }}</span>
+    <span><b>Synchronisation :</b> {{ synchro|default:"échanges non configurés" }}</span>
+    <span><b>Généré le :</b> {{ genere_le|date:"d/m/Y H:i" }} par {{ request.user }}</span>
+  </div>
+</header>
+
+<h2>1. Billetterie — départs effectués ce jour</h2>
+<table><thead><tr><th>Véhicule</th><th>Trajet</th><th>Départ</th><th class="num">Places</th><th class="num">Prix unitaire</th><th class="num">Montant</th></tr></thead>
+<tbody>{% for l in billetterie %}<tr>
+  <td>{{ l.vehicule.immatriculation|default:"—" }}{% if l.vehicule.designation %}<br><span class="petit">{{ l.vehicule.designation }}</span>{% endif %}</td>
+  <td>{{ l.trajet }}</td><td>{{ l.depart.numero }}<br><span class="petit">{{ l.depart.heure|time:"H:i" }}</span></td>
+  <td class="num">{{ l.places }}</td><td class="num">{% if l.prix is not None %}{{ l.prix|montant }}{% else %}—{% endif %}</td><td class="num">{{ l.montant|montant }}</td></tr>
+{% empty %}<tr><td colspan="6" class="vide">Aucune opération</td></tr>{% endfor %}
+<tr class="total"><td colspan="3">TOTAL BILLETTERIE</td><td class="num">{{ total_billetterie.places }}</td><td></td><td class="num">{{ total_billetterie.montant|montant }}</td></tr></tbody></table>
+<p class="note">Montants en FCFA. Voyageurs partis avec le car ; prix = part du billet qui revient à ce car (correspondance : part du trajet).
+Billets payés un autre jour ou dans une autre agence compris : ce tableau n'est pas l'encaissement du jour (voir tableau 5).
+{% if non_partis %}<b>{{ non_partis }} départ(s) programmé(s) pas encore parti(s)</b>, non comptés.{% endif %}</p>
+
+<h2>2. Bagages payants des voyageurs</h2>
+<table><thead><tr><th>Véhicule</th><th>Désignation</th><th>Destination</th><th class="num">Qté</th><th class="num">Montant</th></tr></thead>
+<tbody><tr><td colspan="5" class="vide">Aucune opération (la saisie des bagages payants n'est pas encore disponible dans le logiciel)</td></tr>
+<tr class="total"><td colspan="3">TOTAL BAGAGES</td><td class="num">0</td><td class="num">0</td></tr></tbody></table>
+
+<h2>3. Colis, courriers et fret encaissés</h2>
+<table><thead><tr><th>N° bordereau</th><th>Désignation</th><th>Destination</th><th>Caisse</th><th class="num">Montant</th></tr></thead>
+<tbody>{% for c in colis %}<tr><td>{{ c.piece }}</td><td>{{ c.designation }}</td><td>{{ c.destination }}</td><td>{{ c.moyen }}</td><td class="num">{{ c.montant|montant }}</td></tr>
+{% empty %}<tr><td colspan="5" class="vide">Aucune opération</td></tr>{% endfor %}
+<tr class="total"><td colspan="4">TOTAL COLIS</td><td class="num">{{ total_colis|montant }}</td></tr></tbody></table>
+
+<h2>4. Sorties payées ce jour</h2>
+<table><thead><tr><th>N° pièce</th><th>Désignation</th><th>Affectation</th><th>Paiement</th><th class="num">Montant</th></tr></thead>
+<tbody>{% for s in sorties %}<tr><td>{{ s.piece }}</td><td>{{ s.designation }}</td><td>{{ s.affectation }}</td><td>{{ s.moyen }}</td><td class="num">{{ s.montant|montant }}</td></tr>
+{% empty %}<tr><td colspan="5" class="vide">Aucune opération</td></tr>{% endfor %}
+<tr class="total"><td colspan="4">TOTAL SORTIES</td><td class="num">{{ total_sorties|montant }}</td></tr></tbody></table>
+<p class="note">Seules les dépenses réellement payées (caisse, banque, Mobile Money). Les factures non réglées n'y sont pas ; les remboursements de billets et les transferts entre caisses sont à part.</p>
+
+<h2>5. Caisse et montant à reverser</h2>
+<table><thead><tr><th>Désignation</th><th class="num">Montant</th></tr></thead><tbody>
+<tr><td>Billets encaissés dans l'agence ce jour</td><td class="num">{{ caisse.billets|montant }}</td></tr>
+<tr><td>Colis, courriers et fret encaissés ce jour</td><td class="num">{{ caisse.colis|montant }}</td></tr>
+<tr><td>Autres encaissements (clients en compte, divers)</td><td class="num">{{ caisse.autres|montant }}</td></tr>
+<tr class="total"><td>TOTAL ENCAISSEMENTS DU JOUR</td><td class="num">{{ caisse.total|montant }}</td></tr>
+<tr><td>&nbsp;&nbsp;dont espèces</td><td class="num">{{ caisse.especes|montant }}</td></tr>
+<tr><td>&nbsp;&nbsp;dont Mobile Money / banque</td><td class="num">{{ caisse.electronique|montant }}</td></tr>
+<tr><td>Remboursements de billets payés</td><td class="num">{{ caisse.remboursements|montant }}</td></tr>
+<tr><td>Sorties payées (tableau 4)</td><td class="num">{{ caisse.sorties|montant }}</td></tr>
+<tr class="total"><td>RECETTE NETTE TOUS MOYENS (hors solde antérieur)</td><td class="num">{{ caisse.nette|montant }}</td></tr>
+<tr class="sous"><td colspan="2">Espèces</td></tr>
+<tr><td>Solde espèces à l'ouverture</td><td class="num">{{ caisse.ouverture_especes|montant }}</td></tr>
+<tr><td>+ Encaissements en espèces</td><td class="num">{{ caisse.especes|montant }}</td></tr>
+<tr><td>− Remboursements et sorties en espèces</td><td class="num">{{ caisse.decaissements_especes|montant }}</td></tr>
+<tr><td>± Versements et transferts (banque, siège, autre caisse)</td><td class="num">{{ caisse.transferts_especes|montant }}</td></tr>
+<tr><td>± Écarts de caisse constatés (sessions des guichets)</td><td class="num">{{ caisse.ecarts|montant }}</td></tr>
+<tr class="total"><td>ESPÈCES EN CAISSE EN FIN DE JOURNÉE (théorique)</td><td class="num">{{ caisse.solde_especes|montant }}</td></tr>
+</tbody></table>
+
+<h2>6. Situation par caisse</h2>
+<table><thead><tr><th>Caisse / compte</th><th class="num">Ouverture</th><th class="num">Entrées</th><th class="num">Sorties</th><th class="num">Transferts</th><th class="num">Solde fin</th></tr></thead>
+<tbody>{% for c in caisses %}<tr><td>{{ c.compte.intitule }}<br><span class="petit">{{ c.compte.numero }} · {{ c.journaux }}{% if not c.especes %} · hors espèces{% endif %}</span></td>
+  <td class="num">{{ c.ouverture|montant }}</td><td class="num">{{ c.entrees|montant }}</td><td class="num">{{ c.sorties|montant }}</td><td class="num">{{ c.transferts|montant }}</td><td class="num">{{ c.solde|montant }}</td></tr>
+{% empty %}<tr><td colspan="6" class="vide">Aucune opération</td></tr>{% endfor %}
+<tr class="total"><td>TOTAL AGENCE</td><td class="num">{{ total_caisses.ouverture|montant }}</td><td class="num">{{ total_caisses.entrees|montant }}</td><td class="num">{{ total_caisses.sorties|montant }}</td><td class="num">{{ total_caisses.transferts|montant }}</td><td class="num">{{ total_caisses.solde|montant }}</td></tr></tbody></table>
+<p class="note">Solde fin = ouverture + entrées − sorties ± transferts. Les transferts entre caisses, vers la banque ou le siège ne sont ni des recettes ni des dépenses.
+Les fonds envoyés et pas encore reçus sont « en transit » (compte 585).</p>
+
+<div class="signatures"><div>Le(s) caissier(s)</div><div>Le chef d'agence</div><div>Le comptable / contrôleur</div></div>
+</body></html>

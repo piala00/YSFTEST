@@ -58,3 +58,10 @@ Journée opérationnelle par agence ≠ période comptable mensuelle ≠ exercic
 ## Conformité
 
 Se référer à l'AUDCIF/SYSCOHADA révisé OHADA, expert-comptable local, fiscalité et paie nationale ; ne pas assimiler un rapport analytique à un bilan légal. Prévoir audit des mappings et version des règles.
+
+## Mise à jour — caisses indépendantes par agence
+
+Ajouter un sous-référentiel « Caisses d'agence » permettant 1..N caisses par agence, distinctes des services opérationnels et des comptes banque/Mobile Money. Une petite agence peut mutualiser les encaissements de la billetterie et du courrier. Une grande agence ou le siège peut avoir plusieurs caisses, y compris garage et centrale, si elles détiennent réellement de l'argent. Ne pas créer de faux décaissements sur simple saisie de charge.
+
+Le transfert entre deux caisses (y compris la remise agence→siège) est un mouvement interne, **pas un chiffre d'affaires nouveau**. Historiser fonds en transit, réception, clôtures/contrôles par caisse et total consolidé agence. Voir `.claude/skills/erp-transport-caisses-multi-agences/SKILL.md`.
+

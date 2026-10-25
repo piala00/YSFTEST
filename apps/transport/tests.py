@@ -683,3 +683,62 @@ class BilletterieAvanceeTests(TestCase):
         self.assertContains(r, "remboursé 6")
         self.assertContains(self.client.get(reverse("transport:fiche_update", args=["lignes", self.ligne.pk])), 'value="EDE"')
         self.assertEqual(self.client.get(reverse("transport:billet_vente") + f"?depart={d.pk}").status_code, 200)
+
+
+class RapportJournalierA4Tests(TestCase):
+    """Rapport journalier simple (tableaux) imprimable en A4 portrait : départs du jour d'un côté, encaissements réels
+    de l'autre, sans double compte."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        cls.dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        cls.yde = Gare.objects.create(code="YDE", nom="Gare de Yaoundé", ville="Yaoundé")
+        cls.ligne = Ligne.objects.create(code="DLA-YDE", gare_depart=cls.dla, gare_arrivee=cls.yde, prix_billet=6000,
+                                         colis_forfait=1500)
+        cls.car = Vehicule.objects.create(immatriculation="LT 800 RJ", designation="Car 08", nombre_places=30)
+        cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur")
+        cls.jour = datetime.date.today()
+
+    def test_tableaux_et_caisse(self):
+        from . import etats
+        from .models_caisse import TransfertFonds
+
+        ca, mm, bq = (Journal.objects.get(code=c) for c in ("CA", "MM", "BQ"))
+        hier = self.jour - datetime.timedelta(days=1)
+        d = Depart.objects.create(ligne=self.ligne, date=self.jour, heure=datetime.time(8), vehicule=self.car, chauffeur=self.chauffeur)
+        Billet(depart=d, voyageur="Payé hier", date_vente=hier).vendre()            # caisse d'hier, départ d'aujourd'hui
+        Billet(depart=d, voyageur="Espèces").vendre()
+        Billet(depart=d, voyageur="Mobile", paiement=Billet.MOBILE_MONEY).vendre()
+        Billet(depart=d, voyageur="Prix spécial", prix=5000).vendre()
+        Billet(depart=d, voyageur="Annulé").vendre().annuler(retenue=1000)          # remboursé 5 000 en espèces
+        Colis(gare_depart=self.dla, gare_arrivee=self.yde, expediteur="E", destinataire="D", prix=2000).enregistrer()
+        d.partir()
+        DepenseVehicule(vehicule=self.car, nature=DepenseVehicule.CARBURANT, montant=10000, caisse=ca).enregistrer()
+        TransfertFonds(origine=ca, destination=bq, montant=4000).envoyer()          # versement : ni recette ni dépense
+
+        r = etats.rapport_agence_a4(self.jour)
+        lignes = [(l["trajet"], l["places"], l["prix"], l["montant"]) for l in r["billetterie"]]
+        self.assertEqual(lignes, [("Douala → Yaoundé", 3, 6000, 18000), ("Douala → Yaoundé", 1, 5000, 5000)])
+        self.assertEqual(r["total_billetterie"], {"places": 4, "montant": 23000})
+        c = r["caisse"]
+        self.assertEqual((c["billets"], c["especes"], c["electronique"]), (6000 + 6000 + 5000 + 6000, 6000 + 5000 + 6000 + 2000, 6000))
+        self.assertEqual((c["colis"], c["remboursements"], c["sorties"]), (2000, 5000, 10000))
+        self.assertEqual(c["nette"], 25000 - 5000 - 10000)
+        self.assertEqual([s["affectation"] for s in r["sorties"]], ["LT 800 RJ"])
+        self.assertEqual(r["colis"][0]["destination"], "Yaoundé")
+        # espèces : 6 000 d'hier + 19 000 − 5 000 − 10 000 − 4 000 versés
+        self.assertEqual((c["ouverture_especes"], c["transferts_especes"], c["solde_especes"]), (6000, -4000, 6000))
+        self.assertEqual(r["total_caisses"]["entrees"], 25000)                       # le versement n'est pas une recette
+
+    def test_page_a4_portrait(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        r = self.client.get(reverse("transport:rapport_journalier_imprimer"))
+        self.assertContains(r, "size: A4 portrait")
+        self.assertContains(r, "RAPPORT JOURNALIER D'AGENCE")
+        self.assertContains(r, "PROVISOIRE")
+        self.assertContains(r, "Aucune opération")
+        self.assertContains(self.client.get(reverse("transport:rapport_journalier")), "Imprimer (A4 portrait)")

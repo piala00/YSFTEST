@@ -1,5 +1,7 @@
 # 11 — Rapport journalier d'agence, résultat des véhicules et centralisation siège
 
+**Priorité UX pour le rapport journalier imprimable d’agence :** respecter le modèle **simple en tableaux** du skill `/erp-transport-rapport-journalier-agence`. La liste A–J ci-dessous constitue l’inventaire global des données de contrôle et des états détaillés disponibles dans l’ERP, **pas des blocs obligatoires de la feuille quotidienne imprimée**.
+
 ## Rapports à produire
 
 ### Rapport quotidien du service billetterie

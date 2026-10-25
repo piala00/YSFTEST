@@ -45,6 +45,15 @@ Ce skill est un **référentiel de réalisation**, pas la preuve que les fonctio
 - [12 — Tests de bout en bout et critères de réception](references/12-tests-acceptation.md)
 - [13 — Méthode concrète de développement avec Claude Code](references/13-methode-claude-code.md)
 - [14 — Références réglementaires et hypothèses à vérifier](references/14-reglementation-sources.md)
+- [15 — Plan analytique Transport, axes Classique/VIP et rattachements interservices](references/15-plan-analytique-transport.md)
+- [16 — Rapport journalier d’agence simplifié (tableaux recettes, bagages, sorties, caisse)](references/16-rapport-journalier-simple.md)
+- [17 — Configuration des caisses par agence et consolidation sans doublons](references/17-caisses-multi-agences.md)
+
+**Module spécialisé multi-caisses ajouté** : invoquer `/erp-transport-caisses-multi-agences` pour les agences mono/multi-caisses, les transferts internes, les sessions et la centralisation des soldes. Les caisses sont indépendantes des services producteurs.
+
+**Module de rapports simples ajouté** : invoquer `/erp-transport-rapport-journalier-agence` pour les états quotidiens en tableaux de chaque agence, leur caisse et leurs reversements. Ne pas confondre montant des départs du jour avec encaissements du jour.
+
+**Module spécialisé ajouté** : invoquer `/erp-transport-plan-analytique` pour l'audit et le développement des dix plans analytiques, le contrôle Classique/VIP et les imputations interservices. Les véhicules VIP et Classique sont distincts et dédiés ; aucune affectation de voyage incompatible ne doit être acceptée.
 
 ## 4. Procédure de travail dans le dépôt
 
