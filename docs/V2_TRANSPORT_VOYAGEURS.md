@@ -98,5 +98,42 @@ les prix étant toutes taxes comprises, l'écriture sépare alors le hors taxe e
 7. **Contrôle du chef de gare** : clôture de caisse par guichetier, comme la fiche de stock de la version 1 ?
 
 ## Tests
-`python manage.py test apps.transport` : 15 tests (comptabilisation de chaque opération, contrôles, cycle complet
+`python manage.py test apps.transport` : 22 tests (comptabilisation de chaque opération, contrôles, cycle complet
 départ → arrivée → remise, écrans, portail selon l'activité). Suite complète : 206 tests.
+
+
+## Recettes et dépenses par véhicule (26/10)
+
+Le véritable défi du métier : **chaque véhicule a son compte**, dans toutes les agences.
+
+- **Le véhicule est une dimension des écritures**, comme le tiers : chaque ligne d'écriture peut porter un véhicule
+  (saisie comptable comprise). D'où le **grand-livre des véhicules** et la **balance des véhicules** (recettes
+  voyageurs, colis, autres ; carburant, entretien, autres dépenses ; résultat), dans le logiciel Transport (Etat ›
+  Comptes des véhicules) et dans la Comptabilité (Etat › Etats des véhicules). Au siège, toutes les agences sont comprises.
+- **Fiche du véhicule** : type, places, propriétaire (société ou partenaire), carte grise, mise en service, échéances
+  d'assurance et de visite technique (alerte 30 jours avant), recettes, dépenses, résultat, départs, remplissage.
+- **La recette est constatée au départ du véhicule, pas à la vente** :
+
+| Opération | Débit | Crédit |
+|---|---|---|
+| Vente du billet | Caisse (ou 411 client) | 41911 Billets vendus, voyage à effectuer |
+| Départ du véhicule | 41911 (part de chaque voyageur) | 70611 Transport de voyageurs **sur le véhicule** (+ taxe si réglée) |
+| Annulation avant le voyage | 41911 (prix) | Caisse (remboursé) / 70611 (retenue) |
+
+- **Correspondance** (ex. Douala → Garoua-Boulaï avec changement à Bertoua) : le billet comprend un **tronçon par
+  véhicule**. Le prix est partagé au prorata des tarifs des tronçons (Douala → Bertoua, Bertoua → Garoua-Boulaï), sinon
+  des distances, sinon à parts égales. Chaque véhicule reçoit sa part à son départ. Le véhicule de correspondance se
+  choisit à la vente ou **à Bertoua** (fiche du départ › « Voyageurs en correspondance à placer »). Les places sont
+  comptées tronçon par tronçon.
+- **Correspondance dans une autre agence** (Bertoua a son propre serveur) : Bertoua place le voyageur et fait partir
+  son car ; la part va à son véhicule (D 185 Douala / C 70611 véhicule de Bertoua). Douala l'apprend par le siège et
+  solde l'avance du voyageur (D 41911 / C 185 Bertoua). Au siège, les liaisons s'annulent, l'avance est soldée et
+  chaque véhicule a sa recette (vérifié sur quatre bases séparées : `apps/echanges/scenario.py`).
+
+Points à confirmer :
+- Comptes **41911** (avance du voyageur) et **70611** : à valider par l'expert-comptable.
+- **Colis** : leur recette reste constatée à l'enregistrement, sans véhicule. Faut-il aussi l'attribuer au véhicule
+  qui les transporte (constatée au départ, comme les billets) ?
+- **Véhicules de partenaires** : le propriétaire est noté sur la fiche ; faut-il calculer et payer sa part
+  (reversement au propriétaire, commission de l'agence) ?
+- Billets vendus avant cette version : leur recette a déjà été constatée à la vente ; ils ne passent pas par 41911.

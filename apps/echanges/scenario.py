@@ -1,4 +1,5 @@
-"""Scénario de bout en bout sur trois dossiers séparés (siège, Douala, Yaoundé) qui ne communiquent que par fichiers.
+"""Scénario de bout en bout sur quatre dossiers séparés (siège, Douala, Yaoundé, Bertoua) qui ne communiquent que par
+fichiers : billets, colis entre agences, voyageur Douala → Garoua-Boulaï qui change de véhicule à Bertoua.
 Utilisé par le test d'intégration ; lançable à la main : python -m apps.echanges.scenario DOSSIER_DE_TRAVAIL
 """
 import json
@@ -40,12 +41,14 @@ def executer(travail):
     for f in travail.glob("*"):
         f.unlink()
     siege, dla, yde = Dossier(travail, "siege"), Dossier(travail, "douala"), Dossier(travail, "yaounde")
-    for d in (siege, dla, yde):
+    bta = Dossier(travail, "bertoua")
+    for d in (siege, dla, yde, bta):
         d.creer()
     r = {}
     siege.manage("echanges", "siege", "--code", "SIEGE", "--nom", "Siège")
     siege.manage("echanges", "agence", "--code", "DLA", "--nom", "Agence de Douala", "--ville", "Douala")
     siege.manage("echanges", "agence", "--code", "YDE", "--nom", "Agence de Yaoundé", "--ville", "Yaoundé")
+    siege.manage("echanges", "agence", "--code", "BTA", "--nom", "Agence de Bertoua", "--ville", "Bertoua")
     siege.py("""
 from apps.core.models import Agence
 from apps.transport.models import Chauffeur, Gare, Ligne, Vehicule
@@ -53,13 +56,21 @@ dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala", agen
 yde = Gare.objects.create(code="YDE", nom="Gare de Yaoundé", ville="Yaoundé", agence=Agence.objects.get(code="YDE"))
 Ligne.objects.create(code="DLA-YDE", gare_depart=dla, gare_arrivee=yde, prix_billet=6000, colis_forfait=1500, colis_prix_kg=100)
 Ligne.objects.create(code="YDE-DLA", gare_depart=yde, gare_arrivee=dla, prix_billet=6000, colis_forfait=1500, colis_prix_kg=100)
+bta = Gare.objects.create(code="BTA", nom="Gare de Bertoua", ville="Bertoua", agence=Agence.objects.get(code="BTA"))
+gbl = Gare.objects.create(code="GBL", nom="Gare de Garoua-Boulaï", ville="Garoua-Boulaï", agence=Agence.objects.get(code="BTA"))
+Ligne.objects.create(code="DLA-BTA", gare_depart=dla, gare_arrivee=bta, prix_billet=8000)
+Ligne.objects.create(code="BTA-GBL", gare_depart=bta, gare_arrivee=gbl, prix_billet=4000)
+Ligne.objects.create(code="DLA-GBL", gare_depart=dla, gare_arrivee=gbl, prix_billet=11000)
 Vehicule.objects.create(immatriculation="LT 101 AA", nombre_places=30)
+Vehicule.objects.create(immatriculation="EN 202 BB", nombre_places=30)
 Chauffeur.objects.create(nom="Chauffeur Un")
 print("null")""")
     inst_dla = lots_de(siege.manage("echanges", "installation", "--agence", "DLA", "--dossier", str(travail)))[0]
     inst_yde = lots_de(siege.manage("echanges", "installation", "--agence", "YDE", "--dossier", str(travail)))[0]
+    inst_bta = lots_de(siege.manage("echanges", "installation", "--agence", "BTA", "--dossier", str(travail)))[0]
     dla.manage("echanges", "installer", inst_dla)
     yde.manage("echanges", "installer", inst_yde)
+    bta.manage("echanges", "installer", inst_bta)
     r["dla_referentiels"] = dla.py("""
 import json
 from apps.transport.models import Gare, Ligne
@@ -71,13 +82,19 @@ print(json.dumps({"gares": Gare.objects.count(), "lignes": Ligne.objects.count()
 import datetime, json
 from apps.transport.models import *
 d = Depart.objects.create(ligne=Ligne.objects.get(code="DLA-YDE"), date=datetime.date.today(), heure=datetime.time(7),
-                          vehicule=Vehicule.objects.first(), chauffeur=Chauffeur.objects.first())
+                          vehicule=Vehicule.objects.get(immatriculation="LT 101 AA"), chauffeur=Chauffeur.objects.first())
 Billet(depart=d, voyageur="Voyageur Fictif", siege=1).vendre()
 Billet(depart=d, voyageur="Voyageuse Fictive", siege=2).vendre()
 c = Colis(gare_depart=Gare.objects.get(code="DLA"), gare_arrivee=Gare.objects.get(code="YDE"), expediteur="Boutique Fictive",
           destinataire="Client Fictif", prix=2000, port=Colis.DU, contre_remboursement=50000).enregistrer()
 c.charger(d); d.partir()
-print(json.dumps({"code": c.code_retrait, "colis": c.numero}))""")
+# Voyageur Douala -> Garoua-Boulaï : car LT 101 AA jusqu'à Bertoua, correspondance choisie à Bertoua
+d2 = Depart.objects.create(ligne=Ligne.objects.get(code="DLA-BTA"), date=datetime.date.today(), heure=datetime.time(6),
+                           vehicule=Vehicule.objects.get(immatriculation="LT 101 AA"), chauffeur=Chauffeur.objects.first())
+b = Billet(depart=d2, gare_arrivee=Gare.objects.get(code="GBL"), voyageur="Voyageur en correspondance").vendre()
+d2.partir()
+print(json.dumps({"code": c.code_retrait, "colis": c.numero, "billet_corr": b.numero,
+                  "parts": [str(t.part) for t in b.troncons.all()]}))""")
     lot1 = lots_de(dla.manage("echanges", "exporter", "--dossier", str(travail)))[0]
     r["siege_import1"] = siege.manage("echanges", "importer", lot1)
     r["siege_rejeu"] = siege.manage("echanges", "importer", lot1)
@@ -97,17 +114,34 @@ cr = c.ecriture_livraison.lignes.get(credit=50000).compte.numero
 print(json.dumps({{"avant": avant, "statut": c.statut, "compte_cr": cr, "billets_ici": Billet.objects.count()}}))""")
     lot_yde = lots_de(yde.manage("echanges", "exporter", "--dossier", str(travail)))[0]
     siege.manage("echanges", "importer", lot_yde)
+    # Bertoua place le voyageur sur son car et le fait partir : la part du tronçon va à ce véhicule
+    vers_bta = [l for l in lots_siege if "vers-BTA" in l][0]
+    r["bta_import"] = bta.manage("echanges", "importer", vers_bta)
+    r["bta_correspondance"] = bta.py(f"""
+import datetime, json
+from apps.transport.models import *
+d = Depart.objects.create(ligne=Ligne.objects.get(code="BTA-GBL"), date=datetime.date.today(), heure=datetime.time(15),
+                          vehicule=Vehicule.objects.get(immatriculation="EN 202 BB"), chauffeur=Chauffeur.objects.first())
+attente = list(d.correspondances_a_affecter())
+attente[0].affecter(d, siege=3)
+d.partir()
+lignes = {{l.compte.numero: (str(l.debit), str(l.credit), l.vehicule.immatriculation if l.vehicule else None)
+          for l in d.ecriture_recettes.lignes.select_related("compte", "vehicule")}}
+print(json.dumps({{"attente": [t.billet.numero for t in attente], "lignes": lignes}}))""")
+    siege.manage("echanges", "importer", lots_de(bta.manage("echanges", "exporter", "--dossier", str(travail)))[0])
     lots_siege = lots_de(siege.manage("echanges", "exporter", "--vers", "tous", "--dossier", str(travail)))
     vers_dla = [l for l in lots_siege if "vers-DLA" in l][0]
-    dla.manage("echanges", "importer", vers_dla)
+    r["dla_import2"] = dla.manage("echanges", "importer", vers_dla)
     # Douala apprend la remise et reverse le contre-remboursement à l'expéditeur
     r["dla_reversement"] = dla.py(f"""
 import json
 from apps.transport.models import *
 c = Colis.objects.get(numero="{r['dla_vente']['colis']}")
 c.reverser_contre_remboursement()
+t = Troncon.objects.get(billet__numero="{r['dla_vente']['billet_corr']}", ordre=2)
 print(json.dumps({{"statut": c.statut, "livre_site": c.livre_site,
-                   "compte": c.ecriture_reversement.lignes.get(debit=50000).compte.numero}}))""")
+                   "compte": c.ecriture_reversement.lignes.get(debit=50000).compte.numero,
+                   "troncon2": [t.statut, t.vehicule.immatriculation if t.vehicule else None, t.site_effectue]}}))""")
     lot2 = lots_de(dla.manage("echanges", "exporter", "--dossier", str(travail)))[0]
     siege.manage("echanges", "importer", lot2)
     r["siege_consolide"] = siege.py("""
@@ -117,7 +151,10 @@ from apps.comptabilite.models import Ecriture, LigneEcriture
 from apps.transport.models import Billet
 def solde(prefixe):
     return str(sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero__startswith=prefixe)), Decimal(0)))
-print(json.dumps({"ecritures": Ecriture.objects.filter(site_origine__in=["DLA", "YDE"]).count(),
+def vehicule(immat):
+    return str(-sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero="70611", vehicule__immatriculation=immat)), Decimal(0)))
+print(json.dumps({"ecritures": Ecriture.objects.filter(site_origine__in=["DLA", "YDE", "BTA"]).count(),
+                  "billets_a_voyager": solde("41911"), "recette_LT101": vehicule("LT 101 AA"), "recette_EN202": vehicule("EN 202 BB"),
                   "journaux": sorted(set(Ecriture.objects.exclude(site_origine="").values_list("journal__code", flat=True))),
                   "liaisons_185": solde("185"), "produits_70611": solde("70611"), "produits_70612": solde("70612"),
                   "caisse": solde("57"), "billets": Billet.objects.count()}))""")

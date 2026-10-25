@@ -1,0 +1,8 @@
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3">
+  <div><label class="form-label small mb-0" for="pv-du">Du</label><input type="date" id="pv-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="pv-au">Au</label><input type="date" id="pv-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  {% if vehicules %}<div><label class="form-label small mb-0" for="pv-v">Véhicule</label><select id="pv-v" name="vehicule" class="form-select form-select-sm"><option value="">Tous</option>
+    {% for v in vehicules %}<option value="{{ v.pk }}" {% if v.pk|stringformat:"s" == vehicule %}selected{% endif %}>{{ v.immatriculation }}</option>{% endfor %}</select></div>{% endif %}
+  <button class="btn btn-sm btn-outline-secondary">Afficher</button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+</form>

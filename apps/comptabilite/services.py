@@ -43,7 +43,7 @@ def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", val
         if not debit and not credit:
             continue
         cle = (ligne["compte"].pk, getattr(ligne.get("tiers"), "pk", None), getattr(ligne.get("section"), "pk", None),
-               "D" if debit else "C")
+               getattr(ligne.get("vehicule"), "pk", None), "D" if debit else "C")
         if cle in regroupees:
             regroupees[cle]["debit"] += debit
             regroupees[cle]["credit"] += credit
@@ -61,7 +61,7 @@ def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", val
     )
     LigneEcriture.objects.bulk_create([
         LigneEcriture(
-            ecriture=ecriture, compte=l["compte"], tiers=l.get("tiers"), section=l.get("section"),
+            ecriture=ecriture, compte=l["compte"], tiers=l.get("tiers"), section=l.get("section"), vehicule=l.get("vehicule"),
             libelle=(l.get("libelle") or libelle)[:200], debit=l["debit"], credit=l["credit"],
         )
         for l in regroupees.values()

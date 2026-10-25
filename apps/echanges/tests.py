@@ -12,21 +12,30 @@ class ScenarioTroisDossiersTests(SimpleTestCase):
     def test_billets_colis_entre_agences_et_consolidation(self):
         with tempfile.TemporaryDirectory() as travail:
             r = scenario.executer(travail)
-        self.assertEqual(r["dla_referentiels"]["gares"], 2)                    # référentiels reçus du siège
-        self.assertEqual(r["dla_referentiels"]["liaisons"], ["18501", "18503"])  # même compte = même agence partout
+        self.assertEqual(r["dla_referentiels"]["gares"], 4)                    # référentiels reçus du siège
+        self.assertEqual(r["dla_referentiels"]["liaisons"], ["18501", "18503", "18504"])  # même compte = même agence partout
         self.assertIn("rejetés : 0", r["siege_import1"])
         self.assertIn("déjà reçu", r["siege_rejeu"])                          # rejeu sans effet
         self.assertEqual(r["yde_remise"]["avant"], "EN_ROUTE")                 # colis relayé, car parti
         self.assertEqual(r["yde_remise"]["statut"], "LIVRE")
         self.assertEqual(r["yde_remise"]["compte_cr"], "18502")                # dû à Douala
         self.assertEqual(r["yde_remise"]["billets_ici"], 0)                    # les billets restent au siège
-        self.assertEqual(r["dla_reversement"], {"statut": "LIVRE", "livre_site": "YDE", "compte": "18503"})
+        self.assertEqual({k: r["dla_reversement"][k] for k in ("statut", "livre_site", "compte")},
+                         {"statut": "LIVRE", "livre_site": "YDE", "compte": "18503"})
+        # Correspondance à Bertoua : la part du tronçon va au car de Bertoua, qui la doit à Douala
+        self.assertEqual(r["dla_vente"]["parts"], ["7333", "3667"])
+        self.assertEqual(r["bta_correspondance"]["lignes"], {"18502": ["3667.00", "0.00", None],
+                                                             "70611": ["0.00", "3667.00", "EN 202 BB"]})
+        self.assertEqual(r["dla_reversement"]["troncon2"], ["EFFECTUE", "EN 202 BB", "BTA"])
+        self.assertNotIn("manquants", r["dla_import2"])
         c = r["siege_consolide"]
-        self.assertEqual(c["ecritures"], 4)
-        self.assertEqual(c["journaux"], ["CA-DLA", "CA-YDE"])
+        self.assertEqual(c["ecritures"], 9)
+        self.assertEqual(c["journaux"], ["CA-DLA", "CA-YDE", "OD-BTA", "OD-DLA"])
         self.assertEqual(c["liaisons_185"], "0.00")                            # liaisons neutralisées
-        self.assertEqual((c["produits_70611"], c["produits_70612"], c["caisse"]), ("-12000.00", "-2000.00", "14000.00"))
-        self.assertEqual(c["billets"], 2)
+        self.assertEqual(c["billets_a_voyager"], "0.00")                       # tous les voyages faits
+        self.assertEqual((c["recette_LT101"], c["recette_EN202"]), ("19333.00", "3667.00"))
+        self.assertEqual((c["produits_70611"], c["produits_70612"], c["caisse"]), ("-23000.00", "-2000.00", "25000.00"))
+        self.assertEqual(c["billets"], 3)
         self.assertIn("abîmé", r["altere"])
 
 

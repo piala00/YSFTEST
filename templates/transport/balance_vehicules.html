@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Balance des véhicules{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Balance des véhicules du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</h1></div>
+{% include "transport/_periode_vehicules.html" %}
+<div class="card"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Véhicule</th><th class="num">Voyageurs</th><th class="num">Colis / fret</th><th class="num">Autres recettes</th><th class="num">Total recettes</th>
+    <th class="num">Carburant</th><th class="num">Entretien</th><th class="num">Autres dépenses</th><th class="num">Total dépenses</th><th class="num">Résultat</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td><a href="{% url 'transport:vehicule_fiche' l.vehicule.pk %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}">{{ l.vehicule.immatriculation }}</a>
+      <span class="text-muted">{{ l.vehicule.designation }}</span>{% if l.vehicule.proprietaire %}<div class="text-muted">{{ l.vehicule.proprietaire.nom }}</div>{% endif %}</td>
+    <td class="num">{{ l.voyageurs|montant_ou_vide }}</td><td class="num">{{ l.colis|montant_ou_vide }}</td><td class="num">{{ l.autres_recettes|montant_ou_vide }}</td>
+    <td class="num fw-semibold">{{ l.recettes|montant }}</td><td class="num">{{ l.carburant|montant_ou_vide }}</td><td class="num">{{ l.entretien|montant_ou_vide }}</td>
+    <td class="num">{{ l.autres_depenses|montant_ou_vide }}</td><td class="num fw-semibold">{{ l.depenses|montant }}</td>
+    <td class="num fw-semibold {% if l.resultat < 0 %}text-danger{% endif %}">{{ l.resultat|montant }}</td></tr>
+  {% empty %}<tr><td colspan="10" class="text-muted text-center p-4">Aucun véhicule.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td><td class="num">{{ totaux.voyageurs|montant }}</td><td class="num">{{ totaux.colis|montant }}</td><td class="num">{{ totaux.autres_recettes|montant }}</td>
+    <td class="num">{{ totaux.recettes|montant }}</td><td class="num">{{ totaux.carburant|montant }}</td><td class="num">{{ totaux.entretien|montant }}</td>
+    <td class="num">{{ totaux.autres_depenses|montant }}</td><td class="num">{{ totaux.depenses|montant }}</td><td class="num">{{ totaux.resultat|montant }}</td></tr></tfoot>
+</table></div>
+<p class="small text-muted mt-2">Écritures validées portant le véhicule : recettes des voyageurs constatées au départ (chaque véhicule reçoit sa part du
+  billet en cas de correspondance), dépenses saisies sur le véhicule et toute écriture comptable où le véhicule est indiqué. Au siège, toutes les agences sont comprises.</p>
+{% endblock %}

@@ -21,6 +21,16 @@ def en_import():
     return _import.get()
 
 
+@contextmanager
+def hors_import():
+    """Fait propre à ce site, créé pendant l'intégration d'un lot (ex. écriture de clôture d'un tronçon) : il est publié."""
+    jeton = _import.set(False)
+    try:
+        yield
+    finally:
+        _import.reset(jeton)
+
+
 def site_local():
     from apps.core.models import Agence
 

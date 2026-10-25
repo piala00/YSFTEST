@@ -30,7 +30,9 @@ class LigneForm(BootstrapMixin, forms.ModelForm):
 class VehiculeForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Vehicule
-        fields = ("immatriculation", "designation", "type_vehicule", "nombre_places", "actif")
+        fields = ("immatriculation", "designation", "type_vehicule", "nombre_places", "proprietaire", "carte_grise",
+                  "mise_en_service", "assurance_echeance", "visite_technique_echeance", "actif")
+        widgets = {"mise_en_service": DateInput(), "assurance_echeance": DateInput(), "visite_technique_echeance": DateInput()}
 
 
 class ChauffeurForm(BootstrapMixin, forms.ModelForm):
@@ -53,13 +55,22 @@ class DepartForm(BootstrapMixin, forms.ModelForm):
 
 
 class BilletForm(BootstrapMixin, forms.ModelForm):
+    depart_correspondance = forms.ModelChoiceField(
+        queryset=Depart.objects.none(), required=False, label="Départ de correspondance",
+        help_text="Si la destination est au-delà du terminus : véhicule pris à la gare de changement (vide : choisi sur place)")
+    siege_correspondance = forms.IntegerField(required=False, min_value=1, label="Siège dans la correspondance")
+
     class Meta:
         model = Billet
-        fields = ("depart", "voyageur", "telephone", "piece_identite", "siege", "prix", "paiement", "caisse", "client")
+        fields = ("depart", "gare_arrivee", "voyageur", "telephone", "piece_identite", "siege", "prix", "paiement", "caisse",
+                  "client")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["depart"].queryset = Depart.objects.filter(statut=Depart.PROGRAMME).select_related("ligne").order_by("date", "heure")
+        programmes = Depart.objects.filter(statut=Depart.PROGRAMME, site_origine="").select_related("ligne").order_by("date", "heure")
+        self.fields["depart"].queryset = programmes
+        self.fields["depart_correspondance"].queryset = programmes
+        self.fields["gare_arrivee"].queryset = Gare.objects.filter(actif=True)
         self.fields["caisse"].queryset = _caisses()
         self.fields["caisse"].help_text = "Vide : caisse de la gare"
         self.fields["client"].queryset = Tiers.objects.filter(type_tiers=Tiers.CLIENT, actif=True)

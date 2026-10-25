@@ -35,4 +35,7 @@ urlpatterns = [
     path("flotte/depenses/nouvelle/", views.depense_form, name="depense_create"),
     path("etats/recette/", views.recette_journaliere, name="recette"),
     path("etats/rentabilite/", views.rentabilite, name="rentabilite"),
+    path("vehicules/<int:pk>/", views.vehicule_fiche, name="vehicule_fiche"),
+    path("etats/balance-vehicules/", views.balance_vehicules, name="balance_vehicules"),
+    path("etats/grand-livre-vehicules/", views.grand_livre_vehicules, name="grand_livre_vehicules"),
 ]

@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Grand-livre des véhicules{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Grand-livre des véhicules du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</h1></div>
+{% include "transport/_periode_vehicules.html" %}
+{% for livre in livres %}<div class="card mb-3"><div class="card-header bg-white fw-semibold small">
+  <a href="{% url 'transport:vehicule_fiche' livre.vehicule.pk %}">{{ livre.vehicule }}</a></div>
+<table class="table table-sm mb-0 small"><thead><tr><th>Date</th><th>Journal</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Dépense</th><th class="num">Recette</th><th class="num">Résultat cumulé</th></tr></thead>
+<tbody>{% for x in livre.lignes %}{% with l=x.ligne %}<tr><td>{{ l.ecriture.date|date:"d/m/Y" }}</td><td>{{ l.ecriture.journal.code }}</td>
+  <td><a href="{% url 'comptabilite:ecriture_detail' l.ecriture.pk %}">{{ l.ecriture.numero }}</a></td><td>{{ l.compte.numero }}</td><td>{{ l.libelle|default:l.ecriture.libelle }}</td>
+  <td class="num">{{ l.debit|montant_ou_vide }}</td><td class="num">{{ l.credit|montant_ou_vide }}</td><td class="num {% if x.cumul < 0 %}text-danger{% endif %}">{{ x.cumul|montant }}</td></tr>{% endwith %}
+{% empty %}<tr><td colspan="8" class="text-muted text-center p-3">Aucun mouvement sur la période.</td></tr>{% endfor %}</tbody></table></div>
+{% empty %}<div class="alert alert-light">Aucun mouvement de véhicule sur la période.</div>{% endfor %}
+{% endblock %}

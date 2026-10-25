@@ -49,12 +49,15 @@ class EcritureForm(BootstrapMixin, forms.ModelForm):
 class LigneEcritureForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = LigneEcriture
-        fields = ("compte", "tiers", "section", "libelle", "debit", "credit")
+        fields = ("compte", "tiers", "section", "vehicule", "libelle", "debit", "credit")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["compte"].queryset = Compte.objects.filter(actif=True)
         self.fields["section"].queryset = SectionAnalytique.objects.filter(actif=True)
+        from apps.transport.models import Vehicule
+
+        self.fields["vehicule"].queryset = Vehicule.objects.filter(actif=True)
         for name in ("debit", "credit"):
             self.fields[name].widget.attrs["class"] += f" ligne-{name} text-end"
             self.fields[name].required = False

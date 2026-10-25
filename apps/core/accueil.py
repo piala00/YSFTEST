@@ -155,6 +155,7 @@ def transport():
                 _raccourci("Enregistrer du fret", "bi-truck", "transport:colis_create", query="nature=FRET"),
                 _raccourci("Dépense de véhicule", "bi-fuel-pump", "transport:depense_create"),
                 _raccourci("Recette journalière", "bi-cash-stack", "transport:recette"),
+                _raccourci("Balance des véhicules", "bi-bus-front", "transport:balance_vehicules"),
                 _raccourci("Rentabilité par ligne", "bi-graph-up", "transport:rentabilite"),
             ]},
         ],

@@ -37,6 +37,8 @@ avec un message clair. Un fichier manquant est signalé (« faits n° 12 à 15 p
 | Écritures comptables validées | oui (consolidation) | non |
 | Billets, dépenses de véhicules | oui (états consolidés) | non |
 | Départs, colis, courriers, fret | oui | à l'agence de départ et à l'agence d'arrivée |
+| Billets avec correspondance | oui | à l'agence de la gare de changement (voyageur à placer) |
+| Tronçon placé ou effectué ailleurs | oui | à l'agence qui a vendu le billet (elle solde l'avance) |
 | Remise d'un colis, arrivée d'un car | oui | à l'agence d'expédition |
 | Agences, gares, lignes, tarifs, véhicules, chauffeurs | oui (si créés en agence) | à toutes les agences |
 
@@ -77,10 +79,11 @@ python manage.py echanges etat
 
 ## Essai
 
-`python manage.py test apps.echanges` : trois **bases séparées** (siège, Douala, Yaoundé) qui ne communiquent que par
+`python manage.py test apps.echanges` : quatre **bases séparées** (siège, Douala, Yaoundé, Bertoua) qui ne communiquent que par
 fichiers. Le scénario couvre l'installation des agences, la vente de billets, un colis en port dû avec
 contre-remboursement, son relais, sa remise à Yaoundé, le reversement à Douala, la consolidation (liaisons à 0), un rejeu
-sans effet et un fichier altéré refusé. Le scénario se lance aussi à la main : `python -m apps.echanges.scenario DOSSIER`.
+sans effet, un fichier altéré refusé, et un voyageur Douala → Garoua-Boulaï qui change de car à Bertoua (chaque
+véhicule reçoit sa part ; avances et liaisons soldées au siège). Le scénario se lance aussi à la main : `python -m apps.echanges.scenario DOSSIER`.
 
 ## Reste à faire
 

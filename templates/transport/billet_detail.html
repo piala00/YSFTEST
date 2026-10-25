@@ -5,7 +5,10 @@
   <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:billet_imprimer' billet.pk %}" target="_blank"><i class="bi bi-printer"></i> Imprimer le billet</a></div>
 <div class="card mb-3"><table class="table table-sm mb-0"><tbody>
   <tr><th style="width:14rem">Voyageur</th><td>{{ billet.voyageur }} {% if billet.telephone %}· {{ billet.telephone }}{% endif %} {% if billet.piece_identite %}· {{ billet.piece_identite }}{% endif %}</td></tr>
-  <tr><th>Départ</th><td><a href="{% url 'transport:depart_detail' billet.depart_id %}">{{ billet.depart }}</a> · siège {{ billet.siege|default:"libre" }}</td></tr>
+  <tr><th>Trajet</th><td>{{ billet.depart.ligne.gare_depart.ville }} → {{ billet.destination.ville }}</td></tr>
+  <tr><th>Véhicules</th><td><table class="table table-sm table-borderless mb-0">{% for t in troncons %}<tr><td>{{ t.ordre }}.</td><td>{{ t.gare_depart.ville }} → {{ t.gare_arrivee.ville }}</td>
+    <td>{% if t.depart %}<a href="{% url 'transport:depart_detail' t.depart_id %}">{{ t.depart.numero }}</a> {{ t.depart.date|date:"d/m" }} {{ t.depart.heure|time:"H:i" }}{% if t.siege %} · siège {{ t.siege }}{% endif %}{% else %}<span class="text-warning-emphasis">véhicule à choisir à {{ t.gare_depart.ville }}</span>{% endif %}</td>
+    <td>part {{ t.part|montant }}</td><td>{{ t.get_statut_display }}{% if t.vehicule %} · {{ t.vehicule.immatriculation }}{% endif %}</td></tr>{% endfor %}</table></td></tr>
   <tr><th>Prix · paiement</th><td>{{ billet.prix|montant }} FCFA · {{ billet.get_paiement_display }}{% if billet.client %} ({{ billet.client }}){% endif %}{% if billet.caisse %} · caisse {{ billet.caisse.code }}{% endif %}</td></tr>
   <tr><th>Vendu</th><td>le {{ billet.date_vente|date:"d/m/Y" }} à {{ billet.gare.nom }} par {{ billet.vendu_par|default:"—" }}</td></tr>
   {% if billet.statut == "ANNULE" %}<tr><th>Annulé</th><td>le {{ billet.annule_le|date:"d/m/Y H:i" }} par {{ billet.annule_par|default:"—" }} · retenue {{ billet.retenue|montant }} · remboursé {{ billet.rembourse|montant }}</td></tr>{% endif %}
@@ -14,7 +17,7 @@
 </tbody></table></div>
 {% if billet.statut == "VENDU" %}<div class="row g-3">
   <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Reporter sur un autre départ</h6>
-    <div class="row g-2"><div class="col-8"><label class="form-label small mb-0" for="r-dep">Départ (même ligne)</label><select id="r-dep" name="depart" class="form-select form-select-sm">
+    <div class="row g-2"><div class="col-8"><label class="form-label small mb-0" for="r-dep">Départ (même trajet)</label><select id="r-dep" name="depart" class="form-select form-select-sm">
       {% for d in autres_departs %}<option value="{{ d.pk }}">{{ d.date|date:"d/m/Y" }} {{ d.heure|time:"H:i" }} · {{ d.places_libres }} libre(s)</option>{% empty %}<option value="">Aucun autre départ programmé</option>{% endfor %}</select></div>
       <div class="col-4"><label class="form-label small mb-0" for="r-siege">Siège</label><input id="r-siege" name="siege" type="number" min="1" class="form-control form-control-sm"></div></div>
     <button class="btn btn-sm btn-outline-primary mt-2" name="action" value="reporter" {% if not autres_departs %}disabled{% endif %}>Reporter (sans frais)</button></form></div>

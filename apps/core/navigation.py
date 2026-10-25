@@ -657,6 +657,11 @@ COMPTABILITE = Module(
                 E("etats.analytique.grand_livre", "Grand-livre analytique", preuve="ERG-CLASSIQUE"),
                 E("etats.analytique.balance", "Balance analytique", "comptabilite:balance_analytique", preuve="ERG-CLASSIQUE"),
             ]),
+            E("etats.vehicules", "Etats des véhicules", icone="bi-bus-front", preuve="AJOUT-ERP", enfants=[
+                E("etats.vehicules.grand_livre", "Grand-livre des véhicules", "comptabilite:grand_livre_vehicules",
+                  preuve="AJOUT-ERP"),
+                E("etats.vehicules.balance", "Balance des véhicules", "comptabilite:balance_vehicules", preuve="AJOUT-ERP"),
+            ]),
             E("etats.budgetaires", "Etats budgétaires", icone="bi-bullseye", preuve="INDICATIF"),
             SEP(),
             E("etats.financiers", "Bilan / Compte de résultat", icone="bi-bank", preuve="ERG-CLASSIQUE", enfants=[
@@ -763,9 +768,12 @@ TRANSPORT = Module(
         ]),
         Onglet("etat", "Etat", "bi-printer", [
             E("etat.recette", "Recette journalière par gare", "transport:recette", icone="bi-cash-stack"),
+            E("etat.vehicules", "Comptes des véhicules", icone="bi-bus-front", enfants=[
+                E("etat.vehicules.balance", "Balance des véhicules", "transport:balance_vehicules"),
+                E("etat.vehicules.grand_livre", "Grand-livre des véhicules", "transport:grand_livre_vehicules"),
+            ]),
             E("etat.rentabilite", "Rentabilité", icone="bi-graph-up", enfants=[
                 E("etat.rentabilite.ligne", "Par ligne", "transport:rentabilite", axe="ligne"),
-                E("etat.rentabilite.vehicule", "Par véhicule", "transport:rentabilite", axe="vehicule"),
                 E("etat.rentabilite.depart", "Par départ", "transport:rentabilite", axe="depart"),
             ]),
             SEP(),

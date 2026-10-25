@@ -46,8 +46,9 @@ def ecriture(e):
                         "tiers": ({"code": l.tiers.code, "nom": l.tiers.nom, "type": l.tiers.type_tiers} if l.tiers_id else None),
                         "section": ({"code": l.section.code, "intitule": l.section.intitule, "plan": l.section.plan}
                                     if l.section_id else None),
+                        "vehicule": str(l.vehicule.uid) if l.vehicule_id else None,
                         "libelle": l.libelle, "debit": _d(l.debit), "credit": _d(l.credit), "lettrage": l.lettrage}
-                       for l in e.lignes.select_related("compte", "tiers", "section").order_by("pk")]}
+                       for l in e.lignes.select_related("compte", "tiers", "section", "vehicule").order_by("pk")]}
 
 
 def serialiser(o):
@@ -68,7 +69,10 @@ def serialiser(o):
                          "colis_prix_kg": _d(o.colis_prix_kg), "actif": o.actif}, None, ""
     if isinstance(o, Vehicule):
         return "vehicule", {"v": VERSION, "uid": str(o.uid), "immatriculation": o.immatriculation, "designation": o.designation,
-                            "type": o.type_vehicule, "places": o.nombre_places, "actif": o.actif}, None, ""
+                            "type": o.type_vehicule, "places": o.nombre_places, "actif": o.actif,
+                            "carte_grise": o.carte_grise, "mise_en_service": _date(o.mise_en_service),
+                            "assurance_echeance": _date(o.assurance_echeance),
+                            "visite_technique_echeance": _date(o.visite_technique_echeance)}, None, ""
     if isinstance(o, Chauffeur):
         return "chauffeur", {"v": VERSION, "uid": str(o.uid), "nom": o.nom, "telephone": o.telephone, "permis": o.permis,
                              "actif": o.actif}, None, ""
@@ -82,7 +86,13 @@ def serialiser(o):
                           "gare": _uid(o.gare), "depart": _uid(o.depart), "voyageur": o.voyageur, "telephone": o.telephone,
                           "piece_identite": o.piece_identite, "siege": o.siege, "prix": _d(o.prix), "paiement": o.paiement,
                           "client": o.client.code if o.client_id else None, "statut": o.statut, "retenue": _d(o.retenue),
-                          "vendu_par": str(o.vendu_par or ""), "annule_le": _date(o.annule_le)}, o.date_vente, o.vendu_par or ""
+                          "vendu_par": str(o.vendu_par or ""), "annule_le": _date(o.annule_le),
+                          "gare_arrivee": _uid(o.gare_arrivee),
+                          "troncons": [{"uid": str(t.uid), "ordre": t.ordre, "gare_depart": _uid(t.gare_depart),
+                                        "gare_arrivee": _uid(t.gare_arrivee), "depart": _uid(t.depart), "siege": t.siege,
+                                        "part": _d(t.part), "statut": t.statut, "vehicule": _uid(t.vehicule),
+                                        "site_effectue": t.site_effectue, "effectue_le": _date(t.effectue_le)}
+                                       for t in o.troncons.order_by("ordre")]}, o.date_vente, o.vendu_par or ""
     if isinstance(o, Colis):
         return "colis", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "nature": o.nature, "date": _date(o.date),
                          "gare_depart": _uid(o.gare_depart), "gare_arrivee": _uid(o.gare_arrivee), "expediteur": o.expediteur,
@@ -165,6 +175,9 @@ def _vehicule(p, origine, local):
     v = _copie(Vehicule, p["uid"], origine)
     v.immatriculation, v.designation, v.type_vehicule, v.nombre_places, v.actif = (
         p["immatriculation"], p.get("designation", ""), p.get("type", "CAR"), p.get("places") or 0, p.get("actif", True))
+    v.carte_grise = p.get("carte_grise", "")
+    for champ in ("mise_en_service", "assurance_echeance", "visite_technique_echeance"):
+        setattr(v, champ, datetime.date.fromisoformat(p[champ]) if p.get(champ) else None)
     _enregistrer(v, "Immatriculation", p["immatriculation"])
 
 
@@ -216,13 +229,22 @@ def _depart(p, origine, local):
     _suivre_statut_depart(d, statut)
 
 
-def _billet(p, origine, local):
-    from apps.commercial.models import Tiers
-    from apps.transport.models import Billet, Depart, Gare
+ORDRE_TRONCON = {"A_VOYAGER": 0, "EFFECTUE": 1, "ANNULE": 2}
 
+
+def _billet(p, origine, local):
+    """Au siège : tous les billets (états consolidés). Dans une agence : ceux dont un tronçon part de ses gares
+    (voyageur en correspondance à placer sur un de ses véhicules)."""
+    from apps.commercial.models import Tiers
+    from apps.transport.models import Billet, Depart, Gare, Troncon, Vehicule
+
+    troncons = p.get("troncons") or []
     if local.role != local.SIEGE:
-        raise SansObjet("billets consolidés au siège seulement")
+        gares = [Gare.objects.filter(uid=t["gare_depart"]).first() for t in troncons if t.get("ordre", 1) > 1]
+        if not _concerne(local, *gares):
+            raise SansObjet("billet sans correspondance dans cette agence")
     b = _copie(Billet, p["uid"], origine)
+    b.gare_arrivee = _par_uid(Gare, p.get("gare_arrivee"), "gare", obligatoire=False)
     b.depart, b.gare = _par_uid(Depart, p["depart"], "départ"), _par_uid(Gare, p.get("gare"), "gare", obligatoire=False)
     for champ in ("numero", "voyageur", "telephone", "piece_identite", "siege", "paiement", "statut"):
         setattr(b, champ, p.get(champ) if p.get(champ) is not None else ("" if champ not in ("siege",) else None))
@@ -230,7 +252,18 @@ def _billet(p, origine, local):
     b.client = Tiers.objects.filter(code=f"{origine.code}.{p['client']}"[:20]).first() if p.get("client") else None
     b.annule_le = parse_datetime(p["annule_le"]) if p.get("annule_le") else None
     _enregistrer(b, "N° de billet", p["numero"])
-    _suivre_statut_depart(b.depart, b.depart.statut)
+    for t in troncons:
+        tr = Troncon.objects.filter(uid=t["uid"]).first() or Troncon(uid=t["uid"], billet=b, site_origine=origine.code)
+        tr.billet, tr.ordre, tr.part = b, t["ordre"], Decimal(t["part"])
+        tr.gare_depart, tr.gare_arrivee = _par_uid(Gare, t["gare_depart"], "gare"), _par_uid(Gare, t["gare_arrivee"], "gare")
+        if t.get("depart") and (tr.depart_id is None or tr.statut == Troncon.A_VOYAGER):
+            tr.depart, tr.siege = _par_uid(Depart, t["depart"], "départ", obligatoire=False) or tr.depart, t.get("siege")
+        if ORDRE_TRONCON[t["statut"]] >= ORDRE_TRONCON.get(tr.statut or "A_VOYAGER", 0):
+            tr.statut = t["statut"]
+            tr.vehicule = _par_uid(Vehicule, t.get("vehicule"), "véhicule", obligatoire=False) or tr.vehicule
+            tr.site_effectue = t.get("site_effectue") or tr.site_effectue
+            tr.effectue_le = parse_datetime(t["effectue_le"]) if t.get("effectue_le") else tr.effectue_le
+        tr.save()
 
 
 ORDRE_COLIS = {"ENREGISTRE": 0, "CHARGE": 1, "EN_ROUTE": 2, "ARRIVE": 3, "LIVRE": 4, "ANNULE": 5}
@@ -291,6 +324,52 @@ def _depart_arrivee(p, origine, local):
         _suivre_statut_depart(d, Depart.ARRIVE)
 
 
+def _troncon_affecte(p, origine, local):
+    """Voyageur placé sur un véhicule de correspondance par l'agence de changement."""
+    from apps.transport.models import Depart, Troncon
+
+    t = Troncon.objects.filter(uid=p["troncon"]).first()
+    if t is None:
+        if local.role == local.SIEGE:
+            raise Attente(f"billet du tronçon {p['troncon']} pas encore reçu")
+        raise SansObjet("tronçon inconnu ici")
+    if t.statut == Troncon.A_VOYAGER:
+        t.depart = Depart.objects.filter(uid=p["depart"]).first() or t.depart
+        t.siege = p.get("siege")
+        t.save(update_fields=["depart", "siege"])
+
+
+def _troncon_effectue(p, origine, local):
+    """Tronçon fait par un véhicule d'une autre agence. Chez l'agence qui a vendu le billet : la somme encaissée
+    d'avance revient à l'agence du véhicule (D billets à voyager / C liaison de cette agence)."""
+    from apps.comptabilite.models import Journal
+    from apps.comptabilite.services import creer_ecriture
+    from apps.echanges.publication import hors_import
+    from apps.transport.models import Billet, ParametresTransport, Troncon, Vehicule, _compte_liaison
+
+    t = Troncon.objects.filter(uid=p["troncon"]).select_related("billet").first()
+    if t is None:
+        if local.role == local.SIEGE:
+            raise Attente(f"billet du tronçon {p['troncon']} pas encore reçu")
+        raise SansObjet("tronçon inconnu ici")
+    if t.statut == Troncon.EFFECTUE:
+        raise SansObjet("tronçon déjà effectué")
+    date = datetime.date.fromisoformat(p["date"])
+    if not t.site_origine and t.part:                   # billet vendu ici : on solde l'avance du voyageur
+        parametres = ParametresTransport.get()
+        with hors_import():
+            creer_ecriture(Journal.objects.get(code="OD"), date,
+                           f"Billet {t.billet.numero} : tronçon {t.gare_depart.ville} → {t.gare_arrivee.ville} fait par {origine.nom}",
+                           [{"compte": parametres.compte_billets_a_voyager, "debit": t.part},
+                            {"compte": _compte_liaison(origine.code), "credit": t.part}],
+                           reference=t.billet.numero, origine=t.billet.numero)
+    t.statut, t.site_effectue = Troncon.EFFECTUE, p.get("site") or origine.code
+    t.vehicule = Vehicule.objects.filter(uid=p.get("vehicule")).first()
+    t.effectue_le = parse_datetime(f"{p['date']}T12:00:00")
+    t.save(update_fields=["statut", "site_effectue", "vehicule", "effectue_le"])
+    Billet.objects.filter(pk=t.billet_id, statut=Billet.VENDU).update(statut=Billet.EMBARQUE)
+
+
 def _depense(p, origine, local):
     from apps.comptabilite.models import Compte, Journal
     from apps.transport.models import Depart, DepenseVehicule, Vehicule
@@ -312,6 +391,7 @@ def _ecriture(p, origine, local):
     from apps.commercial.models import Tiers
     from apps.comptabilite.models import Compte, Ecriture, Journal, LigneEcriture, SectionAnalytique
     from apps.core.models import Exercice
+    from apps.transport.models import Vehicule
 
     if local.role != local.SIEGE:
         raise SansObjet("écritures consolidées au siège seulement")
@@ -349,7 +429,9 @@ def _ecriture(p, origine, local):
                 "nom": f"{t['nom']} ({origine.code})"[:100], "type_tiers": t["type"]})[0]
         section = (SectionAnalytique.objects.get_or_create(code=l["section"]["code"], defaults={
             "plan": l["section"]["plan"], "intitule": l["section"]["intitule"]})[0] if l.get("section") else section_site)
-        lignes.append(LigneEcriture(ecriture=e, compte=compte, tiers=tiers, section=section, libelle=(l.get("libelle") or "")[:200],
+        vehicule = Vehicule.objects.filter(uid=l["vehicule"]).first() if l.get("vehicule") else None
+        lignes.append(LigneEcriture(ecriture=e, compte=compte, tiers=tiers, section=section, vehicule=vehicule,
+                                    libelle=(l.get("libelle") or "")[:200],
                                     debit=Decimal(l["debit"]), credit=Decimal(l["credit"]), lettrage=l.get("lettrage") or ""))
     LigneEcriture.objects.bulk_create(lignes)
     if sum(l.debit for l in lignes) != sum(l.credit for l in lignes):
@@ -358,11 +440,14 @@ def _ecriture(p, origine, local):
 
 INTEGRATIONS = {"agence": _agence, "gare": _gare, "ligne": _ligne, "vehicule": _vehicule, "chauffeur": _chauffeur,
                 "depart": _depart, "billet": _billet, "colis": _colis, "colis_livraison": _colis_livraison,
-                "depart_arrivee": _depart_arrivee, "depense": _depense, "ecriture": _ecriture}
+                "depart_arrivee": _depart_arrivee, "depense": _depense, "ecriture": _ecriture,
+                "troncon_affecte": _troncon_affecte, "troncon_effectue": _troncon_effectue}
 
 # Ordre d'intégration d'un même lot : les référentiels avant les faits qui les utilisent
 PRIORITE = {"agence": 0, "gare": 1, "vehicule": 1, "chauffeur": 1, "ligne": 2, "depart": 3, "billet": 4, "colis": 4,
-            "depense": 4, "colis_livraison": 5, "depart_arrivee": 5, "ecriture": 6}
+            "depense": 4, "colis_livraison": 5, "depart_arrivee": 5, "troncon_affecte": 5, "troncon_effectue": 5,
+            "ecriture": 6}
 
 # Faits qu'une agence doit connaître quand ils viennent d'une autre agence (relais par le siège)
-RELAYES = {"agence", "gare", "ligne", "vehicule", "chauffeur", "depart", "colis", "colis_livraison", "depart_arrivee"}
+RELAYES = {"agence", "gare", "ligne", "vehicule", "chauffeur", "depart", "colis", "colis_livraison", "depart_arrivee",
+           "billet", "troncon_affecte", "troncon_effectue"}

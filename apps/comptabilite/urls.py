@@ -2,6 +2,7 @@ from django.urls import path
 
 from apps.core import views as core_views
 from apps.echanges import views as echanges_views
+from apps.transport import views as transport_views
 from apps.reporting import views as reporting_views
 
 from . import views
@@ -12,6 +13,9 @@ urlpatterns = [
     path("a-propos/", core_views.a_propos, name="a_propos"),
     path("autorisations/", core_views.autorisations, {"module": "comptabilite"}, name="autorisations"),
     path("echanges/", echanges_views.echanges, {"module": "comptabilite"}, name="echanges"),
+    path("vehicules/balance/", transport_views.balance_vehicules, name="balance_vehicules"),
+    path("vehicules/grand-livre/", transport_views.grand_livre_vehicules, name="grand_livre_vehicules"),
+    path("vehicules/<int:pk>/", transport_views.vehicule_fiche, name="vehicule_fiche"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "comptabilite"}, name="journal_evenements"),
     path("sauvegarde/", core_views.sauvegarde, {"module": "comptabilite"}, name="sauvegarde"),
     path("reprise-dossier/", core_views.reprise_dossier, {"module": "comptabilite"}, name="reprise_dossier"),

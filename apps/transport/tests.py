@@ -39,10 +39,14 @@ class TransportTests(TestCase):
         self.assertEqual((b.prix, b.gare, b.caisse.code), (6000, self.dla, "CA"))
         self.assertTrue(b.numero.startswith("BIL"))
         self.assertEqual(solde("5711"), 6000)
-        self.assertEqual(solde("70611"), -6000)
-        self.assertEqual(b.ecriture.lignes.get(compte__numero="70611").section, self.dla.section)
+        self.assertEqual(solde("41911"), -6000)                              # encaissé, voyage à effectuer
+        self.assertEqual(solde("70611"), 0)
         with self.assertRaisesMessage(ValidationError, "déjà vendu"):
             Billet(depart=d, voyageur="Voyageur Deux", siege=1).vendre()
+        d.partir()                                                            # la recette va au véhicule qui roule
+        self.assertEqual(solde("41911"), 0)
+        recette = LigneEcriture.objects.get(compte__numero="70611")
+        self.assertEqual((recette.credit, recette.vehicule, recette.section), (6000, self.car, self.dla.section))
 
     def test_depart_complet(self):
         d = self.depart()
@@ -62,6 +66,7 @@ class TransportTests(TestCase):
         b.annuler(retenue=1000)
         self.assertEqual(b.statut, Billet.ANNULE)
         self.assertEqual(solde("5711"), 1000)                                 # 6 000 encaissés, 5 000 rendus
+        self.assertEqual(solde("41911"), 0)
         self.assertEqual(solde("70611"), -1000)                               # la retenue reste un produit
         self.assertEqual(Depart.objects.get(pk=b.depart_id).places_vendues, 0)
         with self.assertRaises(ValidationError):
@@ -71,7 +76,9 @@ class TransportTests(TestCase):
         d1, d2 = self.depart(), self.depart()
         b = Billet(depart=d1, voyageur="Voyageur", siege=2).vendre()
         b.reporter(d2, siege=3)
+        b.refresh_from_db()
         self.assertEqual((b.depart, b.siege), (d2, 3))
+        self.assertEqual((d1.places_vendues, d2.places_vendues), (0, 1))
         self.assertEqual(solde("5711"), 6000)                                 # aucune écriture de plus
 
     def test_cycle_du_depart_et_des_colis(self):
@@ -141,14 +148,78 @@ class TransportTests(TestCase):
         p.taxe_billets = Taxe.objects.create(code="T19", intitule="TVA 19,25 %", sens=Taxe.COLLECTEE, taux=Decimal("19.25"),
                                              compte=Compte.objects.get(numero="4431"))
         p.save()
-        b = Billet(depart=self.depart(), voyageur="V", prix=11925).vendre()
-        self.assertEqual(b.ecriture.lignes.get(compte__numero="70611").credit, 10000)
-        self.assertEqual(b.ecriture.lignes.get(compte__numero="4431").credit, 1925)
+        d = self.depart()
+        Billet(depart=d, voyageur="V", prix=11925).vendre()
+        d.partir()
+        self.assertEqual(d.ecriture_recettes.lignes.get(compte__numero="70611").credit, 10000)
+        self.assertEqual(d.ecriture_recettes.lignes.get(compte__numero="4431").credit, 1925)
 
     def test_comptes_crees_au_premier_usage(self):
         ParametresTransport.get()
-        for numero in ("70611", "70612", "70613", "4718"):
+        for numero in ("70611", "70612", "70613", "4718", "41911"):
             self.assertTrue(Compte.objects.filter(numero=numero).exists())
+
+
+class CorrespondanceTests(TestCase):
+    """Douala → Garoua-Boulaï avec changement de véhicule à Bertoua : chaque véhicule reçoit sa part de la recette."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        cls.dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        cls.bta = Gare.objects.create(code="BTA", nom="Gare de Bertoua", ville="Bertoua")
+        cls.gbl = Gare.objects.create(code="GBL", nom="Gare de Garoua-Boulaï", ville="Garoua-Boulaï")
+        cls.l1 = Ligne.objects.create(code="DLA-BTA", gare_depart=cls.dla, gare_arrivee=cls.bta, prix_billet=8000)
+        cls.l2 = Ligne.objects.create(code="BTA-GBL", gare_depart=cls.bta, gare_arrivee=cls.gbl, prix_billet=4000)
+        Ligne.objects.create(code="DLA-GBL", gare_depart=cls.dla, gare_arrivee=cls.gbl, prix_billet=11000)   # tarif direct
+        cls.car1 = Vehicule.objects.create(immatriculation="CAR 1", nombre_places=30)
+        cls.car2 = Vehicule.objects.create(immatriculation="CAR 2", nombre_places=30)
+        cls.ch = Chauffeur.objects.create(nom="Chauffeur")
+
+    def depart(self, ligne, car, heure):
+        return Depart.objects.create(ligne=ligne, date=datetime.date.today(), heure=datetime.time(heure), vehicule=car,
+                                     chauffeur=self.ch)
+
+    def recette(self, car):
+        return -sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero="70611", vehicule=car)), Decimal(0))
+
+    def test_partage_entre_deux_vehicules(self):
+        d1, d2 = self.depart(self.l1, self.car1, 6), self.depart(self.l2, self.car2, 15)
+        b = Billet(depart=d1, gare_arrivee=self.gbl, voyageur="Voyageur", siege=4).vendre(depart_correspondance=d2,
+                                                                                           siege_correspondance=9)
+        self.assertEqual(b.prix, 11000)                                      # tarif Douala → Garoua-Boulaï
+        t1, t2 = b.troncons.all()
+        self.assertEqual((t1.part, t2.part), (7333, 3667))                   # au prorata 8 000 / 4 000
+        self.assertEqual((d1.places_vendues, d2.places_vendues), (1, 1))
+        self.assertIn(9, d2.sieges_occupes())
+        d1.partir()
+        self.assertEqual((self.recette(self.car1), self.recette(self.car2)), (7333, 0))
+        self.assertEqual(solde("41911"), -3667)                              # reste à voyager
+        with self.assertRaisesMessage(ValidationError, "n'a pas commencé"):
+            b.annuler()
+        d2.partir()
+        self.assertEqual((self.recette(self.car1), self.recette(self.car2)), (7333, 3667))
+        self.assertEqual(solde("41911"), 0)
+
+    def test_correspondance_affectee_a_bertoua(self):
+        d1 = self.depart(self.l1, self.car1, 6)
+        b = Billet(depart=d1, gare_arrivee=self.gbl, voyageur="Voyageur").vendre()          # véhicule choisi à Bertoua
+        d2 = self.depart(self.l2, self.car2, 15)
+        attente = list(d2.correspondances_a_affecter())
+        self.assertEqual([t.billet for t in attente], [b])
+        attente[0].affecter(d2, siege=2)
+        self.assertEqual(d2.places_vendues, 1)
+        self.assertFalse(d2.correspondances_a_affecter().exists())
+        with self.assertRaisesMessage(ValidationError, "ne fait pas le trajet"):
+            b.troncons.get(ordre=1).affecter(d2)
+
+    def test_sans_tarif_le_prix_est_demande(self):
+        autre = Gare.objects.create(code="NGD", nom="Gare de Ngaoundéré", ville="Ngaoundéré")
+        d1 = self.depart(self.l1, self.car1, 6)
+        with self.assertRaisesMessage(ValidationError, "indiquez le prix"):
+            Billet(depart=d1, gare_arrivee=autre, voyageur="V").vendre()
+        b = Billet(depart=d1, gare_arrivee=autre, voyageur="V", prix=15000).vendre()
+        self.assertEqual([t.part for t in b.troncons.all()], [7500, 7500])  # parts égales sans tarif
 
 
 class EcransTransportTests(TestCase):
@@ -215,3 +286,35 @@ class EcransTransportTests(TestCase):
         recette = self.client.get(reverse("transport:recette"))
         self.assertContains(recette, "11 500")                               # port dû 1 500 + contre-remboursement 10 000
         self.assertContains(self.client.get(reverse("transport:rentabilite") + "?axe=depart"), depart.numero)
+
+
+class ComptesVehiculesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", "--demo", verbosity=0)
+
+    def test_balance_grand_livre_et_fiche(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        from . import etats
+
+        car = Vehicule.objects.get(immatriculation="LT 101 DEMO")
+        d = Depart.objects.filter(vehicule=car).first()
+        Billet(depart=d, voyageur="V1").vendre()
+        Billet(depart=d, voyageur="V2").vendre()
+        d.partir()
+        DepenseVehicule(vehicule=car, nature=DepenseVehicule.CARBURANT, montant=5000,
+                        caisse=Journal.objects.get(code="CA")).enregistrer()
+        jour = datetime.date.today()
+        ligne = next(l for l in etats.balance_vehicules(jour, jour) if l["vehicule"] == car)
+        self.assertEqual((ligne["voyageurs"], ligne["carburant"], ligne["resultat"]), (12000, 5000, 7000))
+        livre = etats.grand_livre_vehicule(car, jour, jour)
+        self.assertEqual(livre[-1]["cumul"], 7000)
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "", "x"))
+        for url in (reverse("transport:vehicule_fiche", args=[car.pk]), reverse("transport:balance_vehicules"),
+                    reverse("transport:grand_livre_vehicules") + f"?vehicule={car.pk}",
+                    reverse("comptabilite:balance_vehicules"), reverse("comptabilite:grand_livre_vehicules")):
+            self.assertContains(self.client.get(url), "LT 101 DEMO", msg_prefix=url)
+        car.assurance_echeance = jour - datetime.timedelta(days=1)
+        self.assertIn("Assurance expirée", car.alertes()[0])

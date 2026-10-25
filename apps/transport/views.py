@@ -49,7 +49,9 @@ def fiches(request, genre):
         for c in champs:
             filtre |= Q(**{f"{c}__icontains": q})
         objets = objets.filter(filtre)
-    lignes = [{"objet": o, "valeurs": [getattr(o, f"get_{c}_display", lambda c=c, o=o: getattr(o, c))() for c in colonnes]}
+    lignes = [{"objet": o, "valeurs": [getattr(o, f"get_{c}_display", lambda c=c, o=o: getattr(o, c))() for c in colonnes],
+               "url": reverse("transport:vehicule_fiche" if genre == "vehicules" else "transport:fiche_update",
+                              args=[o.pk] if genre == "vehicules" else [genre, o.pk])}
               for o in objets]
     entetes = [modele._meta.get_field(c).verbose_name for c in colonnes]
     return render(request, "transport/fiches.html", {"titre": titre, "genre": genre, "entetes": entetes, "lignes": lignes})
@@ -123,15 +125,22 @@ def depart_detail(request, pk):
                 colis = get_object_or_404(Colis, pk=request.POST.get("colis"))
                 colis.charger(depart)
                 messages.success(request, f"Colis {colis.numero} chargé.")
+            elif action == "affecter":
+                from .models import Troncon
+
+                troncon = get_object_or_404(Troncon, pk=request.POST.get("troncon"))
+                troncon.affecter(depart, int(request.POST["siege"]) if request.POST.get("siege") else None)
+                messages.success(request, f"{troncon.billet.voyageur} placé sur ce départ (correspondance).")
         except ValidationError as exc:
             _erreur(request, exc)
         return redirect("transport:depart_detail", depart.pk)
-    billets = depart.billets.select_related("vendu_par").order_by("siege", "numero")
+    billets = depart.troncons.select_related("billet__gare_arrivee", "billet__vendu_par").order_by("siege", "billet__numero")
     occupes = depart.sieges_occupes()
     a_charger = Colis.objects.filter(statut=Colis.ENREGISTRE, gare_depart=depart.ligne.gare_depart,
                                      gare_arrivee=depart.ligne.gare_arrivee) if depart.statut == Depart.PROGRAMME else []
     return render(request, "transport/depart_detail.html", {
         "depart": depart, "billets": billets, "colis": depart.colis.all(), "a_charger": a_charger,
+        "correspondances": depart.correspondances_a_affecter() if depart.statut == Depart.PROGRAMME else [],
         "sieges": [(n, n in occupes) for n in range(1, depart.places + 1)],
         "recette_billets": depart.recette_billets(), "recette_colis": depart.recette_colis(), "depenses": depart.depenses(),
         "depenses_liste": depart.depenses_vehicule.all()})
@@ -141,7 +150,7 @@ def depart_detail(request, pk):
 def manifeste(request, pk):
     depart = get_object_or_404(Depart, pk=pk)
     return render(request, "transport/manifeste.html", {
-        "depart": depart, "billets": depart.billets_actifs.order_by("siege", "numero"),
+        "depart": depart, "billets": depart.voyageurs.select_related("billet__gare_arrivee").order_by("siege", "billet__numero"),
         "colis": depart.colis.exclude(statut=Colis.ANNULE)})
 
 
@@ -169,7 +178,8 @@ def billet_vente(request):
     if request.method == "POST" and form.is_valid():
         billet = form.save(commit=False)
         try:
-            billet.vendre(request.user)
+            billet.vendre(request.user, depart_correspondance=form.cleaned_data.get("depart_correspondance"),
+                          siege_correspondance=form.cleaned_data.get("siege_correspondance"))
             messages.success(request, f"Billet {billet.numero} vendu ({billet.prix:,.0f} FCFA).".replace(",", " "))
             if request.POST.get("suivant"):
                 return redirect(f"{reverse('transport:billet_vente')}?depart={billet.depart_id}")
@@ -196,9 +206,15 @@ def billet_detail(request, pk):
         except (ValidationError, ArithmeticError, ValueError) as exc:
             _erreur(request, exc)
         return redirect("transport:billet_detail", billet.pk)
-    autres = Depart.objects.filter(ligne=billet.depart.ligne, statut=Depart.PROGRAMME).exclude(pk=billet.depart_id).order_by("date", "heure")
+    from .models import Troncon
+
+    a_faire = billet.troncons.filter(statut=Troncon.A_VOYAGER).first()
+    autres = (Depart.objects.filter(ligne__gare_depart=a_faire.gare_depart, ligne__gare_arrivee=a_faire.gare_arrivee,
+                                    statut=Depart.PROGRAMME).exclude(pk=a_faire.depart_id).order_by("date", "heure")
+              if a_faire else [])
     return render(request, "transport/billet_detail.html", {
-        "billet": billet, "autres_departs": autres, "retenue_conseillee": ParametresTransport.get().retenue_annulation})
+        "billet": billet, "troncons": billet.troncons.select_related("gare_depart", "gare_arrivee", "depart", "vehicule"),
+        "autres_departs": autres, "retenue_conseillee": ParametresTransport.get().retenue_annulation})
 
 
 @login_required
@@ -322,4 +338,56 @@ def rentabilite(request):
     axe = request.GET.get("axe", "ligne")
     return render(request, "transport/rentabilite.html", {
         "du": debut, "au": fin, "axe": axe, "lignes": etats.rentabilite(debut, fin, axe),
-        "axes": [("ligne", "Par ligne"), ("vehicule", "Par véhicule"), ("depart", "Par départ")]})
+        "axes": [("ligne", "Par ligne"), ("depart", "Par départ")]})
+
+
+# ---------------------------------------------------------------- Véhicules : fiche, grand livre, balance
+def _periode(request):
+    from apps.core.models import Exercice
+
+    exercice = Exercice.courant()
+    fin = _jour(request, "au") if request.GET.get("au") else (exercice.date_fin if exercice else timezone.localdate())
+    debut = _jour(request, "du") if request.GET.get("du") else (exercice.date_debut if exercice else fin.replace(month=1, day=1))
+    return debut, fin
+
+
+@login_required
+def vehicule_fiche(request, pk):
+    from . import etats
+
+    vehicule = get_object_or_404(Vehicule.objects.select_related("proprietaire"), pk=pk)
+    debut, fin = _periode(request)
+    solde = next((l for l in etats.balance_vehicules(debut, fin) if l["vehicule"].pk == vehicule.pk), None)
+    departs = vehicule.departs.filter(date__range=(debut, fin)).exclude(statut=Depart.ANNULE)
+    places = sum((d.places for d in departs), 0)
+    voyageurs = sum((d.places_vendues for d in departs), 0)
+    return render(request, "transport/vehicule_fiche.html", {
+        "vehicule": vehicule, "du": debut, "au": fin, "solde": solde, "alertes": vehicule.alertes(),
+        "nb_departs": departs.count(), "voyageurs": voyageurs,
+        "remplissage": round(100 * voyageurs / places) if places else None,
+        "derniers_departs": departs.select_related("ligne", "chauffeur")[:10],
+        "dernieres_depenses": vehicule.depenses.filter(date__range=(debut, fin))[:10]})
+
+
+@login_required
+def balance_vehicules(request):
+    from . import etats
+
+    debut, fin = _periode(request)
+    lignes = etats.balance_vehicules(debut, fin)
+    totaux = {cle: sum((l[cle] for l in lignes), ZERO) for cle in ("voyageurs", "colis", "autres_recettes", "recettes",
+                                                                  "carburant", "entretien", "autres_depenses", "depenses",
+                                                                  "resultat")}
+    return render(request, "transport/balance_vehicules.html", {"du": debut, "au": fin, "lignes": lignes, "totaux": totaux})
+
+
+@login_required
+def grand_livre_vehicules(request):
+    from . import etats
+
+    debut, fin = _periode(request)
+    choisis = Vehicule.objects.filter(pk=request.GET["vehicule"]) if request.GET.get("vehicule") else Vehicule.objects.all()
+    livres = [{"vehicule": v, "lignes": etats.grand_livre_vehicule(v, debut, fin)} for v in choisis]
+    return render(request, "transport/grand_livre_vehicules.html", {
+        "du": debut, "au": fin, "livres": [l for l in livres if l["lignes"] or request.GET.get("vehicule")],
+        "vehicules": Vehicule.objects.all(), "vehicule": request.GET.get("vehicule", "")})

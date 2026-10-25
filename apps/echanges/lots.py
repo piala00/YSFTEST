@@ -73,9 +73,15 @@ def _evenement_dict(e, origine):
 
 # ---------------------------------------------------------------- Pertinence des relais (au siège)
 def _gares_de(evt):
-    from apps.transport.models import Colis, Depart, Gare, Ligne
+    """Gares concernées par un fait relayé (None : utile à toutes les agences)."""
+    from apps.transport.models import Colis, Depart, Gare, Ligne, Troncon
 
     p = evt.payload
+    if evt.type == "billet":                       # correspondances : gares de changement
+        return list(Gare.objects.filter(uid__in=[t["gare_depart"] for t in p.get("troncons", []) if t.get("ordre", 1) > 1]))
+    if evt.type in ("troncon_affecte", "troncon_effectue"):
+        t = Troncon.objects.filter(uid=p.get("troncon")).select_related("billet__gare").first()
+        return [t.billet.gare] if t and t.billet.gare else []
     if evt.type == "depart":
         ligne = Ligne.objects.filter(uid=p.get("ligne")).first()
         return [ligne.gare_depart, ligne.gare_arrivee] if ligne else []

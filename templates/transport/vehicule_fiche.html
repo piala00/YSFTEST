@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Véhicule {{ vehicule.immatriculation }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1><i class="bi bi-bus-front"></i> {{ vehicule.immatriculation }} <span class="fs-6 text-muted">{{ vehicule.designation }}</span>
+  {% if not vehicule.actif %}<span class="badge text-bg-secondary fs-6">inactif</span>{% endif %}</h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:fiche_update' 'vehicules' vehicule.pk %}"><i class="bi bi-pencil"></i> Modifier</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:grand_livre_vehicules' %}?vehicule={{ vehicule.pk }}&amp;du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}"><i class="bi bi-book"></i> Grand-livre</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:depense_create' %}?vehicule={{ vehicule.pk }}"><i class="bi bi-fuel-pump"></i> Dépense</a></div></div>
+{% for a in alertes %}<div class="alert alert-warning py-1 small">{{ a }}</div>{% endfor %}
+<form class="d-flex gap-2 align-items-end mb-3"><div><label class="form-label small mb-0" for="f-du">Du</label><input type="date" id="f-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="f-au">Au</label><input type="date" id="f-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <button class="btn btn-sm btn-outline-secondary">Afficher</button></form>
+<div class="row g-3 mb-3 small">
+  <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Recettes</div><div class="fs-5 fw-semibold">{{ solde.recettes|default:0|montant }}</div>
+    voyageurs {{ solde.voyageurs|default:0|montant }} · colis {{ solde.colis|default:0|montant }}</div></div>
+  <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Dépenses</div><div class="fs-5 fw-semibold">{{ solde.depenses|default:0|montant }}</div>
+    carburant {{ solde.carburant|default:0|montant }} · entretien {{ solde.entretien|default:0|montant }}</div></div>
+  <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Résultat</div>
+    <div class="fs-5 fw-semibold {% if solde.resultat < 0 %}text-danger{% else %}text-success{% endif %}">{{ solde.resultat|default:0|montant }}</div></div></div>
+  <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Activité</div><div class="fs-5 fw-semibold">{{ nb_departs }} départ(s)</div>
+    {{ voyageurs }} voyageur(s){% if remplissage is not None %} · remplissage {{ remplissage }} %{% endif %}</div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-4"><div class="card"><div class="card-header bg-white fw-semibold small">Fiche</div><table class="table table-sm mb-0 small"><tbody>
+    <tr><th>Type</th><td>{{ vehicule.get_type_vehicule_display }} · {{ vehicule.nombre_places }} places</td></tr>
+    <tr><th>Propriétaire</th><td>{{ vehicule.proprietaire.nom|default:"la société" }}</td></tr>
+    <tr><th>Carte grise</th><td>{{ vehicule.carte_grise|default:"—" }}</td></tr>
+    <tr><th>Mise en service</th><td>{{ vehicule.mise_en_service|date:"d/m/Y"|default:"—" }}</td></tr>
+    <tr><th>Assurance jusqu'au</th><td>{{ vehicule.assurance_echeance|date:"d/m/Y"|default:"—" }}</td></tr>
+    <tr><th>Visite technique jusqu'au</th><td>{{ vehicule.visite_technique_echeance|date:"d/m/Y"|default:"—" }}</td></tr>
+  </tbody></table></div></div>
+  <div class="col-lg-4"><div class="card"><div class="card-header bg-white fw-semibold small">Derniers départs</div><table class="table table-sm mb-0 small"><tbody>
+    {% for d in derniers_departs %}<tr><td><a href="{% url 'transport:depart_detail' d.pk %}">{{ d.date|date:"d/m" }} {{ d.heure|time:"H:i" }}</a></td><td>{{ d.ligne.code }}</td><td class="num">{{ d.places_vendues }}/{{ d.places }}</td><td class="num">{{ d.recette_billets|montant }}</td></tr>
+    {% empty %}<tr><td class="text-muted text-center p-3">Aucun départ.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="col-lg-4"><div class="card"><div class="card-header bg-white fw-semibold small">Dernières dépenses</div><table class="table table-sm mb-0 small"><tbody>
+    {% for dv in dernieres_depenses %}<tr><td>{{ dv.date|date:"d/m" }}</td><td>{{ dv.get_nature_display }}</td><td class="num">{{ dv.montant|montant }}</td></tr>
+    {% empty %}<tr><td class="text-muted text-center p-3">Aucune dépense.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endblock %}

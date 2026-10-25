@@ -73,3 +73,49 @@ def rentabilite(debut, fin, axe="ligne"):
         g["marge"] = g["recettes"] - g["depenses"]
         g["remplissage"] = round(100 * g["voyageurs"] / g["places"]) if g["places"] else None
     return list(groupes.values())
+
+
+# ---------------------------------------------------------------- Comptes des véhicules (comptabilité)
+def _lignes_vehicules(debut, fin):
+    from apps.comptabilite.models import Ecriture, LigneEcriture
+
+    return (LigneEcriture.objects.filter(vehicule__isnull=False, ecriture__statut=Ecriture.STATUT_VALIDEE,
+                                         ecriture__date__range=(debut, fin))
+            .select_related("ecriture__journal", "compte", "vehicule"))
+
+
+def balance_vehicules(debut, fin):
+    """Par véhicule, sur toutes les écritures (au siège : toutes les agences) : recettes (classe 7), dépenses
+    (classe 6), résultat, et détail des recettes voyageurs / colis et des principales dépenses."""
+    from .models import ParametresTransport, Vehicule
+
+    p = ParametresTransport.get()
+    lignes = OrderedDict((v.pk, {"vehicule": v, "voyageurs": ZERO, "colis": ZERO, "autres_recettes": ZERO, "recettes": ZERO,
+                                 "carburant": ZERO, "entretien": ZERO, "autres_depenses": ZERO, "depenses": ZERO})
+                         for v in Vehicule.objects.all())
+    for l in _lignes_vehicules(debut, fin):
+        g, numero, net = lignes[l.vehicule_id], l.compte.numero, l.credit - l.debit
+        if numero.startswith("7"):
+            cle = ("voyageurs" if numero == p.compte_billets.numero else
+                   "colis" if numero in (p.compte_colis.numero, p.compte_fret.numero) else "autres_recettes")
+            g[cle] += net
+            g["recettes"] += net
+        elif numero.startswith("6"):
+            cle = "carburant" if numero.startswith("605") else "entretien" if numero.startswith("624") else "autres_depenses"
+            g[cle] -= net
+            g["depenses"] -= net
+    resultat = []
+    for g in lignes.values():
+        g["resultat"] = g["recettes"] - g["depenses"]
+        if g["recettes"] or g["depenses"] or g["vehicule"].actif:
+            resultat.append(g)
+    return resultat
+
+
+def grand_livre_vehicule(vehicule, debut, fin):
+    """Mouvements du véhicule, avec le résultat cumulé (recettes − dépenses)."""
+    lignes, cumul = [], ZERO
+    for l in _lignes_vehicules(debut, fin).filter(vehicule=vehicule).order_by("ecriture__date", "ecriture__numero", "pk"):
+        cumul += l.credit - l.debit
+        lignes.append({"ligne": l, "cumul": cumul})
+    return lignes
