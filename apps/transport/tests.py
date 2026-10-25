@@ -376,7 +376,7 @@ class JourneeAgenceTests(TestCase):
         o = OrdreReparation.objects.create(vehicule=car, panne="Pneu")
         LigneReparation.objects.create(ordre=o, designation="Pneu", prix_unitaire=60000)
         o.cloturer(caisse=caisse)
-        Employe.objects.create(matricule="C1", nom="Chauffeur", vehicule=car, salaire_base=120000)       # personnel
+        self.assertEqual(Employe.objects.get(vehicule=car).salaire_base, 120000)                        # chauffeur de la démo
         jour = datetime.date.today()
         paie = PeriodePaie.objects.create(annee=jour.year, mois=jour.month)
         paie.generer()
