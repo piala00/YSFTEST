@@ -89,7 +89,8 @@ PREUVES = {
 
 # Gestion commerciale : découpage officiel V11/V12 ; Comptabilité : ergonomie Sage 100 classique et skill
 # « sage100-comptabilite-v5-v12-expert », à confirmer sur le découpage officiel Comptabilité ; Reporting : propre à l'ERP
-PREUVE_PAR_DEFAUT = {"commercial": "DOC-V12", "comptabilite": "ERG-CLASSIQUE", "reporting": "AJOUT-ERP", "transport": "AJOUT-ERP"}
+PREUVE_PAR_DEFAUT = {"commercial": "DOC-V12", "comptabilite": "ERG-CLASSIQUE", "reporting": "AJOUT-ERP", "transport": "AJOUT-ERP",
+                     "billetterie": "AJOUT-ERP", "colis": "AJOUT-ERP", "garage": "AJOUT-ERP", "personnel": "AJOUT-ERP"}
 
 _compteur = itertools.count()
 
@@ -245,12 +246,17 @@ def menu_aide(module):
 
 
 MODULES_ACCUEIL = {"commercial": "commercial:accueil", "comptabilite": "comptabilite:accueil", "reporting": "reporting:dashboard",
-                   "transport": "transport:accueil"}
+                   "transport": "transport:accueil", "billetterie": "billetterie:accueil", "colis": "colis:accueil",
+                   "garage": "garage:accueil", "personnel": "personnel:accueil"}
 AUTRES_LOGICIELS = [
     ("commercial", "Gestion commerciale", "commercial:accueil", "bi-shop"),
     ("comptabilite", "Comptabilité OHADA", "comptabilite:accueil", "bi-calculator"),
     ("reporting", "Reporting", "reporting:dashboard", "bi-bar-chart-line"),
-    ("transport", "Transport de voyageurs", "transport:accueil", "bi-bus-front"),
+    ("transport", "Direction de l'agence", "transport:accueil", "bi-building-gear"),
+    ("billetterie", "Billetterie", "billetterie:accueil", "bi-ticket-perforated"),
+    ("colis", "Colis et expéditions", "colis:accueil", "bi-box-seam"),
+    ("garage", "Garage", "garage:accueil", "bi-wrench-adjustable"),
+    ("personnel", "Personnel et paie", "personnel:accueil", "bi-people"),
 ]
 
 
@@ -724,12 +730,83 @@ REPORTING = Module(
 )
 
 # Transport interurbain de voyageurs (version 2) : propre à l'ERP, sur le modèle des menus Sage
+def _module_service(code, titre, description, icone, couleur, prefixe, structure, traitement, etat, accueil=None):
+    """Logiciel d'un service (billetterie, colis, garage, personnel) : même barre de menus que les autres."""
+    return Module(code=code, titre=titre, description=description, icone=icone, couleur=couleur, prefixe=prefixe,
+                  accueil=accueil or f"{code}:accueil", onglets=[
+                      menu_fichier(code, "commercial:societe"), menu_edition(),
+                      *([Onglet("structure", "Structure", "bi-diagram-3", structure)] if structure else []),
+                      Onglet("traitement", "Traitement", "bi-gear", traitement),
+                      Onglet("etat", "Etat", "bi-printer", etat),
+                      menu_fenetre(code), menu_aide(code)])
+
+
+# Transport interurbain : un logiciel par service ; chacun travaille dans le sien, selon ses droits. Tout se regroupe
+# automatiquement dans la comptabilité, sur chaque véhicule, et dans le rapport journalier de la Direction.
+BILLETTERIE = _module_service(
+    "billetterie", "Billetterie", "Départs, vente des billets, correspondances, annulations, encaissements du guichet",
+    "bi-ticket-perforated", "#e65100", "/transport/billetterie/",
+    structure=[E("structure.clients", "Clients en compte", "commercial:clients", icone="bi-people")],
+    traitement=[
+        E("billetterie.departs", "Départs du jour", "transport:departs", icone="bi-bus-front"),
+        E("billetterie.programmer", "Programmer un départ", "transport:depart_create", icone="bi-calendar-plus"),
+        E("billetterie.vendre", "Vendre un billet", "transport:billet_vente", icone="bi-ticket-perforated"),
+        E("billetterie.billets", "Billets vendus (annulation, report)", "transport:billets", icone="bi-list-ul"),
+        SEP(),
+        E("billetterie.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
+    ],
+    etat=[E("billetterie.recette", "Recette de la billetterie", "transport:recette_billetterie", icone="bi-cash-stack")])
+
+COLIS = _module_service(
+    "colis", "Colis et expéditions", "Enregistrement, chargement, arrivée, remise, contre-remboursements",
+    "bi-box-seam", "#6d4c41", "/transport/colis/", structure=None,
+    traitement=[
+        E("colis.enregistrer", "Enregistrer un colis", "transport:colis_create", icone="bi-box-seam", nature="COLIS"),
+        E("colis.courrier", "Enregistrer un courrier", "transport:colis_create", icone="bi-envelope", nature="COURRIER"),
+        E("colis.fret", "Enregistrer du fret", "transport:colis_create", icone="bi-truck", nature="FRET"),
+        SEP(),
+        E("colis.a_charger", "Envois à charger", "transport:colis", icone="bi-box-arrow-up", statut="ENREGISTRE"),
+        E("colis.a_remettre", "Envois arrivés à remettre", "transport:colis", icone="bi-box-arrow-in-down", statut="ARRIVE"),
+        E("colis.reverser", "Contre-remboursements à reverser", "transport:colis", icone="bi-arrow-return-left", statut="LIVRE"),
+        E("colis.liste", "Suivi des envois", "transport:colis", icone="bi-search"),
+    ],
+    etat=[E("colis.recette", "Recette des colis", "transport:recette_colis", icone="bi-cash-stack")])
+
+GARAGE = _module_service(
+    "garage", "Garage", "Véhicules, carburant, réparations, pièces, échéances des papiers",
+    "bi-wrench-adjustable", "#455a64", "/transport/garage/",
+    structure=[E("garage.vehicules", "Véhicules", "transport:vehicules", icone="bi-bus-front"),
+               E("garage.chauffeurs", "Chauffeurs", "transport:fiches", "chauffeurs", icone="bi-person-badge")],
+    traitement=[
+        E("garage.plein", "Saisir un plein de carburant", "garage:plein_create", icone="bi-fuel-pump"),
+        E("garage.pleins", "Pleins de carburant", "garage:pleins", icone="bi-list-ul"),
+        SEP(),
+        E("garage.entree", "Entrée d'un véhicule au garage", "garage:reparation_create", icone="bi-wrench"),
+        E("garage.reparations", "Réparations en cours", "garage:reparations", icone="bi-tools"),
+        SEP(),
+        E("garage.depense", "Autre dépense de véhicule", "transport:depense_create", icone="bi-receipt"),
+        E("garage.depenses", "Autres dépenses", "transport:depenses", icone="bi-list-ul"),
+    ],
+    etat=[E("garage.consommation", "Carburant et consommation par véhicule", "garage:consommation", icone="bi-speedometer"),
+          E("garage.echeances", "Papiers des véhicules (assurance, visite)", "garage:echeances", icone="bi-calendar-event"),
+          E("garage.balance", "Coûts des véhicules", "transport:balance_vehicules", icone="bi-bus-front")])
+
+PERSONNEL = _module_service(
+    "personnel", "Personnel et paie", "Employés par service, avances, paie du mois, bulletins",
+    "bi-people", "#5e35b1", "/personnel/",
+    structure=[E("personnel.employes", "Employés", "personnel:employes", icone="bi-person-vcard"),
+               E("personnel.rubriques", "Rubriques de paie", "personnel:rubriques", icone="bi-list-check")],
+    traitement=[E("personnel.avance", "Verser une avance", "personnel:avance_create", icone="bi-cash"),
+                E("personnel.avances", "Avances sur salaire", "personnel:avances", icone="bi-list-ul"),
+                E("personnel.paie", "Paie du mois", "personnel:paies", icone="bi-wallet2")],
+    etat=[E("personnel.livre", "Livre de paie", "personnel:paies", icone="bi-journal-text", vue="livre")])
+
 TRANSPORT = Module(
     code="transport",
-    titre="Transport de voyageurs",
-    description="Billetterie des cars, colis et courrier, fret, flotte — liés à la comptabilité",
-    icone="bi-bus-front",
-    couleur="#e65100",
+    titre="Direction de l'agence",
+    description="Rapport journalier de toute l'agence, comptes des véhicules, rentabilité, lignes et tarifs, échanges",
+    icone="bi-building-gear",
+    couleur="#bf360c",
     prefixe="/transport/",
     accueil="transport:accueil",
     onglets=[
@@ -738,39 +815,24 @@ TRANSPORT = Module(
         Onglet("structure", "Structure", "bi-diagram-3", [
             E("structure.gares", "Gares", "transport:fiches", "gares", icone="bi-geo-alt"),
             E("structure.lignes", "Lignes et tarifs", "transport:fiches", "lignes", icone="bi-signpost-split"),
-            E("structure.vehicules", "Véhicules", "transport:fiches", "vehicules", icone="bi-bus-front"),
+            E("structure.vehicules", "Véhicules", "transport:vehicules", icone="bi-bus-front"),
             E("structure.chauffeurs", "Chauffeurs", "transport:fiches", "chauffeurs", icone="bi-person-badge"),
             SEP(),
             E("structure.clients", "Clients en compte", "commercial:clients", icone="bi-people"),
             E("structure.parametres", "Paramètres transport (comptes et taxes)", "transport:parametres", icone="bi-sliders"),
         ]),
         Onglet("traitement", "Traitement", "bi-gear", [
-            E("billetterie", "Billetterie", icone="bi-ticket-perforated", enfants=[
-                E("billetterie.departs", "Départs du jour", "transport:departs"),
-                E("billetterie.programmer", "Programmer un départ", "transport:depart_create"),
-                E("billetterie.vendre", "Vendre un billet", "transport:billet_vente"),
-                E("billetterie.billets", "Billets vendus (annulation, report)", "transport:billets"),
-            ]),
-            E("colis", "Colis et courrier", icone="bi-box-seam", enfants=[
-                E("colis.enregistrer", "Enregistrer un colis", "transport:colis_create", nature="COLIS"),
-                E("colis.courrier", "Enregistrer un courrier", "transport:colis_create", nature="COURRIER"),
-                E("colis.liste", "Suivi des envois", "transport:colis"),
-                E("colis.a_remettre", "Envois à remettre aux destinataires", "transport:colis", statut="ARRIVE"),
-            ]),
-            E("logistique", "Logistique", icone="bi-truck", enfants=[
-                E("logistique.fret", "Enregistrer du fret", "transport:colis_create", nature="FRET"),
-                E("logistique.depense", "Saisir une dépense de véhicule", "transport:depense_create"),
-                E("logistique.depenses", "Dépenses des véhicules", "transport:depenses"),
-            ]),
-            SEP(),
+            E("traitement.departs", "Départs du jour", "transport:departs", icone="bi-bus-front"),
             E("traitement.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
             E("traitement.reglement", "Règlement d'un client en compte", "commercial:reglement_create", icone="bi-wallet2"),
         ]),
         Onglet("etat", "Etat", "bi-printer", [
+            E("etat.rapport", "Rapport journalier de l'agence", "transport:rapport_journalier", icone="bi-clipboard-data"),
             E("etat.recette", "Recette journalière par gare", "transport:recette", icone="bi-cash-stack"),
             E("etat.vehicules", "Comptes des véhicules", icone="bi-bus-front", enfants=[
                 E("etat.vehicules.balance", "Balance des véhicules", "transport:balance_vehicules"),
                 E("etat.vehicules.grand_livre", "Grand-livre des véhicules", "transport:grand_livre_vehicules"),
+                E("etat.vehicules.carburant", "Carburant et consommation", "garage:consommation"),
             ]),
             E("etat.rentabilite", "Rentabilité", icone="bi-graph-up", enfants=[
                 E("etat.rentabilite.ligne", "Par ligne", "transport:rentabilite", axe="ligne"),
@@ -784,17 +846,21 @@ TRANSPORT = Module(
     ],
 )
 
-MODULES = [GESTION_COMMERCIALE, COMPTABILITE, REPORTING, TRANSPORT]
+# Ordre : les préfixes les plus précis d'abord (/transport/billetterie/ avant /transport/)
+MODULES = [GESTION_COMMERCIALE, COMPTABILITE, REPORTING, BILLETTERIE, COLIS, GARAGE, TRANSPORT, PERSONNEL]
+SERVICES_TRANSPORT = {"transport", "billetterie", "colis", "garage"}
 MODULES_PAR_CODE = {m.code: m for m in MODULES}
 
 
 def modules_proposes(societe):
-    """Logiciels proposés selon l'activité de la société (le logiciel du métier en premier)."""
+    """Logiciels proposés selon l'activité de la société (ceux du métier en premier)."""
+    ordre = ["transport", "billetterie", "colis", "garage", "personnel", "commercial", "comptabilite", "reporting"]
     if societe.activite == societe.ACTIVITE_COMMERCE:
-        return [m for m in MODULES if m.code != "transport"]
+        return [m for m in MODULES if m.code not in SERVICES_TRANSPORT]
+    modules = sorted(MODULES, key=lambda m: ordre.index(m.code))
     if societe.activite == societe.ACTIVITE_TRANSPORT:
-        return sorted(MODULES, key=lambda m: m.code != "transport")
-    return list(MODULES)
+        return [m for m in modules if m.code != "commercial"]
+    return modules
 
 
 # ---------------------------------------------------------------------------
@@ -864,7 +930,8 @@ PARTAGE = {
 
 def fichiers_lies(module):
     """[(logiciel lié, données partagées)…] d'un logiciel."""
-    return [(m, PARTAGE[frozenset({module.code, m.code})]) for m in MODULES if m is not module]
+    return [(m, PARTAGE.get(frozenset({module.code, m.code}), "Même base : tiers, plan comptable, journaux, véhicules, agences"))
+            for m in MODULES if m is not module]
 
 
 def module_pour_chemin(chemin):
@@ -876,9 +943,11 @@ def module_pour_chemin(chemin):
 
 def _module_cible(module, lien):
     """Code du logiciel qui affiche ce lien (« » si c'est le module lui-même, « web » hors logiciel)."""
-    if not lien or lien.startswith(module.prefixe):
+    if not lien:
         return ""
-    autre = module_pour_chemin(lien)
+    autre = module_pour_chemin(lien)               # le préfixe le plus précis (/transport/garage/ avant /transport/)
+    if autre is module:
+        return ""
     return autre.code if autre else "web"
 
 

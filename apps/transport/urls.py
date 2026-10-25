@@ -1,41 +1,47 @@
+"""Écrans du transport. Les chemins indiquent le logiciel du service qui les utilise :
+/transport/billetterie/…, /transport/colis/…, /transport/garage/… ; le reste est la Direction de l'agence."""
 from django.urls import path
 
-from apps.core import views as core_views
-from apps.echanges import views as echanges_views
+from apps.core.urls_communes import urls_communes
 
 from . import views
 
 app_name = "transport"
 
 urlpatterns = [
-    path("", core_views.accueil_module, {"module": "transport"}, name="accueil"),
-    path("echanges/", echanges_views.echanges, {"module": "transport"}, name="echanges"),
-    path("a-propos/", core_views.a_propos, name="a_propos"),
-    path("autorisations/", core_views.autorisations, {"module": "transport"}, name="autorisations"),
-    path("journal-evenements/", core_views.journal_evenements, {"module": "transport"}, name="journal_evenements"),
-    path("sauvegarde/", core_views.sauvegarde, {"module": "transport"}, name="sauvegarde"),
+    *urls_communes("transport"),
+    # Direction de l'agence
     path("parametres/", views.parametres, name="parametres"),
     path("fiches/<str:genre>/", views.fiches, name="fiches"),
     path("fiches/<str:genre>/nouvelle/", views.fiche_form, name="fiche_create"),
     path("fiches/<str:genre>/<int:pk>/", views.fiche_form, name="fiche_update"),
-    path("departs/", views.departs, name="departs"),
-    path("departs/nouveau/", views.depart_form, name="depart_create"),
-    path("departs/<int:pk>/", views.depart_detail, name="depart_detail"),
-    path("departs/<int:pk>/modifier/", views.depart_form, name="depart_update"),
-    path("departs/<int:pk>/manifeste/", views.manifeste, name="manifeste"),
-    path("billets/", views.billets, name="billets"),
-    path("billets/vendre/", views.billet_vente, name="billet_vente"),
-    path("billets/<int:pk>/", views.billet_detail, name="billet_detail"),
-    path("billets/<int:pk>/imprimer/", views.billet_imprimer, name="billet_imprimer"),
-    path("colis/", views.colis_liste, name="colis"),
-    path("colis/nouveau/", views.colis_form, name="colis_create"),
-    path("colis/<int:pk>/", views.colis_detail, name="colis_detail"),
-    path("colis/<int:pk>/imprimer/", views.colis_imprimer, name="colis_imprimer"),
-    path("flotte/depenses/", views.depenses, name="depenses"),
-    path("flotte/depenses/nouvelle/", views.depense_form, name="depense_create"),
+    path("etats/rapport-journalier/", views.rapport_journalier, name="rapport_journalier"),
     path("etats/recette/", views.recette_journaliere, name="recette"),
     path("etats/rentabilite/", views.rentabilite, name="rentabilite"),
-    path("vehicules/<int:pk>/", views.vehicule_fiche, name="vehicule_fiche"),
     path("etats/balance-vehicules/", views.balance_vehicules, name="balance_vehicules"),
     path("etats/grand-livre-vehicules/", views.grand_livre_vehicules, name="grand_livre_vehicules"),
+    # Billetterie
+    path("billetterie/departs/", views.departs, name="departs"),
+    path("billetterie/departs/nouveau/", views.depart_form, name="depart_create"),
+    path("billetterie/departs/<int:pk>/", views.depart_detail, name="depart_detail"),
+    path("billetterie/departs/<int:pk>/modifier/", views.depart_form, name="depart_update"),
+    path("billetterie/departs/<int:pk>/manifeste/", views.manifeste, name="manifeste"),
+    path("billetterie/billets/", views.billets, name="billets"),
+    path("billetterie/billets/vendre/", views.billet_vente, name="billet_vente"),
+    path("billetterie/billets/<int:pk>/", views.billet_detail, name="billet_detail"),
+    path("billetterie/billets/<int:pk>/imprimer/", views.billet_imprimer, name="billet_imprimer"),
+    path("billetterie/recette/", views.recette_journaliere, {"service": "billetterie"}, name="recette_billetterie"),
+    # Colis et expéditions
+    path("colis/envois/", views.colis_liste, name="colis"),
+    path("colis/envois/nouveau/", views.colis_form, name="colis_create"),
+    path("colis/envois/<int:pk>/", views.colis_detail, name="colis_detail"),
+    path("colis/envois/<int:pk>/imprimer/", views.colis_imprimer, name="colis_imprimer"),
+    path("colis/recette/", views.recette_journaliere, {"service": "colis"}, name="recette_colis"),
+    # Garage : véhicules et autres dépenses (pleins et réparations : logiciel Garage)
+    path("garage/vehicules/", views.fiches, {"genre": "vehicules"}, name="vehicules"),
+    path("garage/vehicules/nouveau/", views.fiche_form, {"genre": "vehicules"}, name="vehicule_create"),
+    path("garage/vehicules/<int:pk>/", views.vehicule_fiche, name="vehicule_fiche"),
+    path("garage/vehicules/<int:pk>/modifier/", views.fiche_form, {"genre": "vehicules"}, name="vehicule_update"),
+    path("garage/depenses/", views.depenses, name="depenses"),
+    path("garage/depenses/nouvelle/", views.depense_form, name="depense_create"),
 ]

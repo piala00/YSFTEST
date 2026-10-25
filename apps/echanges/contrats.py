@@ -106,6 +106,18 @@ def serialiser(o):
         return "depense", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "date": _date(o.date),
                            "vehicule": _uid(o.vehicule), "depart": _uid(o.depart), "nature": o.nature, "libelle": o.libelle,
                            "montant": _d(o.montant), "compte": o.compte.numero if o.compte_id else None}, o.date, o.cree_par or ""
+    from apps.garage.models import OrdreReparation, PleinCarburant
+
+    if isinstance(o, PleinCarburant):
+        return "plein", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "date": _date(o.date), "vehicule": _uid(o.vehicule),
+                         "depart": _uid(o.depart), "litres": _d(o.litres), "prix_litre": _d(o.prix_litre),
+                         "montant": _d(o.montant), "kilometrage": o.kilometrage, "station": o.station}, o.date, o.cree_par or ""
+    if isinstance(o, OrdreReparation):
+        return "reparation", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "vehicule": _uid(o.vehicule),
+                              "date_entree": _date(o.date_entree), "date_sortie": _date(o.date_sortie), "kilometrage": o.kilometrage,
+                              "panne": o.panne, "intervenant": o.intervenant, "statut": o.statut,
+                              "lignes": [{"nature": l.nature, "designation": l.designation, "quantite": _d(l.quantite),
+                                          "prix_unitaire": _d(l.prix_unitaire)} for l in o.lignes.all()]}, o.date_entree, o.cree_par or ""
     raise TypeError(f"Objet non échangeable : {o!r}")
 
 
@@ -386,6 +398,40 @@ def _depense(p, origine, local):
     _enregistrer(dv, "N° de dépense", p["numero"])
 
 
+def _plein(p, origine, local):
+    """Au siège : détail du carburant de chaque véhicule, toutes agences (le montant est déjà dans les écritures)."""
+    from apps.garage.models import PleinCarburant
+    from apps.transport.models import Depart, Vehicule
+
+    if local.role != local.SIEGE:
+        raise SansObjet("carburant consolidé au siège seulement")
+    o = _copie(PleinCarburant, p["uid"], origine)
+    o.numero, o.date, o.station, o.kilometrage = p["numero"], datetime.date.fromisoformat(p["date"]), p.get("station", ""), p.get("kilometrage")
+    o.vehicule = _par_uid(Vehicule, p["vehicule"], "véhicule")
+    o.depart = _par_uid(Depart, p.get("depart"), "départ", obligatoire=False)
+    o.litres, o.prix_litre, o.montant = Decimal(p["litres"]), Decimal(p["prix_litre"]), Decimal(p["montant"])
+    _enregistrer(o, "N° de plein", p["numero"])
+
+
+def _reparation(p, origine, local):
+    from apps.garage.models import LigneReparation, OrdreReparation
+    from apps.transport.models import Vehicule
+
+    if local.role != local.SIEGE:
+        raise SansObjet("réparations consolidées au siège seulement")
+    o = _copie(OrdreReparation, p["uid"], origine)
+    o.numero, o.panne, o.intervenant, o.statut, o.kilometrage = (p["numero"], p["panne"], p.get("intervenant", ""), p["statut"],
+                                                                 p.get("kilometrage"))
+    o.vehicule = _par_uid(Vehicule, p["vehicule"], "véhicule")
+    o.date_entree = datetime.date.fromisoformat(p["date_entree"])
+    o.date_sortie = datetime.date.fromisoformat(p["date_sortie"]) if p.get("date_sortie") else None
+    _enregistrer(o, "N° d'ordre de réparation", p["numero"])
+    o.lignes.all().delete()
+    LigneReparation.objects.bulk_create([LigneReparation(ordre=o, nature=l["nature"], designation=l["designation"],
+                                                         quantite=Decimal(l["quantite"]), prix_unitaire=Decimal(l["prix_unitaire"]))
+                                         for l in p.get("lignes", [])])
+
+
 def _ecriture(p, origine, local):
     """Consolidation au siège : l'écriture de l'agence est reprise telle quelle, dans un journal propre au site."""
     from apps.commercial.models import Tiers
@@ -441,11 +487,12 @@ def _ecriture(p, origine, local):
 INTEGRATIONS = {"agence": _agence, "gare": _gare, "ligne": _ligne, "vehicule": _vehicule, "chauffeur": _chauffeur,
                 "depart": _depart, "billet": _billet, "colis": _colis, "colis_livraison": _colis_livraison,
                 "depart_arrivee": _depart_arrivee, "depense": _depense, "ecriture": _ecriture,
-                "troncon_affecte": _troncon_affecte, "troncon_effectue": _troncon_effectue}
+                "troncon_affecte": _troncon_affecte, "troncon_effectue": _troncon_effectue,
+                "plein": _plein, "reparation": _reparation}
 
 # Ordre d'intégration d'un même lot : les référentiels avant les faits qui les utilisent
 PRIORITE = {"agence": 0, "gare": 1, "vehicule": 1, "chauffeur": 1, "ligne": 2, "depart": 3, "billet": 4, "colis": 4,
-            "depense": 4, "colis_livraison": 5, "depart_arrivee": 5, "troncon_affecte": 5, "troncon_effectue": 5,
+            "depense": 4, "plein": 4, "reparation": 4, "colis_livraison": 5, "depart_arrivee": 5, "troncon_affecte": 5, "troncon_effectue": 5,
             "ecriture": 6}
 
 # Faits qu'une agence doit connaître quand ils viennent d'une autre agence (relais par le siège)

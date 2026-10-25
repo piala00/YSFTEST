@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Rubriques de paie{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Rubriques de paie</h1><a class="btn btn-primary btn-sm" href="{% url 'personnel:rubrique_create' %}"><i class="bi bi-plus"></i> Nouvelle rubrique</a></div>
+<div class="alert alert-info small py-2">Le logiciel n'impose aucun taux : créez les rubriques de votre société (cotisations sociales, impôts sur salaire,
+  primes, indemnités…) avec les taux et plafonds fixés par votre expert-comptable.</div>
+<div class="card"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Code</th><th>Libellé</th><th>Nature</th><th>Calcul</th><th class="num">Valeur</th><th class="num">Plafond</th><th>Compte</th><th>Contrepartie</th><th>Tous les bulletins</th></tr></thead>
+  <tbody>{% for r in rubriques %}<tr class="{% if not r.actif %}text-muted{% endif %}"><td><a href="{% url 'personnel:rubrique_update' r.pk %}">{{ r.code }}</a></td><td>{{ r.libelle }}</td>
+    <td>{{ r.get_nature_display }}</td><td>{{ r.get_calcul_display }}</td><td class="num">{{ r.valeur|floatformat:"-2" }}{% if r.calcul == "TAUX" %} %{% endif %}</td>
+    <td class="num">{{ r.plafond|montant_ou_vide }}</td><td>{{ r.compte.numero }}</td><td>{{ r.compte_contrepartie.numero|default:"" }}</td><td>{% if r.automatique %}oui{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucune rubrique : le salaire de base seul est payé.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

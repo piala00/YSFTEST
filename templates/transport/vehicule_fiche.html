@@ -4,9 +4,11 @@
 <div class="page-title"><h1><i class="bi bi-bus-front"></i> {{ vehicule.immatriculation }} <span class="fs-6 text-muted">{{ vehicule.designation }}</span>
   {% if not vehicule.actif %}<span class="badge text-bg-secondary fs-6">inactif</span>{% endif %}</h1>
   <div class="d-flex gap-2">
-    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:fiche_update' 'vehicules' vehicule.pk %}"><i class="bi bi-pencil"></i> Modifier</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:vehicule_update' vehicule.pk %}"><i class="bi bi-pencil"></i> Modifier</a>
     <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:grand_livre_vehicules' %}?vehicule={{ vehicule.pk }}&amp;du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}"><i class="bi bi-book"></i> Grand-livre</a>
-    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:depense_create' %}?vehicule={{ vehicule.pk }}"><i class="bi bi-fuel-pump"></i> Dépense</a></div></div>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'garage:plein_create' %}?vehicule={{ vehicule.pk }}"><i class="bi bi-fuel-pump"></i> Plein</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'garage:reparation_create' %}?vehicule={{ vehicule.pk }}"><i class="bi bi-wrench"></i> Réparation</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:depense_create' %}?vehicule={{ vehicule.pk }}"><i class="bi bi-receipt"></i> Autre dépense</a></div></div>
 {% for a in alertes %}<div class="alert alert-warning py-1 small">{{ a }}</div>{% endfor %}
 <form class="d-flex gap-2 align-items-end mb-3"><div><label class="form-label small mb-0" for="f-du">Du</label><input type="date" id="f-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
   <div><label class="form-label small mb-0" for="f-au">Au</label><input type="date" id="f-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
@@ -21,6 +23,15 @@
   <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Activité</div><div class="fs-5 fw-semibold">{{ nb_departs }} départ(s)</div>
     {{ voyageurs }} voyageur(s){% if remplissage is not None %} · remplissage {{ remplissage }} %{% endif %}</div></div>
 </div>
+<div class="row g-3 mb-3 small">
+  <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Carburant</div><div class="fs-6 fw-semibold">{{ activite.litres|floatformat:"-1" }} L · {{ activite.cout_carburant|montant }}</div>
+    {% if activite.consommation %}consommation {{ activite.consommation }} L/100 km sur {{ activite.km }} km{% else %}consommation : relevez le compteur à chaque plein{% endif %}</div></div>
+  <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Garage</div><div class="fs-6 fw-semibold">{{ activite.reparations|length }} réparation(s)</div>
+    {{ activite.jours_garage }} jour(s) d'immobilisation</div></div>
+  <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Colis transportés</div><div class="fs-6 fw-semibold">{{ activite.colis }}</div></div></div>
+  <div class="col-md-3"><div class="card card-body h-100"><div class="text-muted">Personnel affecté</div>
+    {% for e in chauffeurs %}<div>{{ e.nom }} <span class="text-muted">{{ e.poste }}</span></div>{% empty %}<span class="text-muted">aucun</span>{% endfor %}</div></div>
+</div>
 <div class="row g-3">
   <div class="col-lg-4"><div class="card"><div class="card-header bg-white fw-semibold small">Fiche</div><table class="table table-sm mb-0 small"><tbody>
     <tr><th>Type</th><td>{{ vehicule.get_type_vehicule_display }} · {{ vehicule.nombre_places }} places</td></tr>
@@ -33,7 +44,13 @@
   <div class="col-lg-4"><div class="card"><div class="card-header bg-white fw-semibold small">Derniers départs</div><table class="table table-sm mb-0 small"><tbody>
     {% for d in derniers_departs %}<tr><td><a href="{% url 'transport:depart_detail' d.pk %}">{{ d.date|date:"d/m" }} {{ d.heure|time:"H:i" }}</a></td><td>{{ d.ligne.code }}</td><td class="num">{{ d.places_vendues }}/{{ d.places }}</td><td class="num">{{ d.recette_billets|montant }}</td></tr>
     {% empty %}<tr><td class="text-muted text-center p-3">Aucun départ.</td></tr>{% endfor %}</tbody></table></div></div>
-  <div class="col-lg-4"><div class="card"><div class="card-header bg-white fw-semibold small">Dernières dépenses</div><table class="table table-sm mb-0 small"><tbody>
+  <div class="col-lg-4"><div class="card mb-3"><div class="card-header bg-white fw-semibold small">Réparations</div><table class="table table-sm mb-0 small"><tbody>
+    {% for o in activite.reparations %}<tr><td><a href="{% url 'garage:reparation' o.pk %}">{{ o.date_entree|date:"d/m" }}</a></td><td>{{ o.panne }}</td><td>{{ o.get_statut_display }}</td><td class="num">{{ o.cout|montant }}</td></tr>
+    {% empty %}<tr><td class="text-muted text-center p-2">Aucune.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="card mb-3"><div class="card-header bg-white fw-semibold small">Derniers pleins</div><table class="table table-sm mb-0 small"><tbody>
+    {% for p in activite.pleins %}<tr><td>{{ p.date|date:"d/m" }}</td><td>{{ p.litres|floatformat:"-1" }} L</td><td>{{ p.kilometrage|default:"" }} km</td><td class="num">{{ p.montant|montant }}</td></tr>
+    {% empty %}<tr><td class="text-muted text-center p-2">Aucun.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="card"><div class="card-header bg-white fw-semibold small">Autres dépenses</div><table class="table table-sm mb-0 small"><tbody>
     {% for dv in dernieres_depenses %}<tr><td>{{ dv.date|date:"d/m" }}</td><td>{{ dv.get_nature_display }}</td><td class="num">{{ dv.montant|montant }}</td></tr>
     {% empty %}<tr><td class="text-muted text-center p-3">Aucune dépense.</td></tr>{% endfor %}</tbody></table></div></div>
 </div>

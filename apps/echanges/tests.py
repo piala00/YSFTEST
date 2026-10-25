@@ -29,13 +29,15 @@ class ScenarioTroisDossiersTests(SimpleTestCase):
         self.assertEqual(r["dla_reversement"]["troncon2"], ["EFFECTUE", "EN 202 BB", "BTA"])
         self.assertNotIn("manquants", r["dla_import2"])
         c = r["siege_consolide"]
-        self.assertEqual(c["ecritures"], 9)
-        self.assertEqual(c["journaux"], ["CA-DLA", "CA-YDE", "OD-BTA", "OD-DLA"])
+        self.assertEqual(c["ecritures"], 10)                                   # + le plein de Bertoua
+        self.assertEqual(c["journaux"], ["CA-BTA", "CA-DLA", "CA-YDE", "OD-BTA", "OD-DLA"])
         self.assertEqual(c["liaisons_185"], "0.00")                            # liaisons neutralisées
         self.assertEqual(c["billets_a_voyager"], "0.00")                       # tous les voyages faits
         self.assertEqual((c["recette_LT101"], c["recette_EN202"]), ("19333.00", "3667.00"))
-        self.assertEqual((c["produits_70611"], c["produits_70612"], c["caisse"]), ("-23000.00", "-2000.00", "25000.00"))
+        self.assertEqual((c["produits_70611"], c["produits_70612"], c["caisse"]), ("-23000.00", "-2000.00", "-101000.00"))
         self.assertEqual(c["billets"], 3)
+        self.assertEqual(c["carburant_EN202"], "126000.00")                    # plein de Bertoua sur son car, au siège
+        self.assertEqual(c["pleins"], ["150.00"])
         self.assertIn("abîmé", r["altere"])
 
 

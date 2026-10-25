@@ -18,7 +18,10 @@ def societe(request):
     fiche = Societe.get()
     from .navigation import modules_proposes
 
-    contexte = {"societe": fiche, "exercice_courant": Exercice.courant(), "modules": modules_proposes(fiche),
+    from .droits import AUCUN, acces_de
+
+    proposes = [m for m in modules_proposes(fiche) if request.user.is_superuser or acces_de(request.user, m.code) != AUCUN]
+    contexte = {"societe": fiche, "exercice_courant": Exercice.courant(), "modules": proposes,
                 "selection": resume(request), "erp_actualiser": request.session.pop("erp_actualiser", None)}
     if fiche.source_mode == Societe.SYNCHRO_MIROIR:
         from .models import LotSynchronisation

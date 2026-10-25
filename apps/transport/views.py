@@ -54,7 +54,9 @@ def fiches(request, genre):
                               args=[o.pk] if genre == "vehicules" else [genre, o.pk])}
               for o in objets]
     entetes = [modele._meta.get_field(c).verbose_name for c in colonnes]
-    return render(request, "transport/fiches.html", {"titre": titre, "genre": genre, "entetes": entetes, "lignes": lignes})
+    nouvelle = reverse("transport:vehicule_create") if genre == "vehicules" else reverse("transport:fiche_create", args=[genre])
+    return render(request, "transport/fiches.html", {"titre": titre, "genre": genre, "entetes": entetes, "lignes": lignes,
+                                                     "nouvelle": nouvelle})
 
 
 @login_required
@@ -63,8 +65,10 @@ def fiche_form(request, genre, pk=None):
     instance = get_object_or_404(modele, pk=pk) if pk else None
     form = formulaire(request.POST or None, instance=instance)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        objet = form.save()
         messages.success(request, "Fiche enregistrée.")
+        if genre == "vehicules":
+            return redirect("transport:vehicule_fiche", objet.pk)
         return redirect("transport:fiches", genre)
     return render(request, "core/form.html", {"form": form, "titre": f"{titre} — {'modifier' if instance else 'nouvelle fiche'}"})
 
@@ -321,12 +325,20 @@ def depense_form(request):
 
 # ---------------------------------------------------------------- États
 @login_required
-def recette_journaliere(request):
-    """Caisse du jour par gare : billets, annulations, colis au départ, encaissements à la livraison, dépenses."""
+def recette_journaliere(request, service=""):
+    """Caisse du jour par gare : billets, annulations, colis au départ, encaissements à la livraison."""
     from . import etats
 
     jour = _jour(request)
-    return render(request, "transport/recette.html", {"jour": jour, "gares": etats.recette_journaliere(jour)})
+    return render(request, "transport/recette.html", {"jour": jour, "gares": etats.recette_journaliere(jour), "service": service})
+
+
+@login_required
+def rapport_journalier(request):
+    from . import etats
+
+    jour = _jour(request)
+    return render(request, "transport/rapport_journalier.html", {"jour": jour, **etats.rapport_journalier(jour)})
 
 
 @login_required
@@ -363,6 +375,7 @@ def vehicule_fiche(request, pk):
     voyageurs = sum((d.places_vendues for d in departs), 0)
     return render(request, "transport/vehicule_fiche.html", {
         "vehicule": vehicule, "du": debut, "au": fin, "solde": solde, "alertes": vehicule.alertes(),
+        "activite": etats.activite_vehicule(vehicule, debut, fin), "chauffeurs": vehicule.employes.filter(actif=True),
         "nb_departs": departs.count(), "voyageurs": voyageurs,
         "remplissage": round(100 * voyageurs / places) if places else None,
         "derniers_departs": departs.select_related("ligne", "chauffeur")[:10],

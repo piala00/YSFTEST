@@ -125,6 +125,10 @@ d = Depart.objects.create(ligne=Ligne.objects.get(code="BTA-GBL"), date=datetime
 attente = list(d.correspondances_a_affecter())
 attente[0].affecter(d, siege=3)
 d.partir()
+from apps.garage.models import PleinCarburant
+from apps.comptabilite.models import Journal
+PleinCarburant(vehicule=d.vehicule, depart=d, litres=150, prix_litre=840, kilometrage=52000, station="Station fictive",
+               caisse=Journal.objects.get(code="CA")).enregistrer()
 lignes = {{l.compte.numero: (str(l.debit), str(l.credit), l.vehicule.immatriculation if l.vehicule else None)
           for l in d.ecriture_recettes.lignes.select_related("compte", "vehicule")}}
 print(json.dumps({{"attente": [t.billet.numero for t in attente], "lignes": lignes}}))""")
@@ -151,13 +155,17 @@ from apps.comptabilite.models import Ecriture, LigneEcriture
 from apps.transport.models import Billet
 def solde(prefixe):
     return str(sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero__startswith=prefixe)), Decimal(0)))
+from apps.garage.models import PleinCarburant
+def vehicule_charge(immat, compte):
+    return str(sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero=compte, vehicule__immatriculation=immat)), Decimal(0)))
 def vehicule(immat):
     return str(-sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero="70611", vehicule__immatriculation=immat)), Decimal(0)))
 print(json.dumps({"ecritures": Ecriture.objects.filter(site_origine__in=["DLA", "YDE", "BTA"]).count(),
                   "billets_a_voyager": solde("41911"), "recette_LT101": vehicule("LT 101 AA"), "recette_EN202": vehicule("EN 202 BB"),
                   "journaux": sorted(set(Ecriture.objects.exclude(site_origine="").values_list("journal__code", flat=True))),
                   "liaisons_185": solde("185"), "produits_70611": solde("70611"), "produits_70612": solde("70612"),
-                  "caisse": solde("57"), "billets": Billet.objects.count()}))""")
+                  "caisse": solde("57"), "billets": Billet.objects.count(),
+                  "carburant_EN202": vehicule_charge("EN 202 BB", "6053"), "pleins": list(PleinCarburant.objects.values_list("litres", flat=True).order_by("pk"))}, default=str))""")
     # Lot altéré : refusé
     octets = bytearray(Path(lot2).read_bytes())
     octets[len(octets) // 2] ^= 0xFF

@@ -465,6 +465,7 @@ def publier_existant():
     """Rattrapage : publie une fois les faits de ce dossier antérieurs à la mise en place des échanges."""
     from apps.comptabilite.models import Ecriture
     from apps.core.models import Agence
+    from apps.garage.models import OrdreReparation, PleinCarburant
     from apps.transport.models import Billet, Chauffeur, Colis, Depart, DepenseVehicule, Gare, Ligne, Vehicule
 
     from .publication import publier_ecriture
@@ -477,7 +478,7 @@ def publier_existant():
             if a.uid not in connus:
                 publier_objet(a)
                 n += 1
-    for modele in (Gare, Vehicule, Chauffeur, Ligne, Depart, Billet, Colis, DepenseVehicule):
+    for modele in (Gare, Vehicule, Chauffeur, Ligne, Depart, Billet, Colis, DepenseVehicule, PleinCarburant, OrdreReparation):
         for o in modele.objects.filter(site_origine=""):
             if o.uid not in connus:
                 publier_objet(o)

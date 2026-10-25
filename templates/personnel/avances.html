@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Avances sur salaire{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Avances sur salaire</h1><a class="btn btn-primary btn-sm" href="{% url 'personnel:avance_create' %}"><i class="bi bi-plus"></i> Verser une avance</a></div>
+<div class="card"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Date</th><th>Employé</th><th>Motif</th><th class="num">Montant</th><th>Reprise</th></tr></thead>
+  <tbody>{% for a in avances %}<tr><td>{{ a.date|date:"d/m/Y" }}</td><td>{{ a.employe.nom }}</td><td>{{ a.motif }}</td><td class="num">{{ a.montant|montant }}</td>
+    <td>{% if a.bulletin %}{{ a.bulletin.periode }}{% else %}<span class="text-warning-emphasis">sur la prochaine paie</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center p-4">Aucune avance.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

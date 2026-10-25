@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView
 
@@ -18,6 +18,10 @@ def portail(request):
     from .navigation import modules_proposes
 
     tuiles = [(m, d.acces_de(request.user, m.code)) for m in modules_proposes(Societe.get())]
+    if not request.user.is_superuser:
+        tuiles = [(m, acces) for m, acces in tuiles if acces != d.AUCUN]     # chacun ne voit que ses logiciels
+        if len(tuiles) == 1:
+            return redirect(tuiles[0][0].accueil)
     return render(request, "core/portail.html", {"tuiles": tuiles})
 
 

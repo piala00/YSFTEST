@@ -65,9 +65,11 @@ class FichiersLiesTests(TestCase):
         self.assertEqual(self.client.get(reverse("commercial:tiers_create") + "?type=CLIENT").status_code, 403)
         # Utilisateur en Comptabilité : saisie permise
         self.assertEqual(self.client.get(reverse("comptabilite:ecriture_create")).status_code, 200)
-        # Aucun accès au Reporting : logiciel refusé, tuile grisée sur le portail
+        # Aucun accès au Reporting : logiciel refusé, et absent du portail (chacun ne voit que ses logiciels)
         self.assertEqual(self.client.get(reverse("reporting:dashboard")).status_code, 403)
-        self.assertContains(self.client.get(reverse("core:portail")), "Aucun accès à ce logiciel")
+        portail = self.client.get(reverse("core:portail"))
+        self.assertContains(portail, "Comptabilité OHADA")
+        self.assertNotContains(portail, 'href="/reporting/"')
         # L'administrateur garde l'accès à tout
         AccesLogiciel.objects.create(utilisateur=self.admin, module="reporting", acces=d.AUCUN)
         self.client.force_login(self.admin)

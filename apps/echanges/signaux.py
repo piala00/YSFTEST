@@ -27,5 +27,8 @@ def connecter():
     from apps.core.models import Agence
     from apps.transport.models import Billet, Chauffeur, Colis, Depart, DepenseVehicule, Gare, Ligne, Troncon, Vehicule
 
-    for modele in (Agence, Gare, Ligne, Vehicule, Chauffeur, Depart, Billet, Troncon, Colis, DepenseVehicule):
+    from apps.garage.models import OrdreReparation, PleinCarburant
+
+    for modele in (Agence, Gare, Ligne, Vehicule, Chauffeur, Depart, Billet, Troncon, Colis, DepenseVehicule, PleinCarburant,
+                   OrdreReparation):
         post_save.connect(_apres_enregistrement, sender=modele, dispatch_uid=f"echanges-{modele.__name__}")

@@ -137,3 +137,43 @@ Points à confirmer :
 - **Véhicules de partenaires** : le propriétaire est noté sur la fiche ; faut-il calculer et payer sa part
   (reversement au propriétaire, commission de l'agence) ?
 - Billets vendus avant cette version : leur recette a déjà été constatée à la vente ; ils ne passent pas par 41911.
+
+## Un logiciel par service, regroupement automatique (26/10)
+
+Chaque service travaille dans **son logiciel**, selon ses droits (Fichier › Autorisations d'accès : accès par
+utilisateur et par logiciel, droits par menu). Un utilisateur ne voit sur le portail que ses logiciels ; s'il n'en a
+qu'un (ex. un guichetier), il y arrive directement.
+
+| Logiciel | Qui | Ce qu'on y fait |
+|---|---|---|
+| **Billetterie** | guichetiers, chef de gare | départs, vente des billets, correspondances, annulations, reports, recette du guichet |
+| **Colis et expéditions** | agents colis | enregistrement (colis, courrier, fret), chargement, arrivée, remise contre code, contre-remboursements |
+| **Garage** | chef de garage, mécaniciens | fiches véhicules, pleins de carburant (litres, compteur, consommation), ordres de réparation (pièces, main d'œuvre extérieure ou interne, fournisseur), autres dépenses, papiers (assurance, visite) |
+| **Personnel et paie** | gestionnaire du personnel | employés par service et par agence, véhicule affecté, rubriques de paie paramétrables, avances, paie du mois, bulletins, paiement |
+| **Direction de l'agence** | chef d'agence | **rapport journalier de toute l'agence**, comptes des véhicules, rentabilité, lignes et tarifs, paramètres, échanges |
+| Comptabilité, Reporting | comptables, direction | tout arrive déjà comptabilisé |
+
+**Tout se regroupe sur chaque véhicule, automatiquement :**
+
+| Fait (service) | Écriture | Sur le véhicule |
+|---|---|---|
+| Départ du car (billetterie) | D 41911 / C 70611 | recette des voyageurs (part de chaque billet) |
+| Départ du car (colis chargés, port payé) | D 41912 / C 70612 ou 70613 | recette des colis transportés |
+| Remise d'un colis en port dû (colis) | D caisse / C 70612 | recette du car qui l'a transporté |
+| Plein (garage) | D 6053 / C caisse ou 401 station | carburant |
+| Réparation terminée (garage) | D 624 / C caisse ou 401 fournisseur | pièces et main d'œuvre extérieure (la main d'œuvre interne est dans la paie) |
+| Paie validée (personnel) | D 661, 664… / C 422, 431… | salaire et charges du chauffeur affecté au véhicule |
+
+Le **rapport journalier** (Direction › Etat) donne pour la journée : la billetterie par guichetier (espèces, Mobile
+Money, en compte, remboursements), les colis (enregistrés, remis, contre-remboursements), **chaque véhicule** (voyages,
+voyageurs, colis, litres, recettes, carburant, réparations, personnel, autres dépenses, résultat), le garage et les
+caisses. La **fiche du véhicule** et la **balance des véhicules** donnent la même vue sur une période ; au siège, toutes
+les agences sont comprises (écritures, pleins et réparations remontent par les échanges).
+
+**Paie** : le logiciel n'impose aucun taux. Créez les rubriques de la société (cotisations sociales, impôts sur salaire,
+primes…) avec les taux et plafonds fixés par l'expert-comptable.
+
+Points à confirmer :
+- Pièces de rechange : achat direct sur la réparation (actuel) ou **magasin de pièces** avec stock (Gestion commerciale) ?
+- Comptes proposés (6053 carburant, 624 réparations, 41912 colis encaissés d'avance, 661/664/422/431 paie) : à valider.
+- Faut-il une **clôture de caisse par guichetier** (versement au chef de gare, écart de caisse) ?

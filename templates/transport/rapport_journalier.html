@@ -1,0 +1,46 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Rapport journalier de l'agence{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Rapport de la journée du {{ jour|date:"l d/m/Y" }}</h1></div>
+<form class="d-flex gap-2 align-items-end mb-3 d-print-none"><div><label class="form-label small mb-0" for="rj-date">Date</label>
+  <input type="date" id="rj-date" name="date" value="{{ jour|date:'Y-m-d' }}" class="form-control form-control-sm" onchange="this.form.submit()"></div>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button></form>
+<p class="small text-muted">Chaque service saisit dans son logiciel (billetterie, colis, garage, personnel) ; ce rapport regroupe tout automatiquement.</p>
+
+<h2 class="h6 mt-3">1. Billetterie — par guichetier</h2>
+<div class="card mb-3"><table class="table table-sm mb-0 small"><thead><tr><th>Guichetier</th><th class="num">Billets</th><th class="num">Espèces</th><th class="num">Mobile Money</th><th class="num">En compte</th><th class="num">Remboursés</th><th class="num">Encaissé net</th></tr></thead>
+<tbody>{% for nom, a in agents.items %}<tr><td>{{ nom }}</td><td class="num">{{ a.nb }}</td><td class="num">{{ a.especes|montant }}</td><td class="num">{{ a.mobile|montant_ou_vide }}</td>
+  <td class="num">{{ a.compte|montant_ou_vide }}</td><td class="num">{{ a.rembourse|montant_ou_vide }}</td><td class="num fw-semibold">{{ a.encaisse|montant }}</td></tr>
+{% empty %}<tr><td colspan="7" class="text-muted text-center">Aucune vente.</td></tr>{% endfor %}</tbody></table></div>
+
+<h2 class="h6">2. Colis et expéditions</h2>
+<div class="card mb-3 card-body small"><div class="row g-2">
+  <div class="col-6 col-md-3">Envois enregistrés : <strong>{{ colis.enregistres }}</strong></div>
+  <div class="col-6 col-md-3">Port payé encaissé : <strong>{{ colis.port_paye|montant }}</strong>{% if colis.en_compte %} (+ {{ colis.en_compte|montant }} en compte){% endif %}</div>
+  <div class="col-6 col-md-3">Envois remis : <strong>{{ colis.remis }}</strong> · port dû {{ colis.port_du|montant }}</div>
+  <div class="col-6 col-md-3">Contre-remb. : encaissés {{ colis.cr_encaisses|montant }} · reversés {{ colis.cr_reverses|montant }}</div>
+  <div class="col-12 text-muted">Envois arrivés en attente du destinataire : {{ colis.a_remettre }}</div></div></div>
+
+<h2 class="h6">3. Véhicules — activité et résultat du jour</h2>
+<div class="card mb-3"><table class="table table-sm mb-0 small"><thead><tr><th>Véhicule</th><th>Voyages</th><th class="num">Voyageurs</th><th class="num">Colis</th><th class="num">Litres</th>
+  <th class="num">Recettes</th><th class="num">Carburant</th><th class="num">Réparations</th><th class="num">Personnel</th><th class="num">Autres</th><th class="num">Résultat</th></tr></thead>
+<tbody>{% for g in vehicules %}<tr><td><a href="{% url 'transport:vehicule_fiche' g.vehicule.pk %}">{{ g.vehicule.immatriculation }}</a></td>
+  <td>{% for d in g.departs %}<a href="{% url 'transport:depart_detail' d.pk %}">{{ d.heure|time:"H:i" }} {{ d.ligne.code }}</a>{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+  <td class="num">{{ g.voyageurs }}</td><td class="num">{{ g.colis }}</td><td class="num">{{ g.litres|floatformat:"-1" }}</td>
+  <td class="num">{{ g.recettes|montant }}</td><td class="num">{{ g.carburant|montant_ou_vide }}</td><td class="num">{{ g.reparations|montant_ou_vide }}</td>
+  <td class="num">{{ g.personnel|montant_ou_vide }}</td><td class="num">{{ g.autres|montant_ou_vide }}</td>
+  <td class="num fw-semibold {% if g.resultat < 0 %}text-danger{% endif %}">{{ g.resultat|montant }}</td></tr>
+{% empty %}<tr><td colspan="11" class="text-muted text-center">Aucun véhicule en activité.</td></tr>{% endfor %}</tbody>
+<tfoot><tr class="total"><td colspan="5">Total</td><td class="num">{{ total_vehicules.recettes|montant }}</td><td colspan="4" class="num">{{ total_vehicules.depenses|montant }}</td><td class="num">{{ total_vehicules.resultat|montant }}</td></tr></tfoot></table></div>
+
+<h2 class="h6">4. Garage</h2>
+<div class="card mb-3"><div class="card-body small">Pleins : <strong>{{ garage.pleins }}</strong> · {{ garage.litres|floatformat:"-1" }} L · {{ garage.carburant|montant }} FCFA ·
+  réparations terminées : {{ garage.reparations_terminees }} ·
+  au garage : {% for o in garage.au_garage %}{{ o.vehicule.immatriculation }} ({{ o.panne }}, depuis {{ o.immobilisation_jours }} j){% if not forloop.last %}, {% endif %}{% empty %}aucun véhicule{% endfor %}
+  {% if avances %}<br>Avances sur salaire versées : {{ avances|montant }}{% endif %}</div></div>
+
+<h2 class="h6">5. Caisses et banques</h2>
+<div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>Journal</th><th class="num">Entrées</th><th class="num">Sorties</th><th class="num">Solde de la journée</th></tr></thead>
+<tbody>{% for c in caisses %}<tr><td>{{ c.journal }}</td><td class="num">{{ c.entrees|montant }}</td><td class="num">{{ c.sorties|montant }}</td><td class="num fw-semibold">{{ c.solde|montant }}</td></tr>
+{% empty %}<tr><td colspan="4" class="text-muted text-center">Aucun mouvement de trésorerie.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

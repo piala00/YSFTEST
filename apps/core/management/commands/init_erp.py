@@ -135,7 +135,16 @@ class Command(BaseCommand):
         today = datetime.date.today()
         for i, (ligne, heure) in enumerate(((lignes[0], 7), (lignes[0], 13), (lignes[2], 8))):
             Depart.objects.create(ligne=ligne, date=today, heure=datetime.time(heure, 0), vehicule=cars[i], chauffeur=chauffeurs[i])
-        self.log("Démonstration transport : 3 gares, 4 lignes, 3 cars, 3 départs aujourd'hui.")
+        from apps.personnel.models import Employe
+
+        for i, (car, ch) in enumerate(zip(cars, chauffeurs), 1):
+            Employe.objects.create(matricule=f"CH{i:02d}", nom=ch.nom, poste="Chauffeur", service=Employe.CONDUITE, vehicule=car,
+                                   chauffeur=ch, salaire_base=120000)
+        Employe.objects.create(matricule="GU01", nom="Guichetier (fictif)", poste="Guichetier", service=Employe.BILLETTERIE,
+                               salaire_base=90000)
+        Employe.objects.create(matricule="ME01", nom="Mécanicien (fictif)", poste="Mécanicien", service=Employe.GARAGE,
+                               salaire_base=100000)
+        self.log("Démonstration transport : 3 gares, 4 lignes, 3 cars, 3 départs aujourd'hui, 5 employés.")
 
     def _sahel(self):
         from apps.commercial import sahel

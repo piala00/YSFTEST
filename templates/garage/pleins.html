@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Pleins de carburant{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Pleins de carburant</h1><a class="btn btn-primary btn-sm" href="{% url 'garage:plein_create' %}"><i class="bi bi-fuel-pump"></i> Saisir un plein</a></div>
+{% include "transport/_periode_vehicules.html" %}
+<div class="card"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Date</th><th>N°</th><th>Véhicule</th><th class="num">Litres</th><th class="num">Prix/L</th><th class="num">Compteur</th><th class="num">L/100 km</th><th>Station</th><th>Paiement</th><th class="num">Montant</th><th>Écriture</th></tr></thead>
+  <tbody>{% for p in pleins %}<tr><td>{{ p.date|date:"d/m/Y" }}</td><td>{{ p.numero }}</td><td><a href="{% url 'transport:vehicule_fiche' p.vehicule_id %}">{{ p.vehicule.immatriculation }}</a></td>
+    <td class="num">{{ p.litres|floatformat:"-2" }}</td><td class="num">{{ p.prix_litre|montant }}</td><td class="num">{{ p.kilometrage|default:"" }}</td>
+    <td class="num">{{ p.consommation|default:"" }}</td><td>{{ p.station }}</td><td>{{ p.get_paiement_display }}</td><td class="num">{{ p.montant|montant }}</td>
+    <td>{% if p.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' p.ecriture.pk %}">{{ p.ecriture.numero }}</a>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="11" class="text-muted text-center p-4">Aucun plein sur la période.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="3">Total</td><td class="num">{{ litres|floatformat:"-2" }}</td><td colspan="5"></td><td class="num">{{ total|montant }}</td><td></td></tr></tfoot>
+</table></div>
+{% endblock %}

@@ -87,9 +87,12 @@ class TransportTests(TestCase):
         c = Colis(gare_depart=self.dla, gare_arrivee=self.yde, expediteur="Exp", destinataire="Dest", poids=30).enregistrer()
         self.assertEqual(c.prix, 3000)                                        # 30 kg × 100, au-dessus du forfait
         self.assertEqual(len(c.code_retrait), 6)
-        self.assertEqual(solde("70612"), -3000)
+        self.assertEqual((solde("41912"), solde("70612")), (-3000, 0))      # encaissé, transport à effectuer
         c.charger(d)
         d.partir()
+        recette = LigneEcriture.objects.get(compte__numero="70612")         # recette du car qui le transporte
+        self.assertEqual((recette.credit, recette.vehicule), (3000, self.car))
+        self.assertEqual(solde("41912"), 0)
         self.assertEqual(Billet.objects.get(pk=b.pk).statut, Billet.EMBARQUE)
         self.assertEqual(Colis.objects.get(pk=c.pk).statut, Colis.EN_ROUTE)
         with self.assertRaisesMessage(ValidationError, "vente impossible"):
@@ -111,6 +114,7 @@ class TransportTests(TestCase):
         c.livrer(c.code_retrait, "Client CNI 9")
         self.assertEqual(c.ecriture_livraison.lignes.get(debit__gt=0).debit, 52000)
         self.assertEqual(solde("70612"), -2000)
+        self.assertEqual(LigneEcriture.objects.get(compte__numero="70612").vehicule, self.car)   # port dû : car du départ
         self.assertEqual(solde("4718"), -50000)                               # dû à l'expéditeur
         c.reverser_contre_remboursement()
         self.assertEqual(solde("4718"), 0)
@@ -121,9 +125,9 @@ class TransportTests(TestCase):
     def test_fret_et_annulation_colis(self):
         c = Colis(nature=Colis.FRET, gare_depart=self.dla, gare_arrivee=self.yde, expediteur="Usine", destinataire="Dépôt",
                   prix=150000).enregistrer()
-        self.assertEqual(solde("70613"), -150000)
+        self.assertEqual(solde("41912"), -150000)
         c.annuler()
-        self.assertEqual(solde("70613"), 0)
+        self.assertEqual(solde("41912"), 0)
         self.assertEqual(solde("5711"), 0)
 
     def test_colis_sur_mauvais_depart(self):
@@ -253,9 +257,32 @@ class EcransTransportTests(TestCase):
 
         from apps.core.models import Societe
 
-        self.assertContains(self.client.get(reverse("core:portail")), "Transport de voyageurs")
+        portail = self.client.get(reverse("core:portail"))
+        for titre in ("Direction de l&#x27;agence", "Billetterie", "Colis et expéditions", "Garage", "Personnel et paie"):
+            self.assertContains(portail, titre)
         Societe.objects.update(activite=Societe.ACTIVITE_COMMERCE)
-        self.assertNotContains(self.client.get(reverse("core:portail")), "Transport de voyageurs")
+        portail = self.client.get(reverse("core:portail"))
+        self.assertNotContains(portail, "Billetterie")
+        self.assertContains(portail, "Personnel et paie")                   # la paie sert aussi au commerce
+
+    def test_chacun_son_logiciel(self):
+        """Un guichetier qui n'a que la Billetterie y arrive directement et ne peut pas ouvrir le Garage."""
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        from apps.core import droits as d
+        from apps.core.models import AccesLogiciel
+        from apps.core.navigation import MODULES
+
+        guichetier = get_user_model().objects.create_user("guichet", "", "x")
+        for m in MODULES:
+            if m.code != "billetterie":
+                AccesLogiciel.objects.create(utilisateur=guichetier, module=m.code, acces=d.AUCUN)
+        self.client.force_login(guichetier)
+        self.assertRedirects(self.client.get(reverse("core:portail")), reverse("billetterie:accueil"))
+        self.assertEqual(self.client.get(reverse("transport:billet_vente")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("garage:pleins")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("transport:rapport_journalier")).status_code, 403)
 
     def test_vente_au_guichet_puis_colis_livre(self):
         from django.urls import reverse
@@ -318,3 +345,53 @@ class ComptesVehiculesTests(TestCase):
             self.assertContains(self.client.get(url), "LT 101 DEMO", msg_prefix=url)
         car.assurance_echeance = jour - datetime.timedelta(days=1)
         self.assertIn("Assurance expirée", car.alertes()[0])
+
+
+class JourneeAgenceTests(TestCase):
+    """Chaque service saisit dans son logiciel ; le rapport de la Direction et la fiche du véhicule regroupent tout."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", "--demo", verbosity=0)
+
+    def test_rapport_journalier_et_vue_vehicule(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        from apps.garage.models import LigneReparation, OrdreReparation, PleinCarburant
+        from apps.personnel.models import Employe, PeriodePaie
+
+        from . import etats
+
+        caisse = Journal.objects.get(code="CA")
+        car = Vehicule.objects.get(immatriculation="LT 101 DEMO")
+        d = Depart.objects.filter(vehicule=car).first()
+        for i in range(3):                                                     # billetterie
+            Billet(depart=d, voyageur=f"Voyageur {i}").vendre()
+        c = Colis(gare_depart=d.ligne.gare_depart, gare_arrivee=d.ligne.gare_arrivee, expediteur="E", destinataire="D",
+                  prix=2500).enregistrer()                                     # colis
+        c.charger(d)
+        d.partir()
+        PleinCarburant(vehicule=car, depart=d, litres=100, prix_litre=840, kilometrage=1000, caisse=caisse).enregistrer()  # garage
+        o = OrdreReparation.objects.create(vehicule=car, panne="Pneu")
+        LigneReparation.objects.create(ordre=o, designation="Pneu", prix_unitaire=60000)
+        o.cloturer(caisse=caisse)
+        Employe.objects.create(matricule="C1", nom="Chauffeur", vehicule=car, salaire_base=120000)       # personnel
+        jour = datetime.date.today()
+        paie = PeriodePaie.objects.create(annee=jour.year, mois=jour.month)
+        paie.generer()
+        paie.valider(date=jour)
+        r = etats.rapport_journalier(jour)
+        ligne = next(g for g in r["vehicules"] if g["vehicule"] == car)
+        self.assertEqual((ligne["voyageurs"], ligne["colis"], ligne["litres"]), (3, 1, 100))
+        self.assertEqual((ligne["recettes"], ligne["carburant"], ligne["reparations"], ligne["personnel"]), (20500, 84000, 60000, 120000))
+        self.assertEqual(ligne["resultat"], 20500 - 84000 - 60000 - 120000)
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "", "x"))
+        page = self.client.get(reverse("transport:rapport_journalier"))
+        self.assertContains(page, "LT 101 DEMO")
+        self.assertContains(page, "admin")                                     # guichetier
+        for url in (reverse("transport:vehicule_fiche", args=[car.pk]), reverse("garage:reparation", args=[o.pk]),
+                    reverse("garage:consommation"), reverse("personnel:paie", args=[paie.pk]),
+                    reverse("personnel:bulletin", args=[paie.bulletins.first().pk]), reverse("billetterie:accueil"),
+                    reverse("colis:accueil"), reverse("garage:accueil"), reverse("personnel:accueil"), reverse("transport:accueil")):
+            self.assertEqual(self.client.get(url).status_code, 200, url)

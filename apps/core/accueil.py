@@ -140,11 +140,11 @@ def transport():
     cr = Colis.objects.filter(statut=Colis.LIVRE, contre_remboursement__gt=0, cr_reverse_le__isnull=True)
     return {
         "raccourcis": [
-            {"groupe": "Billetterie", "liens": [
-                _raccourci("Départs du jour", "bi-bus-front", "transport:departs"),
-                _raccourci("Vendre un billet", "bi-ticket-perforated", "transport:billet_vente"),
-                _raccourci("Billets vendus", "bi-list-ul", "transport:billets"),
-                _raccourci("Programmer un départ", "bi-calendar-plus", "transport:depart_create"),
+            {"groupe": "Direction", "liens": [
+                _raccourci("Rapport journalier de l'agence", "bi-clipboard-data", "transport:rapport_journalier"),
+                _raccourci("Balance des véhicules", "bi-bus-front", "transport:balance_vehicules"),
+                _raccourci("Départs du jour", "bi-calendar-check", "transport:departs"),
+                _raccourci("Échanges entre agences", "bi-arrow-left-right", "transport:echanges"),
             ]},
             {"groupe": "Colis et courrier", "liens": [
                 _raccourci("Enregistrer un colis", "bi-box-seam", "transport:colis_create", query="nature=COLIS"),
@@ -175,4 +175,122 @@ def transport():
     }
 
 
-PAGES = {"commercial": commercial, "comptabilite": comptabilite, "transport": transport}
+def billetterie():
+    from apps.transport.models import Billet, Depart, Troncon
+
+    today = datetime.date.today()
+    departs = Depart.objects.filter(date=today, statut=Depart.PROGRAMME)
+    billets = Billet.objects.filter(date_vente=today).exclude(statut=Billet.ANNULE)
+    correspondances = Troncon.objects.filter(depart__isnull=True, statut=Troncon.A_VOYAGER, billet__statut=Billet.VENDU).count()
+    return {
+        "raccourcis": [{"groupe": "Guichet", "liens": [
+            _raccourci("Vendre un billet", "bi-ticket-perforated", "transport:billet_vente"),
+            _raccourci("Départs du jour", "bi-bus-front", "transport:departs"),
+            _raccourci("Billets vendus", "bi-list-ul", "transport:billets"),
+            _raccourci("Programmer un départ", "bi-calendar-plus", "transport:depart_create"),
+            _raccourci("Recette de la billetterie", "bi-cash-stack", "transport:recette_billetterie"),
+        ]}],
+        "indicateurs": [
+            _indicateur("Départs encore à la vente", departs.count(), reverse("transport:departs"), genre="nombre"),
+            _indicateur("Billets vendus aujourd'hui", billets.count(), reverse("transport:billets"), genre="nombre"),
+            _indicateur("Encaissé aujourd'hui", sum((b.prix for b in billets if b.paiement != Billet.COMPTE), ZERO),
+                        reverse("transport:recette_billetterie")),
+            _indicateur("Correspondances à placer", correspondances, reverse("transport:departs"), genre="nombre",
+                        alerte=bool(correspondances)),
+        ],
+        "titre_dernieres": "Derniers billets",
+        "dernieres": [{"date": b.date_vente, "piece": b.numero, "libelle": f"{b.voyageur} · {b.depart.ligne.code}", "montant": b.prix,
+                       "statut": b.get_statut_display(), "url": reverse("transport:billet_detail", args=[b.pk])}
+                      for b in Billet.objects.select_related("depart__ligne").order_by("-cree_le")[:10]],
+    }
+
+
+def colis():
+    from apps.transport.models import Colis
+
+    today = datetime.date.today()
+    a_charger, a_remettre = Colis.objects.filter(statut=Colis.ENREGISTRE), Colis.objects.filter(statut=Colis.ARRIVE)
+    cr = Colis.objects.filter(statut=Colis.LIVRE, contre_remboursement__gt=0, cr_reverse_le__isnull=True, site_origine="")
+    return {
+        "raccourcis": [{"groupe": "Expéditions", "liens": [
+            _raccourci("Enregistrer un colis", "bi-box-seam", "transport:colis_create", query="nature=COLIS"),
+            _raccourci("Enregistrer un courrier", "bi-envelope", "transport:colis_create", query="nature=COURRIER"),
+            _raccourci("Envois à charger", "bi-box-arrow-up", "transport:colis", query="statut=ENREGISTRE"),
+            _raccourci("Envois à remettre", "bi-box-arrow-in-down", "transport:colis", query="statut=ARRIVE"),
+            _raccourci("Recette des colis", "bi-cash-stack", "transport:recette_colis"),
+        ]}],
+        "indicateurs": [
+            _indicateur("Envois du jour", Colis.objects.filter(date=today).count(), reverse("transport:colis"), genre="nombre"),
+            _indicateur("À charger", a_charger.count(), reverse("transport:colis") + "?statut=ENREGISTRE", genre="nombre",
+                        alerte=a_charger.exists()),
+            _indicateur("À remettre aux destinataires", a_remettre.count(), reverse("transport:colis") + "?statut=ARRIVE",
+                        genre="nombre", alerte=a_remettre.exists()),
+            _indicateur("Contre-remboursements à reverser", sum((c.contre_remboursement for c in cr), ZERO),
+                        reverse("transport:colis") + "?statut=LIVRE", alerte=cr.exists()),
+        ],
+        "titre_dernieres": "Derniers envois",
+        "dernieres": [{"date": c.date, "piece": c.numero, "libelle": f"{c.expediteur} → {c.destinataire}", "montant": c.prix,
+                       "statut": c.get_statut_display(), "url": reverse("transport:colis_detail", args=[c.pk])}
+                      for c in Colis.objects.order_by("-cree_le")[:10]],
+    }
+
+
+def garage():
+    from apps.garage.models import OrdreReparation, PleinCarburant
+    from apps.transport.models import Vehicule
+
+    today = datetime.date.today()
+    pleins = PleinCarburant.objects.filter(date__year=today.year, date__month=today.month)
+    au_garage = OrdreReparation.objects.filter(statut=OrdreReparation.OUVERT)
+    papiers = [v for v in Vehicule.objects.filter(actif=True) if v.alertes()]
+    return {
+        "raccourcis": [{"groupe": "Garage", "liens": [
+            _raccourci("Saisir un plein", "bi-fuel-pump", "garage:plein_create"),
+            _raccourci("Entrée au garage", "bi-wrench", "garage:reparation_create"),
+            _raccourci("Réparations en cours", "bi-tools", "garage:reparations"),
+            _raccourci("Véhicules", "bi-bus-front", "transport:vehicules"),
+            _raccourci("Consommation", "bi-speedometer", "garage:consommation"),
+        ]}],
+        "indicateurs": [
+            _indicateur("Véhicules au garage", au_garage.count(), reverse("garage:reparations"), genre="nombre",
+                        alerte=au_garage.exists()),
+            _indicateur("Carburant du mois (litres)", int(sum((p.litres for p in pleins), ZERO)), reverse("garage:pleins"), genre="nombre"),
+            _indicateur("Carburant du mois", sum((p.montant for p in pleins), ZERO), reverse("garage:pleins")),
+            _indicateur("Papiers à renouveler", len(papiers), reverse("garage:echeances"), genre="nombre", alerte=bool(papiers)),
+        ],
+        "titre_dernieres": "Derniers pleins",
+        "dernieres": [{"date": p.date, "piece": p.numero, "libelle": f"{p.vehicule.immatriculation} · {p.litres} L", "montant": p.montant,
+                       "statut": p.station, "url": reverse("transport:vehicule_fiche", args=[p.vehicule_id])}
+                      for p in PleinCarburant.objects.select_related("vehicule").order_by("-cree_le")[:10]],
+    }
+
+
+def personnel():
+    from apps.personnel.models import Avance, Employe, PeriodePaie
+
+    employes = Employe.objects.filter(actif=True)
+    derniere = PeriodePaie.objects.first()
+    return {
+        "raccourcis": [{"groupe": "Personnel", "liens": [
+            _raccourci("Employés", "bi-person-vcard", "personnel:employes"),
+            _raccourci("Verser une avance", "bi-cash", "personnel:avance_create"),
+            _raccourci("Paie du mois", "bi-wallet2", "personnel:paies"),
+            _raccourci("Rubriques de paie", "bi-list-check", "personnel:rubriques"),
+        ]}],
+        "indicateurs": [
+            _indicateur("Employés", employes.count(), reverse("personnel:employes"), genre="nombre"),
+            _indicateur("Masse salariale de base", sum((e.salaire_base for e in employes), ZERO), reverse("personnel:employes")),
+            _indicateur("Avances à reprendre", sum((a.montant for a in Avance.objects.filter(bulletin__isnull=True, ecriture__isnull=False)), ZERO),
+                        reverse("personnel:avances")),
+            _indicateur("Dernière paie", str(derniere or "—"), reverse("personnel:paies"), genre="nombre",
+                        detail=derniere.get_statut_display() if derniere else ""),
+        ],
+        "titre_dernieres": "Dernières avances",
+        "dernieres": [{"date": a.date, "piece": a.employe.matricule, "libelle": a.employe.nom, "montant": a.montant,
+                       "statut": "reprise" if a.bulletin_id else "à reprendre", "url": reverse("personnel:avances")}
+                      for a in Avance.objects.select_related("employe")[:10]],
+    }
+
+
+PAGES = {"commercial": commercial, "comptabilite": comptabilite, "transport": transport, "billetterie": billetterie,
+         "colis": colis, "garage": garage, "personnel": personnel}

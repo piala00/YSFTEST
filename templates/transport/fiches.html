@@ -2,7 +2,7 @@
 {% block title %}{{ titre }}{% endblock %}
 {% block content %}
 <div class="page-title"><h1>{{ titre }}</h1>
-  <a class="btn btn-primary btn-sm" href="{% url 'transport:fiche_create' genre %}"><i class="bi bi-plus"></i> Nouvelle fiche</a></div>
+  <a class="btn btn-primary btn-sm" href="{{ nouvelle }}"><i class="bi bi-plus"></i> Nouvelle fiche</a></div>
 <form class="mb-3" style="max-width:20rem"><input class="form-control form-control-sm" name="q" value="{{ request.GET.q }}" placeholder="Rechercher…" aria-label="Rechercher"></form>
 <div class="card"><table class="table table-sm table-hover mb-0">
   <thead><tr>{% for e in entetes %}<th>{{ e|capfirst }}</th>{% endfor %}<th>Actif</th></tr></thead>

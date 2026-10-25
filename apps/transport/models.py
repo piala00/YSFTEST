@@ -46,10 +46,20 @@ class ParametresTransport(models.Model):
         "comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
         verbose_name="Billets vendus, voyage à effectuer",
         help_text="Encaissement d'avance du voyageur ; soldé au départ de chaque véhicule, qui reçoit sa part")
+    compte_colis_a_transporter = models.ForeignKey(
+        "comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Envois encaissés, transport à effectuer",
+        help_text="Port payé à l'expédition ; passé en recette du véhicule qui transporte l'envoi, à son départ")
     taxe_billets = models.ForeignKey("comptabilite.Taxe", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
                                      verbose_name="Taxe sur les billets", help_text="Vide : aucune taxe (réglage par défaut)")
     taxe_colis = models.ForeignKey("comptabilite.Taxe", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
                                    verbose_name="Taxe sur les colis et le fret", help_text="Vide : aucune taxe (réglage par défaut)")
+    compte_carburant = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
+                                         verbose_name="Garage : carburant")
+    compte_pieces = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
+                                      verbose_name="Garage : pièces et fournitures")
+    compte_main_oeuvre = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
+                                           verbose_name="Garage : main d'œuvre extérieure")
     retenue_annulation = models.DecimalField(
         "Retenue sur billet annulé (%)", max_digits=5, decimal_places=2, default=ZERO,
         help_text="Part du prix gardée par l'agence quand un voyageur annule (modifiable à chaque annulation)")
@@ -61,7 +71,11 @@ class ParametresTransport(models.Model):
                "compte_colis": ("70612", "Colis et courrier"),
                "compte_fret": ("70613", "Fret et logistique"),
                "compte_contre_remboursement": ("4718", "Envois contre remboursement à reverser"),
-               "compte_billets_a_voyager": ("41911", "Billets vendus, voyage à effectuer")}
+               "compte_billets_a_voyager": ("41911", "Billets vendus, voyage à effectuer"),
+               "compte_colis_a_transporter": ("41912", "Envois encaissés, transport à effectuer"),
+               "compte_carburant": ("6053", "Fournitures non stockables - Autres énergies"),
+               "compte_pieces": ("624", "Entretien, réparations et maintenance"),
+               "compte_main_oeuvre": ("624", "Entretien, réparations et maintenance")}
 
     @classmethod
     def get(cls):
@@ -74,9 +88,12 @@ class ParametresTransport(models.Model):
         fiche = cls.objects.first()
         if fiche is None:
             fiche = cls.objects.create(**{champ: compte(champ) for champ in cls.COMPTES})
-        elif not fiche.compte_billets_a_voyager_id:          # fiche antérieure aux tronçons
-            fiche.compte_billets_a_voyager = compte("compte_billets_a_voyager")
-            fiche.save(update_fields=["compte_billets_a_voyager"])
+        else:                                                # fiche antérieure : comptes ajoutés depuis
+            manquants = [champ for champ in cls.COMPTES if not getattr(fiche, f"{champ}_id")]
+            for champ in manquants:
+                setattr(fiche, champ, compte(champ))
+            if manquants:
+                fiche.save(update_fields=manquants)
         return fiche
 
 
@@ -352,23 +369,29 @@ class Depart(models.Model):
         self.statut, self.parti_le = self.PARTI, timezone.now()
         self.save(update_fields=["statut", "parti_le"])
         troncons = list(self.troncons.filter(statut=Troncon.A_VOYAGER).select_related("billet"))
+        envois = list(self.colis.filter(statut=Colis.CHARGE, port=Colis.PAYE, recette_constatee=False, ecriture__isnull=False))
         local = _site_local()
+        parametres = ParametresTransport.get()
+        debits, lignes = {}, []
+        for t in troncons:                             # billet vendu ailleurs : la somme est chez l'agence vendeuse
+            compte = _compte_liaison(t.billet.site_origine) if t.billet.site_origine else parametres.compte_billets_a_voyager
+            debits[compte] = debits.get(compte, ZERO) + t.part
+        total_billets = sum((t.part for t in troncons), ZERO)
+        if total_billets:
+            lignes += [{**l, "vehicule": self.vehicule, "section": self.ligne.gare_depart.section}
+                       for l in _ventiler(total_billets, parametres.compte_billets, parametres.taxe_billets)]
+        for c in envois:                               # port payé à l'expédition : recette du véhicule qui transporte
+            debits[parametres.compte_colis_a_transporter] = debits.get(parametres.compte_colis_a_transporter, ZERO) + c.prix
+            lignes += [{**l, "vehicule": self.vehicule, "section": self.ligne.gare_depart.section}
+                       for l in _ventiler(c.prix, c.compte_produit(parametres), parametres.taxe_colis)]
+        if lignes:
+            self.ecriture_recettes = creer_ecriture(
+                Journal.objects.get(code="OD"), timezone.localdate(),
+                f"Recettes du départ {self.numero} {self.ligne.code} - {self.vehicule.immatriculation}",
+                [{"compte": c, "debit": m} for c, m in debits.items()] + lignes, reference=self.numero, origine=self.numero)
+            self.save(update_fields=["ecriture_recettes"])
+        Colis.objects.filter(pk__in=[c.pk for c in envois]).update(recette_constatee=True)
         if troncons:
-            parametres = ParametresTransport.get()
-            debits = {}
-            for t in troncons:                         # billet vendu ailleurs : la somme est chez l'agence vendeuse
-                compte = _compte_liaison(t.billet.site_origine) if t.billet.site_origine else parametres.compte_billets_a_voyager
-                debits[compte] = debits.get(compte, ZERO) + t.part
-            total = sum(debits.values(), ZERO)
-            if total:
-                lignes = [{"compte": c, "debit": m} for c, m in debits.items()]
-                lignes += [{**l, "vehicule": self.vehicule, "section": self.ligne.gare_depart.section}
-                           for l in _ventiler(total, parametres.compte_billets, parametres.taxe_billets)]
-                self.ecriture_recettes = creer_ecriture(
-                    Journal.objects.get(code="OD"), timezone.localdate(),
-                    f"Recettes voyageurs départ {self.numero} {self.ligne.code} - {self.vehicule.immatriculation}",
-                    lignes, reference=self.numero, origine=self.numero)
-                self.save(update_fields=["ecriture_recettes"])
             for t in troncons:
                 t.statut, t.vehicule, t.effectue_le = Troncon.EFFECTUE, self.vehicule, self.parti_le
                 t.site_effectue = local.code if local is not None and t.site_origine else ""
@@ -712,6 +735,8 @@ class Colis(models.Model):
     code_retrait = models.CharField("Code de retrait", max_length=6, blank=True)
     livre_le = models.DateTimeField(null=True, blank=True)
     retire_par = models.CharField("Retiré par (nom, pièce)", max_length=150, blank=True)
+    recette_constatee = models.BooleanField(
+        default=False, editable=False, help_text="Port payé passé en recette du véhicule (au départ) ; port dû : à la remise")
     livre_site = models.CharField("Remis dans l'agence", max_length=10, blank=True,
                                   help_text="Agence qui a remis l'envoi, si ce n'est pas celle d'expédition")
     cr_reverse_le = models.DateTimeField("Contre-remboursement reversé le", null=True, blank=True)
@@ -767,12 +792,14 @@ class Colis(models.Model):
             else:
                 journal = self.gare_depart.journal_caisse()
                 contrepartie = {"compte": journal.compte_tresorerie}
+            # Encaissé d'avance : la recette ira au véhicule qui transporte l'envoi, à son départ
             lignes = [{**contrepartie, "debit": self.prix},
-                      *[{**l, "section": self.gare_depart.section}
-                        for l in _ventiler(self.prix, self.compte_produit(parametres), parametres.taxe_colis)]]
+                      {"compte": parametres.compte_colis_a_transporter, "credit": self.prix, "section": self.gare_depart.section}]
             self.ecriture = creer_ecriture(journal, self.date, f"{self.get_nature_display()} {self.numero} - {self.expediteur}",
                                            lignes, reference=self.numero, origine=self.numero)
             self.save(update_fields=["ecriture"])
+        else:
+            Colis.objects.filter(pk=self.pk).update(recette_constatee=self.port == self.PAYE)     # gratuit : rien à constater
         return self
 
     @transaction.atomic
@@ -810,8 +837,9 @@ class Colis(models.Model):
             parametres = ParametresTransport.get()
             caisse = self.gare_arrivee.journal_caisse()
             lignes = [{"compte": caisse.compte_tresorerie, "debit": self.a_encaisser}]
-            if self.port == self.DU and self.prix:
-                lignes += [{**l, "section": self.gare_arrivee.section}
+            if self.port == self.DU and self.prix:            # recette du véhicule qui l'a transporté
+                vehicule = self.depart.vehicule if self.depart_id else None
+                lignes += [{**l, "section": self.gare_arrivee.section, "vehicule": vehicule}
                            for l in _ventiler(self.prix, self.compte_produit(parametres), parametres.taxe_colis)]
             if self.contre_remboursement:
                 # Envoi d'une autre agence : la somme est due à cette agence (qui la reverse à l'expéditeur)
