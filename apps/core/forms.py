@@ -45,9 +45,13 @@ class SocieteForm(BootstrapMixin, forms.ModelForm):
         ordre.insert(ordre.index("separation_gros_detail") + 1, "depots_detail")
         self.order_fields(ordre)
         self.fields["activite"].required = False                   # absent du formulaire envoyé : activité inchangée
+        self.fields["systeme_comptable"].required = False          # idem : système comptable inchangé
 
     def clean_activite(self):
         return self.cleaned_data.get("activite") or self.instance.activite or Societe.ACTIVITE_COMMERCE
+
+    def clean_systeme_comptable(self):
+        return self.cleaned_data.get("systeme_comptable") or self.instance.systeme_comptable or Societe.SYSTEME_NORMAL
 
     def clean(self):
         donnees = super().clean()

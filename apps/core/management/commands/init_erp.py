@@ -20,6 +20,8 @@ class Command(BaseCommand):
         parser.add_argument("--regime-tva", choices=["automatique", "manuelle", "non-assujettie", "assujettie"],
                             help="Configuration de la TVA (automatique = taux du Cameroun ; manuelle = aucune TVA ; "
                                  "« assujettie » = ancien nom d'« automatique »)")
+        parser.add_argument("--systeme", choices=["normal", "smt"],
+                            help="Système comptable : normal, ou minimal de trésorerie (SMT)")
         parser.add_argument("--activite", choices=["commerce", "transport", "mixte"],
                             help="Activité de la société (transport : billetterie, colis, logistique)")
         parser.add_argument("--admin", metavar="MOT_DE_PASSE", help="Crée le super-utilisateur « admin » (ou lui redonne ce mot de passe)")
@@ -37,6 +39,9 @@ class Command(BaseCommand):
                                   "manuelle": Societe.TVA_MANUELLE, "non-assujettie": Societe.TVA_NON_ASSUJETTIE}[options["regime_tva"]]
             societe.save(update_fields=["regime_tva"])
             self.log(f"Régime de TVA : {societe.get_regime_tva_display()}.")
+        if options.get("systeme"):
+            societe.systeme_comptable = {"normal": Societe.SYSTEME_NORMAL, "smt": Societe.SYSTEME_SMT}[options["systeme"]]
+            societe.save(update_fields=["systeme_comptable"])
         if options.get("activite"):
             societe.activite = {"commerce": Societe.ACTIVITE_COMMERCE, "transport": Societe.ACTIVITE_TRANSPORT,
                                 "mixte": Societe.ACTIVITE_MIXTE}[options["activite"]]

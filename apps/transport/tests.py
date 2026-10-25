@@ -919,3 +919,52 @@ class BagagesTests(TestCase):
         self.assertEqual((b.prix, b.prix_bagages, b.total), (8000, 1500, 9500))
         self.assertContains(self.client.get(reverse("transport:billet_detail", args=[b.pk])), "1 carton")
         self.assertContains(self.client.get(reverse("transport:manifeste", args=[d.pk])), "1 carton")
+
+
+class SystemeMinimalTresorerieTests(TestCase):
+    """Système comptable choisi pour la société : le SMT présente les mêmes écritures en recettes et dépenses."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--systeme", "smt", verbosity=0)
+        dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        yde = Gare.objects.create(code="YDE", nom="Gare de Yaoundé", ville="Yaoundé")
+        cls.ligne = Ligne.objects.create(code="DLA-YDE", gare_depart=dla, gare_arrivee=yde, prix_billet=6000)
+        cls.car = Vehicule.objects.create(immatriculation="LT 321 SM", nombre_places=30)
+        cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur")
+
+    def test_etats_smt(self):
+        from apps.comptabilite import smt
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+        from apps.core.models import Exercice, Societe
+
+        self.assertEqual(Societe.get().systeme_comptable, Societe.SYSTEME_SMT)
+        jour = datetime.date.today()
+        d = Depart.objects.create(ligne=self.ligne, date=jour, heure=datetime.time(7), vehicule=self.car, chauffeur=self.chauffeur)
+        Billet(depart=d, voyageur="Parti").vendre()
+        d.partir()
+        Billet(depart=Depart.objects.create(ligne=self.ligne, date=jour, heure=datetime.time(15), vehicule=self.car,
+                                            chauffeur=self.chauffeur), voyageur="Demain").vendre()   # encaissé, pas voyagé
+        ca = Journal.objects.get(code="CA")
+        DepenseVehicule(vehicule=self.car, nature=DepenseVehicule.CARBURANT, montant=3000, caisse=ca).enregistrer()
+        loyer = Compte.objects.get_or_create(numero="6222", defaults={"intitule": "Locations de bâtiments"})[0]
+        creer_ecriture(ca, jour, "Loyer", [{"compte": loyer, "debit": 5000}, {"compte": Compte.objects.get(numero="5711"), "credit": 5000}])
+        ex = Exercice.courant()
+        cr = smt.compte_de_resultat(ex.date_debut, ex.date_fin)
+        m = cr["montants"]
+        self.assertEqual((m["ventes"], m["achats"], m["loyers"], cr["solde"]), (12000, 3000, 5000, 4000))
+        self.assertEqual(cr["var_dettes"], 6000)                           # billet encaissé, voyage à faire
+        self.assertEqual((cr["resultat"], cr["resultat_comptable"], cr["ecart"]), (-2000, -2000, 0))
+        b = smt.bilan(ex.date_fin)
+        self.assertTrue(b["equilibre"])
+        self.assertEqual(b["passif"]["resultat"], -2000)
+
+    def test_ecrans_smt_et_normal(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        self.assertContains(self.client.get(reverse("comptabilite:bilan") + "?ok=1"), "système minimal de trésorerie")
+        self.assertContains(self.client.get(reverse("comptabilite:compte_resultat") + "?ok=1"), "TOTAL DES RECETTES SUR PRODUITS")
+        self.assertContains(self.client.get(reverse("comptabilite:bilan") + "?ok=1&systeme=NORMAL"), "Bilan SYSCOHADA")

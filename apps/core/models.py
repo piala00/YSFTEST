@@ -83,6 +83,14 @@ class Societe(models.Model):
     regime_fiscal = models.CharField(
         "Régime d'imposition", max_length=20, choices=REGIMES_FISCAUX, blank=True,
         help_text="CGI 2026, art. 93 ter et quater. IGS : CA annuel HT < 50 M FCFA (30 M pour les professions libérales).")
+    SYSTEME_NORMAL, SYSTEME_SMT = "NORMAL", "SMT"
+    SYSTEMES_COMPTABLES = [(SYSTEME_NORMAL, "Système normal"), (SYSTEME_SMT, "Système minimal de trésorerie (SMT)")]
+    systeme_comptable = models.CharField(
+        "Système comptable (présentation des états financiers)", max_length=10, choices=SYSTEMES_COMPTABLES,
+        default=SYSTEME_NORMAL,
+        help_text="Acte uniforme OHADA relatif au droit comptable : système normal, ou système minimal de trésorerie "
+                  "réservé aux très petites entités (seuils de l'Acte uniforme, à confirmer avec l'expert-comptable). "
+                  "La saisie reste la même ; seuls le bilan et le compte de résultat changent de présentation.")
     taux_tva_defaut = models.DecimalField("Taux TVA par défaut (%)", max_digits=5, decimal_places=2, default=Decimal("0"),
                                           help_text="0 par défaut : pas de TVA tant que la société ne l'active pas")
     stock_negatif_autorise = models.BooleanField(

@@ -287,15 +287,31 @@ def journal_view(request):
     })
 
 
+def _smt(request):
+    """Présentation du système minimal de trésorerie si la société l'a choisi (?systeme=NORMAL pour comparer)."""
+    from apps.core.models import Societe
+
+    return Societe.get().systeme_comptable == Societe.SYSTEME_SMT and request.GET.get("systeme") != "NORMAL"
+
+
 @login_required
 def bilan_view(request):
     form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
+    if _smt(request):
+        from . import smt
+
+        return render(request, "comptabilite/bilan_smt.html", {"form": form, "bilan": smt.bilan(p["date_fin"]), "p": p})
     return render(request, "comptabilite/bilan.html", {"form": form, "bilan": etats.bilan(p["date_fin"]), "p": p})
 
 
 @login_required
 def compte_resultat_view(request):
     form, p = PeriodeForm.depuis_requete(request, avec_comptes=False)
+    if _smt(request):
+        from . import smt
+
+        return render(request, "comptabilite/compte_resultat_smt.html",
+                      {"form": form, "cr": smt.compte_de_resultat(p["date_debut"], p["date_fin"]), "p": p})
     cr = etats.compte_de_resultat(p["date_debut"], p["date_fin"])
     return render(request, "comptabilite/compte_resultat.html", {"form": form, "cr": cr, "p": p})
 
