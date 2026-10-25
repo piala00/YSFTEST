@@ -1,7 +1,13 @@
 {% extends "base.html" %}{% load erp %}
-{% block title %}Rapport journalier de l'agence{% endblock %}
+{% block title %}Rapport journalier de l'agence
+<h2 class="h6 mt-3">7. Points ouverts</h2>
+<div class="card"><div class="card-body small">{% for b in bloquants %}<div class="text-danger">{{ b }}</div>{% endfor %}{% for a in signales %}<div class="text-warning-emphasis">{{ a }}</div>{% endfor %}
+  {% if not bloquants and not signales %}<span class="text-success">Aucun.</span>{% endif %}
+  {% if cloture %}<div class="text-muted mt-1">Journée clôturée par {{ cloture.cloture_par }} le {{ cloture.cloture_le|date:"d/m/Y H:i" }}{% if cloture.commentaire %} — {{ cloture.commentaire }}{% endif %}</div>{% endif %}</div></div>
+{% endblock %}
 {% block content %}
-<div class="page-title"><h1>Rapport de la journée du {{ jour|date:"l d/m/Y" }}</h1></div>
+<div class="page-title"><h1>Rapport de la journée du {{ jour|date:"l d/m/Y" }}
+  {% if cloture %}<span class="badge text-bg-success fs-6">Clôturé</span>{% else %}<span class="badge text-bg-warning fs-6">Provisoire</span>{% endif %}</h1></div>
 <form class="d-flex gap-2 align-items-end mb-3 d-print-none"><div><label class="form-label small mb-0" for="rj-date">Date</label>
   <input type="date" id="rj-date" name="date" value="{{ jour|date:'Y-m-d' }}" class="form-control form-control-sm" onchange="this.form.submit()"></div>
   <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button></form>
@@ -39,8 +45,19 @@
   au garage : {% for o in garage.au_garage %}{{ o.vehicule.immatriculation }} ({{ o.panne }}, depuis {{ o.immobilisation_jours }} j){% if not forloop.last %}, {% endif %}{% empty %}aucun véhicule{% endfor %}
   {% if avances %}<br>Avances sur salaire versées : {{ avances|montant }}{% endif %}</div></div>
 
-<h2 class="h6">5. Caisses et banques</h2>
+<h2 class="h6">5. Caisses des guichets</h2>
+<div class="card mb-3"><table class="table table-sm mb-0 small"><thead><tr><th>Caisse</th><th>Agent</th><th class="num">Attendu</th><th class="num">Compté</th><th class="num">Écart</th><th>Statut</th></tr></thead>
+<tbody>{% for s in sessions %}<tr><td>{{ s.numero }}</td><td>{{ s.agent }}</td><td class="num">{{ s.attendu|montant_ou_vide }}</td><td class="num">{{ s.montant_compte|montant_ou_vide }}</td>
+  <td class="num {% if s.ecart %}text-danger{% endif %}">{{ s.ecart|montant_ou_vide }}</td><td>{{ s.get_statut_display }}</td></tr>
+{% empty %}<tr><td colspan="6" class="text-muted text-center">Aucune session de caisse.</td></tr>{% endfor %}</tbody></table></div>
+
+<h2 class="h6">6. Trésorerie (journaux)</h2>
 <div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>Journal</th><th class="num">Entrées</th><th class="num">Sorties</th><th class="num">Solde de la journée</th></tr></thead>
 <tbody>{% for c in caisses %}<tr><td>{{ c.journal }}</td><td class="num">{{ c.entrees|montant }}</td><td class="num">{{ c.sorties|montant }}</td><td class="num fw-semibold">{{ c.solde|montant }}</td></tr>
 {% empty %}<tr><td colspan="4" class="text-muted text-center">Aucun mouvement de trésorerie.</td></tr>{% endfor %}</tbody></table></div>
+
+<h2 class="h6 mt-3">7. Points ouverts</h2>
+<div class="card"><div class="card-body small">{% for b in bloquants %}<div class="text-danger">{{ b }}</div>{% endfor %}{% for a in signales %}<div class="text-warning-emphasis">{{ a }}</div>{% endfor %}
+  {% if not bloquants and not signales %}<span class="text-success">Aucun.</span>{% endif %}
+  {% if cloture %}<div class="text-muted mt-1">Journée clôturée par {{ cloture.cloture_par }} le {{ cloture.cloture_le|date:"d/m/Y H:i" }}{% if cloture.commentaire %} — {{ cloture.commentaire }}{% endif %}</div>{% endif %}</div></div>
 {% endblock %}

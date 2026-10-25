@@ -107,5 +107,6 @@ class DepenseVehiculeForm(BootstrapMixin, forms.ModelForm):
 class ParametresTransportForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = ParametresTransport
-        fields = ("compte_billets", "compte_colis", "compte_fret", "compte_contre_remboursement", "taxe_billets", "taxe_colis",
-                  "retenue_annulation")
+        fields = ("compte_billets", "compte_colis", "compte_fret", "compte_contre_remboursement", "compte_billets_a_voyager",
+                  "compte_colis_a_transporter", "compte_carburant", "compte_pieces", "compte_main_oeuvre", "taxe_billets",
+                  "taxe_colis", "retenue_annulation", "sessions_caisse_obligatoires")

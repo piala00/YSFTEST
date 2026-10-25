@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Caisses des guichets{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Caisses des guichets du {{ jour|date:"d/m/Y" }}</h1></div>
+<form class="d-flex gap-2 align-items-end mb-3"><div><label class="form-label small mb-0" for="s-date">Date</label>
+  <input type="date" id="s-date" name="date" value="{{ jour|date:'Y-m-d' }}" class="form-control form-control-sm" onchange="this.form.submit()"></div></form>
+<div class="card"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Caisse</th><th>Agent</th><th>Service</th><th>Ouverte</th><th>Fermée</th><th class="num">Fonds</th><th class="num">Attendu</th><th class="num">Compté</th><th class="num">Écart</th><th>Statut</th><th>Approbation</th></tr></thead>
+  <tbody>{% for s, d in sessions %}<tr class="{% if s.ecart %}table-warning{% endif %}"><td>{{ s.numero }}</td><td>{{ s.agent }}</td><td>{{ s.get_service_display }}</td>
+    <td>{{ s.ouverte_le|date:"H:i" }}</td><td>{{ s.fermee_le|date:"H:i" }}</td><td class="num">{{ s.fonds_initial|montant }}</td>
+    <td class="num">{% if s.attendu is not None %}{{ s.attendu|montant }}{% else %}{{ d.attendu|montant }} <span class="text-muted">(en cours)</span>{% endif %}</td>
+    <td class="num">{{ s.montant_compte|montant_ou_vide }}</td><td class="num fw-semibold">{{ s.ecart|montant_ou_vide }}</td><td>{{ s.get_statut_display }}</td>
+    <td>{% if s.statut == "FERMEE" %}<form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="session" value="{{ s.pk }}">
+      {% if s.ecart %}<input name="justification" value="{{ s.justification }}" class="form-control form-control-sm" placeholder="justification" aria-label="Justification">
+      {% if s.ecart < 0 %}<select name="imputation" class="form-select form-select-sm" aria-label="Manquant">{% for c, l in imputations %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select>{% endif %}{% endif %}
+      <button class="btn btn-sm btn-success py-0">Approuver</button></form>
+    {% elif s.statut == "APPROUVEE" %}{{ s.approuvee_par }} {{ s.approuvee_le|date:"H:i" }}{% if s.justification %} · {{ s.justification }}{% endif %}{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="11" class="text-muted text-center p-4">Aucune caisse ouverte ce jour.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Ma caisse{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Ma caisse</h1></div>
+{% if not session %}
+<form method="post" class="card card-body" style="max-width:40rem">{% csrf_token %}<h6>Ouvrir ma caisse</h6>
+  <div class="row g-2">
+    <div class="col-md-5"><label class="form-label small mb-0" for="c-caisse">Caisse</label><select id="c-caisse" name="caisse" class="form-select form-select-sm">{% for c in caisses %}<option value="{{ c.pk }}" {% if c.code == "CA" %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><label class="form-label small mb-0" for="c-gare">Gare</label><select id="c-gare" name="gare" class="form-select form-select-sm"><option value="">—</option>{% for g in gares %}<option value="{{ g.pk }}">{{ g.nom }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-label small mb-0" for="c-fonds">Fonds de départ</label><input id="c-fonds" name="fonds_initial" type="number" min="0" value="0" class="form-control form-control-sm"></div>
+  </div>
+  <button class="btn btn-sm btn-primary mt-2" name="action" value="ouvrir">Ouvrir ma caisse</button></form>
+{% else %}
+<div class="card mb-3"><div class="card-header bg-white fw-semibold small">Caisse {{ session.numero }} ouverte le {{ session.ouverte_le|date:"d/m/Y H:i" }} · {{ session.caisse }}</div>
+<table class="table table-sm mb-0 small"><tbody>
+  <tr><td>Fonds de départ</td><td class="num">{{ session.fonds_initial|montant }}</td></tr>
+  <tr><td>Billets payés en espèces ({{ detail.nb_billets }} billet(s) en tout)</td><td class="num">+ {{ detail.billets_especes|montant }}</td></tr>
+  <tr><td>Remboursements</td><td class="num">− {{ detail.remboursements|montant }}</td></tr>
+  <tr><td>Colis encaissés à l'expédition</td><td class="num">+ {{ detail.colis|montant }}</td></tr>
+  <tr><td>Encaissé à la remise des colis (port dû, contre-remboursement)</td><td class="num">+ {{ detail.livraisons|montant }}</td></tr>
+  <tr><td>Contre-remboursements reversés</td><td class="num">− {{ detail.reversements|montant }}</td></tr>
+  <tr class="total"><td>Espèces attendues dans la caisse</td><td class="num">{{ detail.attendu|montant }}</td></tr>
+  <tr class="text-muted"><td>Pour mémoire : Mobile Money {{ detail.billets_mobile|montant }} · en compte {{ detail.billets_compte|montant }}</td><td></td></tr>
+</tbody></table></div>
+<form method="post" class="card card-body" style="max-width:40rem">{% csrf_token %}<h6>Fermer ma caisse</h6>
+  <div class="row g-2">
+    <div class="col-md-4"><label class="form-label small mb-0" for="f-mt">Montant compté</label><input id="f-mt" name="montant_compte" type="number" min="0" required class="form-control form-control-sm"></div>
+    <div class="col-md-4"><label class="form-label small mb-0" for="f-remis">Fonds remis à</label><input id="f-remis" name="remis_a" class="form-control form-control-sm" placeholder="chef de gare, coffre…"></div>
+    <div class="col-md-12"><label class="form-label small mb-0" for="f-just">Explication d'un écart éventuel</label><input id="f-just" name="justification" class="form-control form-control-sm"></div>
+  </div>
+  <button class="btn btn-sm btn-danger mt-2" name="action" value="fermer" onclick="return confirm('Fermer votre caisse ?')">Fermer ma caisse</button></form>
+{% endif %}
+{% if dernieres %}<div class="card mt-3"><div class="card-header bg-white fw-semibold small">Mes dernières caisses</div><table class="table table-sm mb-0 small"><tbody>
+{% for s in dernieres %}<tr><td>{{ s.numero }}</td><td>{{ s.ouverte_le|date:"d/m H:i" }} → {{ s.fermee_le|date:"H:i" }}</td><td class="num">attendu {{ s.attendu|montant }}</td><td class="num">compté {{ s.montant_compte|montant }}</td>
+  <td class="num {% if s.ecart %}text-danger{% endif %}">écart {{ s.ecart|montant }}</td><td>{{ s.get_statut_display }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% endblock %}

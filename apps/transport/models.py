@@ -60,6 +60,9 @@ class ParametresTransport(models.Model):
                                       verbose_name="Garage : pièces et fournitures")
     compte_main_oeuvre = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
                                            verbose_name="Garage : main d'œuvre extérieure")
+    sessions_caisse_obligatoires = models.BooleanField(
+        "Caisse ouverte obligatoire pour encaisser", default=False,
+        help_text="Chaque guichetier ou agent colis ouvre sa caisse (fonds de départ) avant d'encaisser, et la ferme le soir")
     retenue_annulation = models.DecimalField(
         "Retenue sur billet annulé (%)", max_digits=5, decimal_places=2, default=ZERO,
         help_text="Part du prix gardée par l'agence quand un voyageur annule (modifiable à chaque annulation)")
@@ -484,6 +487,9 @@ class Billet(models.Model):
     ecriture_annulation = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL,
                                                related_name="+")
     vendu_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    session = models.ForeignKey("transport.SessionCaisse", null=True, blank=True, on_delete=models.PROTECT, related_name="billets")
+    session_annulation = models.ForeignKey("transport.SessionCaisse", null=True, blank=True, on_delete=models.PROTECT,
+                                           related_name="annulations")
     cree_le = models.DateTimeField(auto_now_add=True)
     annule_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     annule_le = models.DateTimeField(null=True, blank=True)
@@ -566,6 +572,9 @@ class Billet(models.Model):
                     raise ValidationError(f"Le siège {siege} est déjà vendu sur le départ {d.numero}.")
         self.gare_arrivee = destination
         self.vendu_par = self.vendu_par or utilisateur
+        from .models_caisse import session_pour
+
+        self.session = self.session or session_pour(utilisateur)
         self.numero = self.numero or Sequence.piece("BIL", self.date_vente.year, largeur=6)
         self.save()
         for ordre, ((a, b, d, siege), part) in enumerate(zip(segments, _parts(self.prix, segments, tarifs)), 1):
@@ -620,9 +629,12 @@ class Billet(models.Model):
                         for l in _ventiler(retenue, parametres.compte_billets, parametres.taxe_billets)]]
             self.ecriture_annulation = creer_ecriture(self._journal(), date, libelle, lignes, reference=self.numero,
                                                       origine=self.numero)
+        from .models_caisse import session_pour
+
+        self.session_annulation = session_pour(utilisateur) if rembourse and self.paiement == self.ESPECES else None
         self.troncons.update(statut=Troncon.ANNULE)
         self.statut, self.retenue, self.annule_par, self.annule_le = self.ANNULE, retenue, utilisateur, timezone.now()
-        self.save(update_fields=["statut", "retenue", "annule_par", "annule_le", "ecriture_annulation"])
+        self.save(update_fields=["statut", "retenue", "annule_par", "annule_le", "ecriture_annulation", "session_annulation"])
         return self
 
     @property
@@ -758,6 +770,12 @@ class Colis(models.Model):
     cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     cree_le = models.DateTimeField(auto_now_add=True)
     livre_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    session = models.ForeignKey("transport.SessionCaisse", null=True, blank=True, on_delete=models.PROTECT,
+                                related_name="colis_enregistres")
+    session_livraison = models.ForeignKey("transport.SessionCaisse", null=True, blank=True, on_delete=models.PROTECT,
+                                          related_name="colis_livres")
+    session_reversement = models.ForeignKey("transport.SessionCaisse", null=True, blank=True, on_delete=models.PROTECT,
+                                            related_name="colis_reverses")
 
     class Meta:
         ordering = ["-date", "-numero"]
@@ -790,6 +808,10 @@ class Colis(models.Model):
         if self.port == self.DU and self.client_id:
             raise ValidationError("Un envoi en compte client est en port payé.")
         self.cree_par = self.cree_par or utilisateur
+        if self.port == self.PAYE and self.prix and not self.client_id:
+            from .models_caisse import session_pour
+
+            self.session = self.session or session_pour(utilisateur)
         self.numero = self.numero or Sequence.piece("COL", self.date.year, largeur=6)
         self.code_retrait = self.code_retrait or f"{secrets.randbelow(1000000):06d}"
         self.save()
@@ -859,9 +881,13 @@ class Colis(models.Model):
             self.ecriture_livraison = creer_ecriture(caisse, date, f"Livraison {self.numero} - {self.destinataire}", lignes,
                                                      reference=self.numero, origine=self.numero)
         local = _site_local()
+        from .models_caisse import session_pour
+
+        self.session_livraison = session_pour(utilisateur) if self.a_encaisser else None
         self.statut, self.livre_le, self.retire_par, self.livre_par = self.LIVRE, timezone.now(), retire_par.strip(), utilisateur
         self.livre_site = local.code if local is not None and self.site_origine else ""
-        self.save(update_fields=["statut", "livre_le", "retire_par", "livre_par", "livre_site", "ecriture_livraison"])
+        self.save(update_fields=["statut", "livre_le", "retire_par", "livre_par", "livre_site", "ecriture_livraison",
+                                 "session_livraison"])
         if self.site_origine:                              # l'agence d'expédition l'apprendra par le siège
             from apps.echanges.publication import publier
 
@@ -892,8 +918,10 @@ class Colis(models.Model):
             [{"compte": compte_cr, "debit": self.contre_remboursement},
              {"compte": caisse.compte_tresorerie, "credit": self.contre_remboursement}],
             reference=self.numero, origine=self.numero)
-        self.cr_reverse_le = timezone.now()
-        self.save(update_fields=["ecriture_reversement", "cr_reverse_le"])
+        from .models_caisse import session_pour
+
+        self.cr_reverse_le, self.session_reversement = timezone.now(), session_pour(utilisateur)
+        self.save(update_fields=["ecriture_reversement", "cr_reverse_le", "session_reversement"])
         return self
 
     @transaction.atomic
@@ -976,3 +1004,6 @@ class DepenseVehicule(models.Model):
                                        reference=self.reference or self.numero, origine=self.numero)
         self.save(update_fields=["ecriture"])
         return self
+
+
+from .models_caisse import ClotureJournee, SessionCaisse, TransfertFonds  # noqa: E402,F401

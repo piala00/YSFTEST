@@ -421,3 +421,67 @@ class NumerotationAgencesTests(TestCase):
         b = Billet(depart=d, voyageur="V", paiement=Billet.MOBILE_MONEY).vendre()
         self.assertEqual(b.caisse.code, "MM")
         self.assertEqual(b.ecriture.lignes.get(debit__gt=0).compte, Journal.objects.get(code="MM").compte_tresorerie)
+
+
+class CaissesEtCloturesTests(TestCase):
+    """P1 : caisse de chaque guichetier, écart justifié et comptabilisé, transferts, clôture de journée."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", "--demo", verbosity=0)
+
+    def test_journee_d_un_guichetier(self):
+        from django.contrib.auth import get_user_model
+
+        from .models_caisse import ClotureJournee, SessionCaisse, TransfertFonds, anomalies_du_jour, cloturer_journee
+
+        User = get_user_model()
+        agent, chef = User.objects.create_user("guichet", "", "x"), User.objects.create_user("chef", "", "x")
+        p = ParametresTransport.get()
+        p.sessions_caisse_obligatoires = True
+        p.save()
+        ca = Journal.objects.get(code="CA")
+        d = Depart.objects.filter(statut=Depart.PROGRAMME).first()
+        with self.assertRaisesMessage(ValidationError, "Ouvrez votre caisse"):
+            Billet(depart=d, voyageur="V").vendre(agent)
+        s = SessionCaisse.ouvrir(agent, ca, fonds_initial=10000)
+        Billet(depart=d, voyageur="V1").vendre(agent)                       # 6 000 espèces
+        b2 = Billet(depart=d, voyageur="V2").vendre(agent)
+        Billet(depart=d, voyageur="V3", paiement=Billet.MOBILE_MONEY).vendre(agent)   # hors espèces
+        b2.annuler(retenue=1000, utilisateur=agent)                          # 5 000 rendus
+        Colis(gare_depart=d.ligne.gare_depart, gare_arrivee=d.ligne.gare_arrivee, expediteur="E", destinataire="D",
+              prix=2000).enregistrer(agent)
+        self.assertEqual(s.detail()["attendu"], 10000 + 12000 - 5000 + 2000)
+        self.assertEqual(s.detail()["billets_mobile"], 6000)
+        jour = datetime.date.today()
+        self.assertIn("encore ouverte", anomalies_du_jour(jour, ClotureJournee.BILLETTERIE)[0][0])
+        s.fermer(18500, "billet de 500 introuvable", "Chef de gare")
+        self.assertEqual(s.ecart, -500)
+        with self.assertRaisesMessage(ValidationError, "propre caisse"):
+            s.approuver(agent)
+        s.approuver(chef, imputation=SessionCaisse.AGENT)                     # manquant retenu à l'agent
+        self.assertEqual(s.ecriture_ecart.lignes.get(debit=500).compte.numero, "421")
+        t = TransfertFonds(origine=ca, destination=Journal.objects.get(code="BQ"), montant=15000).envoyer(chef)
+        self.assertEqual(t.ecriture_envoi.lignes.get(debit=15000).compte.numero, "585")
+        t.recevoir(chef)
+        self.assertEqual(t.statut, TransfertFonds.RECU)
+        cloturer_journee(jour, ClotureJournee.BILLETTERIE, chef)
+        cloture = cloturer_journee(jour, ClotureJournee.AGENCE, chef)
+        self.assertTrue(any("pas clôturé" in a for a in cloture.anomalies))   # colis et garage acceptés ouverts
+        with self.assertRaises(ValidationError):
+            cloturer_journee(jour, ClotureJournee.AGENCE, chef)
+
+    def test_ecrans(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "", "x"))
+        page = self.client.post(reverse("transport:ma_caisse_billetterie"), {"action": "ouvrir", "caisse": Journal.objects.get(code="CA").pk,
+                                                                             "fonds_initial": 5000}, follow=True)
+        self.assertContains(page, "Espèces attendues")
+        page = self.client.post(reverse("transport:ma_caisse_billetterie"), {"action": "fermer", "montant_compte": 5000}, follow=True)
+        self.assertContains(page, "Caisse fermée")
+        for url in ("transport:sessions_caisse", "transport:transferts", "transport:cloture", "transport:rapport_journalier",
+                    "transport:cloture_colis", "transport:ma_caisse_colis"):
+            self.assertEqual(self.client.get(reverse(url)).status_code, 200, url)
+        self.assertContains(self.client.get(reverse("transport:rapport_journalier")), "Provisoire")

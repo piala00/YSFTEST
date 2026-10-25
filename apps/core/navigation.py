@@ -753,7 +753,9 @@ BILLETTERIE = _module_service(
         E("billetterie.vendre", "Vendre un billet", "transport:billet_vente", icone="bi-ticket-perforated"),
         E("billetterie.billets", "Billets vendus (annulation, report)", "transport:billets", icone="bi-list-ul"),
         SEP(),
+        E("billetterie.ma_caisse", "Ma caisse (ouverture, fermeture)", "transport:ma_caisse_billetterie", icone="bi-safe"),
         E("billetterie.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
+        E("billetterie.cloture", "Clôturer la journée de la billetterie", "transport:cloture_billetterie", icone="bi-lock"),
     ],
     etat=[E("billetterie.recette", "Recette de la billetterie", "transport:recette_billetterie", icone="bi-cash-stack")])
 
@@ -769,6 +771,9 @@ COLIS = _module_service(
         E("colis.a_remettre", "Envois arrivés à remettre", "transport:colis", icone="bi-box-arrow-in-down", statut="ARRIVE"),
         E("colis.reverser", "Contre-remboursements à reverser", "transport:colis", icone="bi-arrow-return-left", statut="LIVRE"),
         E("colis.liste", "Suivi des envois", "transport:colis", icone="bi-search"),
+        SEP(),
+        E("colis.ma_caisse", "Ma caisse (ouverture, fermeture)", "transport:ma_caisse_colis", icone="bi-safe"),
+        E("colis.cloture", "Clôturer la journée des colis", "transport:cloture_colis", icone="bi-lock"),
     ],
     etat=[E("colis.recette", "Recette des colis", "transport:recette_colis", icone="bi-cash-stack")])
 
@@ -786,6 +791,8 @@ GARAGE = _module_service(
         SEP(),
         E("garage.depense", "Autre dépense de véhicule", "transport:depense_create", icone="bi-receipt"),
         E("garage.depenses", "Autres dépenses", "transport:depenses", icone="bi-list-ul"),
+        SEP(),
+        E("garage.cloture", "Clôturer la journée du garage", "transport:cloture_garage", icone="bi-lock"),
     ],
     etat=[E("garage.consommation", "Carburant et consommation par véhicule", "garage:consommation", icone="bi-speedometer"),
           E("garage.echeances", "Papiers des véhicules (assurance, visite)", "garage:echeances", icone="bi-calendar-event"),
@@ -823,6 +830,10 @@ TRANSPORT = Module(
         ]),
         Onglet("traitement", "Traitement", "bi-gear", [
             E("traitement.departs", "Départs du jour", "transport:departs", icone="bi-bus-front"),
+            E("traitement.sessions", "Contrôle des caisses des guichets", "transport:sessions_caisse", icone="bi-safe"),
+            E("traitement.transferts", "Transferts de fonds (banque, siège)", "transport:transferts", icone="bi-arrow-left-right"),
+            E("traitement.cloture", "Clôture de la journée", "transport:cloture", icone="bi-lock"),
+            SEP(),
             E("traitement.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
             E("traitement.reglement", "Règlement d'un client en compte", "commercial:reglement_create", icone="bi-wallet2"),
         ]),

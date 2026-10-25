@@ -337,8 +337,14 @@ def recette_journaliere(request, service=""):
 def rapport_journalier(request):
     from . import etats
 
+    from .models_caisse import ClotureJournee, SessionCaisse, anomalies_du_jour
+
     jour = _jour(request)
-    return render(request, "transport/rapport_journalier.html", {"jour": jour, **etats.rapport_journalier(jour)})
+    bloquants, signales = anomalies_du_jour(jour)
+    return render(request, "transport/rapport_journalier.html", {
+        "jour": jour, **etats.rapport_journalier(jour), "bloquants": bloquants, "signales": signales,
+        "cloture": ClotureJournee.objects.filter(date=jour, perimetre=ClotureJournee.AGENCE).first(),
+        "sessions": SessionCaisse.objects.filter(ouverte_le__date=jour).select_related("agent")})
 
 
 @login_required
@@ -404,3 +410,97 @@ def grand_livre_vehicules(request):
     return render(request, "transport/grand_livre_vehicules.html", {
         "du": debut, "au": fin, "livres": [l for l in livres if l["lignes"] or request.GET.get("vehicule")],
         "vehicules": Vehicule.objects.all(), "vehicule": request.GET.get("vehicule", "")})
+
+
+# ---------------------------------------------------------------- Caisses des guichets et clôtures
+@login_required
+def ma_caisse(request, service):
+    """Ouverture, suivi et fermeture de la caisse de l'agent connecté."""
+    from apps.comptabilite.models import Journal
+
+    from .models_caisse import SessionCaisse
+
+    session = SessionCaisse.ouverte_de(request.user)
+    if request.method == "POST":
+        try:
+            if request.POST.get("action") == "ouvrir":
+                SessionCaisse.ouvrir(request.user, get_object_or_404(Journal, pk=request.POST.get("caisse")), service=service,
+                                     gare=Gare.objects.filter(pk=request.POST.get("gare")).first(),
+                                     fonds_initial=Decimal(request.POST.get("fonds_initial") or 0))
+                messages.success(request, "Caisse ouverte.")
+            elif request.POST.get("action") == "fermer" and session:
+                session.fermer(Decimal(request.POST.get("montant_compte") or "-1"), request.POST.get("justification", ""),
+                               request.POST.get("remis_a", ""))
+                messages.success(request, f"Caisse fermée : attendu {session.attendu:,.0f}, compté {session.montant_compte:,.0f}, "
+                                          f"écart {session.ecart:,.0f}. Le chef de gare doit l'approuver.".replace(",", " "))
+        except (ValidationError, ArithmeticError, ValueError) as exc:
+            _erreur(request, exc)
+        return redirect(request.path)
+    return render(request, "transport/ma_caisse.html", {
+        "session": session, "detail": session.detail() if session else None, "service": service,
+        "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE), "gares": Gare.objects.filter(actif=True),
+        "dernieres": SessionCaisse.objects.filter(agent=request.user).exclude(statut=SessionCaisse.OUVERTE)[:5]})
+
+
+@login_required
+def sessions_caisse(request):
+    from .models_caisse import SessionCaisse
+
+    jour = _jour(request)
+    if request.method == "POST":
+        s = get_object_or_404(SessionCaisse, pk=request.POST.get("session"))
+        try:
+            s.approuver(request.user, request.POST.get("justification", ""), request.POST.get("imputation") or SessionCaisse.CHARGE)
+            messages.success(request, f"Caisse {s.numero} approuvée.")
+        except ValidationError as exc:
+            _erreur(request, exc)
+        return redirect(f"{request.path}?date={jour.isoformat()}")
+    sessions = SessionCaisse.objects.filter(ouverte_le__date=jour).select_related("agent", "caisse", "gare")
+    return render(request, "transport/sessions_caisse.html", {
+        "jour": jour, "sessions": [(s, s.detail()) for s in sessions], "imputations": SessionCaisse.IMPUTATIONS})
+
+
+@login_required
+def transferts(request):
+    from apps.comptabilite.models import Journal
+
+    from .models_caisse import TransfertFonds
+
+    if request.method == "POST":
+        try:
+            if request.POST.get("action") == "envoyer":
+                TransfertFonds(origine=get_object_or_404(Journal, pk=request.POST["origine"]),
+                               destination=get_object_or_404(Journal, pk=request.POST["destination"]),
+                               montant=Decimal(request.POST.get("montant") or 0), porteur=request.POST.get("porteur", "")
+                               ).envoyer(request.user)
+                messages.success(request, "Fonds envoyés : en transit jusqu'à leur réception.")
+            elif request.POST.get("action") == "recevoir":
+                get_object_or_404(TransfertFonds, pk=request.POST["transfert"]).recevoir(request.user)
+                messages.success(request, "Réception enregistrée.")
+        except (ValidationError, ArithmeticError, ValueError, KeyError) as exc:
+            _erreur(request, exc)
+        return redirect(request.path)
+    return render(request, "transport/transferts.html", {
+        "transferts": TransfertFonds.objects.select_related("origine", "destination")[:100],
+        "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)})
+
+
+@login_required
+def cloture_journee(request, perimetre=""):
+    from .models_caisse import ClotureJournee, anomalies_du_jour, cloturer_journee
+
+    jour = _jour(request)
+    perimetres = [p for p in ClotureJournee.PERIMETRES if not perimetre or p[0] == perimetre]
+    if request.method == "POST":
+        try:
+            cloturer_journee(jour, request.POST["perimetre"], request.user, request.POST.get("commentaire", ""))
+            messages.success(request, "Journée clôturée.")
+        except (ValidationError, KeyError) as exc:
+            _erreur(request, exc)
+        return redirect(f"{request.path}?date={jour.isoformat()}")
+    etats = []
+    for code, libelle in perimetres:
+        bloquants, signales = anomalies_du_jour(jour, code)
+        etats.append({"code": code, "libelle": libelle, "bloquants": bloquants, "signales": signales,
+                      "cloture": ClotureJournee.objects.filter(date=jour, perimetre=code).select_related("cloture_par").first()})
+    return render(request, "transport/cloture.html", {"jour": jour, "etats": etats})
