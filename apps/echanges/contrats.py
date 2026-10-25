@@ -66,7 +66,8 @@ def serialiser(o):
         return "ligne", {"v": VERSION, "uid": str(o.uid), "code": o.code, "gare_depart": _uid(o.gare_depart),
                          "gare_arrivee": _uid(o.gare_arrivee), "distance_km": o.distance_km, "duree": o.duree,
                          "prix_billet": _d(o.prix_billet), "colis_forfait": _d(o.colis_forfait),
-                         "colis_prix_kg": _d(o.colis_prix_kg), "actif": o.actif}, None, ""
+                         "colis_prix_kg": _d(o.colis_prix_kg), "actif": o.actif,
+                         "arrets": [_uid(a.gare) for a in o.arrets.select_related("gare")]}, None, ""
     if isinstance(o, Vehicule):
         return "vehicule", {"v": VERSION, "uid": str(o.uid), "immatriculation": o.immatriculation, "designation": o.designation,
                             "type": o.type_vehicule, "places": o.nombre_places, "actif": o.actif,
@@ -87,7 +88,8 @@ def serialiser(o):
                           "piece_identite": o.piece_identite, "siege": o.siege, "prix": _d(o.prix), "paiement": o.paiement,
                           "client": o.client.code if o.client_id else None, "statut": o.statut, "retenue": _d(o.retenue),
                           "vendu_par": str(o.vendu_par or ""), "annule_le": _date(o.annule_le),
-                          "gare_arrivee": _uid(o.gare_arrivee),
+                          "gare_arrivee": _uid(o.gare_arrivee), "gare_montee": _uid(o.gare_montee),
+                          "remboursement": o.remboursement,
                           "troncons": [{"uid": str(t.uid), "ordre": t.ordre, "gare_depart": _uid(t.gare_depart),
                                         "gare_arrivee": _uid(t.gare_arrivee), "depart": _uid(t.depart), "siege": t.siege,
                                         "part": _d(t.part), "statut": t.statut, "vehicule": _uid(t.vehicule),
@@ -179,6 +181,13 @@ def _ligne(p, origine, local):
     l.gare_depart, l.gare_arrivee = _par_uid(Gare, p["gare_depart"], "gare"), _par_uid(Gare, p["gare_arrivee"], "gare")
     l.prix_billet, l.colis_forfait, l.colis_prix_kg = Decimal(p["prix_billet"]), Decimal(p["colis_forfait"]), Decimal(p["colis_prix_kg"])
     _enregistrer(l, "Code de ligne", p["code"])
+    if "arrets" in p:                                       # arrêts intermédiaires, dans l'ordre (absents en v1)
+        from apps.transport.models import ArretLigne
+
+        gares = [_par_uid(Gare, g, "gare") for g in p["arrets"]]
+        l.arrets.exclude(gare__in=gares).delete()
+        for ordre, g in enumerate(gares, 1):
+            ArretLigne.objects.update_or_create(ligne=l, gare=g, defaults={"ordre": ordre})
 
 
 def _vehicule(p, origine, local):
@@ -257,6 +266,8 @@ def _billet(p, origine, local):
             raise SansObjet("billet sans correspondance dans cette agence")
     b = _copie(Billet, p["uid"], origine)
     b.gare_arrivee = _par_uid(Gare, p.get("gare_arrivee"), "gare", obligatoire=False)
+    b.gare_montee = _par_uid(Gare, p.get("gare_montee"), "gare", obligatoire=False)
+    b.remboursement = p.get("remboursement", b.remboursement or "")
     b.depart, b.gare = _par_uid(Depart, p["depart"], "départ"), _par_uid(Gare, p.get("gare"), "gare", obligatoire=False)
     for champ in ("numero", "voyageur", "telephone", "piece_identite", "siege", "paiement", "statut"):
         setattr(b, champ, p.get(champ) if p.get(champ) is not None else ("" if champ not in ("siege",) else None))

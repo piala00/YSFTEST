@@ -65,3 +65,22 @@ fiscales ou sociales restent à valider par l'expert-comptable (réf. 07, 14).
    forfaitaire) et les dépenses à la charge du propriétaire.
 3. Salaire des chauffeurs : imputation au véhicule habituel (actuel) ou ventilation par voyage effectué.
 4. Embarquement : un contrôleur avec un appareil qui scanne le QR, ou contrôle sur liste (manifeste) ?
+
+## 4. Avancement (27/10/2026)
+
+Choix de l'utilisateur :
+- étapes P1, P2, P3 et P4, après P0 ;
+- partenaires payés par **commission sur recettes** ou **location forfaitaire** ;
+- salaire du chauffeur : **plusieurs options** selon l'accord (ventilation habituelle, par voyage, par jour, agence) ;
+- embarquement : **contrôle sur liste** (manifeste), sans scanner QR.
+
+| Étape | État | Où |
+|---|---|---|
+| P0 | ✅ | `Sequence.piece` (numéros par agence), journal Mobile Money |
+| P1 | ✅ | `apps/transport/models_caisse.py` (sessions, transferts, clôtures, anomalies) |
+| P2 | ✅ | `apps/transport/models_exploitation.py`, `Depart.partir` / `cloturer` |
+| P3 | ✅ | `apps/partenaires` (contrats versionnés, décomptes, règlements, relevés) |
+| P4 | 🟡 | arrêts et sièges par tronçon, embarquement sur liste, remboursement séparé, historique ; **quotas inter-agences à faire** |
+| P5 à P7 | ❌ | à planifier |
+
+Détail fonctionnel : `docs/V2_TRANSPORT_VOYAGEURS.md`, section « Étapes P0 à P4 ».

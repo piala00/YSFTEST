@@ -555,3 +555,131 @@ class ExploitationTests(TestCase):
         self.assertEqual([f for _, f in e.repartition(jour.replace(day=1), jour)], [Decimal("0.5"), Decimal("0.5")])
         e.ventilation = Employe.AGENCE
         self.assertEqual(e.repartition(jour, jour), [])
+
+
+class BilletterieAvanceeTests(TestCase):
+    """P4 : arrêts intermédiaires et sièges par tronçon, embarquement pointé sur la liste, remboursement après
+    autorisation, historique du billet."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        cls.dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        cls.ede = Gare.objects.create(code="EDE", nom="Arrêt d'Edéa", ville="Edéa")
+        cls.yde = Gare.objects.create(code="YDE", nom="Gare de Yaoundé", ville="Yaoundé")
+        cls.ligne = Ligne.objects.create(code="DLA-YDE", gare_depart=cls.dla, gare_arrivee=cls.yde, prix_billet=6000)
+        Ligne.objects.create(code="DLA-EDE", gare_depart=cls.dla, gare_arrivee=cls.ede, prix_billet=2000)
+        Ligne.objects.create(code="EDE-YDE", gare_depart=cls.ede, gare_arrivee=cls.yde, prix_billet=4500)
+        from .models import ArretLigne
+
+        ArretLigne.objects.create(ligne=cls.ligne, ordre=1, gare=cls.ede)
+        cls.car = Vehicule.objects.create(immatriculation="LT 700 AV", nombre_places=2)
+        cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur")
+
+    def depart(self, heure=7):
+        return Depart.objects.create(ligne=self.ligne, date=datetime.date.today(), heure=datetime.time(heure),
+                                     vehicule=self.car, chauffeur=self.chauffeur)
+
+    def test_arrets_sieges_revendus_apres_descente(self):
+        d = self.depart()
+        b1 = Billet(depart=d, voyageur="Descend à Edéa", gare_arrivee=self.ede, siege=1).vendre()
+        self.assertEqual((b1.prix, b1.troncons.get().gare_arrivee), (2000, self.ede))      # tarif DLA-EDE
+        b2 = Billet(depart=d, voyageur="Monte à Edéa", gare_montee=self.ede, siege=1).vendre()  # même siège, après Edéa
+        self.assertEqual((b2.prix, b2.montee, b2.destination), (4500, self.ede, self.yde))
+        self.assertEqual(d.places_vendues, 1)                                 # au plus 1 voyageur à bord à la fois
+        with self.assertRaisesMessage(ValidationError, "déjà vendu"):
+            Billet(depart=d, voyageur="Tout le trajet", siege=1).vendre()
+        Billet(depart=d, voyageur="Tout le trajet", siege=2).vendre()
+        with self.assertRaisesMessage(ValidationError, "complet"):
+            Billet(depart=d, voyageur="De trop", gare_arrivee=self.ede).vendre()
+        with self.assertRaisesMessage(ValidationError, "avant"):
+            Billet(depart=d, voyageur="À l'envers", gare_montee=self.ede, gare_arrivee=self.dla).vendre()
+        d.partir()
+        self.assertEqual(solde("70611"), -(2000 + 4500 + 6000))
+        self.assertEqual(solde("41911"), 0)
+
+    def test_embarquement_pointe_absent_puis_reporte(self):
+        d = self.depart()
+        present = Billet(depart=d, voyageur="Présent", siege=1).vendre()
+        absent = Billet(depart=d, voyageur="Absent", siege=2).vendre()
+        d.pointer_embarquement([present.troncons.get().pk])
+        d.refresh_from_db()
+        d.partir()
+        self.assertEqual(solde("70611"), -6000)                               # seul le présent est une recette du car
+        self.assertEqual(solde("41911"), -6000)                               # l'absent reste dû au voyageur
+        t = absent.troncons.get()
+        self.assertEqual((t.depart, t.depart_manque, t.statut), (None, d, "A_VOYAGER"))
+        self.assertEqual(Billet.objects.get(pk=absent.pk).statut, Billet.VENDU)
+        self.assertEqual(Billet.objects.get(pk=present.pk).statut, Billet.EMBARQUE)
+        suivant = self.depart(heure=15)
+        absent.refresh_from_db()
+        absent.reporter(suivant, siege=1)
+        self.assertEqual(absent.troncons.get().depart, suivant)
+        evenements = list(absent.historique.values_list("evenement", flat=True))
+        self.assertEqual(evenements, ["VENTE", "ABSENT", "REPORT"])
+        self.assertIn("PARTI", present.historique.values_list("evenement", flat=True))
+
+    def test_remboursement_autorise_puis_paye(self):
+        b = Billet(depart=self.depart(), voyageur="Annule").vendre()
+        b.annuler(retenue=1000, rembourser=False)
+        self.assertEqual((b.remboursement, b.rembourse), (Billet.AUTORISE, 5000))
+        self.assertEqual(solde("5711"), 6000)                                 # rien n'est encore sorti de la caisse
+        self.assertEqual(solde("41913"), -5000)                               # dû au voyageur
+        b.rembourser()
+        self.assertEqual(solde("5711"), 1000)
+        self.assertEqual(solde("41913"), 0)
+        self.assertEqual(b.remboursement, Billet.PAYE)
+        with self.assertRaisesMessage(ValidationError, "Aucun remboursement"):
+            b.rembourser()
+        self.assertEqual(list(b.historique.values_list("evenement", flat=True)), ["VENTE", "ANNULATION", "REMBOURSEMENT"])
+
+    def test_remboursement_dans_la_session_du_guichetier_qui_paie(self):
+        from django.contrib.auth import get_user_model
+
+        from .models_caisse import SessionCaisse
+
+        p = ParametresTransport.get()
+        p.sessions_caisse_obligatoires = True
+        p.save()
+        vendeur = get_user_model().objects.create_user("vendeur", password="x")
+        payeur = get_user_model().objects.create_user("payeur", password="x")
+        ca = Journal.objects.get(code="CA")
+        s1 = SessionCaisse.ouvrir(vendeur, ca, fonds_initial=0)
+        b = Billet(depart=self.depart(), voyageur="V").vendre(vendeur)
+        b.annuler(retenue=0, utilisateur=vendeur, rembourser=False)
+        self.assertEqual(s1.detail()["attendu"], 6000)                        # autorisé, pas payé
+        s2 = SessionCaisse.ouvrir(payeur, ca, fonds_initial=10000)
+        b.rembourser(payeur)
+        self.assertEqual((s1.detail()["attendu"], s2.detail()["attendu"]), (6000, 4000))
+
+    def test_ligne_avec_arrets_par_le_formulaire(self):
+        from .forms import LigneForm
+
+        form = LigneForm({"code": "DLA-BFS", "gare_depart": self.dla.pk, "gare_arrivee": self.yde.pk, "arrets": "ede",
+                          "prix_billet": 7000, "colis_forfait": 0, "colis_prix_kg": 0, "actif": "on"})
+        self.assertTrue(form.is_valid(), form.errors)
+        ligne = form.save()
+        self.assertEqual([g.code for g in ligne.gares()], ["DLA", "EDE", "YDE"])
+        self.assertFalse(LigneForm({"code": "X", "gare_depart": self.dla.pk, "gare_arrivee": self.yde.pk, "arrets": "DLA",
+                                    "prix_billet": 1, "colis_forfait": 0, "colis_prix_kg": 0}).is_valid())
+
+    def test_ecrans(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        d = self.depart()
+        b = Billet(depart=d, voyageur="Voyageur", siege=1).vendre()
+        self.client.post(reverse("transport:depart_detail", args=[d.pk]), {"action": "embarquement", "embarques": [b.troncons.get().pk]})
+        self.assertTrue(b.troncons.get().embarque)
+        self.assertContains(self.client.get(reverse("transport:depart_detail", args=[d.pk])), "Liste pointée")
+        self.assertContains(self.client.get(reverse("transport:manifeste", args=[d.pk])), "Montée")
+        self.client.post(reverse("transport:billet_detail", args=[b.pk]), {"action": "annuler", "retenue": "0", "rembourser": "plus_tard"})
+        self.assertEqual(Billet.objects.get(pk=b.pk).remboursement, Billet.AUTORISE)
+        self.assertContains(self.client.get(reverse("transport:billets") + "?remboursement=AUTORISE"), b.numero)
+        self.client.post(reverse("transport:billet_detail", args=[b.pk]), {"action": "rembourser"})
+        r = self.client.get(reverse("transport:billet_detail", args=[b.pk]))
+        self.assertContains(r, "Historique du billet")
+        self.assertContains(r, "remboursé 6")
+        self.assertContains(self.client.get(reverse("transport:fiche_update", args=["lignes", self.ligne.pk])), 'value="EDE"')
+        self.assertEqual(self.client.get(reverse("transport:billet_vente") + f"?depart={d.pk}").status_code, 200)

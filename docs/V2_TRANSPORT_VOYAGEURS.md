@@ -176,4 +176,57 @@ primes…) avec les taux et plafonds fixés par l'expert-comptable.
 Points à confirmer :
 - Pièces de rechange : achat direct sur la réparation (actuel) ou **magasin de pièces** avec stock (Gestion commerciale) ?
 - Comptes proposés (6053 carburant, 624 réparations, 41912 colis encaissés d'avance, 661/664/422/431 paie) : à valider.
-- Faut-il une **clôture de caisse par guichetier** (versement au chef de gare, écart de caisse) ?
+- ~~Clôture de caisse par guichetier~~ : faite (étape P1 ci-dessous).
+
+## Étapes P0 à P4 de l'audit du skill transport
+
+Plan dans `docs/AUDIT_SKILL_TRANSPORT_2026-10-26.md`. Les comptes proposés restent **à valider par l'expert-comptable**.
+
+**P0 — Corrections.** Numéros préfixés par le code de l'agence (`DLA-BIL2026-000001`) dès que les échanges sont
+configurés : plus de collision entre agences. Billet payé en Mobile Money porté au journal Mobile Money de la gare.
+
+**P1 — Caisses et clôtures.** Session de caisse par guichetier ou agent colis (fonds de départ, encaissements,
+comptage, écart), approuvée par un autre utilisateur ; écart en 658 / 421 (manquant) ou 758 (excédent). Transferts de
+fonds via 585 (en transit jusqu'à la réception). Clôture de la journée par service et pour l'agence, refusée tant
+qu'il reste un point bloquant (caisse ouverte ou non approuvée) ; les autres anomalies sont listées dans le rapport.
+Option « caisse ouverte obligatoire pour encaisser » dans les Paramètres transport.
+
+**P2 — Exploitation.** Convoyeur, kilomètres au départ et à l'arrivée, refus d'un véhicule déjà programmé à la même
+heure ou encore sur la route, refus du départ si l'assurance ou la visite technique est expirée (réglable). Avance de
+mission à l'équipage (47121), justifiée au retour (péage 638, frais de route 6181, carburant, dépannage 624) ; le
+voyage se clôture quand l'avance est justifiée.
+
+**P3 — Véhicules des partenaires** (Direction › Traitement › Véhicules des partenaires).
+
+| Modèle de contrat | Ce qui revient au propriétaire sur la période |
+|---|---|
+| Commission sur recettes | recettes du véhicule − commission de l'agence (%) − dépenses mises à sa charge |
+| Location forfaitaire | forfait par jour, ou par mois au prorata des jours − dépenses mises à sa charge |
+
+- Le contrat dit quelles dépenses sont à la charge du propriétaire : carburant, réparations, équipage, péages et
+  frais de route, autres. Un **avenant** crée une nouvelle version datée ; l'ancienne reste dans l'historique.
+- Le **décompte** se calcule depuis les comptes du véhicule (au siège, une fois les fichiers des agences importés) et
+  garde la version du contrat appliquée. Une période ne se décompte qu'une fois.
+- À l'approbation : D 622 (sur le véhicule) / C 401 du partenaire. Si le résultat est négatif, le propriétaire doit la
+  différence à l'agence (sens inverse).
+- Les **règlements** (D 401 / C caisse ou banque) peuvent être partiels. Le **relevé** montre le dû, les paiements et
+  le reste à payer.
+- Le résultat du véhicule pour l'agence, le décompte du partenaire et le solde de son compte restent distincts.
+
+**P4 — Billetterie avancée.**
+- **Arrêts intermédiaires** : sur la fiche de la ligne, codes des gares desservies en route (ex. `EDE, PKL`). On peut
+  vendre un billet qui monte ou descend à un arrêt. Le siège est compté **par tronçon** : libéré à Edéa, il se revend
+  pour Edéa → Yaoundé. Le prix vient de la ligne-tarif entre les deux gares, sinon il se saisit. Les arrêts sont
+  transmis aux agences.
+- **Embarquement sur la liste** (fiche du départ) : le contrôleur coche les voyageurs à bord, puis valide la liste.
+  Au départ du car, les non-cochés sont **absents** : pas de recette pour ce car, avance du voyageur gardée (41911),
+  billet à reporter ou à rembourser (signalé au rapport). Sans liste validée, tout le monde est considéré parti (comme
+  avant). Le manifeste imprimé a une case « à bord » et la montée et la descente de chaque voyageur.
+- **Remboursement séparé de l'annulation** : à l'annulation, choisir « rembourser maintenant » (comme avant) ou
+  « autoriser seulement ». Le remboursement autorisé est une dette envers le voyageur (41913, proposé). Il se paie
+  ensuite en caisse (Billetterie › Remboursements à payer) et compte dans la session du guichetier qui paie.
+- **Historique du billet** : vente, placement ou report, pointage, départ, absence, annulation, remboursement, avec
+  l'auteur et l'heure ; jamais modifié.
+
+Reste du plan : quotas de sièges pour vendre sur les départs d'une autre agence (P4, à faire avec la synchronisation),
+magasin du garage (P5), RH (P6), socle de sécurité et de contrôle (P7).

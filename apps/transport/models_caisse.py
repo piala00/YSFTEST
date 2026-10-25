@@ -89,7 +89,7 @@ class SessionCaisse(models.Model):
             "billets_mobile": sum((b.prix for b in billets if b.paiement == Billet.MOBILE_MONEY), ZERO),
             "billets_compte": sum((b.prix for b in billets if b.paiement == Billet.COMPTE), ZERO),
             "nb_billets": billets.count(),
-            "remboursements": sum((b.rembourse for b in self.annulations.all() if b.paiement == Billet.ESPECES), ZERO),
+            "remboursements": sum((b.rembourse for b in self.remboursements_billets.all() if b.paiement == Billet.ESPECES), ZERO),
             "colis": sum((c.prix for c in self.colis_enregistres.all() if c.port == Colis.PAYE and not c.client_id
                           and c.statut != Colis.ANNULE), ZERO),
             "livraisons": sum((c.a_encaisser for c in self.colis_livres.all()), ZERO),
@@ -265,10 +265,17 @@ def anomalies_du_jour(jour, perimetre=ClotureJournee.AGENCE):
 
         for a in AvanceMission.objects.filter(statut=AvanceMission.REMISE, date__lte=jour):
             signales.append(f"Avance de mission {a.numero} ({a.beneficiaire}, {a.montant:,.0f}) pas encore justifiée".replace(",", " "))
-        n = Troncon.objects.filter(depart__isnull=True, statut=Troncon.A_VOYAGER, billet__statut=Billet.VENDU,
-                                   site_origine="").count()
+        attente = Troncon.objects.filter(depart__isnull=True, statut=Troncon.A_VOYAGER, billet__statut=Billet.VENDU,
+                                         site_origine="")
+        n = attente.filter(depart_manque__isnull=True).count()
         if n:
             signales.append(f"{n} voyageur(s) en correspondance à placer")
+        n = attente.filter(depart_manque__isnull=False).count()
+        if n:
+            signales.append(f"{n} voyageur(s) absent(s) au départ, billet à reporter ou rembourser")
+        n = Billet.objects.filter(remboursement=Billet.AUTORISE, site_origine="").count()
+        if n:
+            signales.append(f"{n} remboursement(s) de billet autorisé(s) pas encore payé(s)")
     if perimetre in (ClotureJournee.COLIS, ClotureJournee.AGENCE):
         n = Colis.objects.filter(date__lte=jour, statut=Colis.ENREGISTRE, site_origine="").count()
         if n:

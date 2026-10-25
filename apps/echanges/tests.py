@@ -13,6 +13,7 @@ class ScenarioTroisDossiersTests(SimpleTestCase):
         with tempfile.TemporaryDirectory() as travail:
             r = scenario.executer(travail)
         self.assertEqual(r["dla_referentiels"]["gares"], 4)                    # référentiels reçus du siège
+        self.assertEqual(r["dla_referentiels"]["arrets_dla_gbl"], ["DLA", "BTA", "GBL"])  # avec les arrêts des lignes
         self.assertEqual(r["dla_referentiels"]["liaisons"], ["18501", "18503", "18504"])  # même compte = même agence partout
         self.assertIn("rejetés : 0", r["siege_import1"])
         self.assertIn("déjà reçu", r["siege_rejeu"])                          # rejeu sans effet

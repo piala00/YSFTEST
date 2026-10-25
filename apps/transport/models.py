@@ -54,6 +54,10 @@ class ParametresTransport(models.Model):
                                      verbose_name="Taxe sur les billets", help_text="Vide : aucune taxe (réglage par défaut)")
     taxe_colis = models.ForeignKey("comptabilite.Taxe", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
                                    verbose_name="Taxe sur les colis et le fret", help_text="Vide : aucune taxe (réglage par défaut)")
+    compte_remboursements = models.ForeignKey(
+        "comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Billets annulés, remboursement à payer",
+        help_text="Remboursement autorisé à l'annulation, payé ensuite en caisse")
     compte_carburant = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
                                          verbose_name="Garage : carburant")
     compte_pieces = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
@@ -78,6 +82,7 @@ class ParametresTransport(models.Model):
                "compte_contre_remboursement": ("4718", "Envois contre remboursement à reverser"),
                "compte_billets_a_voyager": ("41911", "Billets vendus, voyage à effectuer"),
                "compte_colis_a_transporter": ("41912", "Envois encaissés, transport à effectuer"),
+               "compte_remboursements": ("41913", "Billets annulés, remboursement à payer"),
                "compte_carburant": ("6053", "Fournitures non stockables - Autres énergies"),
                "compte_pieces": ("624", "Entretien, réparations et maintenance"),
                "compte_main_oeuvre": ("624", "Entretien, réparations et maintenance")}
@@ -220,6 +225,32 @@ class Ligne(models.Model):
     def prix_colis(self, poids):
         return max(self.colis_forfait, _arrondi(Decimal(poids or 0) * self.colis_prix_kg))
 
+    def gares(self):
+        """Gares desservies dans l'ordre : départ, arrêts intermédiaires, arrivée."""
+        return [self.gare_depart, *[a.gare for a in self.arrets.select_related("gare")], self.gare_arrivee]
+
+    def dessert(self, gare_depart, gare_arrivee):
+        """Vrai si un voyageur peut monter à la première gare et descendre à la seconde."""
+        rangs = [g.pk for g in self.gares()]
+        return (gare_depart.pk in rangs and gare_arrivee.pk in rangs
+                and rangs.index(gare_depart.pk) < rangs.index(gare_arrivee.pk))
+
+
+class ArretLigne(models.Model):
+    """Arrêt intermédiaire d'une ligne : un voyageur peut y monter ou en descendre ; son siège est libre ensuite."""
+
+    ligne = models.ForeignKey(Ligne, on_delete=models.CASCADE, related_name="arrets")
+    ordre = models.PositiveSmallIntegerField(default=1)
+    gare = models.ForeignKey(Gare, on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        ordering = ["ligne", "ordre"]
+        unique_together = [("ligne", "gare")]
+        verbose_name = "Arrêt de ligne"
+
+    def __str__(self):
+        return f"{self.ligne.code} : {self.gare.ville}"
+
 
 class Vehicule(models.Model):
     """Fiche du véhicule : c'est aussi un compte (recettes et dépenses portées sur les lignes d'écriture)."""
@@ -313,6 +344,9 @@ class Depart(models.Model):
     observations = models.CharField("Observations, incidents", max_length=250, blank=True)
     cloture_le = models.DateTimeField(null=True, blank=True)
     cloture_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    embarquement_valide_le = models.DateTimeField("Liste d'embarquement pointée le", null=True, blank=True)
+    embarquement_valide_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                                related_name="+")
     statut = models.CharField(max_length=10, choices=STATUTS, default=PROGRAMME)
     parti_le = models.DateTimeField(null=True, blank=True)
     arrive_le = models.DateTimeField(null=True, blank=True)
@@ -357,16 +391,73 @@ class Depart(models.Model):
     def billets_actifs(self):
         return self.voyageurs
 
+    def _rangs(self):
+        return {g.pk: i for i, g in enumerate(self.ligne.gares())}
+
+    def _occupants(self, gare_depart=None, gare_arrivee=None):
+        """Tronçons de ce départ qui occupent une place entre les deux gares (tout le trajet par défaut). Un voyageur
+        qui descend à un arrêt libère son siège pour la suite."""
+        rangs = self._rangs()
+        fin = len(rangs) - 1
+        a = rangs.get(getattr(gare_depart, "pk", None), 0)
+        b = rangs.get(getattr(gare_arrivee, "pk", None), fin)
+        resultat = []
+        for t in self.voyageurs:
+            ta, tb = rangs.get(t.gare_depart_id, 0), rangs.get(t.gare_arrivee_id, fin)
+            if tb <= ta:
+                ta, tb = 0, fin
+            if ta < b and a < tb:
+                resultat.append(t)
+        return resultat
+
+    def _charge_max(self, gare_depart=None, gare_arrivee=None):
+        """Voyageurs à bord sur la partie la plus chargée du trajet (entre les deux gares, tout le trajet par défaut)."""
+        rangs = self._rangs()
+        fin = len(rangs) - 1
+        a = rangs.get(getattr(gare_depart, "pk", None), 0)
+        b = rangs.get(getattr(gare_arrivee, "pk", None), fin)
+        charge = [0] * fin
+        for t in self.voyageurs:
+            ta, tb = rangs.get(t.gare_depart_id, 0), rangs.get(t.gare_arrivee_id, fin)
+            if tb <= ta:
+                ta, tb = 0, fin
+            for i in range(ta, tb):
+                charge[i] += 1
+        return max(charge[a:b] or [0])
+
     @property
     def places_vendues(self):
-        return self.voyageurs.count()
+        return self._charge_max()
 
     @property
     def places_libres(self):
         return max(self.places - self.places_vendues, 0)
 
-    def sieges_occupes(self):
-        return set(self.voyageurs.exclude(siege=None).values_list("siege", flat=True))
+    def places_libres_entre(self, gare_depart, gare_arrivee):
+        return max(self.places - self._charge_max(gare_depart, gare_arrivee), 0)
+
+    def sieges_occupes(self, gare_depart=None, gare_arrivee=None):
+        return {t.siege for t in self._occupants(gare_depart, gare_arrivee) if t.siege is not None}
+
+    @transaction.atomic
+    def pointer_embarquement(self, embarques, utilisateur=None):
+        """Contrôle sur la liste (manifeste) : les tronçons cochés sont à bord. Une fois la liste validée, les
+        voyageurs non cochés seront « absents » au départ du car (pas de recette, billet à reporter ou rembourser)."""
+        _proprietaire(self, f"Le départ {self.numero}")
+        if self.statut != self.PROGRAMME:
+            raise ValidationError("L'embarquement se pointe avant le départ du car.")
+        embarques = {int(pk) for pk in embarques}
+        maintenant = timezone.now()
+        for t in self.voyageurs.filter(statut=Troncon.A_VOYAGER).select_related("billet"):
+            if (t.pk in embarques) != t.embarque:
+                t.embarque, t.embarque_le, t.embarque_par = t.pk in embarques, maintenant, utilisateur
+                t.save(update_fields=["embarque", "embarque_le", "embarque_par"])
+                if not t.billet.site_origine:
+                    t.billet.tracer("EMBARQUE" if t.embarque else "DEBARQUE",
+                                    f"{'À bord' if t.embarque else 'Retiré de la liste'} du départ {self.numero}", utilisateur)
+        self.embarquement_valide_le, self.embarquement_valide_par = maintenant, utilisateur
+        self.save(update_fields=["embarquement_valide_le", "embarquement_valide_par"])
+        return self
 
     def recette_billets(self):
         """Part des billets qui revient à ce départ (donc à son véhicule)."""
@@ -380,8 +471,11 @@ class Depart(models.Model):
 
     def correspondances_a_affecter(self):
         """Voyageurs en correspondance qui attendent un véhicule pour ce trajet."""
-        return Troncon.objects.filter(depart__isnull=True, statut=Troncon.A_VOYAGER, gare_depart=self.ligne.gare_depart,
-                                      gare_arrivee=self.ligne.gare_arrivee).select_related("billet")
+        gares = [g.pk for g in self.ligne.gares()]
+        attente = Troncon.objects.filter(depart__isnull=True, statut=Troncon.A_VOYAGER, gare_depart__in=gares[:-1],
+                                         gare_arrivee__in=gares[1:]).exclude(billet__statut=Billet.ANNULE)
+        retenus = [t.pk for t in attente if gares.index(t.gare_depart_id) < gares.index(t.gare_arrivee_id)]
+        return Troncon.objects.filter(pk__in=retenus).select_related("billet", "gare_depart", "gare_arrivee")
 
     def ouvert_a_la_vente(self):
         _proprietaire(self, f"Le départ {self.numero}")
@@ -407,6 +501,12 @@ class Depart(models.Model):
             raise ValidationError(f"Départ refusé : {', '.join(expires)} ({self.vehicule.immatriculation}).")
         self.statut, self.parti_le = self.PARTI, timezone.now()
         self.save(update_fields=["statut", "parti_le"])
+        if self.embarquement_valide_le:                # liste pointée : les non-cochés ne sont pas partis
+            for t in self.troncons.filter(statut=Troncon.A_VOYAGER, embarque=False).select_related("billet"):
+                t.depart_manque, t.depart, t.siege = self, None, None
+                t.save(update_fields=["depart_manque", "depart", "siege"])
+                if not t.billet.site_origine:
+                    t.billet.tracer("ABSENT", f"Absent au départ {self.numero} : billet à reporter ou à rembourser")
         troncons = list(self.troncons.filter(statut=Troncon.A_VOYAGER).select_related("billet"))
         envois = list(self.colis.filter(statut=Colis.CHARGE, port=Colis.PAYE, recette_constatee=False, ecriture__isnull=False))
         local = _site_local()
@@ -443,6 +543,10 @@ class Depart(models.Model):
                                                         "site": t.site_effectue, "date": timezone.localdate().isoformat()},
                             "EFFECTUE", timezone.localdate())
             Billet.objects.filter(troncons__in=troncons, statut=Billet.VENDU).update(statut=Billet.EMBARQUE)
+            for t in troncons:
+                if not t.billet.site_origine:
+                    t.billet.tracer("PARTI", f"Parti avec le départ {self.numero} ({self.vehicule.immatriculation}), "
+                                             f"{t.gare_depart.ville} → {t.gare_arrivee.ville}")
         self.colis.filter(statut=Colis.CHARGE).update(statut=Colis.EN_ROUTE)
 
     @transaction.atomic
@@ -514,6 +618,8 @@ class Billet(models.Model):
                              verbose_name="Gare de vente", help_text="Vide : gare de départ de la ligne")
     depart = models.ForeignKey(Depart, on_delete=models.PROTECT, related_name="billets", verbose_name="Départ",
                                help_text="Premier véhicule emprunté")
+    gare_montee = models.ForeignKey(Gare, null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+                                    verbose_name="Montée à", help_text="Vide : gare de départ de la ligne ; sinon un arrêt")
     gare_arrivee = models.ForeignKey(Gare, null=True, blank=True, on_delete=models.PROTECT, related_name="billets_arrivee",
                                      verbose_name="Destination",
                                      help_text="Vide : terminus du départ ; plus loin : correspondance à la gare d'arrivée du départ")
@@ -540,6 +646,15 @@ class Billet(models.Model):
     cree_le = models.DateTimeField(auto_now_add=True)
     annule_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     annule_le = models.DateTimeField(null=True, blank=True)
+    AUTORISE, PAYE = "AUTORISE", "PAYE"
+    REMBOURSEMENTS = [("", "—"), (AUTORISE, "Autorisé, à payer"), (PAYE, "Payé")]
+    remboursement = models.CharField(max_length=10, choices=REMBOURSEMENTS, blank=True, default="")
+    rembourse_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    rembourse_le = models.DateTimeField(null=True, blank=True)
+    session_remboursement = models.ForeignKey("transport.SessionCaisse", null=True, blank=True, on_delete=models.PROTECT,
+                                              related_name="remboursements_billets")
+    ecriture_remboursement = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL,
+                                                  related_name="+")
 
     class Meta:
         ordering = ["-date_vente", "-numero"]
@@ -550,6 +665,15 @@ class Billet(models.Model):
     @property
     def destination(self):
         return self.gare_arrivee or self.depart.ligne.gare_arrivee
+
+    @property
+    def montee(self):
+        return self.gare_montee or self.depart.ligne.gare_depart
+
+    def tracer(self, evenement, libelle="", utilisateur=None):
+        """Historique des statuts du billet (jamais modifié ni effacé)."""
+        return HistoriqueBillet.objects.create(billet=self, evenement=evenement, libelle=libelle[:200],
+                                               utilisateur=utilisateur if getattr(utilisateur, "pk", None) else None)
 
     def _contrepartie(self):
         """Ligne de trésorerie ou de client du billet (montant à placer par l'appelant)."""
@@ -582,16 +706,23 @@ class Billet(models.Model):
             self.caisse = self.caisse or self.gare.journal_caisse()
             if not self.caisse or not self.caisse.compte_tresorerie_id:
                 raise ValidationError("La caisse de la gare n'a pas de compte de trésorerie.")
-        origine, correspondance = depart.ligne.gare_depart, depart.ligne.gare_arrivee
-        destination = self.gare_arrivee or correspondance
+        gares = depart.ligne.gares()
+        origine, terminus = self.gare_montee or depart.ligne.gare_depart, depart.ligne.gare_arrivee
+        if origine not in gares[:-1]:
+            raise ValidationError(f"Le départ {depart.numero} ne prend pas de voyageurs à {origine.ville}.")
+        destination = self.gare_arrivee or terminus
         if destination == origine:
             raise ValidationError("La destination doit être différente de la gare de départ.")
+        if destination in gares and not depart.ligne.dessert(origine, destination):
+            raise ValidationError(f"{destination.ville} est avant {origine.ville} sur cette ligne.")
+        correspondance = destination if destination in gares else terminus      # descente à un arrêt ou correspondance
+        self.gare_montee = origine
         segments = [(origine, correspondance, depart, self.siege)]
         if destination != correspondance:
             if depart_correspondance is not None:
                 depart_correspondance = Depart.objects.select_for_update().get(pk=depart_correspondance.pk)
                 depart_correspondance.ouvert_a_la_vente()
-                if (depart_correspondance.ligne.gare_depart, depart_correspondance.ligne.gare_arrivee) != (correspondance, destination):
+                if not depart_correspondance.ligne.dessert(correspondance, destination):
                     raise ValidationError(f"Le départ de correspondance doit aller de {correspondance.ville} à {destination.ville}.")
                 if (depart_correspondance.date, depart_correspondance.heure) < (depart.date, depart.heure):
                     raise ValidationError("La correspondance part avant le premier véhicule.")
@@ -607,15 +738,15 @@ class Billet(models.Model):
                 raise ValidationError(f"Aucun tarif de {origine.ville} à {destination.ville} : indiquez le prix du billet.")
         if self.prix < 0:
             raise ValidationError("Le prix ne peut pas être négatif.")
-        for _, _, d, siege in segments:
+        for a, b, d, siege in segments:
             if d is None:
                 continue
-            if d.places and d.places_libres <= 0:
+            if d.places and d.places_libres_entre(a, b) <= 0:
                 raise ValidationError(f"Le départ {d.numero} est complet ({d.places} places).")
             if siege is not None:
                 if d.places and not 1 <= siege <= d.places:
                     raise ValidationError(f"Siège {siege} inexistant sur le départ {d.numero} (1 à {d.places}).")
-                if siege in d.sieges_occupes():
+                if siege in d.sieges_occupes(a, b):
                     raise ValidationError(f"Le siège {siege} est déjà vendu sur le départ {d.numero}.")
         self.gare_arrivee = destination
         self.vendu_par = self.vendu_par or utilisateur
@@ -626,6 +757,8 @@ class Billet(models.Model):
         self.save()
         for ordre, ((a, b, d, siege), part) in enumerate(zip(segments, _parts(self.prix, segments, tarifs)), 1):
             Troncon.objects.create(billet=self, ordre=ordre, gare_depart=a, gare_arrivee=b, depart=d, siege=siege, part=part)
+        self.tracer("VENTE", f"Vendu {self.prix} ({self.get_paiement_display()}) {origine.ville} → {destination.ville}, "
+                             f"départ {depart.numero}" + (f" siège {self.siege}" if self.siege else ""), utilisateur)
         from apps.echanges.publication import publier_objet
 
         publier_objet(self)                                 # billet complet, avec ses tronçons
@@ -645,16 +778,18 @@ class Billet(models.Model):
         _proprietaire(self, f"Le billet {self.numero}")
         if self.statut == self.ANNULE:
             raise ValidationError("Billet annulé.")
-        troncon = self.troncons.filter(statut=Troncon.A_VOYAGER, gare_depart=nouveau_depart.ligne.gare_depart,
-                                       gare_arrivee=nouveau_depart.ligne.gare_arrivee).first()
+        troncon = next((t for t in self.troncons.filter(statut=Troncon.A_VOYAGER).select_related("gare_depart", "gare_arrivee")
+                        if nouveau_depart.ligne.dessert(t.gare_depart, t.gare_arrivee)), None)
         if troncon is None:
             raise ValidationError("Le report se fait sur un départ du même trajet, pas encore effectué.")
         troncon.affecter(nouveau_depart, siege)
         return self
 
     @transaction.atomic
-    def annuler(self, retenue=None, utilisateur=None, date=None):
-        """Annule le billet avant tout voyage : rembourse le prix moins la retenue (qui devient un produit)."""
+    def annuler(self, retenue=None, utilisateur=None, date=None, rembourser=True):
+        """Annule le billet avant tout voyage : rembourse le prix moins la retenue (qui devient un produit).
+        rembourser=False : l'annulation AUTORISE seulement le remboursement (dette envers le voyageur) ; il est payé
+        ensuite en caisse (Billet.rembourser), par un guichetier, sur sa session."""
         from apps.comptabilite.services import creer_ecriture
 
         _proprietaire(self, f"Le billet {self.numero}")
@@ -668,25 +803,74 @@ class Billet(models.Model):
             raise ValidationError("La retenue doit être comprise entre 0 et le prix du billet.")
         rembourse = self.prix - retenue
         date = date or timezone.localdate()
+        differe = not rembourser and rembourse and self.paiement != self.COMPTE
         if self.prix:
             libelle = f"Annulation billet {self.numero} - {self.voyageur} (retenue {retenue})"
             lignes = [{"compte": parametres.compte_billets_a_voyager, "debit": self.prix, "section": self.gare.section},
-                      {**self._contrepartie(), "credit": rembourse},
+                      {**({"compte": parametres.compte_remboursements} if differe else self._contrepartie()), "credit": rembourse},
                       *[{**l, "section": self.gare.section}
                         for l in _ventiler(retenue, parametres.compte_billets, parametres.taxe_billets)]]
             self.ecriture_annulation = creer_ecriture(self._journal(), date, libelle, lignes, reference=self.numero,
                                                       origine=self.numero)
         from .models_caisse import session_pour
 
-        self.session_annulation = session_pour(utilisateur) if rembourse and self.paiement == self.ESPECES else None
+        especes = rembourse and self.paiement == self.ESPECES and not differe
+        self.session_annulation = session_pour(utilisateur) if especes else None
+        self.session_remboursement = self.session_annulation
         self.troncons.update(statut=Troncon.ANNULE)
         self.statut, self.retenue, self.annule_par, self.annule_le = self.ANNULE, retenue, utilisateur, timezone.now()
-        self.save(update_fields=["statut", "retenue", "annule_par", "annule_le", "ecriture_annulation", "session_annulation"])
+        self.remboursement = (self.AUTORISE if differe else self.PAYE) if rembourse else ""
+        if self.remboursement == self.PAYE:
+            self.rembourse_par, self.rembourse_le = utilisateur, self.annule_le
+        self.save(update_fields=["statut", "retenue", "annule_par", "annule_le", "ecriture_annulation", "session_annulation",
+                                 "session_remboursement", "remboursement", "rembourse_par", "rembourse_le"])
+        self.tracer("ANNULATION", f"Annulé, retenue {retenue}, " + (
+            f"remboursement de {rembourse} autorisé (à payer en caisse)" if differe else f"remboursé {rembourse}"), utilisateur)
+        return self
+
+    @transaction.atomic
+    def rembourser(self, utilisateur=None, date=None, caisse=None):
+        """Paie au voyageur le remboursement autorisé à l'annulation (D remboursements à payer / C caisse)."""
+        from apps.comptabilite.services import creer_ecriture
+
+        from .models_caisse import session_pour
+
+        _proprietaire(self, f"Le billet {self.numero}")
+        if self.remboursement != self.AUTORISE:
+            raise ValidationError("Aucun remboursement autorisé à payer pour ce billet.")
+        caisse = caisse or self.caisse
+        if not caisse or not caisse.compte_tresorerie_id:
+            raise ValidationError("Choisissez la caisse qui paie le remboursement.")
+        date = date or timezone.localdate()
+        parametres = ParametresTransport.get()
+        self.ecriture_remboursement = creer_ecriture(
+            caisse, date, f"Remboursement billet {self.numero} - {self.voyageur}",
+            [{"compte": parametres.compte_remboursements, "debit": self.rembourse},
+             {"compte": caisse.compte_tresorerie, "credit": self.rembourse}], reference=self.numero, origine=self.numero)
+        self.session_remboursement = session_pour(utilisateur) if self.paiement == self.ESPECES else None
+        self.remboursement, self.rembourse_par, self.rembourse_le = self.PAYE, utilisateur, timezone.now()
+        self.save(update_fields=["ecriture_remboursement", "session_remboursement", "remboursement", "rembourse_par",
+                                 "rembourse_le"])
+        self.tracer("REMBOURSEMENT", f"Remboursement de {self.rembourse} payé ({caisse.code})", utilisateur)
         return self
 
     @property
     def rembourse(self):
         return self.prix - self.retenue if self.statut == self.ANNULE else ZERO
+
+
+class HistoriqueBillet(models.Model):
+    """Ce qui est arrivé au billet, dans l'ordre : vente, placement, pointage, départ, absence, annulation, remboursement."""
+
+    billet = models.ForeignKey(Billet, on_delete=models.CASCADE, related_name="historique")
+    quand = models.DateTimeField(default=timezone.now)
+    evenement = models.CharField(max_length=15)
+    libelle = models.CharField(max_length=200, blank=True)
+    utilisateur = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["billet", "quand", "pk"]
+        verbose_name = "Historique de billet"
 
 
 def _parts(prix, segments, tarifs):
@@ -726,6 +910,11 @@ class Troncon(models.Model):
                                  help_text="Véhicule qui a fait le trajet (au départ)")
     effectue_le = models.DateTimeField(null=True, blank=True)
     site_effectue = models.CharField("Constaté par l'agence", max_length=10, blank=True)
+    embarque = models.BooleanField("Pointé à bord", default=False)
+    embarque_le = models.DateTimeField(null=True, blank=True)
+    embarque_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    depart_manque = models.ForeignKey(Depart, null=True, blank=True, on_delete=models.SET_NULL, related_name="absents",
+                                      help_text="Départ auquel le voyageur était absent (liste pointée)")
 
     class Meta:
         ordering = ["billet", "ordre"]
@@ -744,15 +933,21 @@ class Troncon(models.Model):
             raise ValidationError("Ce tronçon est déjà effectué ou annulé.")
         if self.billet.site_origine and not _gare_ici(self.gare_depart):
             raise ValidationError(f"Le billet {self.billet.numero} appartient à l'agence {self.billet.site_origine}.")
-        if (depart.ligne.gare_depart_id, depart.ligne.gare_arrivee_id) != (self.gare_depart_id, self.gare_arrivee_id):
+        if not depart.ligne.dessert(self.gare_depart, self.gare_arrivee):
             raise ValidationError(f"Le départ {depart.numero} ne fait pas le trajet {self.gare_depart.ville} → {self.gare_arrivee.ville}.")
         if self.depart_id != depart.pk:
-            if depart.places and depart.places_libres <= 0:
+            if depart.places and depart.places_libres_entre(self.gare_depart, self.gare_arrivee) <= 0:
                 raise ValidationError(f"Le départ {depart.numero} est complet.")
-        if siege is not None and siege in depart.sieges_occupes() - ({self.siege} if self.depart_id == depart.pk else set()):
+        occupes = depart.sieges_occupes(self.gare_depart, self.gare_arrivee)
+        if siege is not None and siege in occupes - ({self.siege} if self.depart_id == depart.pk else set()):
             raise ValidationError(f"Le siège {siege} est déjà vendu sur ce départ.")
-        self.depart, self.siege = depart, siege
-        self.save(update_fields=["depart", "siege"])
+        ancien = self.depart
+        self.depart, self.siege, self.embarque = depart, siege, False
+        self.save(update_fields=["depart", "siege", "embarque"])
+        if not self.billet.site_origine and ancien != depart:
+            self.billet.tracer("REPORT" if ancien or self.depart_manque_id else "PLACE",
+                               f"Placé sur le départ {depart.numero} du {depart.date:%d/%m/%Y} {depart.heure:%H:%M}"
+                               + (f" (siège {siege})" if siege else ""))
         if self.ordre == 1 and not self.billet.site_origine:
             Billet.objects.filter(pk=self.billet_id).update(depart=depart, siege=siege)
         if self.site_origine:                           # agence de correspondance : l'agence vendeuse est prévenue

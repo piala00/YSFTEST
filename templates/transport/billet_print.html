@@ -5,7 +5,7 @@
 <body onload="window.print()">
 <div class="text-center"><strong>{{ societe.raison_sociale }}</strong><br><span class="small">{{ societe.telephone }}</span><hr class="my-1">
 <h5 class="mb-0">BILLET DE VOYAGE</h5><div>N° {{ billet.numero }}</div></div><hr class="my-1">
-<div>{{ billet.depart.ligne.gare_depart.nom }} → {{ billet.depart.ligne.gare_arrivee.nom }}</div>
+<div>{{ billet.montee.nom }} → {{ billet.destination.nom }}</div>
 <div><strong>{{ billet.depart.date|date:"d/m/Y" }} à {{ billet.depart.heure|time:"H:i" }}</strong>{% if billet.siege %} · siège <strong>{{ billet.siege }}</strong>{% endif %}</div>
 <div>Voyageur : {{ billet.voyageur }}</div>
 <div>Prix : <strong>{{ billet.prix|montant }} FCFA</strong> ({{ billet.get_paiement_display }})</div>

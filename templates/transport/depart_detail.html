@@ -52,12 +52,22 @@
 <div class="row g-3">
 <div class="col-lg-7"><div class="card"><div class="card-header bg-white fw-semibold small d-flex justify-content-between">Voyageurs ({{ depart.places_vendues }})
   {% if depart.statut == "PROGRAMME" %}<a href="{% url 'transport:billet_vente' %}?depart={{ depart.pk }}">Vendre un billet</a>{% endif %}</div>
-  <table class="table table-sm mb-0 small"><thead><tr><th>Siège</th><th>Billet</th><th>Voyageur</th><th>Destination</th><th class="num">Part du véhicule</th><th>Statut</th></tr></thead>
-  <tbody>{% for t in billets %}<tr class="{% if t.statut == 'ANNULE' %}text-muted text-decoration-line-through{% endif %}"><td>{{ t.siege|default:"—" }}</td>
+  {% if depart.statut == "PROGRAMME" %}<form method="post" id="f-embarquement">{% csrf_token %}{% endif %}
+  <table class="table table-sm mb-0 small"><thead><tr><th title="Pointage sur la liste">À bord</th><th>Siège</th><th>Billet</th><th>Voyageur</th><th>Trajet sur ce car</th><th class="num">Part du véhicule</th><th>Statut</th></tr></thead>
+  <tbody>{% for t in billets %}<tr class="{% if t.statut == 'ANNULE' %}text-muted text-decoration-line-through{% endif %}">
+    <td>{% if depart.statut == "PROGRAMME" and t.statut == "A_VOYAGER" %}<input class="form-check-input" type="checkbox" name="embarques" value="{{ t.pk }}" aria-label="À bord" {% if t.embarque %}checked{% endif %}>{% elif t.embarque %}<i class="bi bi-check2 text-success"></i>{% endif %}</td>
+    <td>{{ t.siege|default:"—" }}</td>
     <td><a href="{% url 'transport:billet_detail' t.billet_id %}">{{ t.billet.numero }}</a></td><td>{{ t.billet.voyageur }} <span class="text-muted">{{ t.billet.telephone }}</span></td>
-    <td>{{ t.billet.gare_arrivee.ville|default:"" }}{% if t.billet.gare_arrivee_id != t.gare_arrivee_id %} <span class="badge text-bg-info">change à {{ t.gare_arrivee.ville }}</span>{% elif t.ordre > 1 %} <span class="badge text-bg-info">correspondance</span>{% endif %}</td>
+    <td>{{ t.gare_depart.ville }} → {{ t.gare_arrivee.ville }}{% if t.billet.gare_arrivee_id != t.gare_arrivee_id %} <span class="badge text-bg-info">puis {{ t.billet.gare_arrivee.ville }}</span>{% elif t.ordre > 1 %} <span class="badge text-bg-info">correspondance</span>{% endif %}</td>
     <td class="num">{{ t.part|montant }}{% if t.part != t.billet.prix %} <span class="text-muted">/ {{ t.billet.prix|montant }}</span>{% endif %}</td><td>{{ t.get_statut_display }}{% if t.billet.paiement == "COMPTE" %} · en compte{% endif %}</td></tr>
-  {% empty %}<tr><td colspan="6" class="text-muted text-center p-3">Aucun voyageur.</td></tr>{% endfor %}</tbody></table></div>
+  {% empty %}<tr><td colspan="7" class="text-muted text-center p-3">Aucun voyageur.</td></tr>{% endfor %}</tbody></table>
+  {% if depart.statut == "PROGRAMME" and billets %}<div class="card-footer bg-white small d-flex flex-wrap gap-2 align-items-center">
+    <button class="btn btn-sm btn-outline-success" name="action" value="embarquement"><i class="bi bi-list-check"></i> Valider la liste d'embarquement</button>
+    <span class="text-muted">{% if depart.embarquement_valide_le %}Liste pointée le {{ depart.embarquement_valide_le|date:"d/m H:i" }} par {{ depart.embarquement_valide_par|default:"—" }} : les voyageurs non cochés seront <strong>absents</strong> au départ (billet à reporter ou rembourser, pas de recette pour ce car).{% else %}Cochez les voyageurs présents à bord. Tant que la liste n'est pas validée, tous les voyageurs sont considérés partis.{% endif %}</span></div>{% endif %}
+  {% if depart.statut == "PROGRAMME" %}</form>{% endif %}</div>
+  {% if absents %}<div class="card mt-3 border-danger"><div class="card-header bg-white fw-semibold small">Absents au départ ({{ absents|length }})</div>
+  <table class="table table-sm mb-0 small"><tbody>{% for t in absents %}<tr><td><a href="{% url 'transport:billet_detail' t.billet_id %}">{{ t.billet.numero }}</a></td><td>{{ t.billet.voyageur }} <span class="text-muted">{{ t.billet.telephone }}</span></td>
+    <td>{{ t.gare_depart.ville }} → {{ t.gare_arrivee.ville }}</td><td>{% if t.depart %}reporté sur {{ t.depart.numero }}{% elif t.statut == "ANNULE" %}annulé{% else %}à reporter ou rembourser{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
   {% if correspondances %}<div class="card mt-3 border-info"><div class="card-header bg-white fw-semibold small">Voyageurs en correspondance à placer sur ce départ</div>
   <table class="table table-sm mb-0 small"><tbody>{% for t in correspondances %}<tr><td>{{ t.billet.numero }}</td><td>{{ t.billet.voyageur }} <span class="text-muted">{{ t.billet.telephone }}</span></td>
     <td>part {{ t.part|montant }}</td><td><form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="troncon" value="{{ t.pk }}">

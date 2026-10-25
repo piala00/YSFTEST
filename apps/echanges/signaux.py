@@ -1,7 +1,8 @@
 """Publication automatique des fiches et opérations du transport, et des agences déclarées au siège."""
 from django.db.models.signals import post_save
 
-LIENS = {"ecriture", "ecriture_annulation", "ecriture_livraison", "ecriture_reversement", "ecriture_recettes",
+LIENS = {"ecriture", "ecriture_annulation", "ecriture_remboursement", "embarque", "embarque_le", "embarque_par",
+         "embarquement_valide_le", "embarquement_valide_par", "ecriture_livraison", "ecriture_reversement", "ecriture_recettes",
          "sequence_integree", "derniere_reception"}          # rattachements et compteurs de réception : rien à publier
 
 

@@ -23,9 +23,53 @@ class GareForm(BootstrapMixin, forms.ModelForm):
 
 
 class LigneForm(BootstrapMixin, forms.ModelForm):
+    arrets = forms.CharField(
+        label="Arrêts intermédiaires", required=False,
+        help_text="Codes des gares desservies en route, dans l'ordre, séparés par des virgules (ex. EDE, PKL). Un voyageur "
+                  "peut y monter ou en descendre ; son siège est revendu pour la suite du trajet. Le prix entre deux gares "
+                  "vient de la ligne-tarif qui les relie (sinon il est saisi à la vente).")
+
     class Meta:
         model = Ligne
-        fields = ("code", "gare_depart", "gare_arrivee", "distance_km", "duree", "prix_billet", "colis_forfait", "colis_prix_kg", "actif")
+        fields = ("code", "gare_depart", "gare_arrivee", "arrets", "distance_km", "duree", "prix_billet", "colis_forfait",
+                  "colis_prix_kg", "actif")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.initial["arrets"] = ", ".join(a.gare.code for a in self.instance.arrets.select_related("gare"))
+
+    def clean_arrets(self):
+        codes = [c.strip().upper() for c in self.cleaned_data["arrets"].replace(";", ",").split(",") if c.strip()]
+        gares = []
+        for code in codes:
+            g = Gare.objects.filter(code__iexact=code).first()
+            if g is None:
+                raise forms.ValidationError(f"Gare « {code} » inconnue.")
+            if g in gares:
+                raise forms.ValidationError(f"Gare « {code} » en double.")
+            gares.append(g)
+        return gares
+
+    def clean(self):
+        donnees = super().clean()
+        extremites = {donnees.get("gare_depart"), donnees.get("gare_arrivee")}
+        if any(g in extremites for g in donnees.get("arrets") or []):
+            self.add_error("arrets", "Un arrêt ne peut pas être la gare de départ ou d'arrivée.")
+        return donnees
+
+    def save(self, commit=True):
+        from apps.echanges.publication import publier_objet
+
+        from .models import ArretLigne
+
+        ligne = super().save(commit=True)
+        gares = self.cleaned_data.get("arrets") or []
+        ligne.arrets.exclude(gare__in=gares).delete()
+        for ordre, g in enumerate(gares, 1):
+            ArretLigne.objects.update_or_create(ligne=ligne, gare=g, defaults={"ordre": ordre})
+        publier_objet(ligne)                                # les agences reçoivent la ligne avec ses arrêts
+        return ligne
 
 
 class VehiculeForm(BootstrapMixin, forms.ModelForm):
@@ -66,7 +110,7 @@ class BilletForm(BootstrapMixin, forms.ModelForm):
 
     class Meta:
         model = Billet
-        fields = ("depart", "gare_arrivee", "voyageur", "telephone", "piece_identite", "siege", "prix", "paiement", "caisse",
+        fields = ("depart", "gare_montee", "gare_arrivee", "voyageur", "telephone", "piece_identite", "siege", "prix", "paiement", "caisse",
                   "client")
 
     def __init__(self, *args, **kwargs):
@@ -75,6 +119,7 @@ class BilletForm(BootstrapMixin, forms.ModelForm):
         self.fields["depart"].queryset = programmes
         self.fields["depart_correspondance"].queryset = programmes
         self.fields["gare_arrivee"].queryset = Gare.objects.filter(actif=True)
+        self.fields["gare_montee"].queryset = Gare.objects.filter(actif=True)
         self.fields["caisse"].queryset = _caisses()
         self.fields["caisse"].help_text = "Vide : caisse de la gare"
         self.fields["client"].queryset = Tiers.objects.filter(type_tiers=Tiers.CLIENT, actif=True)
@@ -111,5 +156,5 @@ class ParametresTransportForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = ParametresTransport
         fields = ("compte_billets", "compte_colis", "compte_fret", "compte_contre_remboursement", "compte_billets_a_voyager",
-                  "compte_colis_a_transporter", "compte_carburant", "compte_pieces", "compte_main_oeuvre", "taxe_billets",
+                  "compte_colis_a_transporter", "compte_remboursements", "compte_carburant", "compte_pieces", "compte_main_oeuvre", "taxe_billets",
                   "taxe_colis", "retenue_annulation", "sessions_caisse_obligatoires")

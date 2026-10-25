@@ -5,16 +5,21 @@
   <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:billet_imprimer' billet.pk %}" target="_blank"><i class="bi bi-printer"></i> Imprimer le billet</a></div>
 <div class="card mb-3"><table class="table table-sm mb-0"><tbody>
   <tr><th style="width:14rem">Voyageur</th><td>{{ billet.voyageur }} {% if billet.telephone %}· {{ billet.telephone }}{% endif %} {% if billet.piece_identite %}· {{ billet.piece_identite }}{% endif %}</td></tr>
-  <tr><th>Trajet</th><td>{{ billet.depart.ligne.gare_depart.ville }} → {{ billet.destination.ville }}</td></tr>
+  <tr><th>Trajet</th><td>{{ billet.montee.ville }} → {{ billet.destination.ville }}</td></tr>
   <tr><th>Véhicules</th><td><table class="table table-sm table-borderless mb-0">{% for t in troncons %}<tr><td>{{ t.ordre }}.</td><td>{{ t.gare_depart.ville }} → {{ t.gare_arrivee.ville }}</td>
     <td>{% if t.depart %}<a href="{% url 'transport:depart_detail' t.depart_id %}">{{ t.depart.numero }}</a> {{ t.depart.date|date:"d/m" }} {{ t.depart.heure|time:"H:i" }}{% if t.siege %} · siège {{ t.siege }}{% endif %}{% else %}<span class="text-warning-emphasis">véhicule à choisir à {{ t.gare_depart.ville }}</span>{% endif %}</td>
-    <td>part {{ t.part|montant }}</td><td>{{ t.get_statut_display }}{% if t.vehicule %} · {{ t.vehicule.immatriculation }}{% endif %}</td></tr>{% endfor %}</table></td></tr>
+    <td>part {{ t.part|montant }}</td><td>{{ t.get_statut_display }}{% if t.vehicule %} · {{ t.vehicule.immatriculation }}{% endif %}{% if t.embarque and t.statut == "A_VOYAGER" %} · <span class="text-success">pointé à bord</span>{% endif %}{% if t.depart_manque and t.statut == "A_VOYAGER" and not t.depart %} · <span class="text-danger">absent au départ {{ t.depart_manque.numero }}</span>{% endif %}</td></tr>{% endfor %}</table></td></tr>
   <tr><th>Prix · paiement</th><td>{{ billet.prix|montant }} FCFA · {{ billet.get_paiement_display }}{% if billet.client %} ({{ billet.client }}){% endif %}{% if billet.caisse %} · caisse {{ billet.caisse.code }}{% endif %}</td></tr>
   <tr><th>Vendu</th><td>le {{ billet.date_vente|date:"d/m/Y" }} à {{ billet.gare.nom }} par {{ billet.vendu_par|default:"—" }}</td></tr>
-  {% if billet.statut == "ANNULE" %}<tr><th>Annulé</th><td>le {{ billet.annule_le|date:"d/m/Y H:i" }} par {{ billet.annule_par|default:"—" }} · retenue {{ billet.retenue|montant }} · remboursé {{ billet.rembourse|montant }}</td></tr>{% endif %}
+  {% if billet.statut == "ANNULE" %}<tr><th>Annulé</th><td>le {{ billet.annule_le|date:"d/m/Y H:i" }} par {{ billet.annule_par|default:"—" }} · retenue {{ billet.retenue|montant }} · {% if billet.remboursement == "AUTORISE" %}<strong class="text-warning-emphasis">remboursement de {{ billet.rembourse|montant }} autorisé, pas encore payé</strong>{% elif billet.remboursement == "PAYE" %}remboursé {{ billet.rembourse|montant }} le {{ billet.rembourse_le|date:"d/m/Y H:i" }} par {{ billet.rembourse_par|default:"—" }}{% else %}rien à rembourser{% endif %}</td></tr>{% endif %}
   <tr><th>Écritures</th><td>{% if billet.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' billet.ecriture.pk %}">{{ billet.ecriture.numero }}</a>{% endif %}
-    {% if billet.ecriture_annulation %} · <a href="{% url 'comptabilite:ecriture_detail' billet.ecriture_annulation.pk %}">{{ billet.ecriture_annulation.numero }}</a>{% endif %}</td></tr>
+    {% if billet.ecriture_annulation %} · <a href="{% url 'comptabilite:ecriture_detail' billet.ecriture_annulation.pk %}">{{ billet.ecriture_annulation.numero }}</a>{% endif %}
+    {% if billet.ecriture_remboursement %} · <a href="{% url 'comptabilite:ecriture_detail' billet.ecriture_remboursement.pk %}">{{ billet.ecriture_remboursement.numero }}</a>{% endif %}</td></tr>
 </tbody></table></div>
+{% if billet.remboursement == "AUTORISE" %}<form method="post" class="card card-body mb-3 border-warning">{% csrf_token %}
+  <div>Remboursement autorisé de <strong>{{ billet.rembourse|montant }} FCFA</strong> par {{ billet.annule_par|default:"—" }} : à payer au voyageur
+  (sur votre caisse si les sessions sont obligatoires).</div>
+  <div><button class="btn btn-sm btn-warning mt-2" name="action" value="rembourser" onclick="return confirm('Payer le remboursement au voyageur ?')">Payer le remboursement</button></div></form>{% endif %}
 {% if billet.statut == "VENDU" %}<div class="row g-3">
   <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Reporter sur un autre départ</h6>
     <div class="row g-2"><div class="col-8"><label class="form-label small mb-0" for="r-dep">Départ (même trajet)</label><select id="r-dep" name="depart" class="form-select form-select-sm">
@@ -24,6 +29,12 @@
   <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Annuler et rembourser</h6>
     <label class="form-label small mb-0" for="a-ret">Retenue gardée par l'agence (FCFA)</label>
     <input id="a-ret" name="retenue" type="number" min="0" max="{{ billet.prix|floatformat:0 }}" class="form-control form-control-sm" placeholder="vide : {{ retenue_conseillee|floatformat:'-2' }} % du prix">
-    <button class="btn btn-sm btn-outline-danger mt-2" name="action" value="annuler" onclick="return confirm('Annuler ce billet et rembourser le voyageur ?')">Annuler le billet</button></form></div>
+    <div class="form-check mt-2 small"><input class="form-check-input" type="radio" name="rembourser" id="a-now" value="maintenant" checked><label class="form-check-label" for="a-now">Rembourser maintenant</label></div>
+    <div class="form-check small"><input class="form-check-input" type="radio" name="rembourser" id="a-later" value="plus_tard"><label class="form-check-label" for="a-later">Autoriser seulement : le remboursement sera payé ensuite en caisse</label></div>
+    <button class="btn btn-sm btn-outline-danger mt-2" name="action" value="annuler" onclick="return confirm('Annuler ce billet ?')">Annuler le billet</button></form></div>
 </div>{% endif %}
+<h6 class="mt-3">Historique du billet</h6>
+<div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>Date</th><th>Événement</th><th>Détail</th><th>Par</th></tr></thead>
+<tbody>{% for h in historique %}<tr><td>{{ h.quand|date:"d/m/Y H:i" }}</td><td>{{ h.evenement|capfirst }}</td><td>{{ h.libelle }}</td><td>{{ h.utilisateur|default:"" }}</td></tr>
+{% empty %}<tr><td colspan="4" class="text-muted">Aucun historique (billet antérieur à cette fonction ou reçu d'une autre agence).</td></tr>{% endfor %}</tbody></table></div>
 {% endblock %}

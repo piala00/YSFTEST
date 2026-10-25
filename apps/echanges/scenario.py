@@ -60,7 +60,11 @@ bta = Gare.objects.create(code="BTA", nom="Gare de Bertoua", ville="Bertoua", ag
 gbl = Gare.objects.create(code="GBL", nom="Gare de Garoua-Boulaï", ville="Garoua-Boulaï", agence=Agence.objects.get(code="BTA"))
 Ligne.objects.create(code="DLA-BTA", gare_depart=dla, gare_arrivee=bta, prix_billet=8000)
 Ligne.objects.create(code="BTA-GBL", gare_depart=bta, gare_arrivee=gbl, prix_billet=4000)
-Ligne.objects.create(code="DLA-GBL", gare_depart=dla, gare_arrivee=gbl, prix_billet=11000)
+directe = Ligne.objects.create(code="DLA-GBL", gare_depart=dla, gare_arrivee=gbl, prix_billet=11000)
+from apps.echanges.publication import publier_objet
+from apps.transport.models import ArretLigne
+ArretLigne.objects.create(ligne=directe, ordre=1, gare=bta)            # arrêt intermédiaire, transmis aux agences
+publier_objet(directe)
 Vehicule.objects.create(immatriculation="LT 101 AA", nombre_places=30)
 Vehicule.objects.create(immatriculation="EN 202 BB", nombre_places=30)
 Vehicule.objects.create(immatriculation="LT 303 CC", nombre_places=30)
@@ -77,6 +81,7 @@ import json
 from apps.transport.models import Gare, Ligne
 from apps.core.models import Agence
 print(json.dumps({"gares": Gare.objects.count(), "lignes": Ligne.objects.count(),
+                  "arrets_dla_gbl": [g.code for g in Ligne.objects.get(code="DLA-GBL").gares()],
                   "liaisons": sorted(a.compte_liaison.numero for a in Agence.objects.filter(locale=False))}))""")
     # Douala vend, expédie un colis en port dû avec contre-remboursement, fait partir le car
     r["dla_vente"] = dla.py("""

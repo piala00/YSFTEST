@@ -157,6 +157,9 @@ def depart_detail(request, pk):
                 get_object_or_404(AvanceMission, pk=request.POST.get("avance"), depart=depart).justifier(
                     Decimal(request.POST.get("restitue") or 0), utilisateur=request.user)
                 messages.success(request, "Avance justifiée.")
+            elif action == "embarquement":
+                depart.pointer_embarquement(request.POST.getlist("embarques"), request.user)
+                messages.success(request, "Liste d'embarquement enregistrée.")
             elif action == "affecter":
                 from .models import Troncon
 
@@ -166,12 +169,14 @@ def depart_detail(request, pk):
         except (ValidationError, ArithmeticError, ValueError) as exc:
             _erreur(request, exc)
         return redirect("transport:depart_detail", depart.pk)
-    billets = depart.troncons.select_related("billet__gare_arrivee", "billet__vendu_par").order_by("siege", "billet__numero")
+    billets = depart.troncons.select_related("billet__gare_arrivee", "billet__vendu_par", "gare_depart", "gare_arrivee").order_by(
+        "siege", "billet__numero")
     occupes = depart.sieges_occupes()
     a_charger = Colis.objects.filter(statut=Colis.ENREGISTRE, gare_depart=depart.ligne.gare_depart,
                                      gare_arrivee=depart.ligne.gare_arrivee) if depart.statut == Depart.PROGRAMME else []
     return render(request, "transport/depart_detail.html", {
         "depart": depart, "billets": billets, "colis": depart.colis.all(), "a_charger": a_charger,
+        "absents": depart.absents.select_related("billet", "gare_depart", "gare_arrivee", "depart"),
         "correspondances": depart.correspondances_a_affecter() if depart.statut == Depart.PROGRAMME else [],
         "sieges": [(n, n in occupes) for n in range(1, depart.places + 1)],
         "recette_billets": depart.recette_billets(), "recette_colis": depart.recette_colis(), "depenses": depart.depenses(),
@@ -195,7 +200,7 @@ def voyages_a_cloturer(request):
 def manifeste(request, pk):
     depart = get_object_or_404(Depart, pk=pk)
     return render(request, "transport/manifeste.html", {
-        "depart": depart, "billets": depart.voyageurs.select_related("billet__gare_arrivee").order_by("siege", "billet__numero"),
+        "depart": depart, "billets": depart.voyageurs.select_related("billet__gare_arrivee", "gare_depart", "gare_arrivee").order_by("siege", "billet__numero"),
         "colis": depart.colis.exclude(statut=Colis.ANNULE)})
 
 
@@ -204,6 +209,8 @@ def manifeste(request, pk):
 def billets(request):
     jour = _jour(request)
     qs = Billet.objects.filter(date_vente=jour).select_related("depart__ligne", "gare", "vendu_par")
+    if request.GET.get("remboursement"):
+        qs = Billet.objects.filter(remboursement=request.GET["remboursement"]).select_related("depart__ligne", "gare", "vendu_par")
     if request.GET.get("q"):
         q = request.GET["q"]
         qs = Billet.objects.filter(Q(numero__icontains=q) | Q(voyageur__icontains=q) | Q(telephone__icontains=q)).select_related(
@@ -218,7 +225,7 @@ def billet_vente(request):
     if request.GET.get("depart"):
         depart = Depart.objects.filter(pk=request.GET["depart"]).first()
         if depart:
-            initial = {"depart": depart, "prix": depart.ligne.prix_billet, "siege": request.GET.get("siege")}
+            initial = {"depart": depart, "siege": request.GET.get("siege")}         # prix : tarif du trajet choisi
     form = BilletForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         billet = form.save(commit=False)
@@ -242,8 +249,17 @@ def billet_detail(request, pk):
         try:
             if action == "annuler":
                 retenue = request.POST.get("retenue")
-                billet.annuler(retenue=Decimal(retenue) if retenue not in (None, "") else None, utilisateur=request.user)
-                messages.success(request, f"Billet annulé : {billet.rembourse:,.0f} FCFA remboursés.".replace(",", " "))
+                maintenant = request.POST.get("rembourser") != "plus_tard"
+                billet.annuler(retenue=Decimal(retenue) if retenue not in (None, "") else None, utilisateur=request.user,
+                               rembourser=maintenant)
+                if billet.remboursement == Billet.AUTORISE:
+                    messages.success(request, f"Billet annulé : remboursement de {billet.rembourse:,.0f} FCFA autorisé, "
+                                              f"à payer en caisse.".replace(",", " "))
+                else:
+                    messages.success(request, f"Billet annulé : {billet.rembourse:,.0f} FCFA remboursés.".replace(",", " "))
+            elif action == "rembourser":
+                billet.rembourser(utilisateur=request.user)
+                messages.success(request, f"Remboursement de {billet.rembourse:,.0f} FCFA payé.".replace(",", " "))
             elif action == "reporter":
                 billet.reporter(get_object_or_404(Depart, pk=request.POST.get("depart")),
                                 siege=int(request.POST["siege"]) if request.POST.get("siege") else None)
@@ -254,11 +270,13 @@ def billet_detail(request, pk):
     from .models import Troncon
 
     a_faire = billet.troncons.filter(statut=Troncon.A_VOYAGER).first()
-    autres = (Depart.objects.filter(ligne__gare_depart=a_faire.gare_depart, ligne__gare_arrivee=a_faire.gare_arrivee,
-                                    statut=Depart.PROGRAMME).exclude(pk=a_faire.depart_id).order_by("date", "heure")
+    autres = ([d for d in Depart.objects.filter(statut=Depart.PROGRAMME, site_origine="").exclude(pk=a_faire.depart_id)
+               .select_related("ligne").order_by("date", "heure")[:200] if d.ligne.dessert(a_faire.gare_depart, a_faire.gare_arrivee)]
               if a_faire else [])
     return render(request, "transport/billet_detail.html", {
-        "billet": billet, "troncons": billet.troncons.select_related("gare_depart", "gare_arrivee", "depart", "vehicule"),
+        "billet": billet, "troncons": billet.troncons.select_related("gare_depart", "gare_arrivee", "depart", "vehicule",
+                                                                     "depart_manque"),
+        "historique": billet.historique.select_related("utilisateur"),
         "autres_departs": autres, "retenue_conseillee": ParametresTransport.get().retenue_annulation})
 
 

@@ -752,6 +752,8 @@ BILLETTERIE = _module_service(
         E("billetterie.programmer", "Programmer un départ", "transport:depart_create", icone="bi-calendar-plus"),
         E("billetterie.vendre", "Vendre un billet", "transport:billet_vente", icone="bi-ticket-perforated"),
         E("billetterie.billets", "Billets vendus (annulation, report)", "transport:billets", icone="bi-list-ul"),
+        E("billetterie.remboursements", "Remboursements à payer", "transport:billets", icone="bi-arrow-counterclockwise",
+          remboursement="AUTORISE"),
         SEP(),
         E("billetterie.ma_caisse", "Ma caisse (ouverture, fermeture)", "transport:ma_caisse_billetterie", icone="bi-safe"),
         E("billetterie.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
