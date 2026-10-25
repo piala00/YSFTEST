@@ -44,6 +44,15 @@ class Societe(models.Model):
         "Vente au détail réservée aux dépôts désignés", default=False,
         help_text="Les magasins de gros ne vendent que par unités entières (pas de carton ouvert) ; la vente au détail "
                   "se fait uniquement dans les dépôts désignés (boutiques), approvisionnés par transfert")
+    # Activité : commerce (achat-revente avec stocks), transport interurbain de voyageurs, ou les deux
+    ACTIVITE_COMMERCE = "COMMERCE"
+    ACTIVITE_TRANSPORT = "TRANSPORT"
+    ACTIVITE_MIXTE = "MIXTE"
+    ACTIVITES = [(ACTIVITE_COMMERCE, "Commerce (achat-revente, stocks)"),
+                 (ACTIVITE_TRANSPORT, "Transport de voyageurs (billetterie, colis, logistique)"),
+                 (ACTIVITE_MIXTE, "Commerce et transport")]
+    activite = models.CharField("Activité", max_length=10, choices=ACTIVITES, default=ACTIVITE_COMMERCE,
+                                help_text="Choisit les logiciels proposés dans le portail (la comptabilité est commune)")
     # Synchronisation avec le dossier de l'ancien logiciel (transition), puis bascule vers l'ERP
     SYNCHRO_AUCUNE = ""
     SYNCHRO_MIROIR = "MIROIR"

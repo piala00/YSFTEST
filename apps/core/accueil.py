@@ -130,4 +130,48 @@ def comptabilite():
     }
 
 
-PAGES = {"commercial": commercial, "comptabilite": comptabilite}
+def transport():
+    from apps.transport.models import Billet, Colis, Depart
+
+    today = datetime.date.today()
+    departs = Depart.objects.filter(date=today).exclude(statut=Depart.ANNULE)
+    billets = Billet.objects.filter(date_vente=today).exclude(statut=Billet.ANNULE)
+    a_remettre = Colis.objects.filter(statut=Colis.ARRIVE)
+    cr = Colis.objects.filter(statut=Colis.LIVRE, contre_remboursement__gt=0, cr_reverse_le__isnull=True)
+    return {
+        "raccourcis": [
+            {"groupe": "Billetterie", "liens": [
+                _raccourci("Départs du jour", "bi-bus-front", "transport:departs"),
+                _raccourci("Vendre un billet", "bi-ticket-perforated", "transport:billet_vente"),
+                _raccourci("Billets vendus", "bi-list-ul", "transport:billets"),
+                _raccourci("Programmer un départ", "bi-calendar-plus", "transport:depart_create"),
+            ]},
+            {"groupe": "Colis et courrier", "liens": [
+                _raccourci("Enregistrer un colis", "bi-box-seam", "transport:colis_create", query="nature=COLIS"),
+                _raccourci("Enregistrer un courrier", "bi-envelope", "transport:colis_create", query="nature=COURRIER"),
+                _raccourci("Envois à remettre", "bi-box-arrow-in-down", "transport:colis", query="statut=ARRIVE"),
+            ]},
+            {"groupe": "Logistique et états", "liens": [
+                _raccourci("Enregistrer du fret", "bi-truck", "transport:colis_create", query="nature=FRET"),
+                _raccourci("Dépense de véhicule", "bi-fuel-pump", "transport:depense_create"),
+                _raccourci("Recette journalière", "bi-cash-stack", "transport:recette"),
+                _raccourci("Rentabilité par ligne", "bi-graph-up", "transport:rentabilite"),
+            ]},
+        ],
+        "indicateurs": [
+            _indicateur("Départs du jour", departs.count(), reverse("transport:departs"), genre="nombre"),
+            _indicateur("Billets vendus aujourd'hui", billets.count(), reverse("transport:billets"), genre="nombre"),
+            _indicateur("Recette billets du jour", sum((b.prix for b in billets), ZERO), reverse("transport:recette")),
+            _indicateur("Envois à remettre", a_remettre.count(), reverse("transport:colis") + "?statut=ARRIVE", genre="nombre",
+                        alerte=a_remettre.exists()),
+            _indicateur("Contre-remboursements à reverser", sum((c.contre_remboursement for c in cr), ZERO),
+                        reverse("transport:colis") + "?statut=LIVRE", alerte=cr.exists()),
+        ],
+        "titre_dernieres": "Derniers billets",
+        "dernieres": [{"date": b.date_vente, "piece": b.numero, "libelle": f"{b.voyageur} · {b.depart.ligne.code}",
+                       "montant": b.prix, "statut": b.get_statut_display(), "url": reverse("transport:billet_detail", args=[b.pk])}
+                      for b in Billet.objects.select_related("depart__ligne").order_by("-cree_le")[:10]],
+    }
+
+
+PAGES = {"commercial": commercial, "comptabilite": comptabilite, "transport": transport}

@@ -89,7 +89,7 @@ PREUVES = {
 
 # Gestion commerciale : découpage officiel V11/V12 ; Comptabilité : ergonomie Sage 100 classique et skill
 # « sage100-comptabilite-v5-v12-expert », à confirmer sur le découpage officiel Comptabilité ; Reporting : propre à l'ERP
-PREUVE_PAR_DEFAUT = {"commercial": "DOC-V12", "comptabilite": "ERG-CLASSIQUE", "reporting": "AJOUT-ERP"}
+PREUVE_PAR_DEFAUT = {"commercial": "DOC-V12", "comptabilite": "ERG-CLASSIQUE", "reporting": "AJOUT-ERP", "transport": "AJOUT-ERP"}
 
 _compteur = itertools.count()
 
@@ -241,11 +241,13 @@ def menu_aide(module):
     ])
 
 
-MODULES_ACCUEIL = {"commercial": "commercial:accueil", "comptabilite": "comptabilite:accueil", "reporting": "reporting:dashboard"}
+MODULES_ACCUEIL = {"commercial": "commercial:accueil", "comptabilite": "comptabilite:accueil", "reporting": "reporting:dashboard",
+                   "transport": "transport:accueil"}
 AUTRES_LOGICIELS = [
     ("commercial", "Gestion commerciale", "commercial:accueil", "bi-shop"),
     ("comptabilite", "Comptabilité OHADA", "comptabilite:accueil", "bi-calculator"),
     ("reporting", "Reporting", "reporting:dashboard", "bi-bar-chart-line"),
+    ("transport", "Transport de voyageurs", "transport:accueil", "bi-bus-front"),
 ]
 
 
@@ -712,8 +714,75 @@ REPORTING = Module(
     ],
 )
 
-MODULES = [GESTION_COMMERCIALE, COMPTABILITE, REPORTING]
+# Transport interurbain de voyageurs (version 2) : propre à l'ERP, sur le modèle des menus Sage
+TRANSPORT = Module(
+    code="transport",
+    titre="Transport de voyageurs",
+    description="Billetterie des cars, colis et courrier, fret, flotte — liés à la comptabilité",
+    icone="bi-bus-front",
+    couleur="#e65100",
+    prefixe="/transport/",
+    accueil="transport:accueil",
+    onglets=[
+        menu_fichier("transport", "commercial:societe"),
+        menu_edition(),
+        Onglet("structure", "Structure", "bi-diagram-3", [
+            E("structure.gares", "Gares", "transport:fiches", "gares", icone="bi-geo-alt"),
+            E("structure.lignes", "Lignes et tarifs", "transport:fiches", "lignes", icone="bi-signpost-split"),
+            E("structure.vehicules", "Véhicules", "transport:fiches", "vehicules", icone="bi-bus-front"),
+            E("structure.chauffeurs", "Chauffeurs", "transport:fiches", "chauffeurs", icone="bi-person-badge"),
+            SEP(),
+            E("structure.clients", "Clients en compte", "commercial:clients", icone="bi-people"),
+            E("structure.parametres", "Paramètres transport (comptes et taxes)", "transport:parametres", icone="bi-sliders"),
+        ]),
+        Onglet("traitement", "Traitement", "bi-gear", [
+            E("billetterie", "Billetterie", icone="bi-ticket-perforated", enfants=[
+                E("billetterie.departs", "Départs du jour", "transport:departs"),
+                E("billetterie.programmer", "Programmer un départ", "transport:depart_create"),
+                E("billetterie.vendre", "Vendre un billet", "transport:billet_vente"),
+                E("billetterie.billets", "Billets vendus (annulation, report)", "transport:billets"),
+            ]),
+            E("colis", "Colis et courrier", icone="bi-box-seam", enfants=[
+                E("colis.enregistrer", "Enregistrer un colis", "transport:colis_create", nature="COLIS"),
+                E("colis.courrier", "Enregistrer un courrier", "transport:colis_create", nature="COURRIER"),
+                E("colis.liste", "Suivi des envois", "transport:colis"),
+                E("colis.a_remettre", "Envois à remettre aux destinataires", "transport:colis", statut="ARRIVE"),
+            ]),
+            E("logistique", "Logistique", icone="bi-truck", enfants=[
+                E("logistique.fret", "Enregistrer du fret", "transport:colis_create", nature="FRET"),
+                E("logistique.depense", "Saisir une dépense de véhicule", "transport:depense_create"),
+                E("logistique.depenses", "Dépenses des véhicules", "transport:depenses"),
+            ]),
+            SEP(),
+            E("traitement.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
+            E("traitement.reglement", "Règlement d'un client en compte", "commercial:reglement_create", icone="bi-wallet2"),
+        ]),
+        Onglet("etat", "Etat", "bi-printer", [
+            E("etat.recette", "Recette journalière par gare", "transport:recette", icone="bi-cash-stack"),
+            E("etat.rentabilite", "Rentabilité", icone="bi-graph-up", enfants=[
+                E("etat.rentabilite.ligne", "Par ligne", "transport:rentabilite", axe="ligne"),
+                E("etat.rentabilite.vehicule", "Par véhicule", "transport:rentabilite", axe="vehicule"),
+                E("etat.rentabilite.depart", "Par départ", "transport:rentabilite", axe="depart"),
+            ]),
+            SEP(),
+            E("etat.balance", "Balance générale", "comptabilite:balance", icone="bi-journal-text"),
+        ]),
+        menu_fenetre("transport"),
+        menu_aide("transport"),
+    ],
+)
+
+MODULES = [GESTION_COMMERCIALE, COMPTABILITE, REPORTING, TRANSPORT]
 MODULES_PAR_CODE = {m.code: m for m in MODULES}
+
+
+def modules_proposes(societe):
+    """Logiciels proposés selon l'activité de la société (le logiciel du métier en premier)."""
+    if societe.activite == societe.ACTIVITE_COMMERCE:
+        return [m for m in MODULES if m.code != "transport"]
+    if societe.activite == societe.ACTIVITE_TRANSPORT:
+        return sorted(MODULES, key=lambda m: m.code != "transport")
+    return list(MODULES)
 
 
 # ---------------------------------------------------------------------------
@@ -774,6 +843,10 @@ PARTAGE = {
                                                "exercices, utilisateurs, profils et droits des écrans communs",
     frozenset({"commercial", "reporting"}): "Lecture des documents, articles, familles, stocks et tiers",
     frozenset({"comptabilite", "reporting"}): "Lecture des écritures, comptes, balances et états financiers",
+    frozenset({"transport", "commercial"}): "Clients en compte, opérations de caisse, règlements",
+    frozenset({"transport", "comptabilite"}): "Écritures des billets, colis, fret et dépenses ; plan comptable, journaux, analytique "
+                                              "(gares, véhicules)",
+    frozenset({"transport", "reporting"}): "Lecture des recettes et des écritures",
 }
 
 

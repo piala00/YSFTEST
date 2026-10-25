@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Rentabilité{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Rentabilité du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</h1></div>
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3">
+  <div><label class="form-label small mb-0" for="p-du">Du</label><input type="date" id="p-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="p-au">Au</label><input type="date" id="p-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="p-axe">Regroupement</label><select id="p-axe" name="axe" class="form-select form-select-sm">
+    {% for code, lib in axes %}<option value="{{ code }}" {% if code == axe %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select></div>
+  <button class="btn btn-sm btn-outline-secondary">Afficher</button></form>
+<div class="card"><table class="table table-sm mb-0">
+  <thead><tr><th></th><th class="num">Départs</th><th class="num">Voyageurs</th><th class="num">Remplissage</th><th class="num">Billets</th><th class="num">Colis / fret</th><th class="num">Recettes</th><th class="num">Dépenses</th><th class="num">Marge</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td>{{ l.libelle }}</td><td class="num">{{ l.departs }}</td><td class="num">{{ l.voyageurs }}</td>
+    <td class="num">{% if l.remplissage is not None %}{{ l.remplissage }} %{% endif %}</td><td class="num">{{ l.billets|montant }}</td><td class="num">{{ l.colis|montant }}</td>
+    <td class="num">{{ l.recettes|montant }}</td><td class="num">{{ l.depenses|montant }}</td><td class="num fw-semibold {% if l.marge < 0 %}text-danger{% endif %}">{{ l.marge|montant }}</td></tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucun départ sur la période.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="small text-muted mt-2">Recettes : billets non annulés et retenues sur annulations, colis et fret chargés sur les départs. Dépenses : dépenses de véhicules
+  (par ligne : seulement celles rattachées à un départ). Hors amortissements, salaires et frais de structure (voir la comptabilité analytique).</p>
+{% endblock %}

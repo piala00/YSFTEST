@@ -16,7 +16,9 @@ def societe(request):
     from .selection import resume
 
     fiche = Societe.get()
-    contexte = {"societe": fiche, "exercice_courant": Exercice.courant(), "modules": MODULES,
+    from .navigation import modules_proposes
+
+    contexte = {"societe": fiche, "exercice_courant": Exercice.courant(), "modules": modules_proposes(fiche),
                 "selection": resume(request), "erp_actualiser": request.session.pop("erp_actualiser", None)}
     if fiche.source_mode == Societe.SYNCHRO_MIROIR:
         from .models import LotSynchronisation

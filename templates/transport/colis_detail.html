@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}{{ colis.get_nature_display }} {{ colis.numero }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>{{ colis.get_nature_display }} {{ colis.numero }} <span class="badge text-bg-primary fs-6">{{ colis.get_statut_display }}</span></h1>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:colis_imprimer' colis.pk %}" target="_blank"><i class="bi bi-printer"></i> Bordereau</a></div>
+<div class="card mb-3"><table class="table table-sm mb-0"><tbody>
+  <tr><th style="width:14rem">Trajet</th><td>{{ colis.gare_depart.nom }} → {{ colis.gare_arrivee.nom }}{% if colis.depart %} · <a href="{% url 'transport:depart_detail' colis.depart_id %}">départ {{ colis.depart.numero }}</a>{% endif %}</td></tr>
+  <tr><th>Expéditeur</th><td>{{ colis.expediteur }} {{ colis.tel_expediteur }}{% if colis.client %} · en compte {{ colis.client }}{% endif %}</td></tr>
+  <tr><th>Destinataire</th><td>{{ colis.destinataire }} {{ colis.tel_destinataire }}</td></tr>
+  <tr><th>Contenu</th><td>{{ colis.description|default:"—" }} · {{ colis.nombre }} pièce(s) · {{ colis.poids }} kg · valeur déclarée {{ colis.valeur_declaree|montant }}</td></tr>
+  <tr><th>Prix · port</th><td>{{ colis.prix|montant }} FCFA · {{ colis.get_port_display }}</td></tr>
+  {% if colis.contre_remboursement %}<tr><th>Contre-remboursement</th><td>{{ colis.contre_remboursement|montant }} FCFA à encaisser pour l'expéditeur
+    {% if colis.cr_reverse_le %}· reversé le {{ colis.cr_reverse_le|date:"d/m/Y" }}{% endif %}</td></tr>{% endif %}
+  <tr><th>Code de retrait</th><td><strong class="fs-5">{{ colis.code_retrait }}</strong> <span class="text-muted small">à communiquer au destinataire par l'expéditeur</span></td></tr>
+  {% if colis.statut == "LIVRE" %}<tr><th>Remis</th><td>le {{ colis.livre_le|date:"d/m/Y H:i" }} à {{ colis.retire_par }} par {{ colis.livre_par|default:"—" }}</td></tr>{% endif %}
+  <tr><th>Écritures</th><td>
+    {% if colis.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' colis.ecriture.pk %}">{{ colis.ecriture.numero }}</a>{% endif %}
+    {% if colis.ecriture_livraison %} · <a href="{% url 'comptabilite:ecriture_detail' colis.ecriture_livraison.pk %}">{{ colis.ecriture_livraison.numero }}</a>{% endif %}
+    {% if colis.ecriture_reversement %} · <a href="{% url 'comptabilite:ecriture_detail' colis.ecriture_reversement.pk %}">{{ colis.ecriture_reversement.numero }}</a>{% endif %}</td></tr>
+</tbody></table></div>
+<div class="row g-3">
+{% if colis.statut == "ENREGISTRE" %}
+  <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Charger sur un départ</h6>
+    <select name="depart" class="form-select form-select-sm" aria-label="Départ">{% for d in departs %}<option value="{{ d.pk }}">{{ d.date|date:"d/m/Y" }} {{ d.heure|time:"H:i" }} · {{ d.vehicule|default:"" }}</option>{% empty %}<option value="">Aucun départ programmé vers {{ colis.gare_arrivee.ville }}</option>{% endfor %}</select>
+    <button class="btn btn-sm btn-outline-primary mt-2" name="action" value="charger" {% if not departs %}disabled{% endif %}>Charger</button></form></div>
+  <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Annuler l'envoi</h6><p class="small text-muted mb-2">Le port payé est remboursé (écriture inverse).</p>
+    <button class="btn btn-sm btn-outline-danger" name="action" value="annuler" onclick="return confirm('Annuler cet envoi ?')">Annuler</button></form></div>
+{% elif colis.statut == "ARRIVE" %}
+  <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Remettre au destinataire</h6>
+    {% if colis.a_encaisser %}<div class="alert alert-warning py-1 small">À encaisser : <strong>{{ colis.a_encaisser|montant }} FCFA</strong>{% if colis.port == "DU" %} (port dû {{ colis.prix|montant }}){% endif %}{% if colis.contre_remboursement %} (contre-remboursement {{ colis.contre_remboursement|montant }}){% endif %}</div>{% endif %}
+    <label class="form-label small mb-0" for="l-code">Code de retrait</label><input id="l-code" name="code" class="form-control form-control-sm" autocomplete="off" inputmode="numeric">
+    <label class="form-label small mb-0 mt-2" for="l-qui">Retiré par (nom, n° de pièce)</label><input id="l-qui" name="retire_par" class="form-control form-control-sm">
+    <button class="btn btn-sm btn-success mt-2" name="action" value="livrer">Remettre{% if colis.a_encaisser %} et encaisser{% endif %}</button></form></div>
+{% elif colis.statut == "LIVRE" and colis.contre_remboursement and not colis.cr_reverse_le %}
+  <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Reverser le contre-remboursement</h6>
+    <p class="small mb-2">{{ colis.contre_remboursement|montant }} FCFA à remettre à {{ colis.expediteur }}.</p>
+    <button class="btn btn-sm btn-primary" name="action" value="reverser">Reverser à l'expéditeur</button></form></div>
+{% endif %}
+</div>
+{% endblock %}

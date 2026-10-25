@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ titre }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>{{ titre }}</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'transport:fiche_create' genre %}"><i class="bi bi-plus"></i> Nouvelle fiche</a></div>
+<form class="mb-3" style="max-width:20rem"><input class="form-control form-control-sm" name="q" value="{{ request.GET.q }}" placeholder="Rechercher…" aria-label="Rechercher"></form>
+<div class="card"><table class="table table-sm table-hover mb-0">
+  <thead><tr>{% for e in entetes %}<th>{{ e|capfirst }}</th>{% endfor %}<th>Actif</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr>
+    {% for v in l.valeurs %}<td>{% if forloop.first %}<a href="{% url 'transport:fiche_update' genre l.objet.pk %}">{{ v|default_if_none:"" }}</a>{% else %}{{ v|default_if_none:"" }}{% endif %}</td>{% endfor %}
+    <td>{% if l.objet.actif %}<i class="bi bi-check-lg text-success"></i>{% else %}<span class="text-muted">non</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="{{ entetes|length|add:1 }}" class="text-muted text-center p-4">Aucune fiche. Créez la première.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

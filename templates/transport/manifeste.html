@@ -1,0 +1,18 @@
+{% load static erp %}<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Manifeste {{ depart.numero }}</title>
+<link href="{% static 'vendor/bootstrap.min.css' %}" rel="stylesheet">
+<style>body{font-size:10pt;padding:1.5rem}.num{text-align:right}@media print{body{padding:0}.no-print{display:none}}</style></head>
+<body onload="window.print()">
+<div class="d-flex justify-content-between mb-3"><div><h5 class="mb-0">{{ societe.raison_sociale }}</h5><div class="small">{{ societe.ville }}{% if societe.telephone %} · {{ societe.telephone }}{% endif %}</div></div>
+  <div class="text-end"><h4 class="mb-0">MANIFESTE DE DÉPART</h4><div>N° <strong>{{ depart.numero }}</strong></div></div></div>
+<table class="table table-sm table-bordered small mb-3"><tr><th>Ligne</th><td>{{ depart.ligne.gare_depart.nom }} → {{ depart.ligne.gare_arrivee.nom }}</td>
+  <th>Date et heure</th><td>{{ depart.date|date:"d/m/Y" }} {{ depart.heure|time:"H:i" }}</td></tr>
+  <tr><th>Véhicule</th><td>{{ depart.vehicule|default:"" }}</td><th>Chauffeur</th><td>{{ depart.chauffeur|default:"" }}{% if depart.chauffeur.permis %} (permis {{ depart.chauffeur.permis }}){% endif %}</td></tr></table>
+<h6>Voyageurs ({{ billets|length }})</h6>
+<table class="table table-sm table-bordered small"><thead><tr><th>Siège</th><th>Billet</th><th>Nom du voyageur</th><th>Pièce d'identité</th><th>Téléphone</th></tr></thead>
+<tbody>{% for b in billets %}<tr><td>{{ b.siege|default:"" }}</td><td>{{ b.numero }}</td><td>{{ b.voyageur }}</td><td>{{ b.piece_identite }}</td><td>{{ b.telephone }}</td></tr>{% endfor %}</tbody></table>
+{% if colis %}<h6>Colis, courriers et fret ({{ colis|length }})</h6>
+<table class="table table-sm table-bordered small"><thead><tr><th>N°</th><th>Nature</th><th>Expéditeur</th><th>Destinataire</th><th class="num">Pièces</th><th class="num">Poids</th></tr></thead>
+<tbody>{% for c in colis %}<tr><td>{{ c.numero }}</td><td>{{ c.get_nature_display }}</td><td>{{ c.expediteur }}</td><td>{{ c.destinataire }} {{ c.tel_destinataire }}</td><td class="num">{{ c.nombre }}</td><td class="num">{{ c.poids }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+<div class="d-flex justify-content-between mt-4 small"><div>Le chef de gare</div><div>Le chauffeur</div></div>
+</body></html>

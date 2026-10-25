@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Départs{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Départs du {{ jour|date:"l d/m/Y" }}</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'transport:depart_create' %}?date={{ jour|date:'Y-m-d' }}"><i class="bi bi-plus"></i> Programmer un départ</a></div>
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3">
+  <a class="btn btn-sm btn-outline-secondary" href="?date={{ veille|date:'Y-m-d' }}&amp;gare={{ gare }}" title="Veille"><i class="bi bi-chevron-left"></i></a>
+  <div><label class="form-label small mb-0" for="d-date">Date</label>
+    <input type="date" id="d-date" name="date" value="{{ jour|date:'Y-m-d' }}" class="form-control form-control-sm" onchange="this.form.submit()"></div>
+  <a class="btn btn-sm btn-outline-secondary" href="?date={{ lendemain|date:'Y-m-d' }}&amp;gare={{ gare }}" title="Lendemain"><i class="bi bi-chevron-right"></i></a>
+  <div><label class="form-label small mb-0" for="d-gare">Gare de départ</label>
+    <select id="d-gare" name="gare" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Toutes</option>
+    {% for g in gares %}<option value="{{ g.pk }}" {% if g.pk|stringformat:"s" == gare %}selected{% endif %}>{{ g.nom }}</option>{% endfor %}</select></div>
+</form>
+<div class="card"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>Heure</th><th>N°</th><th>Ligne</th><th>Véhicule</th><th>Chauffeur</th><th class="num">Vendues</th><th class="num">Libres</th><th class="num">Recette billets</th><th>Statut</th><th></th></tr></thead>
+  <tbody>{% for d in departs %}<tr>
+    <td class="fw-semibold">{{ d.heure|time:"H:i" }}</td><td><a href="{% url 'transport:depart_detail' d.pk %}">{{ d.numero }}</a></td>
+    <td>{{ d.ligne.gare_depart.ville }} → {{ d.ligne.gare_arrivee.ville }}</td><td>{{ d.vehicule.immatriculation|default:"—" }}</td>
+    <td>{{ d.chauffeur|default:"—" }}</td><td class="num">{{ d.places_vendues }} / {{ d.places }}</td>
+    <td class="num {% if not d.places_libres %}text-danger{% endif %}">{{ d.places_libres }}</td><td class="num">{{ d.recette_billets|montant }}</td>
+    <td><span class="badge text-bg-{% if d.statut == 'PROGRAMME' %}primary{% elif d.statut == 'PARTI' %}warning{% elif d.statut == 'ARRIVE' %}success{% else %}secondary{% endif %}">{{ d.get_statut_display }}</span></td>
+    <td>{% if d.statut == "PROGRAMME" and d.places_libres %}<a class="btn btn-sm btn-outline-primary py-0" href="{% url 'transport:billet_vente' %}?depart={{ d.pk }}">Vendre</a>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="10" class="text-muted text-center p-4">Aucun départ programmé ce jour.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

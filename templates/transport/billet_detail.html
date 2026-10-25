@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Billet {{ billet.numero }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Billet {{ billet.numero }} <span class="badge text-bg-{% if billet.statut == 'ANNULE' %}secondary{% elif billet.statut == 'EMBARQUE' %}success{% else %}primary{% endif %} fs-6">{{ billet.get_statut_display }}</span></h1>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:billet_imprimer' billet.pk %}" target="_blank"><i class="bi bi-printer"></i> Imprimer le billet</a></div>
+<div class="card mb-3"><table class="table table-sm mb-0"><tbody>
+  <tr><th style="width:14rem">Voyageur</th><td>{{ billet.voyageur }} {% if billet.telephone %}· {{ billet.telephone }}{% endif %} {% if billet.piece_identite %}· {{ billet.piece_identite }}{% endif %}</td></tr>
+  <tr><th>Départ</th><td><a href="{% url 'transport:depart_detail' billet.depart_id %}">{{ billet.depart }}</a> · siège {{ billet.siege|default:"libre" }}</td></tr>
+  <tr><th>Prix · paiement</th><td>{{ billet.prix|montant }} FCFA · {{ billet.get_paiement_display }}{% if billet.client %} ({{ billet.client }}){% endif %}{% if billet.caisse %} · caisse {{ billet.caisse.code }}{% endif %}</td></tr>
+  <tr><th>Vendu</th><td>le {{ billet.date_vente|date:"d/m/Y" }} à {{ billet.gare.nom }} par {{ billet.vendu_par|default:"—" }}</td></tr>
+  {% if billet.statut == "ANNULE" %}<tr><th>Annulé</th><td>le {{ billet.annule_le|date:"d/m/Y H:i" }} par {{ billet.annule_par|default:"—" }} · retenue {{ billet.retenue|montant }} · remboursé {{ billet.rembourse|montant }}</td></tr>{% endif %}
+  <tr><th>Écritures</th><td>{% if billet.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' billet.ecriture.pk %}">{{ billet.ecriture.numero }}</a>{% endif %}
+    {% if billet.ecriture_annulation %} · <a href="{% url 'comptabilite:ecriture_detail' billet.ecriture_annulation.pk %}">{{ billet.ecriture_annulation.numero }}</a>{% endif %}</td></tr>
+</tbody></table></div>
+{% if billet.statut == "VENDU" %}<div class="row g-3">
+  <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Reporter sur un autre départ</h6>
+    <div class="row g-2"><div class="col-8"><label class="form-label small mb-0" for="r-dep">Départ (même ligne)</label><select id="r-dep" name="depart" class="form-select form-select-sm">
+      {% for d in autres_departs %}<option value="{{ d.pk }}">{{ d.date|date:"d/m/Y" }} {{ d.heure|time:"H:i" }} · {{ d.places_libres }} libre(s)</option>{% empty %}<option value="">Aucun autre départ programmé</option>{% endfor %}</select></div>
+      <div class="col-4"><label class="form-label small mb-0" for="r-siege">Siège</label><input id="r-siege" name="siege" type="number" min="1" class="form-control form-control-sm"></div></div>
+    <button class="btn btn-sm btn-outline-primary mt-2" name="action" value="reporter" {% if not autres_departs %}disabled{% endif %}>Reporter (sans frais)</button></form></div>
+  <div class="col-md-6"><form method="post" class="card card-body">{% csrf_token %}<h6>Annuler et rembourser</h6>
+    <label class="form-label small mb-0" for="a-ret">Retenue gardée par l'agence (FCFA)</label>
+    <input id="a-ret" name="retenue" type="number" min="0" max="{{ billet.prix|floatformat:0 }}" class="form-control form-control-sm" placeholder="vide : {{ retenue_conseillee|floatformat:'-2' }} % du prix">
+    <button class="btn btn-sm btn-outline-danger mt-2" name="action" value="annuler" onclick="return confirm('Annuler ce billet et rembourser le voyageur ?')">Annuler le billet</button></form></div>
+</div>{% endif %}
+{% endblock %}

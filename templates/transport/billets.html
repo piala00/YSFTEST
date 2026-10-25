@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Billets vendus{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Billets {% if q %}— recherche « {{ q }} »{% else %}vendus le {{ jour|date:"d/m/Y" }}{% endif %}</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'transport:billet_vente' %}"><i class="bi bi-ticket-perforated"></i> Vendre un billet</a></div>
+<form class="d-flex gap-2 align-items-end mb-3"><div><label class="form-label small mb-0" for="b-date">Date de vente</label>
+  <input type="date" id="b-date" name="date" value="{{ jour|date:'Y-m-d' }}" class="form-control form-control-sm" onchange="this.form.submit()"></div>
+  <div><label class="form-label small mb-0" for="b-q">N°, voyageur ou téléphone</label><input id="b-q" name="q" value="{{ q }}" class="form-control form-control-sm"></div>
+  <button class="btn btn-sm btn-outline-secondary">Rechercher</button></form>
+<div class="card"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>N°</th><th>Voyageur</th><th>Départ</th><th>Siège</th><th>Gare</th><th>Paiement</th><th class="num">Prix</th><th>Statut</th><th>Vendu par</th></tr></thead>
+  <tbody>{% for b in billets %}<tr class="{% if b.statut == 'ANNULE' %}text-muted{% endif %}"><td><a href="{% url 'transport:billet_detail' b.pk %}">{{ b.numero }}</a></td>
+    <td>{{ b.voyageur }}</td><td>{{ b.depart.ligne.code }} {{ b.depart.date|date:"d/m" }} {{ b.depart.heure|time:"H:i" }}</td><td>{{ b.siege|default:"—" }}</td>
+    <td>{{ b.gare.nom }}</td><td>{{ b.get_paiement_display }}</td><td class="num">{{ b.prix|montant }}</td><td>{{ b.get_statut_display }}</td><td>{{ b.vendu_par|default:"" }}</td></tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucun billet.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="6">Total (hors annulés)</td><td class="num">{{ total|montant }}</td><td colspan="2"></td></tr></tfoot>
+</table></div>
+{% endblock %}

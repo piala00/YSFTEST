@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "apps.commercial",
     "apps.comptabilite",
     "apps.reporting",
+    "apps.transport",
     "apps.api",
 ]
 

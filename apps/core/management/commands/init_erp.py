@@ -20,6 +20,8 @@ class Command(BaseCommand):
         parser.add_argument("--regime-tva", choices=["automatique", "manuelle", "non-assujettie", "assujettie"],
                             help="Configuration de la TVA (automatique = taux du Cameroun ; manuelle = aucune TVA ; "
                                  "« assujettie » = ancien nom d'« automatique »)")
+        parser.add_argument("--activite", choices=["commerce", "transport", "mixte"],
+                            help="Activité de la société (transport : billetterie, colis, logistique)")
         parser.add_argument("--admin", metavar="MOT_DE_PASSE", help="Crée le super-utilisateur « admin » (ou lui redonne ce mot de passe)")
 
     def log(self, message):
@@ -35,6 +37,11 @@ class Command(BaseCommand):
                                   "manuelle": Societe.TVA_MANUELLE, "non-assujettie": Societe.TVA_NON_ASSUJETTIE}[options["regime_tva"]]
             societe.save(update_fields=["regime_tva"])
             self.log(f"Régime de TVA : {societe.get_regime_tva_display()}.")
+        if options.get("activite"):
+            societe.activite = {"commerce": Societe.ACTIVITE_COMMERCE, "transport": Societe.ACTIVITE_TRANSPORT,
+                                "mixte": Societe.ACTIVITE_MIXTE}[options["activite"]]
+            societe.save(update_fields=["activite"])
+            self.log(f"Activité : {societe.get_activite_display()}.")
         crees = 0
         for numero, intitule in PLAN:
             _, created = Compte.objects.get_or_create(
@@ -82,8 +89,16 @@ class Command(BaseCommand):
                 admin.save(update_fields=["password"])
                 self.log("Mot de passe du super-utilisateur « admin » mis à jour.")
 
+        transport = societe.activite in (Societe.ACTIVITE_TRANSPORT, Societe.ACTIVITE_MIXTE)
+        if transport:
+            from apps.transport.models import ParametresTransport
+
+            ParametresTransport.get()                      # comptes 70611, 70612, 70613, 4718
         if options["demo"]:
-            self._demo()
+            if societe.activite != Societe.ACTIVITE_TRANSPORT:
+                self._demo()
+            if transport:
+                self._demo_transport()
         if options["sahel"]:
             self._sahel()
         # TVA : rien n'est imposé ; les taux du Cameroun ne sont créés qu'en configuration automatique
@@ -99,6 +114,28 @@ class Command(BaseCommand):
             configurer_tva_manuelle()
             self.log("TVA en configuration manuelle : aucun taux créé.")
         self.log(self.style.SUCCESS("Initialisation terminée."))
+
+    def _demo_transport(self):
+        """Gares, lignes, cars, chauffeurs et départs du jour fictifs."""
+        import datetime
+
+        from apps.transport.models import Chauffeur, Depart, Gare, Ligne, Vehicule
+
+        if Gare.objects.exists():
+            return
+        gares = {code: Gare.objects.create(code=code, nom=f"Gare de {ville}", ville=ville)
+                 for code, ville in (("DLA", "Douala"), ("YDE", "Yaoundé"), ("BFS", "Bafoussam"))}
+        lignes = []
+        for a, b, prix, km in (("DLA", "YDE", 6000, 240), ("YDE", "DLA", 6000, 240), ("DLA", "BFS", 5000, 280), ("BFS", "DLA", 5000, 280)):
+            lignes.append(Ligne.objects.create(code=f"{a}-{b}", gare_depart=gares[a], gare_arrivee=gares[b], prix_billet=prix,
+                                               distance_km=km, colis_forfait=1500, colis_prix_kg=100))
+        cars = [Vehicule.objects.create(immatriculation=f"LT {n} DEMO", designation=f"Car {n} (fictif)", nombre_places=30)
+                for n in (101, 102, 103)]
+        chauffeurs = [Chauffeur.objects.create(nom=f"Chauffeur {n} (fictif)") for n in (1, 2, 3)]
+        today = datetime.date.today()
+        for i, (ligne, heure) in enumerate(((lignes[0], 7), (lignes[0], 13), (lignes[2], 8))):
+            Depart.objects.create(ligne=ligne, date=today, heure=datetime.time(heure, 0), vehicule=cars[i], chauffeur=chauffeurs[i])
+        self.log("Démonstration transport : 3 gares, 4 lignes, 3 cars, 3 départs aujourd'hui.")
 
     def _sahel(self):
         from apps.commercial import sahel

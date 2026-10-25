@@ -1,0 +1,14 @@
+{% load static erp %}<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Billet {{ billet.numero }}</title>
+<link href="{% static 'vendor/bootstrap.min.css' %}" rel="stylesheet">
+<style>body{font-size:10pt;padding:1rem;max-width:80mm}@media print{body{padding:0}}</style></head>
+<body onload="window.print()">
+<div class="text-center"><strong>{{ societe.raison_sociale }}</strong><br><span class="small">{{ societe.telephone }}</span><hr class="my-1">
+<h5 class="mb-0">BILLET DE VOYAGE</h5><div>N° {{ billet.numero }}</div></div><hr class="my-1">
+<div>{{ billet.depart.ligne.gare_depart.nom }} → {{ billet.depart.ligne.gare_arrivee.nom }}</div>
+<div><strong>{{ billet.depart.date|date:"d/m/Y" }} à {{ billet.depart.heure|time:"H:i" }}</strong>{% if billet.siege %} · siège <strong>{{ billet.siege }}</strong>{% endif %}</div>
+<div>Voyageur : {{ billet.voyageur }}</div>
+<div>Prix : <strong>{{ billet.prix|montant }} FCFA</strong> ({{ billet.get_paiement_display }})</div>
+<hr class="my-1"><div class="small">Vendu le {{ billet.date_vente|date:"d/m/Y" }} à {{ billet.gare.nom }} par {{ billet.vendu_par|default:"" }}.
+Présentez-vous 30 minutes avant le départ.</div>
+</body></html>

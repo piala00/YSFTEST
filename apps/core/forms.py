@@ -44,6 +44,10 @@ class SocieteForm(BootstrapMixin, forms.ModelForm):
         ordre = [n for n in self.fields if n != "depots_detail"]          # la liste des boutiques juste après l'option
         ordre.insert(ordre.index("separation_gros_detail") + 1, "depots_detail")
         self.order_fields(ordre)
+        self.fields["activite"].required = False                   # absent du formulaire envoyé : activité inchangée
+
+    def clean_activite(self):
+        return self.cleaned_data.get("activite") or self.instance.activite or Societe.ACTIVITE_COMMERCE
 
     def clean(self):
         donnees = super().clean()

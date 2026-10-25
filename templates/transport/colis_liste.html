@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Colis et courriers{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Colis, courriers et fret</h1>
+  <div class="dropdown"><button class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-box-seam"></i> Enregistrer</button>
+  <ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" href="{% url 'transport:colis_create' %}?nature=COLIS">Un colis</a></li>
+    <li><a class="dropdown-item" href="{% url 'transport:colis_create' %}?nature=COURRIER">Un courrier</a></li>
+    <li><a class="dropdown-item" href="{% url 'transport:colis_create' %}?nature=FRET">Du fret</a></li></ul></div></div>
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3">
+  <div><label class="form-label small mb-0" for="c-date">Enregistrés le</label><input type="date" id="c-date" name="date" value="{{ jour|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="c-statut">Ou statut</label><select id="c-statut" name="statut" class="form-select form-select-sm"><option value="">—</option>
+    {% for code, lib in statuts %}<option value="{{ code }}" {% if code == statut %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="c-gare">Gare</label><select id="c-gare" name="gare" class="form-select form-select-sm"><option value="">Toutes</option>
+    {% for g in gares %}<option value="{{ g.pk }}" {% if g.pk|stringformat:"s" == gare %}selected{% endif %}>{{ g.nom }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="c-q">N°, nom ou téléphone</label><input id="c-q" name="q" value="{{ q }}" class="form-control form-control-sm"></div>
+  <button class="btn btn-sm btn-outline-secondary">Afficher</button>
+  <a class="btn btn-sm btn-outline-secondary" href="?statut=ARRIVE">À remettre aux destinataires</a></form>
+<div class="card"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>N°</th><th>Nature</th><th>Trajet</th><th>Expéditeur</th><th>Destinataire</th><th class="num">Poids</th><th class="num">Prix</th><th>Port</th><th class="num">Contre-remb.</th><th>Statut</th></tr></thead>
+  <tbody>{% for c in colis %}<tr><td><a href="{% url 'transport:colis_detail' c.pk %}">{{ c.numero }}</a></td><td>{{ c.get_nature_display }}</td>
+    <td>{{ c.gare_depart.ville }} → {{ c.gare_arrivee.ville }}</td><td>{{ c.expediteur }}</td><td>{{ c.destinataire }} {{ c.tel_destinataire }}</td>
+    <td class="num">{{ c.poids }}</td><td class="num">{{ c.prix|montant }}</td><td>{% if c.port == "DU" %}dû{% else %}payé{% endif %}</td>
+    <td class="num">{{ c.contre_remboursement|montant_ou_vide }}</td><td>{{ c.get_statut_display }}</td></tr>
+  {% empty %}<tr><td colspan="10" class="text-muted text-center p-4">Aucun envoi.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

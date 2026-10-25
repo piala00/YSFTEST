@@ -14,7 +14,10 @@ from .navigation import MODULES_PAR_CODE
 def portail(request):
     from . import droits as d
 
-    tuiles = [(m, d.acces_de(request.user, m.code)) for m in MODULES_PAR_CODE.values()]
+    from .models import Societe
+    from .navigation import modules_proposes
+
+    tuiles = [(m, d.acces_de(request.user, m.code)) for m in modules_proposes(Societe.get())]
     return render(request, "core/portail.html", {"tuiles": tuiles})
 
 

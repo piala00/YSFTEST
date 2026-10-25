@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ titre }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>{{ titre }}</h1></div>
+<div class="card"><div class="card-body"><form method="post">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="row g-3">{% for field in form %}<div class="col-md-4">
+    <label class="form-label small" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}
+    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+    {% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>{% endfor %}</div>
+  <div class="mt-4 d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Vendre</button>
+    <button class="btn btn-outline-primary" name="suivant" value="1" title="Enregistre et ouvre une nouvelle vente sur le même départ">Vendre et billet suivant</button>
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">Annuler</a></div>
+</form></div></div>
+{% endblock %}

@@ -105,11 +105,18 @@ def preparer_base():
     lancer("manage.py", "collectstatic", "--noinput", "-v0")
     from_zero = not (LOGICIEL / ".initialise").exists()
     if from_zero:
-        demo = oui("Ajouter les données de démonstration (clients, articles, pièces fictifs) ?", "O")
+        print("\nActivité de la société :")
+        print("  1. Commerce (achat-revente de marchandises, stocks)")
+        print("  2. Transport de voyageurs (billetterie des cars, colis et courrier, logistique)")
+        print("  3. Les deux")
+        activite = {"1": "commerce", "2": "transport", "3": "mixte"}.get(demander("Votre choix", "1"), "commerce")
+        demo = oui("Ajouter les données de démonstration (fictives) ?", "O")
         print("\nTVA : par défaut, aucune TVA n'est appliquée (modifiable ensuite dans les Paramètres de la société).")
         tva = oui("La société facture-t-elle la TVA (taux du Cameroun : 19,25 %, 11 %, 0 %) ?", "N")
-        lancer("manage.py", "init_erp", *(["--demo"] if demo else []), *(["--regime-tva", "automatique"] if tva else []))
-        configurer_gros_detail()
+        lancer("manage.py", "init_erp", "--activite", activite, *(["--demo"] if demo else []),
+               *(["--regime-tva", "automatique"] if tva else []))
+        if activite != "transport":
+            configurer_gros_detail()
         (LOGICIEL / ".initialise").write_text("ok", encoding="utf-8")
     print("Base prête.")
 
