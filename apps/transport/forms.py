@@ -111,7 +111,7 @@ class BilletForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Billet
         fields = ("depart", "gare_montee", "gare_arrivee", "voyageur", "telephone", "piece_identite", "siege", "prix", "paiement", "caisse",
-                  "client")
+                  "client", "bagages", "bagages_nombre", "bagages_poids", "prix_bagages")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -123,6 +123,17 @@ class BilletForm(BootstrapMixin, forms.ModelForm):
         self.fields["caisse"].queryset = _caisses()
         self.fields["caisse"].help_text = "Vide : caisse de la gare"
         self.fields["client"].queryset = Tiers.objects.filter(type_tiers=Tiers.CLIENT, actif=True)
+        for champ in ("bagages_nombre", "bagages_poids", "prix_bagages"):    # pas de bagage : laisser vide
+            self.fields[champ].required = False
+
+    def clean_bagages_nombre(self):
+        return self.cleaned_data.get("bagages_nombre") or 0
+
+    def clean_bagages_poids(self):
+        return self.cleaned_data.get("bagages_poids") or 0
+
+    def clean_prix_bagages(self):
+        return self.cleaned_data.get("prix_bagages") or 0
 
 
 class ColisForm(BootstrapMixin, forms.ModelForm):
@@ -155,6 +166,6 @@ class DepenseVehiculeForm(BootstrapMixin, forms.ModelForm):
 class ParametresTransportForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = ParametresTransport
-        fields = ("compte_billets", "compte_colis", "compte_fret", "compte_contre_remboursement", "compte_billets_a_voyager",
+        fields = ("compte_billets", "compte_colis", "compte_bagages", "compte_fret", "compte_contre_remboursement", "compte_billets_a_voyager",
                   "compte_colis_a_transporter", "compte_remboursements", "compte_carburant", "compte_pieces", "compte_main_oeuvre", "taxe_billets",
                   "taxe_colis", "retenue_annulation", "sessions_caisse_obligatoires")

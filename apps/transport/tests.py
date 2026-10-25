@@ -856,3 +856,66 @@ class ComptabiliteAnalytiqueTests(TestCase):
             self.assertEqual(self.client.get(url).status_code, 200, url)
         self.assertContains(self.client.get(reverse("comptabilite:analytique_vehicules")), "Rapprochement avec la comptabilité générale")
         self.assertContains(self.client.get(reverse("comptabilite:analytique_vehicule", args=[self.car.pk])), "RÉSULTAT D'EXPLOITATION")
+
+
+class BagagesTests(TestCase):
+    """Bagages payants déclarés à l'achat du billet : encaissés avec le billet, recette du véhicule au départ."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        cls.dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        cls.bta = Gare.objects.create(code="BTA", nom="Gare de Bertoua", ville="Bertoua")
+        cls.gbl = Gare.objects.create(code="GBL", nom="Gare de Garoua-Boulaï", ville="Garoua-Boulaï")
+        cls.l1 = Ligne.objects.create(code="DLA-BTA", gare_depart=cls.dla, gare_arrivee=cls.bta, prix_billet=8000)
+        cls.l2 = Ligne.objects.create(code="BTA-GBL", gare_depart=cls.bta, gare_arrivee=cls.gbl, prix_billet=4000)
+        cls.car1 = Vehicule.objects.create(immatriculation="LT 111 BG", nombre_places=30)
+        cls.car2 = Vehicule.objects.create(immatriculation="LT 222 BG", nombre_places=30)
+        cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur")
+
+    def depart(self, ligne, car, heure=7):
+        return Depart.objects.create(ligne=ligne, date=datetime.date.today(), heure=datetime.time(heure), vehicule=car,
+                                     chauffeur=self.chauffeur)
+
+    def test_bagages_encaisses_puis_recette_du_vehicule(self):
+        from . import analytique, etats
+
+        d = self.depart(self.l1, self.car1)
+        b = Billet(depart=d, voyageur="Avec bagages", bagages="2 cartons, 1 sac", bagages_nombre=3, bagages_poids=45,
+                   prix_bagages=3000).vendre()
+        self.assertEqual((b.total, solde("5711"), solde("41911")), (11000, 11000, -11000))
+        with self.assertRaisesMessage(ValidationError, "Décrivez les bagages"):
+            Billet(depart=d, voyageur="Sans description", prix_bagages=500).vendre()
+        d.partir()
+        self.assertEqual((solde("41911"), solde("70611"), solde("70614")), (0, -8000, -3000))
+        bag = LigneEcriture.objects.get(compte__numero="70614")
+        self.assertEqual(bag.vehicule, self.car1)
+        r = etats.rapport_agence_a4(datetime.date.today())
+        self.assertEqual((r["total_bagages"], r["caisse"]["bagages"], r["caisse"]["billets"]),
+                         ({"quantite": 3, "montant": 3000}, 3000, 8000))
+        ligne = next(l for l in analytique.vehicules(datetime.date.today(), datetime.date.today())["lignes"]
+                     if l["vehicule"] == self.car1)
+        self.assertEqual((ligne["billetterie"], ligne["bagages"]), (8000, 3000))
+
+    def test_correspondance_bagages_partages_et_annulation(self):
+        d1, d2 = self.depart(self.l1, self.car1), self.depart(self.l2, self.car2, heure=15)
+        b = Billet(depart=d1, voyageur="Long trajet", gare_arrivee=self.gbl, prix=12000, bagages="1 malle",
+                   prix_bagages=1200).vendre(depart_correspondance=d2)
+        self.assertEqual([t.part_bagages for t in b.troncons.all()], [800, 400])     # même partage que le billet (8 000 / 4 000)
+        b2 = Billet(depart=d1, voyageur="Annule", bagages="1 sac", prix_bagages=1000).vendre()
+        b2.annuler(retenue=2000)
+        self.assertEqual(b2.rembourse, 8000 + 1000 - 2000)                            # bagages rendus en entier
+
+    def test_vente_au_guichet_avec_bagages(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        d = self.depart(self.l1, self.car1)
+        self.client.post(reverse("transport:billet_vente"), {
+            "depart": d.pk, "voyageur": "Guichet", "paiement": "ESPECES", "bagages": "1 carton", "bagages_nombre": 1,
+            "bagages_poids": "20", "prix_bagages": "1500"})
+        b = Billet.objects.get(voyageur="Guichet")
+        self.assertEqual((b.prix, b.prix_bagages, b.total), (8000, 1500, 9500))
+        self.assertContains(self.client.get(reverse("transport:billet_detail", args=[b.pk])), "1 carton")
+        self.assertContains(self.client.get(reverse("transport:manifeste", args=[d.pk])), "1 carton")

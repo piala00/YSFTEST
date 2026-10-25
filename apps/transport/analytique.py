@@ -38,6 +38,8 @@ def _rubrique(numero, p, remuneration):
             return "billetterie"
         if numero in (n(p.compte_colis), n(p.compte_fret)):
             return "colis"
+        if numero == n(p.compte_bagages):
+            return "bagages"
         return "autres_produits"
     if numero == remuneration:
         return "proprietaire"

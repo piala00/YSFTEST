@@ -89,10 +89,12 @@ def serialiser(o):
                           "client": o.client.code if o.client_id else None, "statut": o.statut, "retenue": _d(o.retenue),
                           "vendu_par": str(o.vendu_par or ""), "annule_le": _date(o.annule_le),
                           "gare_arrivee": _uid(o.gare_arrivee), "gare_montee": _uid(o.gare_montee),
-                          "remboursement": o.remboursement,
+                          "remboursement": o.remboursement, "bagages": o.bagages, "bagages_nombre": o.bagages_nombre,
+                          "bagages_poids": _d(o.bagages_poids), "prix_bagages": _d(o.prix_bagages),
                           "troncons": [{"uid": str(t.uid), "ordre": t.ordre, "gare_depart": _uid(t.gare_depart),
                                         "gare_arrivee": _uid(t.gare_arrivee), "depart": _uid(t.depart), "siege": t.siege,
-                                        "part": _d(t.part), "statut": t.statut, "vehicule": _uid(t.vehicule),
+                                        "part": _d(t.part), "part_bagages": _d(t.part_bagages),
+                                        "statut": t.statut, "vehicule": _uid(t.vehicule),
                                         "site_effectue": t.site_effectue, "effectue_le": _date(t.effectue_le)}
                                        for t in o.troncons.order_by("ordre")]}, o.date_vente, o.vendu_par or ""
     if isinstance(o, Colis):
@@ -270,6 +272,8 @@ def _billet(p, origine, local):
     b.gare_arrivee = _par_uid(Gare, p.get("gare_arrivee"), "gare", obligatoire=False)
     b.gare_montee = _par_uid(Gare, p.get("gare_montee"), "gare", obligatoire=False)
     b.remboursement = p.get("remboursement", b.remboursement or "")
+    b.bagages, b.bagages_nombre = p.get("bagages", ""), p.get("bagages_nombre") or 0
+    b.bagages_poids, b.prix_bagages = Decimal(p.get("bagages_poids") or 0), Decimal(p.get("prix_bagages") or 0)
     b.depart, b.gare = _par_uid(Depart, p["depart"], "départ"), _par_uid(Gare, p.get("gare"), "gare", obligatoire=False)
     for champ in ("numero", "voyageur", "telephone", "piece_identite", "siege", "paiement", "statut"):
         setattr(b, champ, p.get(champ) if p.get(champ) is not None else ("" if champ not in ("siege",) else None))
@@ -280,6 +284,7 @@ def _billet(p, origine, local):
     for t in troncons:
         tr = Troncon.objects.filter(uid=t["uid"]).first() or Troncon(uid=t["uid"], billet=b, site_origine=origine.code)
         tr.billet, tr.ordre, tr.part = b, t["ordre"], Decimal(t["part"])
+        tr.part_bagages = Decimal(t.get("part_bagages") or 0)
         tr.gare_depart, tr.gare_arrivee = _par_uid(Gare, t["gare_depart"], "gare"), _par_uid(Gare, t["gare_arrivee"], "gare")
         if t.get("depart") and (tr.depart_id is None or tr.statut == Troncon.A_VOYAGER):
             tr.depart, tr.siege = _par_uid(Depart, t["depart"], "départ", obligatoire=False) or tr.depart, t.get("siege")
@@ -380,13 +385,14 @@ def _troncon_effectue(p, origine, local):
     if t.statut == Troncon.EFFECTUE:
         raise SansObjet("tronçon déjà effectué")
     date = datetime.date.fromisoformat(p["date"])
-    if not t.site_origine and t.part:                   # billet vendu ici : on solde l'avance du voyageur
+    du = t.part + t.part_bagages                       # billet et bagages encaissés ici, transportés ailleurs
+    if not t.site_origine and du:                      # billet vendu ici : on solde l'avance du voyageur
         parametres = ParametresTransport.get()
         with hors_import():
             creer_ecriture(Journal.objects.get(code="OD"), date,
                            f"Billet {t.billet.numero} : tronçon {t.gare_depart.ville} → {t.gare_arrivee.ville} fait par {origine.nom}",
-                           [{"compte": parametres.compte_billets_a_voyager, "debit": t.part},
-                            {"compte": _compte_liaison(origine.code), "credit": t.part}],
+                           [{"compte": parametres.compte_billets_a_voyager, "debit": du},
+                            {"compte": _compte_liaison(origine.code), "credit": du}],
                            reference=t.billet.numero, origine=t.billet.numero)
     t.statut, t.site_effectue = Troncon.EFFECTUE, p.get("site") or origine.code
     t.vehicule = Vehicule.objects.filter(uid=p.get("vehicule")).first()

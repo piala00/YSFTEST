@@ -85,9 +85,9 @@ class SessionCaisse(models.Model):
 
         billets = self.billets.all()
         d = {
-            "billets_especes": sum((b.prix for b in billets if b.paiement == Billet.ESPECES), ZERO),
-            "billets_mobile": sum((b.prix for b in billets if b.paiement == Billet.MOBILE_MONEY), ZERO),
-            "billets_compte": sum((b.prix for b in billets if b.paiement == Billet.COMPTE), ZERO),
+            "billets_especes": sum((b.total for b in billets if b.paiement == Billet.ESPECES), ZERO),
+            "billets_mobile": sum((b.total for b in billets if b.paiement == Billet.MOBILE_MONEY), ZERO),
+            "billets_compte": sum((b.total for b in billets if b.paiement == Billet.COMPTE), ZERO),
             "nb_billets": billets.count(),
             "remboursements": sum((b.rembourse for b in self.remboursements_billets.all() if b.paiement == Billet.ESPECES), ZERO),
             "colis": sum((c.prix for c in self.colis_enregistres.all() if c.port == Colis.PAYE and not c.client_id

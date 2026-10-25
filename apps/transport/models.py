@@ -40,6 +40,9 @@ class ParametresTransport(models.Model):
                                      verbose_name="Produits des colis et courriers")
     compte_fret = models.ForeignKey("comptabilite.Compte", on_delete=models.PROTECT, related_name="+",
                                     verbose_name="Produits du fret")
+    compte_bagages = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
+                                       verbose_name="Produits des bagages des voyageurs",
+                                       help_text="Bagages payants déclarés à l'achat du billet ; recette du véhicule qui les transporte")
     compte_contre_remboursement = models.ForeignKey(
         "comptabilite.Compte", on_delete=models.PROTECT, related_name="+", verbose_name="Fonds contre remboursement à reverser")
     compte_billets_a_voyager = models.ForeignKey(
@@ -78,6 +81,7 @@ class ParametresTransport(models.Model):
 
     COMPTES = {"compte_billets": ("70611", "Transport de voyageurs (billets)"),
                "compte_colis": ("70612", "Colis et courrier"),
+               "compte_bagages": ("70614", "Bagages des voyageurs"),
                "compte_fret": ("70613", "Fret et logistique"),
                "compte_contre_remboursement": ("4718", "Envois contre remboursement à reverser"),
                "compte_billets_a_voyager": ("41911", "Billets vendus, voyage à effectuer"),
@@ -553,11 +557,13 @@ class Depart(models.Model):
         debits, lignes = {}, []
         for t in troncons:                             # billet vendu ailleurs : la somme est chez l'agence vendeuse
             compte = _compte_liaison(t.billet.site_origine) if t.billet.site_origine else parametres.compte_billets_a_voyager
-            debits[compte] = debits.get(compte, ZERO) + t.part
+            debits[compte] = debits.get(compte, ZERO) + t.part + t.part_bagages
         total_billets = sum((t.part for t in troncons), ZERO)
-        if total_billets:
-            lignes += [{**l, "vehicule": self.vehicule, "section": self.ligne.gare_depart.section}
-                       for l in _ventiler(total_billets, parametres.compte_billets, parametres.taxe_billets)]
+        total_bagages = sum((t.part_bagages for t in troncons), ZERO)
+        for montant, compte_produit in ((total_billets, parametres.compte_billets), (total_bagages, parametres.compte_bagages)):
+            if montant:
+                lignes += [{**l, "vehicule": self.vehicule, "section": self.ligne.gare_depart.section}
+                           for l in _ventiler(montant, compte_produit, parametres.taxe_billets)]
         for c in envois:                               # port payé à l'expédition : recette du véhicule qui transporte
             debits[parametres.compte_colis_a_transporter] = debits.get(parametres.compte_colis_a_transporter, ZERO) + c.prix
             lignes += [{**l, "vehicule": self.vehicule, "section": self.ligne.gare_depart.section}
@@ -579,6 +585,7 @@ class Depart(models.Model):
 
                     publier("troncon_effectue", t.uid, {"v": 1, "troncon": str(t.uid), "depart": str(self.uid),
                                                         "vehicule": str(self.vehicule.uid), "part": str(t.part),
+                                                        "part_bagages": str(t.part_bagages),
                                                         "site": t.site_effectue, "date": timezone.localdate().isoformat()},
                             "EFFECTUE", timezone.localdate())
             Billet.objects.filter(troncons__in=troncons, statut=Billet.VENDU).update(statut=Billet.EMBARQUE)
@@ -669,6 +676,12 @@ class Billet(models.Model):
     siege = models.PositiveIntegerField("Siège", null=True, blank=True)
     prix = models.DecimalField(max_digits=12, decimal_places=0, null=True, blank=True,
                                help_text="Vide : tarif de la gare de départ à la destination")
+    bagages = models.CharField("Bagages (désignation)", max_length=150, blank=True,
+                               help_text="Demandez au voyageur s'il a des bagages ; s'il en a, évaluez-les (ex. 2 cartons, 1 sac)")
+    bagages_nombre = models.PositiveIntegerField("Nombre de bagages", default=0)
+    bagages_poids = models.DecimalField("Poids des bagages (kg)", max_digits=8, decimal_places=1, default=ZERO)
+    prix_bagages = models.DecimalField("Prix des bagages", max_digits=12, decimal_places=0, default=ZERO,
+                                       help_text="Prix fixé pour les bagages ; 0 si rien à payer")
     paiement = models.CharField(max_length=15, choices=PAIEMENTS, default=ESPECES)
     caisse = models.ForeignKey("comptabilite.Journal", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
                                limit_choices_to={"type_journal": "TRESORERIE"})
@@ -705,6 +718,11 @@ class Billet(models.Model):
     @property
     def destination(self):
         return self.gare_arrivee or self.depart.ligne.gare_arrivee
+
+    @property
+    def total(self):
+        """Prix du billet et des bagages : ce que le voyageur paie."""
+        return (self.prix or ZERO) + (self.prix_bagages or ZERO)
 
     @property
     def montee(self):
@@ -776,8 +794,13 @@ class Billet(models.Model):
                 self.prix = sum((t.prix_billet for t in tarifs), ZERO)
             else:
                 raise ValidationError(f"Aucun tarif de {origine.ville} à {destination.ville} : indiquez le prix du billet.")
-        if self.prix < 0:
+        if self.prix < 0 or (self.prix_bagages or ZERO) < 0:
             raise ValidationError("Le prix ne peut pas être négatif.")
+        self.prix_bagages = self.prix_bagages or ZERO
+        if self.prix_bagages and not self.bagages.strip():
+            raise ValidationError("Décrivez les bagages (ex. 2 cartons, 1 sac).")
+        if self.bagages.strip() and not self.bagages_nombre:
+            self.bagages_nombre = 1
         for a, b, d, siege in segments:
             if d is None:
                 continue
@@ -795,18 +818,22 @@ class Billet(models.Model):
         self.session = self.session or session_pour(utilisateur)
         self.numero = self.numero or Sequence.piece("BIL", self.date_vente.year, largeur=6)
         self.save()
-        for ordre, ((a, b, d, siege), part) in enumerate(zip(segments, _parts(self.prix, segments, tarifs)), 1):
-            Troncon.objects.create(billet=self, ordre=ordre, gare_depart=a, gare_arrivee=b, depart=d, siege=siege, part=part)
-        self.tracer("VENTE", f"Vendu {self.prix} ({self.get_paiement_display()}) {origine.ville} → {destination.ville}, "
+        parts_bagages = _parts(self.prix_bagages, segments, tarifs)      # bagages : même partage que le billet
+        for ordre, ((a, b, d, siege), part, bag) in enumerate(zip(segments, _parts(self.prix, segments, tarifs), parts_bagages), 1):
+            Troncon.objects.create(billet=self, ordre=ordre, gare_depart=a, gare_arrivee=b, depart=d, siege=siege, part=part,
+                                   part_bagages=bag)
+        self.tracer("VENTE", f"Vendu {self.prix}" + (f" + bagages {self.prix_bagages} ({self.bagages})" if self.prix_bagages else "")
+                    + f" ({self.get_paiement_display()}) {origine.ville} → {destination.ville}, "
                              f"départ {depart.numero}" + (f" siège {self.siege}" if self.siege else ""), utilisateur)
         from apps.echanges.publication import publier_objet
 
         publier_objet(self)                                 # billet complet, avec ses tronçons
-        if self.prix:
+        if self.total:
             parametres = ParametresTransport.get()
-            libelle = f"Billet {self.numero} {origine.ville} → {destination.ville} - {self.voyageur}"
-            lignes = [{**self._contrepartie(), "debit": self.prix},
-                      {"compte": parametres.compte_billets_a_voyager, "credit": self.prix, "section": self.gare.section}]
+            libelle = (f"Billet {self.numero} {origine.ville} → {destination.ville} - {self.voyageur}"
+                       + (f" + bagages {self.prix_bagages}" if self.prix_bagages else ""))
+            lignes = [{**self._contrepartie(), "debit": self.total},
+                      {"compte": parametres.compte_billets_a_voyager, "credit": self.total, "section": self.gare.section}]
             self.ecriture = creer_ecriture(self._journal(), self.date_vente, libelle, lignes, reference=self.numero,
                                            origine=self.numero)
             self.save(update_fields=["ecriture"])
@@ -841,12 +868,12 @@ class Billet(models.Model):
         retenue = Decimal(retenue)
         if not ZERO <= retenue <= self.prix:
             raise ValidationError("La retenue doit être comprise entre 0 et le prix du billet.")
-        rembourse = self.prix - retenue
+        rembourse = self.total - retenue                 # les bagages non transportés sont rendus en entier
         date = date or timezone.localdate()
         differe = not rembourser and rembourse and self.paiement != self.COMPTE
-        if self.prix:
+        if self.total:
             libelle = f"Annulation billet {self.numero} - {self.voyageur} (retenue {retenue})"
-            lignes = [{"compte": parametres.compte_billets_a_voyager, "debit": self.prix, "section": self.gare.section},
+            lignes = [{"compte": parametres.compte_billets_a_voyager, "debit": self.total, "section": self.gare.section},
                       {**({"compte": parametres.compte_remboursements} if differe else self._contrepartie()), "credit": rembourse},
                       *[{**l, "section": self.gare.section}
                         for l in _ventiler(retenue, parametres.compte_billets, parametres.taxe_billets)]]
@@ -896,7 +923,7 @@ class Billet(models.Model):
 
     @property
     def rembourse(self):
-        return self.prix - self.retenue if self.statut == self.ANNULE else ZERO
+        return self.total - self.retenue if self.statut == self.ANNULE else ZERO
 
 
 class HistoriqueBillet(models.Model):
@@ -945,6 +972,7 @@ class Troncon(models.Model):
                                help_text="Vide : correspondance pas encore affectée à un véhicule")
     siege = models.PositiveIntegerField(null=True, blank=True)
     part = models.DecimalField("Part du prix", max_digits=12, decimal_places=0, default=ZERO)
+    part_bagages = models.DecimalField("Part des bagages", max_digits=12, decimal_places=0, default=ZERO)
     statut = models.CharField(max_length=10, choices=STATUTS, default=A_VOYAGER)
     vehicule = models.ForeignKey(Vehicule, null=True, blank=True, on_delete=models.PROTECT, related_name="troncons",
                                  help_text="Véhicule qui a fait le trajet (au départ)")

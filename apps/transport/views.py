@@ -216,7 +216,7 @@ def billets(request):
         qs = Billet.objects.filter(Q(numero__icontains=q) | Q(voyageur__icontains=q) | Q(telephone__icontains=q)).select_related(
             "depart__ligne", "gare", "vendu_par")
     return render(request, "transport/billets.html", {"billets": qs, "jour": jour, "q": request.GET.get("q", ""),
-                                                      "total": sum((b.prix for b in qs if b.statut != Billet.ANNULE), ZERO)})
+                                                      "total": sum((b.total for b in qs if b.statut != Billet.ANNULE), ZERO)})
 
 
 @login_required

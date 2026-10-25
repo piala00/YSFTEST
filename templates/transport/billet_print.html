@@ -9,6 +9,8 @@
 <div><strong>{{ billet.depart.date|date:"d/m/Y" }} à {{ billet.depart.heure|time:"H:i" }}</strong>{% if billet.siege %} · siège <strong>{{ billet.siege }}</strong>{% endif %}</div>
 <div>Voyageur : {{ billet.voyageur }}</div>
 <div>Prix : <strong>{{ billet.prix|montant }} FCFA</strong> ({{ billet.get_paiement_display }})</div>
+{% if billet.bagages %}<div>Bagages : {{ billet.bagages }} ({{ billet.bagages_nombre }}{% if billet.bagages_poids %}, {{ billet.bagages_poids }} kg{% endif %}) : <strong>{{ billet.prix_bagages|montant }} FCFA</strong></div>
+<div>Total payé : <strong>{{ billet.total|montant }} FCFA</strong></div>{% endif %}
 <hr class="my-1"><div class="small">Vendu le {{ billet.date_vente|date:"d/m/Y" }} à {{ billet.gare.nom }} par {{ billet.vendu_par|default:"" }}.
 Présentez-vous 30 minutes avant le départ.</div>
 </body></html>

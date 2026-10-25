@@ -15,9 +15,9 @@ def recette_journaliere(jour):
     for b in Billet.objects.filter(date_vente=jour).select_related("gare"):
         ligne = gares[b.gare_id]
         if b.paiement == Billet.COMPTE:
-            ligne["billets_en_compte"] += b.prix
+            ligne["billets_en_compte"] += b.total
         else:
-            ligne["billets"] += b.prix
+            ligne["billets"] += b.total
         ligne["nb_billets"] += 1
     for b in Billet.objects.filter(statut=Billet.ANNULE, annule_le__date=jour).exclude(paiement=Billet.COMPTE):
         gares[b.gare_id]["annulations"] += b.rembourse
@@ -170,7 +170,7 @@ def rapport_journalier(jour):
     for b in Billet.objects.filter(date_vente=jour).select_related("vendu_par"):
         a = agents[str(b.vendu_par or "—")]
         a["nb"] += 1
-        a[{"ESPECES": "especes", "MOBILE_MONEY": "mobile", "COMPTE": "compte"}[b.paiement]] += b.prix
+        a[{"ESPECES": "especes", "MOBILE_MONEY": "mobile", "COMPTE": "compte"}[b.paiement]] += b.total
     for b in Billet.objects.filter(statut=Billet.ANNULE, annule_le__date=jour).select_related("annule_par"):
         agents[str(b.annule_par or b.vendu_par or "—")]["rembourse"] += b.rembourse
     for a in agents.values():
@@ -294,6 +294,12 @@ def rapport_agence_a4(jour, site=""):
             billetterie.append({"depart": d, "vehicule": d.vehicule, "trajet": f"{a} → {b}", "places": g["places"],
                                 "prix": prix, "montant": (prix or ZERO) * g["places"]})
     non_partis = Depart.objects.filter(date=jour, site_origine=site, statut=Depart.PROGRAMME).count()
+    # Bagages payants des voyageurs partis (part revenant à chaque car)
+    bagages = [{"vehicule": t.depart.vehicule, "designation": t.billet.bagages, "billet": t.billet.numero,
+                "destination": t.gare_arrivee.ville, "quantite": t.billet.bagages_nombre, "montant": t.part_bagages}
+               for t in (Troncon.objects.filter(depart__date=jour, depart__site_origine=site, statut=Troncon.EFFECTUE,
+                                                part_bagages__gt=0)
+                         .select_related("depart__vehicule", "billet", "gare_arrivee").order_by("depart__heure", "billet__numero"))]
 
     # B. Trésorerie : lignes des comptes de trésorerie de la journée
     journaux = Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__isnull=False).select_related(
@@ -327,6 +333,14 @@ def rapport_agence_a4(jour, site=""):
             nature = "remboursement"
         elif num(p.compte_billets_a_voyager) in numeros:
             nature = "billets"
+            if entree > 0:                            # vente : la part des bagages est sur le billet
+                from .models import Billet as BilletModele
+
+                b = BilletModele.objects.filter(numero=e.reference).only("prix_bagages").first()
+                part = min(b.prix_bagages, entree) if b and b.prix_bagages else ZERO
+                if part:
+                    totaux["bagages"]["especes" if especes(l.compte) else "electronique"] += part
+                    totaux["billets"]["especes" if especes(l.compte) else "electronique"] -= part
         elif numeros & colis_comptes and entree > 0:
             nature = "colis"
         else:
@@ -356,7 +370,8 @@ def rapport_agence_a4(jour, site=""):
         v = totaux[nature] if nature in totaux else {"especes": ZERO, "electronique": ZERO}
         return v[moyen] if moyen else v["especes"] + v["electronique"]
 
-    encaissements = {m: t("billets", m) + t("colis", m) + t("autres_entrees", m) for m in ("especes", "electronique")}
+    encaissements = {m: t("billets", m) + t("bagages", m) + t("colis", m) + t("autres_entrees", m)
+                     for m in ("especes", "electronique")}
 
     # Situation par caisse / banque / Mobile Money
     caisses = []
@@ -378,10 +393,12 @@ def rapport_agence_a4(jour, site=""):
         "billetterie": billetterie, "non_partis": non_partis,
         "total_billetterie": {"places": sum(l["places"] for l in billetterie),
                               "montant": sum((l["montant"] for l in billetterie), ZERO)},
+        "bagages": bagages, "total_bagages": {"quantite": sum(b["quantite"] for b in bagages),
+                                              "montant": sum((b["montant"] for b in bagages), ZERO)},
         "colis": colis, "total_colis": sum((c["montant"] for c in colis), ZERO),
         "sorties": sorties, "total_sorties": total_sorties,
         "caisse": {
-            "billets": t("billets"), "colis": t("colis"), "autres": t("autres_entrees"),
+            "billets": t("billets"), "bagages": t("bagages"), "colis": t("colis"), "autres": t("autres_entrees"),
             "total": encaissements["especes"] + encaissements["electronique"],
             "especes": encaissements["especes"], "electronique": encaissements["electronique"],
             "remboursements": t("remboursement"), "sorties": total_sorties,
