@@ -90,7 +90,7 @@ class PleinCarburant(models.Model):
             raise ValidationError(f"Compteur inférieur au plein précédent ({avant.kilometrage} km le {avant.date:%d/%m/%Y}).")
         journal, contrepartie = _contrepartie(self.paiement, self.caisse, self.fournisseur, "Plein")
         self.cree_par = self.cree_par or utilisateur
-        self.numero = self.numero or Sequence.suivant("CARB", self.date.year)
+        self.numero = self.numero or Sequence.piece("CARB", self.date.year)
         self.save()
         if self.montant:
             p = ParametresTransport.get()
@@ -132,7 +132,7 @@ class OrdreReparation(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            self.numero = Sequence.suivant("OR", self.date_entree.year)
+            self.numero = Sequence.piece("OR", self.date_entree.year)
         super().save(*args, **kwargs)
 
     @property

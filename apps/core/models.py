@@ -169,6 +169,16 @@ class Sequence(models.Model):
             seq.save(update_fields=["dernier_numero"])
         return f"{code}{annee}-{seq.dernier_numero:0{largeur}d}"
 
+    @classmethod
+    def piece(cls, code, annee, largeur=5):
+        """Numéro d'une pièce qui circule entre agences : préfixé par le code de l'agence quand les échanges sont
+        configurés (DLA-BIL2026-000001), pour que deux agences ne produisent jamais le même numéro."""
+        from apps.echanges.publication import site_local
+
+        local = site_local()
+        numero = cls.suivant(code, annee, largeur)
+        return f"{local.code}-{numero}" if local is not None else numero
+
 
 class DroitAcces(models.Model):
     """Fichier › Autorisations d'accès : niveau d'un profil (groupe) sur une entrée de menu d'un logiciel."""

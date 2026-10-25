@@ -155,6 +155,9 @@ class Gare(models.Model):
     caisse = models.ForeignKey("comptabilite.Journal", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
                                limit_choices_to={"type_journal": "TRESORERIE"},
                                help_text="Journal de caisse de la gare (vide : caisse principale CA)")
+    mobile_money = models.ForeignKey("comptabilite.Journal", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+                                     limit_choices_to={"type_journal": "TRESORERIE"}, verbose_name="Journal Mobile Money",
+                                     help_text="Encaissements Mobile Money de la gare (vide : journal MM)")
     section = models.ForeignKey("comptabilite.SectionAnalytique", null=True, blank=True, on_delete=models.PROTECT,
                                 related_name="+", help_text="Section analytique de la gare (créée automatiquement)")
     actif = models.BooleanField(default=True)
@@ -175,6 +178,11 @@ class Gare(models.Model):
 
     def journal_caisse(self):
         return self.caisse or _caisse_par_defaut()
+
+    def journal_mobile_money(self):
+        from apps.comptabilite.models import Journal
+
+        return self.mobile_money or Journal.objects.filter(code="MM").first() or self.journal_caisse()
 
 
 class Ligne(models.Model):
@@ -310,7 +318,7 @@ class Depart(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            self.numero = Sequence.suivant("DEP", self.date.year)
+            self.numero = Sequence.piece("DEP", self.date.year)
         if not self.places and self.vehicule_id:
             self.places = self.vehicule.nombre_places
         super().save(*args, **kwargs)
@@ -515,6 +523,8 @@ class Billet(models.Model):
             raise ValidationError("Choisissez le client qui paie en compte.")
         if self.paiement == self.COMPTE and not self.client.vente_credit:
             raise ValidationError(f"Le client {self.client} est au comptant : vente en compte impossible.")
+        if self.paiement == self.MOBILE_MONEY and not self.caisse_id:
+            self.caisse = self.gare.journal_mobile_money()      # pas dans la caisse espèces : compte de l'opérateur
         if self.paiement != self.COMPTE:
             self.caisse = self.caisse or self.gare.journal_caisse()
             if not self.caisse or not self.caisse.compte_tresorerie_id:
@@ -556,7 +566,7 @@ class Billet(models.Model):
                     raise ValidationError(f"Le siège {siege} est déjà vendu sur le départ {d.numero}.")
         self.gare_arrivee = destination
         self.vendu_par = self.vendu_par or utilisateur
-        self.numero = self.numero or Sequence.suivant("BIL", self.date_vente.year, largeur=6)
+        self.numero = self.numero or Sequence.piece("BIL", self.date_vente.year, largeur=6)
         self.save()
         for ordre, ((a, b, d, siege), part) in enumerate(zip(segments, _parts(self.prix, segments, tarifs)), 1):
             Troncon.objects.create(billet=self, ordre=ordre, gare_depart=a, gare_arrivee=b, depart=d, siege=siege, part=part)
@@ -780,7 +790,7 @@ class Colis(models.Model):
         if self.port == self.DU and self.client_id:
             raise ValidationError("Un envoi en compte client est en port payé.")
         self.cree_par = self.cree_par or utilisateur
-        self.numero = self.numero or Sequence.suivant("COL", self.date.year, largeur=6)
+        self.numero = self.numero or Sequence.piece("COL", self.date.year, largeur=6)
         self.code_retrait = self.code_retrait or f"{secrets.randbelow(1000000):06d}"
         self.save()
         if self.port == self.PAYE and self.prix:
@@ -957,7 +967,7 @@ class DepenseVehicule(models.Model):
         if not self.caisse.compte_tresorerie_id:
             raise ValidationError(f"Le journal {self.caisse.code} n'a pas de compte de trésorerie.")
         self.cree_par = self.cree_par or utilisateur
-        self.numero = self.numero or Sequence.suivant("DV", self.date.year)
+        self.numero = self.numero or Sequence.piece("DV", self.date.year)
         self.save()
         libelle = self.libelle or f"{self.get_nature_display()} {self.vehicule.immatriculation}"
         self.ecriture = creer_ecriture(self.caisse, self.date, libelle,

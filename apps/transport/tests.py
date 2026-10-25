@@ -395,3 +395,29 @@ class JourneeAgenceTests(TestCase):
                     reverse("personnel:bulletin", args=[paie.bulletins.first().pk]), reverse("billetterie:accueil"),
                     reverse("colis:accueil"), reverse("garage:accueil"), reverse("personnel:accueil"), reverse("transport:accueil")):
             self.assertEqual(self.client.get(url).status_code, 200, url)
+
+
+class NumerotationAgencesTests(TestCase):
+    """Deux agences ne produisent jamais le même numéro de pièce (audit du 26/10)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", "--demo", verbosity=0)
+
+    def test_numeros_prefixes_par_l_agence(self):
+        from apps.echanges import lots
+
+        ligne = Ligne.objects.first()
+        Depart.objects.create(numero=f"DEP{datetime.date.today().year}-00004", site_origine="DLA", ligne=ligne,
+                              heure=datetime.time(9))                        # copie reçue, ancien format
+        lots.configurer_siege("YDE", "Agence de Yaoundé")
+        d = Depart.objects.create(ligne=ligne, heure=datetime.time(10))
+        self.assertTrue(d.numero.startswith("YDE-DEP"), d.numero)
+        b = Billet(depart=d, voyageur="V").vendre()
+        self.assertTrue(b.numero.startswith("YDE-BIL"), b.numero)
+
+    def test_mobile_money_hors_de_la_caisse_especes(self):
+        d = Depart.objects.filter(statut=Depart.PROGRAMME).first()
+        b = Billet(depart=d, voyageur="V", paiement=Billet.MOBILE_MONEY).vendre()
+        self.assertEqual(b.caisse.code, "MM")
+        self.assertEqual(b.ecriture.lignes.get(debit__gt=0).compte, Journal.objects.get(code="MM").compte_tresorerie)

@@ -14,11 +14,12 @@ def _caisses():
 class GareForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Gare
-        fields = ("code", "nom", "ville", "agence", "caisse", "actif")
+        fields = ("code", "nom", "ville", "agence", "caisse", "mobile_money", "actif")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["caisse"].queryset = _caisses()
+        self.fields["mobile_money"].queryset = _caisses()
 
 
 class LigneForm(BootstrapMixin, forms.ModelForm):
