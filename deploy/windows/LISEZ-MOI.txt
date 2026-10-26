@@ -180,13 +180,16 @@ Reprendre un dossier Sage existant (transition, puis bascule) :
   quelques minutes). Résultat : executable\ERP-OHADA-<Édition>\ avec
   ERP-OHADA-<Édition>.exe. Copiez tout ce dossier sur un autre poste :
   il contient le logiciel, Python et le serveur ; rien à installer.
-- Double-clic sur le .exe : au premier lancement il crée sa base (dossier
-  donnees à côté du programme), le plan comptable à 7 chiffres, puis
-  demande l'identifiant et le mot de passe de l'administrateur.
-- Autres usages (invite de commandes, dans le dossier du programme) :
-    ERP-OHADA-Transport.exe reseau          serveur pour tous les postes
-    ERP-OHADA-Transport.exe simulation 3    simulation de 3 mois (fictive)
-    ERP-OHADA-Transport.exe manage <commande>   administration
+- Double-clic sur le .exe : il démarre TOUT ce que lançaient les fichiers
+  .bat (serveur pour tous les postes du réseau, sauvegardes automatiques,
+  copie miroir SQL Server si elle est réglée, synchronisation du dossier
+  d'origine, serveur de simulation s'il existe). Au premier lancement il
+  crée sa base SQLite, le plan comptable à 7 chiffres, puis demande
+  l'identifiant et le mot de passe de l'administrateur.
+- Les données ne sont pas dans le dossier du programme mais dans
+  C:\ProgramData\ERP-OHADA\<Édition> (base, sauvegardes en lecture seule,
+  configuration). Détails, restauration et copie miroir SQL Server :
+  LISEZ-MOI.txt à côté du programme compilé.
 
 
 4. EN CAS DE PROBLÈME

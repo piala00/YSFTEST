@@ -15,7 +15,7 @@ echo.
 echo.
 echo   Programme pret : executable\ERP-OHADA-%ERP_EDITION%\ERP-OHADA-%ERP_EDITION%.exe
 echo   Copiez tout le dossier ERP-OHADA-%ERP_EDITION% sur le poste voulu, puis double-cliquez sur le .exe.
-echo   Ses donnees seront dans le sous-dossier donnees, a cote du programme.
+echo   Ses donnees seront dans C:\ProgramData\ERP-OHADA\%ERP_EDITION% : lisez LISEZ-MOI.txt a cote du programme.
 pause
 exit /b 0
 :erreur

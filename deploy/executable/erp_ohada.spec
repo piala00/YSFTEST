@@ -39,3 +39,10 @@ a = Analysis([str(RACINE / "deploy" / "executable" / "erp_ohada.py")], pathex=[s
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=NOM, console=True, upx=False)
 coll = COLLECT(exe, a.binaries, a.datas, upx=False, name=NOM)
+
+# À côté du programme : la notice et la documentation (sans les paquets .zip)
+import shutil  # noqa: E402
+
+DOSSIER = Path(DISTPATH) / NOM
+shutil.copy2(RACINE / "deploy" / "executable" / "LISEZ-MOI.txt", DOSSIER / "LISEZ-MOI.txt")
+shutil.copytree(RACINE / "docs", DOSSIER / "documentation", ignore=shutil.ignore_patterns("*.zip"), dirs_exist_ok=True)
