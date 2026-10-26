@@ -36,6 +36,10 @@ def env_bool(key, default=False):
 
 SECRET_KEY = env("SECRET_KEY", "dev-insecure-change-me")
 DEBUG = env_bool("DEBUG", True)
+# Refuser d'enregistrer un départ bien avant son heure prévue (désactivé pendant les tests, qui tournent à toute heure)
+import sys as _sys  # noqa: E402
+
+CONTROLE_HEURE_DEPART = env_bool("CONTROLE_HEURE_DEPART", "test" not in _sys.argv)
 ALLOWED_HOSTS = [h.strip() for h in env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 

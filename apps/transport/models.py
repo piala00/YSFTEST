@@ -13,6 +13,7 @@ Schémas comptables (comptes réglables dans Paramètres transport, à valider p
   … reversé à l'expéditeur      D 4718                        / C caisse
   Dépense de véhicule           D 6xx (sur le véhicule)       / C caisse
 """
+import datetime
 import secrets
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
@@ -72,6 +73,9 @@ class ParametresTransport(models.Model):
     sessions_caisse_obligatoires = models.BooleanField(
         "Caisse ouverte obligatoire pour encaisser", default=False,
         help_text="Chaque guichetier ou agent colis ouvre sa caisse (fonds de départ) avant d'encaisser, et la ferme le soir")
+    avance_depart_toleree = models.PositiveIntegerField(
+        "Départ enregistré au plus tôt (minutes avant l'heure prévue)", null=True, blank=True, default=120,
+        help_text="Empêche de marquer parti un car qui n'est pas encore parti ; vide : pas de contrôle de l'heure")
     plafond_depense_sans_autorisation = models.DecimalField(
         "Dépenses autorisées d'office jusqu'à", max_digits=14, decimal_places=0, default=ZERO,
         help_text="0 : toute dépense de fonctionnement attend l'autorisation du siège")
@@ -547,6 +551,17 @@ class Depart(models.Model):
         if not self.vehicule_id or not self.chauffeur_id:
             raise ValidationError("Indiquez le véhicule et le chauffeur avant le départ.")
         self.controler_gamme()
+        maintenant = timezone.localtime()
+        if self.date > maintenant.date():
+            raise ValidationError(f"Ce départ est prévu le {self.date:%d/%m/%Y} : il ne peut pas être enregistré parti avant ce jour.")
+        from django.conf import settings as reglages
+
+        avance = ParametresTransport.get().avance_depart_toleree
+        if getattr(reglages, "CONTROLE_HEURE_DEPART", True) and self.heure and self.date == maintenant.date() and avance is not None:
+            prevu = timezone.make_aware(datetime.datetime.combine(self.date, self.heure))
+            if prevu - maintenant > datetime.timedelta(minutes=avance):
+                raise ValidationError(f"Départ prévu à {self.heure:%H:%M} : trop tôt pour l'enregistrer parti "
+                                      f"(tolérance {avance} min, réglable dans les Paramètres transport).")
         en_route = Depart.objects.filter(vehicule_id=self.vehicule_id, statut=self.PARTI).exclude(pk=self.pk).first()
         if en_route:
             raise ValidationError(f"Ce véhicule est encore sur la route (départ {en_route.numero}) : constatez d'abord son arrivée.")

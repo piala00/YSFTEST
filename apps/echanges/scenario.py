@@ -14,7 +14,8 @@ RACINE = Path(__file__).resolve().parents[2]
 class Dossier:
     def __init__(self, travail, nom):
         self.nom, self.base = nom, str(Path(travail) / f"{nom}.sqlite3")
-        self.env = {**os.environ, "SQLITE_FICHIER": self.base, "DB_ENGINE": "sqlite", "DJANGO_SETTINGS_MODULE": "erp.settings"}
+        self.env = {**os.environ, "SQLITE_FICHIER": self.base, "DB_ENGINE": "sqlite", "DJANGO_SETTINGS_MODULE": "erp.settings",
+                    "CONTROLE_HEURE_DEPART": "0"}
 
     def manage(self, *args):
         r = subprocess.run([sys.executable, "manage.py", *args], cwd=RACINE, env=self.env, capture_output=True, text=True)

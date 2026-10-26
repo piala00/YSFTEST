@@ -444,6 +444,12 @@ class CaissesEtCloturesTests(TestCase):
         d = Depart.objects.filter(statut=Depart.PROGRAMME).first()
         with self.assertRaisesMessage(ValidationError, "Ouvrez votre caisse"):
             Billet(depart=d, voyageur="V").vendre(agent)
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+
+        creer_ecriture(ca, datetime.date.today(), "Fonds de caisse", [               # fonds remis au guichet, déjà en caisse
+            {"compte": Compte.objects.get(numero="5711"), "debit": 10000},
+            {"compte": Compte.objects.get_or_create(numero="101", defaults={"intitule": "Capital social"})[0], "credit": 10000}])
         s = SessionCaisse.ouvrir(agent, ca, fonds_initial=10000)
         Billet(depart=d, voyageur="V1").vendre(agent)                       # 6 000 espèces
         b2 = Billet(depart=d, voyageur="V2").vendre(agent)
@@ -1182,3 +1188,78 @@ class ComparaisonsTransportTests(TestCase):
             r = self.client.get(reverse("reporting:comparaisons_transport") + f"?axe={axe}")
             self.assertEqual(r.status_code, 200, axe)
             self.assertContains(r, "Écart A − B")
+
+
+class AnomaliesRapportJournalierTests(TestCase):
+    """Anomalies relevées sur le rapport RJ : caisse négative, départs futurs, rapprochement, car des colis."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        yde = Gare.objects.create(code="YDE", nom="Gare de Yaoundé", ville="Yaoundé")
+        cls.ligne = Ligne.objects.create(code="DLA-YDE", gare_depart=dla, gare_arrivee=yde, prix_billet=6000, colis_forfait=2500)
+        cls.car = Vehicule.objects.create(immatriculation="LT 701 AN", nombre_places=30)
+        cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur")
+        cls.ca = Journal.objects.get(code="CA")
+
+    def depart(self, jour=None, heure=7):
+        return Depart.objects.create(ligne=self.ligne, date=jour or datetime.date.today(), heure=datetime.time(heure),
+                                     vehicule=self.car, chauffeur=self.chauffeur)
+
+    def test_depart_futur_refuse(self):
+        from django.test import override_settings
+
+        demain = self.depart(jour=datetime.date.today() + datetime.timedelta(days=1))
+        with self.assertRaisesMessage(ValidationError, "avant ce jour"):
+            demain.partir()
+        p = ParametresTransport.get()
+        p.avance_depart_toleree = 1
+        p.save()
+        tard = self.depart(heure=23)
+        tard.heure = datetime.time(23, 59)
+        tard.save()
+        if timezone_maintenant().time() < datetime.time(23, 50):
+            with override_settings(CONTROLE_HEURE_DEPART=True), self.assertRaisesMessage(ValidationError, "trop tôt"):
+                tard.partir()
+
+    def test_caisse_negative_bloquante_et_transfert_limite(self):
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+
+        from .models_caisse import ClotureJournee, TransfertFonds, anomalies_du_jour
+
+        Billet(depart=self.depart(), voyageur="V").vendre()                    # 6 000 en caisse
+        with self.assertRaisesMessage(ValidationError, "n'a que 6 000"):
+            TransfertFonds(origine=self.ca, destination=Journal.objects.get(code="BQ"), montant=10000).envoyer()
+        creer_ecriture(self.ca, datetime.date.today(), "Sortie sans fonds",
+                       [{"compte": Compte.objects.get_or_create(numero="658", defaults={"intitule": "Charges diverses"})[0],
+                         "debit": 9000}, {"compte": Compte.objects.get(numero="5711"), "credit": 9000}])
+        bloquants, _ = anomalies_du_jour(datetime.date.today(), ClotureJournee.AGENCE)
+        self.assertTrue(any("négative" in b for b in bloquants))
+        from . import etats
+
+        self.assertEqual([c["solde"] for c in etats.rapport_agence_a4(datetime.date.today())["caisses_negatives"]], [-3000])
+
+    def test_rapprochement_des_billets_et_car_des_colis(self):
+        from . import etats
+
+        jour = datetime.date.today()
+        d = self.depart()
+        Billet(depart=d, voyageur="Payé hier", date_vente=jour - datetime.timedelta(days=1)).vendre()
+        Billet(depart=d, voyageur="Payé ce jour").vendre()
+        c = Colis(gare_depart=self.ligne.gare_depart, gare_arrivee=self.ligne.gare_arrivee, expediteur="E", destinataire="D",
+                  prix=2500).enregistrer()
+        c.charger(d)
+        Colis(gare_depart=self.ligne.gare_depart, gare_arrivee=self.ligne.gare_arrivee, expediteur="E", destinataire="D2",
+              prix=2500).enregistrer()
+        d.partir()
+        r = etats.rapport_agence_a4(jour)
+        self.assertEqual((r["rapprochement"]["ce_jour"], r["rapprochement"]["avant"]), (6000, 6000))
+        self.assertEqual(sorted(x["car"] for x in r["colis"]), ["LT 701 AN", "pas encore chargé"])
+
+
+def timezone_maintenant():
+    from django.utils import timezone
+
+    return timezone.localtime()

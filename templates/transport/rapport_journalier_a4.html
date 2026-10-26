@@ -20,6 +20,7 @@ th { background: #eee; text-align: left; font-weight: bold; font-size: 8.3pt; }
 .num { text-align: right; white-space: nowrap; }
 tr.total td { font-weight: bold; background: #f2f2f2; }
 tr.sous td { font-weight: bold; }
+.alerte { border: 1.2pt solid #000; padding: 2mm; margin: 0 0 3mm; font-size: 8.5pt; }
 td.vide { text-align: center; font-style: italic; color: #333; }
 .petit { font-size: 7.8pt; color: #333; }
 .note { font-size: 7.8pt; margin: 1mm 0 0; }
@@ -53,18 +54,25 @@ td.vide { text-align: center; font-style: italic; color: #333; }
     <span><b>Généré le :</b> {{ genere_le|date:"d/m/Y H:i" }} par {{ request.user }}</span>
   </div>
 </header>
+{% if caisses_negatives %}<div class="alerte"><b>ANOMALIE BLOQUANTE :</b> {% for c in caisses_negatives %}caisse {{ c.compte.numero }} ({{ c.journaux }}) négative en fin de journée ({{ c.solde|montant }} FCFA){% if not forloop.last %} ; {% endif %}{% endfor %}.
+  Une caisse physique ne peut pas être négative : vérifier les transferts, les sorties et leurs pièces. La journée ne peut pas être clôturée.</div>{% endif %}
 
 <h2>1. Billetterie — départs effectués ce jour</h2>
 <table><thead><tr><th>Véhicule</th><th>Trajet</th><th>Départ</th><th class="num">Places</th><th class="num">Prix unitaire</th><th class="num">Montant</th></tr></thead>
 <tbody>{% for l in billetterie %}<tr>
   <td>{{ l.vehicule.immatriculation|default:"—" }}{% if l.vehicule.designation %}<br><span class="petit">{{ l.vehicule.designation }}</span>{% endif %}</td>
-  <td>{{ l.trajet }}</td><td>{{ l.depart.numero }}<br><span class="petit">{{ l.depart.heure|time:"H:i" }}</span></td>
+  <td>{{ l.trajet }}</td><td>{{ l.depart.numero }}<br><span class="petit">prévu {{ l.depart.heure|time:"H:i" }}{% if l.depart.parti_le %} · parti {{ l.depart.parti_le|time:"H:i" }}{% endif %}</span></td>
   <td class="num">{{ l.places }}</td><td class="num">{% if l.prix is not None %}{{ l.prix|montant }}{% else %}—{% endif %}</td><td class="num">{{ l.montant|montant }}</td></tr>
 {% empty %}<tr><td colspan="6" class="vide">Aucune opération</td></tr>{% endfor %}
 <tr class="total"><td colspan="3">TOTAL BILLETTERIE</td><td class="num">{{ total_billetterie.places }}</td><td></td><td class="num">{{ total_billetterie.montant|montant }}</td></tr></tbody></table>
 <p class="note">Montants en FCFA. Voyageurs partis avec le car ; prix = part du billet qui revient à ce car (correspondance : part du trajet).
 Billets payés un autre jour ou dans une autre agence compris : ce tableau n'est pas l'encaissement du jour (voir tableau 5).
 {% if non_partis %}<b>{{ non_partis }} départ(s) programmé(s) pas encore parti(s)</b>, non comptés.{% endif %}</p>
+<table style="width:auto;min-width:60%"><thead><tr><th>Rapprochement des billets transportés (tableau 1) avec la caisse</th><th class="num">Montant</th></tr></thead><tbody>
+<tr><td>Payés ce jour dans cette agence (dans la caisse du jour, tableau 5)</td><td class="num">{{ rapprochement.ce_jour|montant }}</td></tr>
+<tr><td>Payés un jour précédent (caisse de ce jour-là)</td><td class="num">{{ rapprochement.avant|montant }}</td></tr>
+<tr><td>Vendus par une autre agence (sa caisse ; liaison entre agences)</td><td class="num">{{ rapprochement.ailleurs|montant }}</td></tr>
+<tr class="total"><td>TOTAL = tableau 1</td><td class="num">{{ total_billetterie.montant|montant }}</td></tr></tbody></table>
 
 <h2>2. Bagages payants des voyageurs</h2>
 <table><thead><tr><th>Véhicule</th><th>Désignation</th><th>Destination</th><th class="num">Qté</th><th class="num">Montant</th></tr></thead>
@@ -73,10 +81,10 @@ Billets payés un autre jour ou dans une autre agence compris : ce tableau n'est
 <tr class="total"><td colspan="3">TOTAL BAGAGES</td><td class="num">{{ total_bagages.quantite }}</td><td class="num">{{ total_bagages.montant|montant }}</td></tr></tbody></table>
 
 <h2>3. Colis, courriers et fret encaissés</h2>
-<table><thead><tr><th>N° bordereau</th><th>Désignation</th><th>Destination</th><th>Caisse</th><th class="num">Montant</th></tr></thead>
-<tbody>{% for c in colis %}<tr><td>{{ c.piece }}</td><td>{{ c.designation }}</td><td>{{ c.destination }}</td><td>{{ c.moyen }}</td><td class="num">{{ c.montant|montant }}</td></tr>
-{% empty %}<tr><td colspan="5" class="vide">Aucune opération</td></tr>{% endfor %}
-<tr class="total"><td colspan="4">TOTAL COLIS</td><td class="num">{{ total_colis|montant }}</td></tr></tbody></table>
+<table><thead><tr><th>N° bordereau</th><th>Désignation</th><th>Destination</th><th>Car</th><th>Caisse</th><th class="num">Montant</th></tr></thead>
+<tbody>{% for c in colis %}<tr><td>{{ c.piece }}</td><td>{{ c.designation }}</td><td>{{ c.destination }}</td><td>{{ c.car }}</td><td>{{ c.moyen }}</td><td class="num">{{ c.montant|montant }}</td></tr>
+{% empty %}<tr><td colspan="6" class="vide">Aucune opération</td></tr>{% endfor %}
+<tr class="total"><td colspan="5">TOTAL COLIS</td><td class="num">{{ total_colis|montant }}</td></tr></tbody></table>
 
 <h2>4. Sorties payées ce jour</h2>
 <table><thead><tr><th>N° pièce</th><th>Désignation</th><th>Affectation</th><th>Paiement</th><th class="num">Montant</th></tr></thead>

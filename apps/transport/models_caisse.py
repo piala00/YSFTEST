@@ -194,6 +194,11 @@ class TransfertFonds(models.Model):
         for j in (self.origine, self.destination):
             if not j.compte_tresorerie_id:
                 raise ValidationError(f"Le journal {j.code} n'a pas de compte de trésorerie.")
+        if self.origine.compte_tresorerie.numero.startswith("57"):      # espèces : jamais plus que ce qu'il y a
+            disponible = solde_tresorerie(self.origine.compte_tresorerie, self.date_envoi)
+            if self.montant > disponible:
+                raise ValidationError(f"La caisse {self.origine.code} n'a que {disponible:,.0f} FCFA en espèces : "
+                                      f"transfert de {self.montant:,.0f} impossible.".replace(",", " "))
         self.numero = self.numero or Sequence.piece("TF", self.date_envoi.year)
         self.envoye_par = utilisateur
         self.save()
@@ -284,6 +289,17 @@ def anomalies_du_jour(jour, perimetre=ClotureJournee.AGENCE):
         for o in OrdreReparation.objects.filter(statut=OrdreReparation.OUVERT, date_entree__lte=jour):
             signales.append(f"Réparation {o.numero} en cours ({o.vehicule.immatriculation})")
     if perimetre == ClotureJournee.AGENCE:
+        from apps.comptabilite.models import Journal
+
+        vus = set()
+        for j in Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__numero__startswith="57"):
+            if j.compte_tresorerie_id in vus:
+                continue
+            vus.add(j.compte_tresorerie_id)
+            s = solde_tresorerie(j.compte_tresorerie, jour)
+            if s < 0:                                   # une caisse physique ne peut pas être négative
+                bloquants.append(f"Caisse {j.compte_tresorerie.numero} négative ({s:,.0f} FCFA) : vérifier les transferts, "
+                                 f"les sorties et leurs pièces avant de clôturer".replace(",", " "))
         for p, _ in ClotureJournee.PERIMETRES[:3]:
             if not ClotureJournee.objects.filter(date=jour, perimetre=p).exists():
                 signales.append(f"Service {dict(ClotureJournee.PERIMETRES)[p]} pas clôturé")
@@ -295,6 +311,15 @@ def anomalies_du_jour(jour, perimetre=ClotureJournee.AGENCE):
         if non_envoyes:
             signales.append(f"{non_envoyes} fait(s) pas encore envoyé(s) au siège (préparez le fichier)")
     return bloquants, signales
+
+
+def solde_tresorerie(compte, jusqua):
+    """Solde d'un compte de caisse ou de banque de ce dossier à une date (écritures validées)."""
+    from apps.comptabilite.models import Ecriture, LigneEcriture
+
+    lignes = LigneEcriture.objects.filter(compte=compte, ecriture__date__lte=jusqua, ecriture__site_origine="",
+                                          ecriture__statut=Ecriture.STATUT_VALIDEE)
+    return sum((l.debit - l.credit for l in lignes), ZERO)
 
 
 @transaction.atomic

@@ -283,13 +283,18 @@ def rapport_agence_a4(jour, site=""):
 
     # A. Billetterie : départs effectués, une ligne par trajet et par prix réellement pratiqué
     billetterie = []
+    rapprochement = {"ce_jour": ZERO, "avant": ZERO, "ailleurs": ZERO, "apres": ZERO}
     for d in (Depart.objects.filter(date=jour, site_origine=site, statut__in=[Depart.PARTI, Depart.ARRIVE, Depart.CLOTURE])
               .select_related("vehicule", "ligne").order_by("heure", "numero")):
         groupes = OrderedDict()
-        for t in (d.troncons.filter(statut=Troncon.EFFECTUE).select_related("gare_depart", "gare_arrivee")
+        for t in (d.troncons.filter(statut=Troncon.EFFECTUE).select_related("gare_depart", "gare_arrivee", "billet")
                   .order_by("gare_depart__ville", "gare_arrivee__ville", "-part")):
             g = groupes.setdefault((t.gare_depart.ville, t.gare_arrivee.ville, t.part), {"places": 0})
             g["places"] += 1
+            b = t.billet                                 # d'où vient l'argent de ce voyageur (rapprochement avec la caisse)
+            origine = ("ailleurs" if b.site_origine != site else "ce_jour" if b.date_vente == jour else
+                       "avant" if b.date_vente < jour else "apres")
+            rapprochement[origine] += t.part
         if not groupes:
             groupes[(d.ligne.gare_depart.ville, d.ligne.gare_arrivee.ville, None)] = {"places": 0}
         for (a, b, prix), g in groupes.items():
@@ -361,7 +366,9 @@ def rapport_agence_a4(jour, site=""):
             c = ColisModele.objects.filter(numero=e.reference).select_related("gare_arrivee").first()
             colis.append({"piece": e.reference or e.numero, "designation": (f"{c.get_nature_display()} {c.description}".strip()
                                                                            if c else e.libelle),
-                          "destination": c.gare_arrivee.ville if c else "—", "moyen": e.journal.code, "montant": entree})
+                          "destination": c.gare_arrivee.ville if c else "—", "moyen": e.journal.code, "montant": entree,
+                          "car": (c.depart.vehicule.immatriculation if c and c.depart_id and c.depart.vehicule_id
+                                  else "pas encore chargé")})
         elif nature == "sorties":
             vehicules = sorted({o.vehicule.immatriculation for o in autres if o.vehicule_id})
             sorties.append({"piece": e.reference or e.numero, "designation": e.libelle,
@@ -392,7 +399,7 @@ def rapport_agence_a4(jour, site=""):
     especes_caisses = [c for c in caisses if c["especes"]]
     total_sorties = sum((s["montant"] for s in sorties), ZERO)
     return {
-        "billetterie": billetterie, "non_partis": non_partis,
+        "billetterie": billetterie, "non_partis": non_partis, "rapprochement": rapprochement,
         "total_billetterie": {"places": sum(l["places"] for l in billetterie),
                               "montant": sum((l["montant"] for l in billetterie), ZERO)},
         "bagages": bagages, "total_bagages": {"quantite": sum(b["quantite"] for b in bagages),
@@ -413,4 +420,5 @@ def rapport_agence_a4(jour, site=""):
             "solde_especes": sum((c["solde"] for c in especes_caisses), ZERO),
         },
         "caisses": caisses, "total_caisses": total_caisses,
+        "caisses_negatives": [c for c in caisses if c["especes"] and c["solde"] < 0],
     }

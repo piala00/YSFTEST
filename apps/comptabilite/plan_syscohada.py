@@ -144,7 +144,8 @@ PLAN = [
     ("5211", "Banque principale"),
     ("53", "Établissements financiers et assimilés"),
     ("55", "Instruments de monnaie électronique"),
-    ("551", "Monnaie électronique (Mobile Money)"),
+    ("551", "Monnaie électronique - carte carburant"),
+    ("552", "Monnaie électronique - téléphone portable (Mobile Money)"),
     ("56", "Banques, crédits de trésorerie et d'escompte"),
     ("561", "Crédits de trésorerie"),
     ("565", "Escompte de crédits ordinaires"),
@@ -251,7 +252,7 @@ JOURNAUX = [
     ("AC", "Journal des achats", "ACHAT", None),
     ("BQ", "Journal de banque", "TRESORERIE", "5211"),
     ("CA", "Journal de caisse", "TRESORERIE", "5711"),
-    ("MM", "Journal Mobile Money", "TRESORERIE", "551"),
+    ("MM", "Journal Mobile Money", "TRESORERIE", "552"),
     ("OD", "Opérations diverses", "OD", None),
     ("AN", "À-nouveaux", "AN", None),
 ]
