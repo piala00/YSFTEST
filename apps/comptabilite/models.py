@@ -20,11 +20,60 @@ CLASSES_SYSCOHADA = {
 }
 
 
+def longueur_comptes():
+    """Longueur fixée des numéros de compte du dossier (0 : libre)."""
+    from apps.core.models import Societe
+
+    return Societe.objects.values_list("longueur_comptes", flat=True).first() or 0
+
+
+def normaliser_numero(numero, longueur=None):
+    """Numéro complété par des zéros à droite jusqu'à la longueur du dossier (« 4111 » → « 4111000 » à 7 chiffres).
+
+    Les zéros à droite ne changent pas les regroupements par préfixe (classe 4, compte 41, 411…) : les états et
+    les contrôles qui cherchent « commence par 411 » restent justes. Un numéro plus long est laissé tel quel.
+    """
+    if not isinstance(numero, str):
+        return numero
+    numero = numero.strip()
+    longueur = longueur_comptes() if longueur is None else longueur
+    if longueur and numero.isdigit() and len(numero) < longueur:
+        return numero.ljust(longueur, "0")
+    return numero
+
+
+class CompteQuerySet(models.QuerySet):
+    """Recherche par numéro exact normalisée : Compte.objects.get(numero="467") trouve 4670000 à 7 chiffres."""
+
+    champ_numero = "numero"
+
+    def _normaliser(self, kwargs):
+        c = self.champ_numero
+        if not any(k in kwargs for k in (c, f"{c}__exact", f"{c}__in")):
+            return kwargs
+        longueur = longueur_comptes()
+        kwargs = dict(kwargs)
+        for cle in (c, f"{c}__exact"):
+            if cle in kwargs:
+                kwargs[cle] = normaliser_numero(kwargs[cle], longueur)
+        if f"{c}__in" in kwargs and not isinstance(kwargs[f"{c}__in"], models.QuerySet):
+            kwargs[f"{c}__in"] = [normaliser_numero(n, longueur) for n in kwargs[f"{c}__in"]]
+        return kwargs
+
+    def filter(self, *args, **kwargs):
+        return super().filter(*args, **self._normaliser(kwargs))
+
+    def exclude(self, *args, **kwargs):
+        return super().exclude(*args, **self._normaliser(kwargs))
+
+
 class Compte(models.Model):
     numero = models.CharField("N° de compte", max_length=20, unique=True)
     intitule = models.CharField(max_length=200)
     lettrable = models.BooleanField(default=False, help_text="Comptes de tiers pouvant être lettrés")
     actif = models.BooleanField(default=True)
+
+    objects = CompteQuerySet.as_manager()
 
     class Meta:
         ordering = ["numero"]
@@ -42,11 +91,20 @@ class Compte(models.Model):
     def libelle_classe(self):
         return CLASSES_SYSCOHADA.get(self.classe, "")
 
+    def save(self, *args, **kwargs):
+        self.numero = normaliser_numero(self.numero)
+        super().save(*args, **kwargs)
+
     def clean(self):
+        self.numero = (self.numero or "").strip()
         if not self.numero.isdigit():
             raise ValidationError({"numero": "Le numéro de compte ne doit contenir que des chiffres."})
         if self.numero[0] == "0":
             raise ValidationError({"numero": "Les classes SYSCOHADA vont de 1 à 9."})
+        longueur = longueur_comptes()
+        if longueur and len(self.numero) > longueur:
+            raise ValidationError({"numero": f"Le plan comptable de la société est à {longueur} chiffres."})
+        self.numero = normaliser_numero(self.numero, longueur)
 
     @classmethod
     def par_numero(cls, numero):
@@ -222,6 +280,12 @@ class Ecriture(models.Model):
         publier_ecriture(self)
 
 
+class LigneEcritureQuerySet(CompteQuerySet):
+    """Même normalisation pour les lignes cherchées par numéro de compte (lignes.get(compte__numero="4111"))."""
+
+    champ_numero = "compte__numero"
+
+
 class LigneEcriture(models.Model):
     ecriture = models.ForeignKey(Ecriture, on_delete=models.CASCADE, related_name="lignes")
     compte = models.ForeignKey(Compte, on_delete=models.PROTECT, related_name="lignes")
@@ -238,6 +302,8 @@ class LigneEcriture(models.Model):
                                  help_text="Compte du véhicule : ses recettes et ses dépenses (grand livre et balance des véhicules)")
     date_pointage = models.DateField("Pointé le", null=True, blank=True,
                                      help_text="Rapprochement bancaire : date du relevé sur lequel la ligne figure")
+
+    objects = LigneEcritureQuerySet.as_manager()
 
     class Meta:
         ordering = ["id"]

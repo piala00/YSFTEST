@@ -56,7 +56,7 @@ class PartenairesTests(TestCase):
         d.approuver()
         self.assertEqual(solde_partenaire(self.proprio), 19000)
         ligne = d.ecriture.lignes.get(debit=19000)
-        self.assertEqual((ligne.compte.numero, ligne.vehicule), ("622", self.car))
+        self.assertEqual((ligne.compte.numero, ligne.vehicule), ("6220000", self.car))
         # résultat du véhicule pour l'agence : 30 000 - 5 000 - 2 000 - 19 000 = 4 000
         l = next(l for l in etats.balance_vehicules(self.debut_mois, self.jour) if l["vehicule"] == self.car)
         self.assertEqual(l["recettes"] - l["depenses"], 4000)
@@ -172,7 +172,7 @@ class RemunerationsProprietairesTests(TestCase):
         self.assertEqual((d.fixe, d.variable, d.montant_du), (150000, 180000, 330000))      # 40 % de (600 000 − 150 000)
         d.approuver()
         self.assertNotEqual(d.ecriture_fixe_id, d.ecriture_id)                               # fixe et variable : deux écritures
-        self.assertEqual(d.ecriture.lignes.get(credit=180000).compte.numero, "467")         # compte propriétaire, pas 401
+        self.assertEqual(d.ecriture.lignes.get(credit=180000).compte.numero, "4670000")         # compte propriétaire, pas 401
         self.assertEqual(solde_partenaire(self.proprio), 330000)
         g = next(l for l in analytique.vehicules(self.debut, self.fin)["lignes"] if l["vehicule"] == self.car)
         self.assertEqual((g["resultat"], g["proprietaire"], g["resultat_societe"]), (600000, 330000, 270000))

@@ -24,6 +24,9 @@ class Command(BaseCommand):
                             help="Système comptable : normal, ou minimal de trésorerie (SMT)")
         parser.add_argument("--activite", choices=["commerce", "transport", "mixte"],
                             help="Activité de la société (transport : billetterie, colis, logistique)")
+        parser.add_argument("--longueur-comptes", type=int, default=7, metavar="N",
+                            help="Longueur des numéros de compte d'un NOUVEAU dossier (7 par défaut ; 0 : libre). "
+                                 "Un dossier qui a déjà un plan comptable garde le sien (commande longueur_comptes).")
         parser.add_argument("--admin", metavar="MOT_DE_PASSE", help="Crée le super-utilisateur « admin » (ou lui redonne ce mot de passe)")
 
     def log(self, message):
@@ -47,6 +50,11 @@ class Command(BaseCommand):
                                 "mixte": Societe.ACTIVITE_MIXTE}[options["activite"]]
             societe.save(update_fields=["activite"])
             self.log(f"Activité : {societe.get_activite_display()}.")
+        if not Compte.objects.exists() and societe.longueur_comptes != options["longueur_comptes"]:
+            societe.longueur_comptes = options["longueur_comptes"]       # nouveau dossier : plan à N chiffres
+            societe.save(update_fields=["longueur_comptes"])
+        if societe.longueur_comptes:
+            self.log(f"Plan comptable à {societe.longueur_comptes} chiffres (complétés par des zéros à droite).")
         crees = 0
         for numero, intitule in PLAN:
             _, created = Compte.objects.get_or_create(

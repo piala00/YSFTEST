@@ -143,7 +143,7 @@ class TransportTests(TestCase):
         dv = DepenseVehicule(vehicule=self.car, depart=d, nature=DepenseVehicule.CARBURANT, montant=40000,
                              caisse=Journal.objects.get(code="CA")).enregistrer()
         ligne = dv.ecriture.lignes.get(debit=40000)
-        self.assertEqual((ligne.compte.numero, ligne.section), ("6053", self.car.section))
+        self.assertEqual((ligne.compte.numero, ligne.section), ("6053000", self.car.section))
         self.assertEqual(d.recette_billets() - d.depenses(), -34000)
 
     def test_taxe_reglable(self):
@@ -467,9 +467,9 @@ class CaissesEtCloturesTests(TestCase):
         with self.assertRaisesMessage(ValidationError, "propre caisse"):
             s.approuver(agent)
         s.approuver(chef, imputation=SessionCaisse.AGENT)                     # manquant retenu à l'agent
-        self.assertEqual(s.ecriture_ecart.lignes.get(debit=500).compte.numero, "421")
+        self.assertEqual(s.ecriture_ecart.lignes.get(debit=500).compte.numero, "4210000")
         t = TransfertFonds(origine=ca, destination=Journal.objects.get(code="BQ"), montant=15000).envoyer(chef)
-        self.assertEqual(t.ecriture_envoi.lignes.get(debit=15000).compte.numero, "585")
+        self.assertEqual(t.ecriture_envoi.lignes.get(debit=15000).compte.numero, "5850000")
         t.recevoir(chef)
         self.assertEqual(t.statut, TransfertFonds.RECU)
         cloturer_journee(jour, ClotureJournee.BILLETTERIE, chef)
@@ -532,7 +532,7 @@ class ExploitationTests(TestCase):
             a.justifier(restitue=0)
         a.justifier(restitue=7000)
         charges = a.ecriture_justification.lignes.filter(debit__gt=0, vehicule=car)
-        self.assertEqual(sorted((l.compte.numero, l.debit) for l in charges), [("6181", 8000), ("638", 5000)])
+        self.assertEqual(sorted((l.compte.numero, l.debit) for l in charges), [("6181000", 8000), ("6380000", 5000)])
         self.assertEqual(sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero="47121")), Decimal(0)), 0)
         with self.assertRaisesMessage(ValidationError, "inférieur"):
             d.cloturer(39000)
@@ -1089,7 +1089,7 @@ class ImprevusTests(TestCase):
         self.assertEqual((solde("709"), solde("421"), solde("658")), (2000, 5000, 0))   # amende retenue au chauffeur
         bord = Incident.recette_a_bord(d, 3000, 1, self.ca)
         self.assertEqual(self.recette("70611", self.car), 6000 + 3000)
-        self.assertEqual(bord.ecriture.lignes.get(debit=3000).compte.numero, "5711")
+        self.assertEqual(bord.ecriture.lignes.get(debit=3000).compte.numero, "5711000")
 
     def test_annulation_par_la_compagnie(self):
         d, autre = self.depart(), self.depart(heure=15)

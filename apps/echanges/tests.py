@@ -14,26 +14,26 @@ class ScenarioTroisDossiersTests(SimpleTestCase):
             r = scenario.executer(travail)
         self.assertEqual(r["dla_referentiels"]["gares"], 4)                    # référentiels reçus du siège
         self.assertEqual(r["dla_referentiels"]["arrets_dla_gbl"], ["DLA", "BTA", "GBL"])  # avec les arrêts des lignes
-        self.assertEqual(r["dla_referentiels"]["liaisons"], ["18501", "18503", "18504"])  # même compte = même agence partout
+        self.assertEqual(r["dla_referentiels"]["liaisons"], ["1850100", "1850300", "1850400"])  # même compte = même agence partout
         self.assertIn("rejetés : 0", r["siege_import1"])
         self.assertIn("déjà reçu", r["siege_rejeu"])                          # rejeu sans effet
         self.assertEqual(r["yde_remise"]["avant"], "EN_ROUTE")                 # colis relayé, car parti
         self.assertEqual(r["yde_remise"]["statut"], "LIVRE")
-        self.assertEqual(r["yde_remise"]["compte_cr"], "18502")                # dû à Douala
+        self.assertEqual(r["yde_remise"]["compte_cr"], "1850200")                # dû à Douala
         self.assertEqual(r["yde_remise"]["billets_ici"], 0)                    # les billets restent au siège
         self.assertEqual({k: r["dla_reversement"][k] for k in ("statut", "livre_site", "compte")},
-                         {"statut": "LIVRE", "livre_site": "YDE", "compte": "18503"})
+                         {"statut": "LIVRE", "livre_site": "YDE", "compte": "1850300"})
         # Correspondance à Bertoua : la part du tronçon va au car de Bertoua, qui la doit à Douala
         self.assertEqual(r["dla_vente"]["parts"], ["7333", "3667"])
-        self.assertEqual(r["bta_correspondance"]["lignes"], {"18502": ["3667.00", "0.00", None],
-                                                             "70611": ["0.00", "3667.00", "EN 202 BB"]})
+        self.assertEqual(r["bta_correspondance"]["lignes"], {"1850200": ["3667.00", "0.00", None],
+                                                             "7061100": ["0.00", "3667.00", "EN 202 BB"]})
         self.assertEqual(r["dla_reversement"]["troncon2"], ["EFFECTUE", "EN 202 BB", "BTA"])
         self.assertNotIn("manquants", r["dla_import2"])
         # Dépenses autorisées par le siège ; Douala paie le loyer de Bertoua (liaisons compensées au siège)
         self.assertEqual(r["siege_demandes"], ["DEMANDEE", "DEMANDEE"])
         self.assertEqual(r["dla_depenses"]["statuts"], ["AUTORISEE", "AUTORISEE"])
-        self.assertEqual(r["dla_depenses"]["lignes"], {"DLA": ["5711", "6222"], "BTA": ["18504", "5711"]})
-        self.assertEqual(r["bta_regularisation"], [["18502", "0.00", "100000.00"], ["6222", "100000.00", "0.00"]])
+        self.assertEqual(r["dla_depenses"]["lignes"], {"DLA": ["5711000", "6222000"], "BTA": ["1850400", "5711000"]})
+        self.assertEqual(r["bta_regularisation"], [["1850200", "0.00", "100000.00"], ["6222000", "100000.00", "0.00"]])
         self.assertEqual(r["siege_depenses"], {"loyers": "120000.00", "liaisons_185": "0.00", "loyer_BTA": "100000.00"})
         c = r["siege_consolide"]
         self.assertEqual(c["ecritures"], 10)                                   # + le plein de Bertoua
@@ -71,7 +71,7 @@ class LotsTests(TestCase):
             lots.importer(octets)
         with self.assertRaisesMessage(lots.LotInvalide, "pas un lot d'échange"):
             lots.importer(b"bonjour")
-        self.assertEqual(Agence.objects.get(code="YDE").compte_liaison.numero, "18503")
+        self.assertEqual(Agence.objects.get(code="YDE").compte_liaison.numero, "1850300")
         with self.assertRaisesMessage(lots.LotInvalide, "fichier d'installation"):
             lots.importer(lots.fichier_installation(yde)[1])
 
@@ -96,7 +96,7 @@ class EcranEchangesTests(TestCase):
         dla = Agence.objects.get(code="DLA")
         page = self.client.get(url)
         self.assertContains(page, "Agence de Douala")
-        self.assertContains(page, "18502")
+        self.assertContains(page, "1850200")
         reponse = self.client.post(url, {"action": "installation", "agence": dla.pk})
         self.assertIn("ERP-INSTALLATION-SIEGE-vers-DLA", reponse["Content-Disposition"])
         reponse = self.client.post(url, {"action": "exporter", "destination": dla.pk})

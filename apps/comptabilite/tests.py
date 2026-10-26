@@ -1,4 +1,5 @@
 import datetime
+import io
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -73,3 +74,58 @@ class ComptabiliteTests(TestCase):
         Exercice.objects.update(cloture=True)
         with self.assertRaises(ValidationError):
             self.ecrire([("5711", 1000, 0), ("101", 0, 1000)])
+
+
+class PlanSeptChiffresTests(TestCase):
+    """Plan comptable à 7 chiffres : nouveau dossier, saisie, conversion d'un dossier existant."""
+
+    def test_nouveau_dossier_a_sept_chiffres(self):
+        from apps.core.models import Societe
+
+        call_command("init_erp", verbosity=0)
+        self.assertEqual(Societe.get().longueur_comptes, 7)
+        numeros = set(Compte.objects.values_list("numero", flat=True))
+        self.assertTrue(all(len(n) == 7 for n in numeros), sorted(n for n in numeros if len(n) != 7))
+        self.assertIn("4111000", numeros)
+        # Le code et les écrans qui désignent un compte par son numéro court le retrouvent
+        self.assertEqual(Compte.objects.get(numero="4111").numero, "4111000")
+        self.assertEqual(Compte.par_numero("571").numero, "5710000")
+        self.assertEqual(Compte.objects.get_or_create(numero="47121", defaults={"intitule": "Avances"})[0].numero, "4712100")
+        self.assertEqual(Compte.objects.filter(numero__in=["101", "701"]).count(), 2)
+        # Saisie : complété par des zéros ; plus de 7 chiffres refusé
+        c = Compte(numero="6058", intitule="Autres achats")
+        c.full_clean()
+        self.assertEqual(c.numero, "6058000")
+        with self.assertRaisesMessage(ValidationError, "7 chiffres"):
+            Compte(numero="60580001", intitule="Trop long").full_clean()
+        # Les états par préfixe restent justes (classe 4, compte 411…)
+        self.assertTrue(Compte.objects.filter(numero__startswith="411").exists())
+
+    def test_conversion_d_un_dossier_existant(self):
+        from apps.core.models import Societe
+
+        call_command("init_erp", "--longueur-comptes", "0", verbosity=0)
+        self.assertEqual(Societe.get().longueur_comptes, 0)
+        self.assertTrue(Compte.objects.filter(numero="4111").exists())
+        exercice = Exercice.objects.first()
+        e = services.creer_ecriture(Journal.objects.get(code="VT"), exercice.date_debut, "Vente",
+                                    [{"compte": Compte.objects.get(numero="4111"), "debit": 1000},
+                                     {"compte": Compte.objects.get(numero="701"), "credit": 1000}])
+        sortie = io.StringIO()
+        call_command("longueur_comptes", stdout=sortie)                      # simulation : rien ne change
+        self.assertIn("compte(s) à renuméroter", sortie.getvalue())
+        self.assertIn(("4111", "4111000"), services.projet_longueur_comptes(7)[0])
+        self.assertTrue(Compte.objects.filter(numero="4111").exists())
+        call_command("longueur_comptes", "--appliquer", stdout=io.StringIO())
+        self.assertEqual(Societe.get().longueur_comptes, 7)
+        self.assertEqual(sorted(e.lignes.values_list("compte__numero", flat=True)), ["4111000", "7010000"])
+        self.assertEqual(sum(l.debit - l.credit for l in e.lignes.all()), 0)  # montants intacts
+
+    def test_collision_refusee(self):
+        from django.core.management.base import CommandError
+
+        call_command("init_erp", "--longueur-comptes", "0", verbosity=0)
+        Compte.objects.create(numero="4111000", intitule="Clients (déjà à 7 chiffres)")
+        with self.assertRaisesMessage(CommandError, "collision"):
+            call_command("longueur_comptes", "--appliquer", stdout=io.StringIO())
+        self.assertTrue(Compte.objects.filter(numero="4111").exists())       # rien n'a bougé

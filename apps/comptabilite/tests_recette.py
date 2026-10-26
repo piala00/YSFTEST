@@ -11,7 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.commercial.models import Article, Document, LigneDocument, Reglement, Tiers
-from apps.core.models import Exercice
+from apps.core.models import Exercice, Societe
 from apps.core.navigation import COMPTABILITE
 
 from . import etats, services
@@ -43,9 +43,10 @@ class BaseCompta(TestCase):
 
 class StructureTests(BaseCompta):
     def test_parametrage_initial(self):
-        self.assertEqual(Taxe.objects.get(code="C19").compte.numero, "4431")
+        self.assertEqual(Societe.get().longueur_comptes, 7)                      # nouveau dossier : 7 chiffres
+        self.assertEqual(Taxe.objects.get(code="C19").compte.numero, "4431000")
         self.assertEqual(Taxe.objects.get(code="D19").taux, Decimal("19.25"))
-        self.assertEqual(Banque.objects.get(code="BQ1").compte.numero, "5211")
+        self.assertEqual(Banque.objects.get(code="BQ1").compte.numero, "5211000")
         self.assertTrue(SectionAnalytique.objects.filter(plan="Agences").exists())
 
     def test_exercice_non_cloturable_par_la_fiche(self):
@@ -140,9 +141,9 @@ class CloturesTests(BaseCompta):
         # Ouverture N+1 : balance d'à-nouveaux, sans double comptage de l'exercice clôturé
         lignes, totaux = services.balance(suivant.date_debut, suivant.date_fin)
         par_compte = {l["compte"].numero: l for l in lignes}
-        self.assertEqual(par_compte["5211"]["an_d"], Decimal("1000000"))
-        self.assertEqual(par_compte["5211"]["mvt_d"], 0)
-        self.assertNotIn("701", par_compte)
+        self.assertEqual(par_compte["5211000"]["an_d"], Decimal("1000000"))       # plan à 7 chiffres
+        self.assertEqual(par_compte["5211000"]["mvt_d"], 0)
+        self.assertNotIn("7010000", par_compte)
         self.assertEqual(totaux["an_d"], totaux["an_c"])
         bilan_n1 = etats.bilan(suivant.date_debut)
         self.assertTrue(bilan_n1["equilibre"])

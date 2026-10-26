@@ -1,5 +1,11 @@
 # Journaux, comptes et analytique (tous les comptes sont des PROPOSITIONS à valider)
 
+**Plan à 7 chiffres.** Un nouveau dossier (Commerce comme Transport) a un plan comptable à 7 chiffres : les numéros
+ci-dessous sont écrits courts et complétés par des zéros à droite (4111 → 4111000, 41911 → 4191100, 467 → 4670000).
+Les regroupements par préfixe (classe, compte à 2 ou 3 chiffres) restent identiques. Un dossier existant passe à
+7 chiffres par `python manage.py longueur_comptes --appliquer` (refusé si deux comptes se confondraient). Un dossier
+repris d'un autre logiciel garde son plan d'origine tel quel jusqu'à la bascule.
+
 ## Journaux
 | Code | Usage |
 |---|---|

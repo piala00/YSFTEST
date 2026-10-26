@@ -91,6 +91,11 @@ class Societe(models.Model):
         help_text="Acte uniforme OHADA relatif au droit comptable : système normal, ou système minimal de trésorerie "
                   "réservé aux très petites entités (seuils de l'Acte uniforme, à confirmer avec l'expert-comptable). "
                   "La saisie reste la même ; seuls le bilan et le compte de résultat changent de présentation.")
+    longueur_comptes = models.PositiveSmallIntegerField(
+        "Longueur des numéros de compte", default=0,
+        help_text="7 : tous les comptes du plan ont 7 chiffres (4111 devient 4111000, complété par des zéros à droite). "
+                  "0 : longueur libre, par exemple pour garder le plan d'un dossier repris d'un autre logiciel. "
+                  "Pour changer la longueur d'un dossier existant : commande « longueur_comptes ».")
     taux_tva_defaut = models.DecimalField("Taux TVA par défaut (%)", max_digits=5, decimal_places=2, default=Decimal("0"),
                                           help_text="0 par défaut : pas de TVA tant que la société ne l'active pas")
     stock_negatif_autorise = models.BooleanField(

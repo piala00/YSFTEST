@@ -309,6 +309,16 @@ def importer(source, date_bascule, appliquer=False, utilisateur=None, debut_exer
     if not rapport.erreurs:
         try:
             with transaction.atomic(), synchronisation():
+                if societe.longueur_comptes and "comptes" in donnees:
+                    # Le plan de l'ancien logiciel fait foi : ses numéros sont repris tels quels (compléter par des
+                    # zéros pourrait réunir deux comptes en un seul). Passage à N chiffres après la bascule.
+                    from apps.comptabilite.services import plan_standard_en_longueur_libre
+
+                    plan_standard_en_longueur_libre(societe.longueur_comptes)
+                    Societe.objects.filter(pk=societe.pk).update(longueur_comptes=0)
+                    rapport.avertissements.append(
+                        f"Plan comptable repris tel quel (longueur libre au lieu de {societe.longueur_comptes} chiffres) ; "
+                        "après la bascule, la commande longueur_comptes le convertit si aucun compte ne se confond.")
                 _Import(donnees, date_bascule, rapport, utilisateur, debut_exercice).executer()
                 if appliquer and rapport.conforme:
                     Societe.objects.filter(pk=societe.pk).update(

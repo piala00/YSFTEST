@@ -70,9 +70,9 @@ class RegimeTvaTests(TestCase):
         soldes = soldes_par_compte(vente.date)
         self.assertNotIn("4431", soldes)
         self.assertNotIn("4452", soldes)
-        self.assertEqual(soldes["601"], Decimal("11925"))
-        self.assertEqual(soldes["4011"], Decimal("-11925"))
-        self.assertEqual(soldes["701"], Decimal("-10000"))
+        self.assertEqual(soldes["6010000"], Decimal("11925"))
+        self.assertEqual(soldes["4011000"], Decimal("-11925"))
+        self.assertEqual(soldes["7010000"], Decimal("-10000"))
 
     def test_brouillon_saisi_avant_le_changement_de_regime(self):
         article = Article.objects.create(reference="A2", designation="Article", prix_vente=1000, suivi_stock=False,

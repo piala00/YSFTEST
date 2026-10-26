@@ -77,7 +77,7 @@ class CasPratiquesTests(SahelDistribution):
         article = Article.objects.get(reference="JUS-001")
         self.assertEqual(article.famille.code, "BOISSONS")
         self.assertTrue(article.suivi_stock)
-        self.assertEqual(article.get_compte_vente().numero, "701")      # marchandise
+        self.assertEqual(article.get_compte_vente().numero, "7010000")      # marchandise
         self.assertEqual(article.cmup, D("800"))                        # valorisé par les entrées
 
     def test_cas_04_tarification_gros_et_detail(self):

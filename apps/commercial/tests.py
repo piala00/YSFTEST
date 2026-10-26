@@ -51,18 +51,18 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
         self.assertTrue(doc.numero.startswith("FA"))
         self.assertTrue(doc.ecriture.equilibree)
         soldes = soldes_par_compte(doc.date)
-        self.assertEqual(soldes["4111"], Decimal("11925"))
-        self.assertEqual(soldes["701"], Decimal("-10000"))
-        self.assertEqual(soldes["4431"], Decimal("-1925"))
+        self.assertEqual(soldes["4111000"], Decimal("11925"))
+        self.assertEqual(soldes["7010000"], Decimal("-10000"))
+        self.assertEqual(soldes["4431000"], Decimal("-1925"))
         self.assertEqual(self.stock(), Decimal("90"))
         self.assertEqual(self.stock(self.depot), Decimal("90"))
 
     def test_facture_fournisseur(self):
         doc = self.document(Document.ACHAT_FACTURE, self.fournisseur, prix=800).valider()
         soldes = soldes_par_compte(doc.date)
-        self.assertEqual(soldes["601"], Decimal("8000"))
-        self.assertEqual(soldes["4452"], Decimal("1540"))
-        self.assertEqual(soldes["4011"], Decimal("-9540"))
+        self.assertEqual(soldes["6010000"], Decimal("8000"))
+        self.assertEqual(soldes["4452000"], Decimal("1540"))
+        self.assertEqual(soldes["4011000"], Decimal("-9540"))
         self.assertEqual(self.stock(), Decimal("110"))
 
     def test_chaine_devis_commande_livraison_facture(self):
@@ -138,7 +138,7 @@ class DocumentsVentesAchatsTests(BaseCommerciale):
         self.assertEqual(f1.reste_a_payer, 0)
         self.assertEqual(f2.reste_a_payer, Decimal("11925") * 2 - Decimal("15000"))
         soldes = soldes_par_compte(reglement.date)
-        self.assertEqual(soldes["5711"], Decimal("15000"))
+        self.assertEqual(soldes["5711000"], Decimal("15000"))
         self.assertEqual(self.client_.solde_comptable(), Decimal("11925") * 2 - Decimal("15000"))
 
     def test_reste_du_recu_en_attente_puis_rattache(self):
@@ -314,7 +314,7 @@ class StocksTests(BaseCommerciale):
     def test_variation_stock_comptabilisee_au_cmup(self):
         constater_variation_stock(timezone.localdate())
         soldes = soldes_par_compte(timezone.localdate())
-        self.assertEqual(soldes["311"], Decimal("80000"))   # 100 × 800
-        self.assertEqual(soldes["6031"], Decimal("-80000"))
+        self.assertEqual(soldes["3110000"], Decimal("80000"))   # 100 × 800
+        self.assertEqual(soldes["6031000"], Decimal("-80000"))
         with self.assertRaises(ValidationError):
             constater_variation_stock(timezone.localdate())

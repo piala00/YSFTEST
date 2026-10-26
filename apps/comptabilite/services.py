@@ -643,3 +643,56 @@ def configurer_tva_manuelle():
     if societe.taux_tva_defaut:
         societe.taux_tva_defaut = ZERO
         societe.save(update_fields=["taux_tva_defaut"])
+
+
+# ---------------------------------------------------------------- Longueur des numéros de compte
+def projet_longueur_comptes(longueur):
+    """Renumérotation de chaque compte à `longueur` chiffres (zéros à droite) : (changements, collisions, trop_longs).
+
+    Seul le numéro change : les écritures, tiers, journaux et paramètres pointent vers le compte lui-même et le
+    suivent. Une collision (deux comptes qui deviendraient le même) bloque tout : on ne réunit jamais deux comptes
+    sans décision de l'expert-comptable.
+    """
+    from .models import normaliser_numero
+
+    existants = dict(Compte.objects.values_list("numero", "pk"))
+    cibles = defaultdict(list)
+    for numero in existants:
+        cibles[normaliser_numero(numero, longueur)].append(numero)
+    changements = sorted((n, c) for c, ns in cibles.items() for n in ns if n != c and len(ns) == 1)
+    collisions = {c: sorted(ns) for c, ns in cibles.items() if len(ns) > 1}
+    trop_longs = sorted(n for n in existants if len(n) > longueur) if longueur else []
+    return changements, collisions, trop_longs
+
+
+@transaction.atomic
+def appliquer_longueur_comptes(longueur):
+    """Passe le dossier à `longueur` chiffres ; refuse s'il y a une collision. Renvoie le nombre de comptes renumérotés."""
+    from apps.core.models import Societe
+
+    changements, collisions, _ = projet_longueur_comptes(longueur)
+    if collisions:
+        raise ValidationError("Comptes qui se confondraient : " + " ; ".join(
+            f"{', '.join(ns)} → {c}" for c, ns in sorted(collisions.items())))
+    pk = dict(Compte.objects.values_list("numero", "pk"))          # par identifiant : sans normalisation
+    for ancien, nouveau in changements:
+        Compte.objects.filter(pk=pk[ancien]).update(numero=nouveau)
+    Societe.objects.update(longueur_comptes=longueur)
+    return len(changements)
+
+
+def plan_standard_en_longueur_libre(longueur):
+    """Reprise d'un dossier : les comptes du plan standard créés à l'installation (à `longueur` chiffres) et jamais
+    mouvementés reprennent leur numéro court, pour que l'ancien plan soit repris tel quel à côté d'eux."""
+    from .plan_syscohada import PLAN
+
+    pk = dict(Compte.objects.values_list("numero", "pk"))
+    mouvementes = set(LigneEcriture.objects.values_list("compte_id", flat=True).distinct())
+    rendus = 0
+    for numero, _ in PLAN:
+        long = numero.ljust(longueur, "0")
+        if long != numero and long in pk and numero not in pk and pk[long] not in mouvementes:
+            Compte.objects.filter(pk=pk.pop(long)).update(numero=numero)
+            pk[numero] = None
+            rendus += 1
+    return rendus

@@ -38,6 +38,8 @@ class SocieteForm(BootstrapMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         from apps.commercial.models import Depot
 
+        # Affichée seulement : la changer renumérote les comptes (commande longueur_comptes, contrôle des collisions)
+        self.fields["longueur_comptes"].disabled = True
         self.fields["depots_detail"].queryset = Depot.objects.filter(actif=True)
         self.fields["depots_detail"].initial = Depot.objects.filter(vente_detail=True)
         self.fields["depots_detail"].widget.attrs.pop("class", None)
