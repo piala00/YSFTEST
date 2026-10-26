@@ -117,7 +117,7 @@ def releve(request, pk=None):
                 if en_cours is None:
                     raise ValidationError("Rien à arrêter : le compte est déjà arrêté à aujourd'hui.")
                 d = Decompte.calculer(contrat, en_cours["debut"], en_cours["fin"]).approuver(request.user)
-                messages.success(request, f"Compte du camion {contrat.vehicule.immatriculation} arrêté au {d.fin:%d/%m/%Y} "
+                messages.success(request, f"Compte du véhicule {contrat.vehicule.immatriculation} arrêté au {d.fin:%d/%m/%Y} "
                                           f"({d.numero}) : {d.montant_du:,.0f} FCFA au compte du propriétaire.".replace(",", " "))
             elif action == "payer_retrait":
                 d = get_object_or_404(DemandeRetrait, pk=request.POST.get("retrait"), partenaire=partenaire)

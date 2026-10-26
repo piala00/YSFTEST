@@ -34,7 +34,7 @@ Voir `AUDIT_ECARTS.md` (EXISTANT / PARTIEL / ABSENT / BLOQUANT, avec fichiers et
 | Plan à 7 chiffres | longueur des comptes par société (7 pour un nouveau dossier), numéros complétés par des zéros à droite, recherche par numéro court conservée, commande de conversion avec contrôle des collisions ; reprise : plan d'origine tel quel | `core 0021` |
 | Deux modules comptables | « Comptabilité générale » et « Comptabilité analytique » (Véhicules, Propriétaires, sections) sur une seule comptabilité | — |
 | Magasin du garage | inventaire permanent : achat D 33x, sortie D charge (véhicule) / C 33x au CMUP ; achat direct pour un véhicule ; immobilisation ; pièce du magasin sur l'ordre de réparation | `garage 0002` |
-| Compte du camion | relevé du propriétaire : compte en cours depuis le dernier arrêté, arrêt à la demande, retrait si positif, compensation si négatif ; contrat « salaire mensuel fixe » | `partenaires 0003` (libellés) |
+| Compte du véhicule | relevé du propriétaire : compte en cours depuis le dernier arrêté, arrêt à la demande, retrait si positif, compensation si négatif ; contrat « salaire mensuel fixe » | `partenaires 0003` (libellés) |
 | Simulation | commande `simulation` : un mois joué par le logiciel dans un dossier séparé ; `7-SIMULATION.bat`, `8-SUPPRIMER-SIMULATION.bat` | — |
 | Anomalies RJ | caisse négative bloquante, transfert limité aux espèces, départ futur refusé, heure réelle de départ, rapprochement des billets, car des colis, Mobile Money 552 | `transport 0014` |
 | Propriétaires | compte 467 séparé du 401, contrats variable / fixe + variable / avance sur variable, plancher contractuel, décompte en deux écritures, avances, retraits autorisés, relevé par nature | `transport 0015`, `partenaires 0002` |

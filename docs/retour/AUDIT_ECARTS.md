@@ -50,7 +50,7 @@ Projet : ERP OHADA (Django 6.1, Python 3.13, SQLite / PostgreSQL / SQL Server), 
 | Contrats versionnés (fixe, variable, fixe + variable, avance, location) | EXISTANT | `ContratPartenaire` (avenants datés) | Clauses de suspension du fixe (sinistre) : à décrire |
 | Fixe et variable en écritures distinctes | EXISTANT | `Decompte.approuver` : deux écritures | — |
 | Avance imputée sur le variable, sans double charge | EXISTANT | Règlement « avance » D 467 / C caisse | Test exemple B |
-| Compte du camion consultable, retrait si positif, compensation si négatif | EXISTANT | Relevé : compte en cours depuis le dernier arrêté, bouton « Arrêter le compte à aujourd'hui » (`CompteDuCamionTests`) | — |
+| Compte du véhicule consultable, retrait si positif, compensation si négatif | EXISTANT | Relevé : compte en cours depuis le dernier arrêté, bouton « Arrêter le compte à aujourd'hui » (`CompteDuCamionTests`) | — |
 | Retraits autorisés, contrôle du disponible | EXISTANT | `DemandeRetrait` | Autorisation par le siège via les échanges : PARTIEL (autorisation locale par une autre personne) |
 | « Salaire du propriétaire » hors paie | EXISTANT | Le propriétaire n'est pas un employé ; aucun lien avec la paie | — |
 | Relevé par nature avec écriture GL | EXISTANT | Relevé (FIXE, VARIABLE, AVANCE, RETRAIT, RÈGLEMENT) | — |

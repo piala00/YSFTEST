@@ -318,7 +318,7 @@ class CompteDuCamionTests(TestCase):
                                                    debut=self.j - datetime.timedelta(days=5), taux_commission=0).activer()
         self.mouvement(self.j, recette=50000)
         url = reverse("partenaires:releve", args=[self.proprio.pk])
-        self.assertContains(self.client.get(url), "Compte du camion CAMION 01 en cours")
+        self.assertContains(self.client.get(url), "Compte du véhicule CAMION 01 en cours")
         self.client.post(url, {"action": "arreter", "contrat": contrat.pk})
         self.assertEqual(solde_partenaire(self.proprio), 50000)
 

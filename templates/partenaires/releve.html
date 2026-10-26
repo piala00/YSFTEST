@@ -17,10 +17,10 @@
   <tfoot><tr class="fw-bold"><td colspan="8">Reste à payer au propriétaire</td><td class="num">{{ reste|montant }}</td></tr>
   {% if solde_comptable != reste %}<tr class="text-warning"><td colspan="8">Solde de son compte propriétaire en comptabilité (autres opérations comprises)</td><td class="num">{{ solde_comptable|montant }}</td></tr>{% endif %}
   <tr><td colspan="8">Disponible pour un retrait (dû comptabilisé − retraits autorisés non payés)</td><td class="num">{{ disponible|montant }}</td></tr></tfoot></table></div>
-  {% for e in en_cours %}<div class="card mb-3 border-info"><div class="card-header bg-white small fw-semibold">Compte du camion {{ e.contrat.vehicule.immatriculation }} en cours, du {{ e.debut|date:"d/m/Y" }} au {{ e.fin|date:"d/m/Y" }} (provisoire, pas encore arrêté)</div>
+  {% for e in en_cours %}<div class="card mb-3 border-info"><div class="card-header bg-white small fw-semibold">Compte du véhicule {{ e.contrat.vehicule.immatriculation }} en cours, du {{ e.debut|date:"d/m/Y" }} au {{ e.fin|date:"d/m/Y" }} (provisoire, pas encore arrêté)</div>
     <table class="table table-sm mb-0 small"><tbody>
-      <tr><td>Recettes du camion</td><td class="num">{{ e.recettes|montant }}</td></tr>
-      <tr><td>Charges du camion à sa charge</td><td class="num">{{ e.depenses|montant }}</td></tr>
+      <tr><td>Recettes du véhicule</td><td class="num">{{ e.recettes|montant }}</td></tr>
+      <tr><td>Charges du véhicule déduites</td><td class="num">{{ e.depenses|montant }}</td></tr>
       {% if e.commission %}<tr><td>Commission de la société</td><td class="num">{{ e.commission|montant }}</td></tr>{% endif %}
       {% if e.fixe %}<tr><td>Salaire / fixe</td><td class="num">{{ e.fixe|montant }}</td></tr>{% endif %}
       <tr class="fw-bold"><td>Revient au propriétaire sur cette période</td><td class="num {% if e.montant_du < 0 %}text-danger{% endif %}">{{ e.montant_du|montant }}</td></tr></tbody></table>
