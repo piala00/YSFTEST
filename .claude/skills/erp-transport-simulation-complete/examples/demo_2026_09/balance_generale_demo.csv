@@ -1,0 +1,20 @@
+﻿compte;intitule;total_debit;total_credit;solde_debiteur;solde_crediteur
+101-DEMO;Capital de simulation - ouverture;0;216000000;0;216000000
+521-DEMO;Banque de simulation;200000000;78412700;121587300;0
+552-DEMO;Monnaie électronique mobile;86783000;0;86783000;0
+5711-DEMO;Caisse de simulation;239624500;88437000;151187500;0
+401-DEMO;Fournisseurs;11977950;15970600;0;3992650
+31-DEMO;Stocks de pièces et consommables (compte à paramétrer);15220600;3583200;11637400;0
+2-DEMO;Immobilisations et matériels (compte à paramétrer);750000;0;750000;0
+422-DEMO;Personnel net à payer;40137500;40137500;0;0
+431-DEMO;Organismes sociaux - démonstration;0;6337500;0;6337500
+467-DEMO;Partenaires - redevances à payer;26297250;43828750;0;17531500
+706-V;Prestations de voyageurs;0;293519000;0;293519000
+706-C;Prestations de messagerie;0;16888500;0;16888500
+605-F;Carburant consommé;79585000;0;79585000;0
+63-PE;Péages et frais de route (imputation à valider);8852000;0;8852000;0
+624-R;Entretien et réparation;0;0;0;0
+60-S;Consommation pièces et fournitures (imputation à valider);3583200;0;3583200;0
+661-DEMO;Rémunérations brutes - simulation;42250000;0;42250000;0
+664-DEMO;Charges sociales employeur - simulation;4225000;0;4225000;0
+63-PART;Redevances partenaires - simulation (qualification à valider);43828750;0;43828750;0

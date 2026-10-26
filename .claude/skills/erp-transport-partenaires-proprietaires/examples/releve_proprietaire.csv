@@ -1,0 +1,5 @@
+date;piece;contrat;vehicule;owner;libelle;droit_du;versement;solde_du;ecriture_gl
+2026-09-30;FIXE-DEMO;CTR-EX-01;BUS-EX-01;OWNER-EX-01;Fixe garanti;150000;0;150000;GL-04
+2026-09-30;VARIABLE-DEMO;CTR-EX-01;BUS-EX-01;OWNER-EX-01;Complément variable;180000;0;330000;GL-05
+2026-09-30;REGLEMENT-FIXE;CTR-EX-01;BUS-EX-01;OWNER-EX-01;Versement fixe;0;150000;180000;GL-06
+2026-09-30;RETRAIT-OWNER;CTR-EX-01;BUS-EX-01;OWNER-EX-01;Retrait partiel approuvé;0;100000;80000;GL-07

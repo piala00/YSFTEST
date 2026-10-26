@@ -1,0 +1,4 @@
+party_id;role_id;role_type;compte_auxiliaire_exemple;commentaire
+PTY-001;OWNER-EX-01;PROPRIETAIRE_VEHICULE;46-OWNER-DEMO;Compte de contrat propriétaire
+PTY-001;SUP-EX-01;FOURNISSEUR;40-SUP-DEMO;"Même personne, autre sous-compte ; aucune écriture fournisseur simulée"
+PTY-002;EMP-EX-01;SALARIE;42-EMP-DEMO;Dossier RH indépendant
