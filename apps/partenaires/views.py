@@ -111,6 +111,14 @@ def releve(request, pk=None):
                 d = get_object_or_404(DemandeRetrait, pk=request.POST.get("retrait"), partenaire=partenaire)
                 d.decider(action == "autoriser", request.user, request.POST.get("motif", ""))
                 messages.success(request, f"Retrait {d.numero} : {d.get_statut_display().lower()}.")
+            elif action == "arreter":
+                contrat = get_object_or_404(ContratPartenaire, pk=request.POST.get("contrat"), partenaire=partenaire)
+                en_cours = Decompte.compte_en_cours(contrat)
+                if en_cours is None:
+                    raise ValidationError("Rien à arrêter : le compte est déjà arrêté à aujourd'hui.")
+                d = Decompte.calculer(contrat, en_cours["debut"], en_cours["fin"]).approuver(request.user)
+                messages.success(request, f"Compte du camion {contrat.vehicule.immatriculation} arrêté au {d.fin:%d/%m/%Y} "
+                                          f"({d.numero}) : {d.montant_du:,.0f} FCFA au compte du propriétaire.".replace(",", " "))
             elif action == "payer_retrait":
                 d = get_object_or_404(DemandeRetrait, pk=request.POST.get("retrait"), partenaire=partenaire)
                 d.payer(get_object_or_404(Journal, pk=request.POST["caisse"]), request.user)
@@ -145,6 +153,8 @@ def releve(request, pk=None):
         contexte.update({
             "mouvements": mouvements, "reste": cumul, "solde_comptable": solde_partenaire(partenaire),
             "disponible": DemandeRetrait.disponible(partenaire),
+            "en_cours": [{"contrat": c, **e} for c in partenaire.contrats_partenaire.filter(statut=ContratPartenaire.ACTIF)
+                         .select_related("vehicule") for e in [Decompte.compte_en_cours(c)] if e],
             "retraits": DemandeRetrait.objects.filter(partenaire=partenaire),
             "natures": [n for n in ReglementPartenaire.NATURES if n[0] != ReglementPartenaire.RETRAIT],
             "contrats": partenaire.contrats_partenaire.select_related("vehicule"),

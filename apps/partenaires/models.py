@@ -52,7 +52,8 @@ def compte_remuneration():
 class ContratPartenaire(models.Model):
     COMMISSION, LOCATION, VARIABLE, FIXE_PLUS_VARIABLE, AVANCE_SUR_VARIABLE = (
         "COMMISSION", "LOCATION", "VARIABLE", "FIXE_VARIABLE", "AVANCE_VARIABLE")
-    MODELES = [(COMMISSION, "Commission de l'agence sur les recettes"), (LOCATION, "Location forfaitaire (fixe seul)"),
+    MODELES = [(COMMISSION, "Compte du camion : recettes − charges (− commission éventuelle de la société)"),
+               (LOCATION, "Salaire mensuel fixe du propriétaire (forfait)"),
                (VARIABLE, "Part du propriétaire sur la marge (variable)"),
                (FIXE_PLUS_VARIABLE, "Fixe garanti + complément variable"),
                (AVANCE_SUR_VARIABLE, "Fixe versé en avance sur le variable")]
@@ -194,21 +195,15 @@ class Decompte(models.Model):
     def __str__(self):
         return f"{self.numero} {self.contrat.vehicule.immatriculation} {self.debut:%d/%m} → {self.fin:%d/%m/%Y}"
 
-    @classmethod
-    @transaction.atomic
-    def calculer(cls, contrat, debut, fin):
-        """Recettes et dépenses du véhicule (comptabilité) sur la partie de la période couverte par le contrat."""
+    @staticmethod
+    def evaluer(contrat, debut, fin):
+        """Calcul du droit du propriétaire sur la période (sans rien enregistrer) : sert au décompte et à l'aperçu."""
         from apps.comptabilite.models import Ecriture, LigneEcriture
         from apps.transport.models import ParametresTransport
 
-        if contrat.statut == ContratPartenaire.BROUILLON:
-            raise ValidationError("Le contrat n'est pas en vigueur.")
         d, f = max(debut, contrat.debut), min(fin, contrat.fin or fin)
         if d > f:
             raise ValidationError("Le contrat ne couvre pas cette période.")
-        deja = Decompte.objects.filter(contrat__vehicule=contrat.vehicule, debut__lte=f, fin__gte=d).first()
-        if deja:
-            raise ValidationError(f"Cette période est déjà dans le décompte {deja.numero}.")
         p = ParametresTransport.get()
         remuneration = compte_remuneration().numero
         lignes = (LigneEcriture.objects.filter(vehicule=contrat.vehicule, ecriture__statut=Ecriture.STATUT_VALIDEE,
@@ -250,16 +245,38 @@ class Decompte(models.Model):
             if contrat.plancher_zero and variable < 0:
                 variable = ZERO
             du = fixe + variable
-        return cls.objects.create(
-            contrat=contrat, debut=d, fin=f, recettes=recettes, commission=commission, depenses=depenses, location=location,
-            fixe=fixe, variable=variable, montant_du=du, numero=Sequence.piece("DCP", f.year),
-            detail={"contrat": contrat.numero, "version": contrat.version, "modele": contrat.modele,
-                    "taux_commission": str(contrat.taux_commission), "montant_location": str(contrat.montant_location),
-                    "periodicite": contrat.periodicite, "a_sa_charge": sorted(a_sa_charge),
-                    "taux_proprietaire": str(contrat.taux_proprietaire), "plancher_zero": contrat.plancher_zero,
-                    "marge": str(marge), "avance_periodique": str(contrat.montant_location)
-                    if contrat.modele == ContratPartenaire.AVANCE_SUR_VARIABLE else "0",
-                    "depenses_par_categorie": {c: str(m) for c, m in sorted(par_categorie.items())}})
+        return {"debut": d, "fin": f, "recettes": recettes, "commission": commission, "depenses": depenses,
+                "location": location, "fixe": fixe, "variable": variable, "montant_du": du,
+                "detail": {"contrat": contrat.numero, "version": contrat.version, "modele": contrat.modele,
+                           "taux_commission": str(contrat.taux_commission), "montant_location": str(contrat.montant_location),
+                           "periodicite": contrat.periodicite, "a_sa_charge": sorted(a_sa_charge),
+                           "taux_proprietaire": str(contrat.taux_proprietaire), "plancher_zero": contrat.plancher_zero,
+                           "marge": str(marge), "avance_periodique": str(contrat.montant_location)
+                           if contrat.modele == ContratPartenaire.AVANCE_SUR_VARIABLE else "0",
+                           "depenses_par_categorie": {c: str(m) for c, m in sorted(par_categorie.items())}}}
+
+    @classmethod
+    @transaction.atomic
+    def calculer(cls, contrat, debut, fin):
+        """Recettes et dépenses du véhicule (comptabilité) sur la partie de la période couverte par le contrat."""
+        if contrat.statut == ContratPartenaire.BROUILLON:
+            raise ValidationError("Le contrat n'est pas en vigueur.")
+        e = cls.evaluer(contrat, debut, fin)
+        deja = Decompte.objects.filter(contrat__vehicule=contrat.vehicule, debut__lte=e["fin"], fin__gte=e["debut"]).first()
+        if deja:
+            raise ValidationError(f"Cette période est déjà dans le décompte {deja.numero}.")
+        return cls.objects.create(contrat=contrat, numero=Sequence.piece("DCP", e["fin"].year), **e)
+
+    @staticmethod
+    def compte_en_cours(contrat, jusqua=None):
+        """Compte du camion depuis le dernier décompte (ou le début du contrat) jusqu'à aujourd'hui : provisoire,
+        consultable par le propriétaire ; il devient disponible au retrait une fois le compte arrêté (décompte)."""
+        jusqua = jusqua or timezone.localdate()
+        dernier = Decompte.objects.filter(contrat__vehicule=contrat.vehicule).order_by("-fin").first()
+        debut = max(contrat.debut, dernier.fin + datetime.timedelta(days=1)) if dernier else contrat.debut
+        if debut > min(jusqua, contrat.fin or jusqua):
+            return None
+        return Decompte.evaluer(contrat, debut, jusqua)
 
     @transaction.atomic
     def approuver(self, utilisateur=None, date=None):

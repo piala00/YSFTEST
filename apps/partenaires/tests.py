@@ -248,3 +248,75 @@ class RemunerationsProprietairesTests(TestCase):
         page = self.client.get(url)
         for mot in ("FIXE", "VARIABLE", "AVANCE", "RETRAIT", "Disponible pour un retrait"):
             self.assertContains(page, mot)
+
+
+class CompteDuCamionTests(TestCase):
+    """Le propriétaire confie son camion : toutes les recettes vont au compte du camion, moins ses charges ;
+    positif, il retire quand il veut ; négatif, les recettes suivantes compensent."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        cls.car = Vehicule.objects.create(immatriculation="CAMION 01", nombre_places=30)
+        cls.proprio = Tiers.objects.create(code="OWN2", nom="Propriétaire du camion", type_tiers=Tiers.FOURNISSEUR)
+        cls.j = datetime.date.today()
+
+    def mouvement(self, jour, recette=0, charge=0):
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+        from apps.transport.models import ParametresTransport
+
+        p = ParametresTransport.get()
+        if recette:
+            creer_ecriture(Journal.objects.get(code="OD"), jour, "Recettes", [
+                {"compte": p.compte_billets_a_voyager, "debit": recette},
+                {"compte": p.compte_billets, "credit": recette, "vehicule": self.car}])
+        if charge:
+            creer_ecriture(Journal.objects.get(code="CA"), jour, "Carburant", [
+                {"compte": p.compte_carburant, "debit": charge, "vehicule": self.car},
+                {"compte": Compte.objects.get(numero="5711"), "credit": charge}])
+
+    def test_compte_consultable_retraits_et_compensation(self):
+        from .models import DemandeRetrait
+
+        j = self.j
+        contrat = ContratPartenaire.objects.create(vehicule=self.car, partenaire=self.proprio, modele=ContratPartenaire.COMMISSION,
+                                                   debut=j - datetime.timedelta(days=30), taux_commission=0, charge_autres=True,
+                                                   charge_equipage=True).activer()
+        self.mouvement(j - datetime.timedelta(days=25), recette=1000000, charge=400000)
+        en_cours = Decompte.compte_en_cours(contrat, jusqua=j - datetime.timedelta(days=20))
+        self.assertEqual((en_cours["recettes"], en_cours["depenses"], en_cours["montant_du"]), (1000000, 400000, 600000))
+        self.assertEqual(solde_partenaire(self.proprio), 0)                       # consultable, pas encore disponible
+        Decompte.calculer(contrat, en_cours["debut"], en_cours["fin"]).approuver()
+        ca = Journal.objects.get(code="CA")
+        r = DemandeRetrait(partenaire=self.proprio, montant=600000).demander()
+        r.decider(True)
+        r.payer(ca)
+        self.mouvement(j - datetime.timedelta(days=15), charge=100000)            # réparation, pas de recette
+        e = Decompte.compte_en_cours(contrat, jusqua=j - datetime.timedelta(days=10))
+        self.assertEqual(e["debut"], j - datetime.timedelta(days=19))             # reprend après le dernier arrêt
+        Decompte.calculer(contrat, e["debut"], e["fin"]).approuver()
+        self.assertEqual(solde_partenaire(self.proprio), -100000)                 # négatif : il doit attendre
+        with self.assertRaises(ValidationError):
+            DemandeRetrait(partenaire=self.proprio, montant=1).demander()
+        self.mouvement(j - datetime.timedelta(days=5), recette=300000)
+        e = Decompte.compte_en_cours(contrat, jusqua=j - datetime.timedelta(days=1))
+        Decompte.calculer(contrat, e["debut"], e["fin"]).approuver()
+        self.assertEqual(solde_partenaire(self.proprio), 200000)                  # compensé par les recettes suivantes
+
+    def test_salaire_mensuel_fixe(self):
+        contrat = ContratPartenaire.objects.create(vehicule=self.car, partenaire=self.proprio, modele=ContratPartenaire.LOCATION,
+                                                   debut=datetime.date(2026, 9, 1), montant_location=Decimal("100000"),
+                                                   charge_carburant=False, charge_reparations=False, charge_route=False).activer()
+        d = Decompte.calculer(contrat, datetime.date(2026, 9, 1), datetime.date(2026, 9, 30)).approuver()
+        self.assertEqual(d.montant_du, 100000)
+
+    def test_ecran_arreter_le_compte(self):
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        contrat = ContratPartenaire.objects.create(vehicule=self.car, partenaire=self.proprio, modele=ContratPartenaire.COMMISSION,
+                                                   debut=self.j - datetime.timedelta(days=5), taux_commission=0).activer()
+        self.mouvement(self.j, recette=50000)
+        url = reverse("partenaires:releve", args=[self.proprio.pk])
+        self.assertContains(self.client.get(url), "Compte du camion CAMION 01 en cours")
+        self.client.post(url, {"action": "arreter", "contrat": contrat.pk})
+        self.assertEqual(solde_partenaire(self.proprio), 50000)
