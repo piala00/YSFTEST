@@ -165,7 +165,12 @@ class OrdreReparation(models.Model):
             raise ValidationError("La sortie ne peut précéder l'entrée au garage.")
         p = ParametresTransport.get()
         lignes, contreparties = [], {}
+        from .models_magasin import sortir
+
         for l in lignes_or:
+            if l.nature == LigneReparation.MAGASIN:          # la sortie du stock passe sa propre écriture (stock → charge)
+                sortir(l.article, l.quantite, self.vehicule, date=date, ordre=self, utilisateur=utilisateur)
+                continue
             if l.nature == LigneReparation.MAIN_OEUVRE_INTERNE or not l.montant:
                 continue
             compte = p.compte_pieces if l.nature == LigneReparation.PIECE else p.compte_main_oeuvre
@@ -175,7 +180,9 @@ class OrdreReparation(models.Model):
             cle = (contrepartie["compte"].pk, getattr(contrepartie.get("tiers"), "pk", None))
             contreparties.setdefault(cle, {**contrepartie, "credit": ZERO})["credit"] += l.montant
         if lignes:
-            journal = caisse if caisse is not None and all(l.paiement == ESPECES for l in lignes_or) else Journal.objects.get(code="OD")
+            journal = (caisse if caisse is not None and all(l.paiement == ESPECES for l in lignes_or
+                                                             if l.nature != LigneReparation.MAGASIN)
+                       else Journal.objects.get(code="OD"))
             self.ecriture = creer_ecriture(journal, date, f"Réparation {self.numero} {self.vehicule.immatriculation} - {self.panne}",
                                            lignes + list(contreparties.values()), reference=self.numero, origine=self.numero)
         self.statut, self.date_sortie = self.CLOTURE, date
@@ -184,8 +191,9 @@ class OrdreReparation(models.Model):
 
 
 class LigneReparation(models.Model):
-    PIECE, MAIN_OEUVRE_EXTERNE, MAIN_OEUVRE_INTERNE = "PIECE", "MO_EXTERNE", "MO_INTERNE"
-    NATURES = [(PIECE, "Pièce / fourniture"), (MAIN_OEUVRE_EXTERNE, "Main d'œuvre extérieure (garage, soudeur…)"),
+    PIECE, MAGASIN, MAIN_OEUVRE_EXTERNE, MAIN_OEUVRE_INTERNE = "PIECE", "MAGASIN", "MO_EXTERNE", "MO_INTERNE"
+    NATURES = [(PIECE, "Pièce achetée pour cette réparation"), (MAGASIN, "Pièce sortie du magasin (stock)"),
+               (MAIN_OEUVRE_EXTERNE, "Main d'œuvre extérieure (garage, soudeur…)"),
                (MAIN_OEUVRE_INTERNE, "Main d'œuvre interne (pour mémoire : déjà dans la paie)")]
 
     ordre = models.ForeignKey(OrdreReparation, on_delete=models.CASCADE, related_name="lignes")
@@ -195,6 +203,8 @@ class LigneReparation(models.Model):
     prix_unitaire = models.DecimalField("Prix unitaire", max_digits=12, decimal_places=0, default=ZERO)
     paiement = models.CharField(max_length=10, choices=PAIEMENTS, default=ESPECES)
     fournisseur = models.ForeignKey("commercial.Tiers", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    article = models.ForeignKey("garage.ArticleMagasin", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
+                                help_text="Pièce du magasin : sortie du stock à la fin de la réparation, au coût moyen")
 
     class Meta:
         ordering = ["pk"]
@@ -202,3 +212,6 @@ class LigneReparation(models.Model):
     @property
     def montant(self):
         return (Decimal(self.quantite) * Decimal(self.prix_unitaire)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+
+from .models_magasin import AchatMagasin, ArticleMagasin, LigneAchatMagasin, MouvementMagasin  # noqa: E402,F401

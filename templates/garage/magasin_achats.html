@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Achats du magasin{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Achats du magasin</h1><a class="btn btn-sm btn-primary" href="{% url 'garage:magasin_achat' %}"><i class="bi bi-cart-plus"></i> Nouvel achat</a></div>
+<div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>N°</th><th>Date</th><th>Fournisseur</th><th>Facture</th><th>Lignes</th><th class="num">Total</th><th>Écriture</th></tr></thead>
+<tbody>{% for a in achats %}<tr><td>{{ a.numero }}</td><td>{{ a.date|date:"d/m/Y" }}</td><td>{{ a.fournisseur|default:"—" }}</td><td>{{ a.facture }}</td>
+  <td>{% for l in a.lignes.all %}<div>{{ l.libelle }} × {{ l.quantite|floatformat:"-2" }} → {{ l.get_destination_display|lower }}{% if l.vehicule %} {{ l.vehicule.immatriculation }}{% endif %}</div>{% endfor %}</td>
+  <td class="num">{{ a.total|montant }}</td><td>{% if a.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' a.ecriture.pk %}">{{ a.ecriture.numero }}</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7" class="text-muted text-center p-4">Aucun achat.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

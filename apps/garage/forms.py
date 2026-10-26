@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 
 from apps.commercial.models import Tiers
@@ -38,8 +40,27 @@ class OrdreForm(BootstrapMixin, forms.ModelForm):
 class LigneReparationForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = LigneReparation
-        fields = ("nature", "designation", "quantite", "prix_unitaire", "paiement", "fournisseur")
+        fields = ("nature", "article", "designation", "quantite", "prix_unitaire", "paiement", "fournisseur")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["fournisseur"].queryset = Tiers.objects.filter(type_tiers=Tiers.FOURNISSEUR, actif=True)
+        from .models_magasin import ArticleMagasin
+
+        self.fields["article"].queryset = ArticleMagasin.objects.filter(actif=True, quantite__gt=0)
+        self.fields["designation"].required = False
+
+    def clean(self):
+        donnees = super().clean()
+        article = donnees.get("article")
+        if donnees.get("nature") == "MAGASIN":
+            if article is None:
+                self.add_error("article", "Choisissez la pièce du magasin.")
+            else:
+                if (donnees.get("quantite") or 0) > article.quantite:
+                    self.add_error("quantite", f"{article.quantite.normalize()} en stock seulement.")
+                donnees["designation"] = donnees.get("designation") or article.designation
+                donnees["prix_unitaire"] = article.cout_moyen.quantize(Decimal("1"))      # coût moyen du stock
+        elif not donnees.get("designation"):
+            self.add_error("designation", "Indiquez la désignation.")
+        return donnees

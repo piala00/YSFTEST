@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Sorties du magasin{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Sorties du magasin (utilisation)</h1></div>
+<form method="post" class="card card-body mb-3 d-flex flex-row flex-wrap gap-2 align-items-end">{% csrf_token %}
+  <div><label class="form-label small mb-0" for="s-a">Article</label><select id="s-a" name="article" required class="form-select form-select-sm">{% for a in articles %}<option value="{{ a.pk }}">{{ a.code }} {{ a.designation }} ({{ a.quantite|floatformat:"-2" }})</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="s-q">Quantité</label><input id="s-q" name="quantite" type="number" step="0.01" min="0" value="1" class="form-control form-control-sm" style="width:6rem"></div>
+  <div><label class="form-label small mb-0" for="s-v">Pour le véhicule</label><select id="s-v" name="vehicule" class="form-select form-select-sm"><option value="">(agence, courrier, bureau)</option>{% for v in vehicules %}<option value="{{ v.pk }}">{{ v.immatriculation }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="s-m">Motif</label><input id="s-m" name="motif" class="form-control form-control-sm" style="width:16rem"></div>
+  <button class="btn btn-sm btn-primary">Sortir du stock</button>
+  <div class="form-text w-100">Les pièces d'une réparation se sortent aussi depuis l'ordre de réparation (ligne « Pièce sortie du magasin »).</div></form>
+<div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>Date</th><th>Sens</th><th>Article</th><th class="num">Qté</th><th class="num">Coût unitaire</th><th class="num">Montant</th><th>Véhicule / réparation</th><th>Motif</th><th>Écriture</th></tr></thead>
+<tbody>{% for m in mouvements %}<tr><td>{{ m.date|date:"d/m/Y" }}</td><td>{{ m.get_sens_display }}</td><td>{{ m.article.designation }}</td><td class="num">{{ m.quantite|floatformat:"-2" }}</td>
+  <td class="num">{{ m.cout_unitaire|montant }}</td><td class="num">{{ m.montant|montant }}</td><td>{{ m.vehicule.immatriculation|default:"" }}{% if m.ordre %} · {{ m.ordre.numero }}{% endif %}</td><td>{{ m.motif }}</td>
+  <td>{% if m.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' m.ecriture.pk %}">{{ m.ecriture.numero }}</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucun mouvement.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}
