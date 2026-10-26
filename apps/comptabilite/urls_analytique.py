@@ -7,7 +7,7 @@ from django.urls import path
 
 from apps.core import views as core_views
 
-from . import views
+from . import views, views_analytique
 
 app_name = "analytique"
 
@@ -18,4 +18,8 @@ urlpatterns = [
     path("journal-evenements/", core_views.journal_evenements, {"module": "analytique"}, name="journal_evenements"),
     path("sauvegarde/", core_views.sauvegarde, {"module": "analytique"}, name="sauvegarde"),
     path("sections/", views.structure_liste, {"structure": "sections"}, name="sections"),
+    # Plan analytique : axes → éléments → états détaillés
+    path("plan/", views_analytique.plan, name="plan"),
+    path("plan/<str:axe>/", views_analytique.axe, name="axe"),
+    path("plan/<str:axe>/<str:cle>/", views_analytique.element, name="element"),
 ]

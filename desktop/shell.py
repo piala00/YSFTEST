@@ -1,6 +1,6 @@
 """Socle commun des logiciels de l'ERP OHADA (client bureau).
 
-Chaque module (Gestion commerciale, Comptabilité, Reporting) est un logiciel
+Chaque module (Gestion commerciale, Comptabilité générale, Comptabilité analytique, Reporting) est un logiciel
 indépendant construit sur ce socle :
 
     ┌──────────────────────────────────────────────────────────┐
@@ -36,8 +36,10 @@ CONFIG_FILE = Path.home() / ".erp_ohada.json"
 MODULES = {
     "commercial": {"titre": "Gestion commerciale", "couleur": "#1565c0",
                    "description": "Tiers, articles, ventes, achats, stock, règlements"},
-    "comptabilite": {"titre": "Comptabilité OHADA", "couleur": "#2e7d32",
-                     "description": "Plan SYSCOHADA, saisie, grand livre, balance, états financiers"},
+    "comptabilite": {"titre": "Comptabilité générale", "couleur": "#2e7d32",
+                     "description": "Plan SYSCOHADA à 7 chiffres, journaux, écritures et états financiers"},
+    "analytique": {"titre": "Comptabilité analytique", "couleur": "#00695c",
+                   "description": "États des véhicules et propriétaires issus des écritures générales"},
     "reporting": {"titre": "Reporting", "couleur": "#6a1b9a",
                   "description": "Tableaux de bord, analyses, balances âgées, synthèses"},
 }
@@ -65,7 +67,8 @@ def sauver_config(config):
 
 
 DOSSIER = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
-EXECUTABLES = {"commercial": "ERP_Commercial", "comptabilite": "ERP_Comptabilite", "reporting": "ERP_Reporting"}
+EXECUTABLES = {"commercial": "ERP_Commercial", "comptabilite": "ERP_Comptabilite",
+               "analytique": "ERP_Analytique", "reporting": "ERP_Reporting"}
 
 
 def lancer_module(code):

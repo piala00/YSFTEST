@@ -129,3 +129,27 @@ class PlanSeptChiffresTests(TestCase):
         with self.assertRaisesMessage(CommandError, "collision"):
             call_command("longueur_comptes", "--appliquer", stdout=io.StringIO())
         self.assertTrue(Compte.objects.filter(numero="4111").exists())       # rien n'a bougé
+
+class TestSecuriteLongueurSeptChiffres(TestCase):
+    """Ne jamais rendre un plan hétérogène en autorisant des comptes > 7 chiffres."""
+
+    def test_conversion_refuse_compte_trop_long_sans_modification(self):
+        from django.core.management.base import CommandError
+        from apps.core.models import Societe
+        from apps.comptabilite.models import Compte
+        call_command("init_erp", "--longueur-comptes", "0", verbosity=0)
+        compte = Compte.objects.create(numero="41112345", intitule="Compte existant à 8 chiffres")
+        with self.assertRaises(CommandError):
+            call_command("longueur_comptes", "--appliquer", stdout=io.StringIO())
+        compte.refresh_from_db()
+        self.assertEqual(compte.numero, "41112345")
+        self.assertEqual(Societe.get().longueur_comptes, 0)
+
+    def test_ecriture_directe_refuse_un_compte_trop_long(self):
+        from django.core.exceptions import ValidationError
+        from apps.comptabilite.models import Compte
+        call_command("init_erp", verbosity=0)
+        with self.assertRaises(ValidationError):
+            Compte.objects.create(numero="41112345", intitule="Dépassement interdit")
+
+

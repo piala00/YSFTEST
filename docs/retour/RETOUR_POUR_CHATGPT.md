@@ -30,6 +30,7 @@ Voir `AUDIT_ECARTS.md` (EXISTANT / PARTIEL / ABSENT / BLOQUANT, avec fichiers et
 ## 4. Modifications de cette mise à jour
 | Sujet | Contenu | Migration |
 |---|---|---|
+| Plan analytique complet | Comptabilité analytique : axes gares, véhicules, propriétaires, gammes, lignes, voyages, activités, contrats et plans de sections ; balance de chaque axe avec non affecté et rapprochement ; six états par élément (exploitation, comptes, grand-livre, évolution, croisé, comparaison) ; périodes en un clic ; CSV. Voir `docs/COMPTABILITE_ANALYTIQUE_ETATS.md`. Repris de l'archive 7 chiffres : refus des comptes trop longs, client bureau analytique ; non repris : inversion de l'ordre des modules (régression), doubles adresses | — |
 | Plan à 7 chiffres | longueur des comptes par société (7 pour un nouveau dossier), numéros complétés par des zéros à droite, recherche par numéro court conservée, commande de conversion avec contrôle des collisions ; reprise : plan d'origine tel quel | `core 0021` |
 | Deux modules comptables | « Comptabilité générale » et « Comptabilité analytique » (Véhicules, Propriétaires, sections) sur une seule comptabilité | — |
 | Magasin du garage | inventaire permanent : achat D 33x, sortie D charge (véhicule) / C 33x au CMUP ; achat direct pour un véhicule ; immobilisation ; pièce du magasin sur l'ordre de réparation | `garage 0002` |

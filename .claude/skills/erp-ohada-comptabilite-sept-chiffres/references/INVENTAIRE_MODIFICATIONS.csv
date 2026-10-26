@@ -1,0 +1,14 @@
+fichier;etat;commentaire
+apps/comptabilite/management/commands/longueur_comptes.py;MODIFIE;Modifie dans le ZIP correctif
+apps/comptabilite/services.py;MODIFIE;Modifie dans le ZIP correctif
+apps/comptabilite/tests.py;MODIFIE;Modifie dans le ZIP correctif
+apps/core/accueil.py;MODIFIE;Modifie dans le ZIP correctif
+apps/core/navigation.py;MODIFIE;Modifie dans le ZIP correctif
+apps/transport/tests.py;MODIFIE;Modifie dans le ZIP correctif
+desktop/COMPILER.bat;MODIFIE;Modifie dans le ZIP correctif
+desktop/comptabilite.py;MODIFIE;Modifie dans le ZIP correctif
+desktop/lanceur.py;MODIFIE;Modifie dans le ZIP correctif
+desktop/pages.py;MODIFIE;Modifie dans le ZIP correctif
+desktop/shell.py;MODIFIE;Modifie dans le ZIP correctif
+NOTE-MISE-A-JOUR-COMPTABILITE-7-CHIFFRES.txt;AJOUTE;Ajoute dans le ZIP correctif
+desktop/analytique.py;AJOUTE;Ajoute dans le ZIP correctif

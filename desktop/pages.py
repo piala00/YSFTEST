@@ -440,6 +440,10 @@ ECRANS_COMPTABILITE = {
     "etats.financiers.resultat": lambda app, el: PageCompteResultat(app, el["titre"]),
 }
 
+# Les écrans des véhicules et propriétaires sont servis par les vues web existantes
+# depuis la même base comptable. Aucun moteur financier supplémentaire n’est créé.
+ECRANS_ANALYTIQUE = {}
+
 ECRANS_REPORTING = {
     "synthese.dashboard": lambda app, el: PageDashboard(app, el["titre"]),
     "tiers.balance_agee_clients": lambda app, el: PageBalanceAgee(app, "Balance âgée clients", "CLIENT"),

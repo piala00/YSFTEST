@@ -670,7 +670,14 @@ def appliquer_longueur_comptes(longueur):
     """Passe le dossier à `longueur` chiffres ; refuse s'il y a une collision. Renvoie le nombre de comptes renumérotés."""
     from apps.core.models import Societe
 
-    changements, collisions, _ = projet_longueur_comptes(longueur)
+    if not 4 <= longueur <= 12:
+        raise ValidationError("Longueur attendue entre 4 et 12 chiffres.")
+    changements, collisions, trop_longs = projet_longueur_comptes(longueur)
+    if trop_longs:
+        raise ValidationError(
+            "Conversion impossible : numéros de compte déjà plus longs que la cible : "
+            + ", ".join(trop_longs)
+        )
     if collisions:
         raise ValidationError("Comptes qui se confondraient : " + " ; ".join(
             f"{', '.join(ns)} → {c}" for c, ns in sorted(collisions.items())))

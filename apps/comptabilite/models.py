@@ -92,7 +92,11 @@ class Compte(models.Model):
         return CLASSES_SYSCOHADA.get(self.classe, "")
 
     def save(self, *args, **kwargs):
-        self.numero = normaliser_numero(self.numero)
+        longueur = longueur_comptes()
+        numero = str(self.numero or "").strip()
+        if longueur and (not numero.isdigit() or len(numero) > longueur):
+            raise ValidationError({"numero": f"Le compte doit être numérique et comporter au plus {longueur} chiffres."})
+        self.numero = normaliser_numero(numero, longueur)
         super().save(*args, **kwargs)
 
     def clean(self):

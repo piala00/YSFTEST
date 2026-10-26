@@ -9,7 +9,7 @@ class Lanceur(ctk.CTk):
         super().__init__()
         ctk.set_appearance_mode("light")
         self.title("ERP OHADA")
-        self.geometry("860x360")
+        self.geometry("1120x390")
         self.resizable(False, False)
         ctk.CTkLabel(self, text="ERP OHADA", font=ctk.CTkFont(size=26, weight="bold")).pack(pady=(24, 2))
         ctk.CTkLabel(self, text="Choisissez une application", text_color="gray").pack(pady=(0, 18))

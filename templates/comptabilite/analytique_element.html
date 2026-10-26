@@ -1,0 +1,87 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}{{ libelle }} — {{ titre_axe }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>{{ libelle }} <small class="text-muted fs-6">{{ titre_axe }} · du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1>
+  <a class="small d-print-none" href="{% url 'analytique:axe' axe %}?{{ params_periode }}">← {{ titre_axe }}</a></div>
+{% url 'analytique:element' axe cle as url_el %}
+{% with export_url=url_el|add:"?"|add:params_periode|add:"&etat="|add:etat|add:"&axe2="|add:axe2|add:"&export=csv" %}{% include "comptabilite/_periode_analytique.html" %}{% endwith %}
+
+<div class="row g-2 mb-3">
+  <div class="col-auto"><div class="card card-body py-2 px-3"><div class="small text-muted">Produits</div><div class="fs-5">{{ total.produits|montant }}</div></div></div>
+  <div class="col-auto"><div class="card card-body py-2 px-3"><div class="small text-muted">Charges</div><div class="fs-5">{{ total.charges|montant }}</div></div></div>
+  <div class="col-auto"><div class="card card-body py-2 px-3"><div class="small text-muted">Résultat</div><div class="fs-5 {% if total.resultat < 0 %}text-danger{% endif %}">{{ total.resultat|montant }}</div></div></div>
+  <div class="col-auto"><div class="card card-body py-2 px-3"><div class="small text-muted">Lignes d'écriture</div><div class="fs-5">{{ total.lignes }}</div></div></div>
+</div>
+
+<ul class="nav nav-tabs mb-2 d-print-none">{% for code, titre in etats %}
+  <li class="nav-item"><a class="nav-link {% if code == etat %}active{% endif %}" href="{{ url_el }}?{{ params_periode }}&amp;etat={{ code }}&amp;axe2={{ axe2 }}">{{ titre }}</a></li>{% endfor %}
+</ul>
+<h5 class="d-none d-print-block">{% for code, titre in etats %}{% if code == etat %}{{ titre }}{% endif %}{% endfor %}</h5>
+
+{% if etat == "exploitation" %}
+<div class="card mb-3" style="max-width:52rem"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Produits</th><th class="num">Montant</th></tr></thead>
+  <tbody>{% for g in produits %}<tr><td>{{ g.libelle }}</td><td class="num">{{ g.montant|montant }}</td></tr>{% empty %}<tr><td colspan="2" class="text-muted">Aucun produit.</td></tr>{% endfor %}
+    <tr class="total"><td>Total des produits</td><td class="num">{{ total.produits|montant }}</td></tr></tbody>
+  <thead><tr><th>Charges</th><th class="num">Montant</th></tr></thead>
+  <tbody>{% for g in charges %}<tr><td>{{ g.libelle }}</td><td class="num">{{ g.montant|montant }}</td></tr>{% empty %}<tr><td colspan="2" class="text-muted">Aucune charge.</td></tr>{% endfor %}
+    <tr class="total"><td>Total des charges</td><td class="num">{{ total.charges|montant }}</td></tr>
+    <tr class="total"><td>Résultat</td><td class="num {% if total.resultat < 0 %}text-danger{% endif %}">{{ total.resultat|montant }}</td></tr></tbody>
+</table></div>
+
+{% elif etat == "comptes" %}
+<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Compte</th><th>Intitulé</th><th class="num">Débit (charges)</th><th class="num">Crédit (produits)</th><th class="num">Lignes</th></tr></thead>
+  <tbody>{% for c in comptes %}<tr><td>{{ c.compte }}</td><td>{{ c.intitule }}</td><td class="num">{{ c.debit|montant_ou_vide }}</td><td class="num">{{ c.credit|montant_ou_vide }}</td><td class="num text-muted">{{ c.lignes }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center p-3">Aucun mouvement.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="2">Total</td><td class="num">{{ total.charges|montant }}</td><td class="num">{{ total.produits|montant }}</td><td class="num">{{ total.lignes }}</td></tr></tfoot>
+</table></div>
+
+{% elif etat == "grand_livre" %}
+<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Date</th><th>Pièce</th><th>Journal</th><th>Compte</th><th>Libellé</th><th class="num">Produit</th><th class="num">Charge</th></tr></thead>
+  <tbody>{% for f in lignes_gl %}<tr><td>{{ f.date|date:"d/m/Y" }}</td><td><a href="{% url 'comptabilite:ecriture_detail' f.ecriture_id %}">{{ f.piece }}</a></td>
+    <td>{{ f.journal }}</td><td>{{ f.compte }}</td><td>{{ f.libelle }}</td>
+    <td class="num">{% if f.produit %}{{ f.montant|montant }}{% endif %}</td><td class="num">{% if not f.produit %}{{ f.montant|montant|cut:"-" }}{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted text-center p-3">Aucune ligne.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="5">Total</td><td class="num">{{ total.produits|montant }}</td><td class="num">{{ total.charges|montant }}</td></tr></tfoot>
+</table></div>
+{% if tronque %}<p class="small text-warning-emphasis">Seules les 1 000 premières lignes sont affichées : l'export les donne toutes, ou réduisez la période.</p>{% endif %}
+
+{% elif etat == "evolution" %}
+<div class="card mb-3" style="max-width:52rem"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>{% if par_jour %}Jour{% else %}Mois{% endif %}</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th></tr></thead>
+  <tbody>{% for s in series %}<tr><td>{% if par_jour %}{{ s.periode|date:"D d/m/Y" }}{% else %}{{ s.periode|date:"F Y" }}{% endif %}</td>
+    <td class="num">{{ s.produits|montant_ou_vide }}</td><td class="num">{{ s.charges|montant_ou_vide }}</td><td class="num {% if s.resultat < 0 %}text-danger{% endif %}">{{ s.resultat|montant }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="text-muted text-center p-3">Aucun mouvement.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td><td class="num">{{ total.produits|montant }}</td><td class="num">{{ total.charges|montant }}</td><td class="num">{{ total.resultat|montant }}</td></tr></tfoot>
+</table></div>
+
+{% elif etat == "croise" %}
+<form class="d-flex gap-2 align-items-end mb-2 d-print-none" method="get">
+  <input type="hidden" name="du" value="{{ du|date:'Y-m-d' }}"><input type="hidden" name="au" value="{{ au|date:'Y-m-d' }}"><input type="hidden" name="etat" value="croise">
+  <div><label class="form-label small mb-0" for="axe2">Ventiler par</label><select id="axe2" name="axe2" class="form-select form-select-sm" onchange="this.form.submit()">
+    {% for code, titre in autres_axes %}<option value="{{ code }}" {% if code == axe2 %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
+</form>
+<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>{{ titre_axe2 }}</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Lignes</th></tr></thead>
+  <tbody>{% for g in croise %}<tr><td>{% if g.cle is None %}<span class="text-muted">Non affecté</span>{% else %}<a href="{% url 'analytique:element' axe2 g.cle %}?{{ params_periode }}">{{ g.libelle }}</a>{% endif %}</td>
+    <td class="num">{{ g.produits|montant_ou_vide }}</td><td class="num">{{ g.charges|montant_ou_vide }}</td><td class="num {% if g.resultat < 0 %}text-danger{% endif %}">{{ g.resultat|montant }}</td><td class="num text-muted">{{ g.lignes }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center p-3">Aucun mouvement.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td><td class="num">{{ total.produits|montant }}</td><td class="num">{{ total.charges|montant }}</td><td class="num">{{ total.resultat|montant }}</td><td class="num">{{ total.lignes }}</td></tr></tfoot>
+</table></div>
+
+{% elif etat == "comparaison" %}
+<p class="small text-muted">Période choisie comparée à la période précédente ({{ periode_precedente.0|date:"d/m/Y" }} – {{ periode_precedente.1|date:"d/m/Y" }}). Produits en positif, charges en négatif.</p>
+<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Compte</th><th>Intitulé</th><th class="num">Période</th><th class="num">Période précédente</th><th class="num">Écart</th></tr></thead>
+  <tbody>{% for c in comparaison %}<tr><td>{{ c.compte }}</td><td>{{ c.intitule }}</td><td class="num">{{ c.actuel|montant }}</td><td class="num">{{ c.precedent|montant }}</td>
+    <td class="num {% if c.ecart < 0 %}text-danger{% endif %}">{{ c.ecart|montant }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center p-3">Aucun mouvement sur les deux périodes.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="2">Résultat</td><td class="num">{{ total.resultat|montant }}</td><td class="num">{{ total_precedent.resultat|montant }}</td>
+    <td class="num">{{ ecart_resultat|montant }}</td></tr></tfoot>
+</table></div>
+{% endif %}
+<p class="small text-muted">Montants : lignes de charges et produits des écritures validées de la comptabilité générale attribuées à cet élément.
+  Cliquez une pièce pour l'ouvrir.</p>
+{% endblock %}

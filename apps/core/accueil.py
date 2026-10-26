@@ -131,7 +131,30 @@ def comptabilite():
 
 
 def analytique():
-    """Comptabilité analytique : lue sur les écritures générales validées (véhicule, section), jamais ressaisie."""
+    """Comptabilité analytique : lue sur les écritures générales validées (véhicule, section…), jamais ressaisie."""
+    from apps.comptabilite import plan_analytique as pa
+    from apps.core.models import Societe
+
+    du, au, _ = pa.periode({})                                         # mois en cours
+    periode = f"du={du.isoformat()}&au={au.isoformat()}"
+    plan = [{"groupe": "Plan analytique", "liens": [
+        _raccourci("Tous les axes", "bi-diagram-3", "analytique:plan", query=periode),
+        *[_raccourci(titre, "bi-list-nested", "analytique:axe", code, query=periode) for code, titre, _ in pa.axes()]]}]
+    if Societe.get().activite == Societe.ACTIVITE_COMMERCE:
+        s = pa.synthese_axes(du, au)
+        return {
+            "raccourcis": plan + [{"groupe": "Sections", "liens": [
+                _raccourci("Balance analytique", "bi-diagram-2", "comptabilite:balance_analytique"),
+                _raccourci("Affecter une section", "bi-pencil-square", "comptabilite:ventilation"),
+                _raccourci("Plan analytique (sections)", "bi-list-ol", "analytique:sections")]}],
+            "indicateurs": [_indicateur("Produits du mois", s["gl"]["produits"], reverse("analytique:plan") + "?" + periode),
+                            _indicateur("Charges du mois", s["gl"]["charges"], reverse("analytique:plan") + "?" + periode),
+                            *[_indicateur(f"Non affecté : {a['titre']}", a["charges_non_affectees"] + a["produits_non_affectes"],
+                                          reverse("analytique:axe", args=[a["code"]]) + "?" + periode,
+                                          alerte=bool(a["charges_non_affectees"] + a["produits_non_affectes"]))
+                              for a in s["axes"][:3]]],
+            "dernieres": [], "titre_dernieres": "",
+        }
     from apps.reporting import services
     from apps.transport import analytique as ana
 
@@ -141,7 +164,7 @@ def analytique():
     c = r["controle"]
     vehicules = sorted((l for l in r["lignes"] if l["produits"] or l["charges"]), key=lambda l: l["resultat_societe"])
     return {
-        "raccourcis": [
+        "raccourcis": plan + [
             {"groupe": "Véhicules", "liens": [
                 _raccourci("Comptes d'exploitation", "bi-bus-front", "comptabilite:analytique_vehicules"),
                 _raccourci("Grand-livre des véhicules", "bi-book", "comptabilite:grand_livre_vehicules"),
@@ -154,7 +177,7 @@ def analytique():
             {"groupe": "Sections", "liens": [
                 _raccourci("Balance analytique", "bi-diagram-2", "comptabilite:balance_analytique"),
                 _raccourci("Affecter une section", "bi-pencil-square", "comptabilite:ventilation"),
-                _raccourci("Plan analytique", "bi-list-ol", "analytique:sections"),
+                _raccourci("Plan analytique (sections)", "bi-list-ol", "analytique:sections"),
             ]},
         ],
         "indicateurs": [

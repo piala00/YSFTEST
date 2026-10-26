@@ -694,6 +694,17 @@ COMPTABILITE = Module(
 # Comptabilité analytique : logiciel distinct à l'écran, mais une seule comptabilité. Chaque montant analytique est
 # lu sur une ligne d'écriture générale validée (véhicule, section) ; rien n'est saisi deux fois.
 # ---------------------------------------------------------------------------
+def _axes_analytiques():
+    """Une entrée par axe du plan analytique du dossier (gares, véhicules… et plans de sections)."""
+    from apps.comptabilite.plan_analytique import axes
+
+    return [E(f"analytique.axes.{code}", titre, "analytique:axe", code, preuve="AJOUT-ERP") for code, titre, _ in axes()]
+
+
+# Entrées du logiciel analytique propres au transport, masquées pour une société de commerce
+ANALYTIQUE_TRANSPORT = {"structure.vehicules", "structure.contrats", "analytique.vehicules", "analytique.proprietaires"}
+
+
 ANALYTIQUE = Module(
     code="analytique",
     titre="Comptabilité analytique",
@@ -716,6 +727,9 @@ ANALYTIQUE = Module(
               preuve="AJOUT-ERP"),
         ]),
         Onglet("etat", "Etat", "bi-printer", [
+            E("analytique.plan", "Plan analytique (tous les axes)", "analytique:plan", icone="bi-diagram-3", preuve="AJOUT-ERP"),
+            E("analytique.axes", "États par axe", icone="bi-list-nested", preuve="AJOUT-ERP", dyn=_axes_analytiques),
+            SEP(),
             E("analytique.vehicules", "Comptabilité analytique : Véhicules", icone="bi-bus-front", preuve="AJOUT-ERP", enfants=[
                 E("analytique.vehicules.comptes", "Comptes d'exploitation des véhicules", "comptabilite:analytique_vehicules",
                   preuve="AJOUT-ERP"),
@@ -762,6 +776,7 @@ REPORTING = Module(
                 E("ventes.clients", "Par client", "reporting:ventes", vue="clients"),
                 E("ventes.articles", "Par article", "reporting:ventes", vue="articles"),
             ]),
+            E("analytique.plan", "Analyses par axe analytique", "analytique:plan", icone="bi-diagram-3", preuve="AJOUT-ERP"),
             E("transport.comparaisons", "Transport : comparaisons", icone="bi-bar-chart-steps", enfants=[
                 E("transport.comparaisons.agence", "Par agence", "reporting:comparaisons_transport", axe="agence"),
                 E("transport.comparaisons.gamme", "Classique / VIP", "reporting:comparaisons_transport", axe="gamme"),
@@ -1100,6 +1115,17 @@ def premier_lien(noeuds):
     return None
 
 
+def elements_selon_activite(module, onglet):
+    """Comptabilité analytique d'une société de commerce : ses sections seulement (ni véhicules ni propriétaires)."""
+    if module.code != "analytique":
+        return onglet.elements
+    from .models import Societe
+
+    if Societe.get().activite != Societe.ACTIVITE_COMMERCE:
+        return onglet.elements
+    return [e for e in onglet.elements if e.code not in ANALYTIQUE_TRANSPORT]
+
+
 def structure_module(module, chemin="", parametres=None):
     """Menus du module, avec le menu et l'élément actifs."""
     parametres = parametres or {}
@@ -1107,7 +1133,7 @@ def structure_module(module, chemin="", parametres=None):
     onglets = []
     for onglet in module.onglets:
         avant = meilleur["noeud"]
-        arbre = _arbre(module, onglet.elements, chemin, parametres, meilleur)
+        arbre = _arbre(module, elements_selon_activite(module, onglet), chemin, parametres, meilleur)
         onglets.append({"code": onglet.code, "titre": onglet.titre, "icone": onglet.icone, "elements": arbre,
                         "url": premier_lien(arbre), "contient_actif": False})
         if meilleur["noeud"] is not avant:

@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Plan analytique{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Plan analytique <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<p class="small text-muted mb-2">Choisissez un axe pour voir tous ses éléments, puis un élément pour ses états détaillés.
+  Tout vient des écritures validées de la comptabilité générale : produits {{ gl.produits|montant }}, charges {{ gl.charges|montant }}.</p>
+<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th style="min-width:24rem">Axe analytique</th><th class="num">Éléments mouvementés</th><th class="num">Produits affectés</th><th class="num">Charges affectées</th>
+    <th class="num">Produits non affectés</th><th class="num">Charges non affectées</th></tr></thead>
+  <tbody>{% for a in axes %}<tr>
+    <td><a class="fw-semibold" href="{% url 'analytique:axe' a.code %}?{{ params_periode }}">{{ a.titre }}</a><br><span class="text-muted">{{ a.description }}</span></td>
+    <td class="num">{{ a.elements }}</td><td class="num">{{ a.produits|montant }}</td><td class="num">{{ a.charges|montant }}</td>
+    <td class="num {% if a.produits_non_affectes %}text-warning-emphasis{% endif %}">{{ a.produits_non_affectes|montant_ou_vide }}</td>
+    <td class="num">{{ a.charges_non_affectees|montant_ou_vide }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center p-4">Aucun axe : créez des sections dans Structure › Plan analytique.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="small text-muted">Une même ligne d'écriture apparaît dans chaque axe (sa gare, son véhicule, sa ligne…) mais ne compte qu'une fois par axe :
+  sur chaque axe, éléments + non affecté = comptabilité générale. Le non affecté (siège, frais généraux…) n'est jamais réparti d'office.</p>
+{% endblock %}

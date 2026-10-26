@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Analytique — {{ titre_axe }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>{{ titre_axe }} <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1>
+  <a class="small d-print-none" href="{% url 'analytique:plan' %}?{{ params_periode }}">← Plan analytique</a></div>
+{% url 'analytique:axe' axe as url_axe %}{% with export_url=url_axe|add:"?"|add:params_periode|add:"&export=csv" %}{% include "comptabilite/_periode_analytique.html" %}{% endwith %}
+<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Élément</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Marge</th><th class="num">Lignes</th></tr></thead>
+  <tbody>{% for e in elements %}<tr>
+    <td><a href="{% url 'analytique:element' axe e.cle %}?{{ params_periode }}">{{ e.libelle }}</a></td>
+    <td class="num">{{ e.produits|montant_ou_vide }}</td><td class="num">{{ e.charges|montant_ou_vide }}</td>
+    <td class="num fw-semibold {% if e.resultat < 0 %}text-danger{% endif %}">{{ e.resultat|montant }}</td>
+    <td class="num text-muted">{% if e.produits %}{% widthratio e.resultat e.produits 100 %} %{% endif %}</td><td class="num text-muted">{{ e.lignes }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center p-4">Aucun montant affecté à cet axe sur la période.</td></tr>{% endfor %}</tbody>
+  <tfoot>
+    <tr class="total"><td>Total des éléments</td><td class="num">{{ total_elements.produits|montant }}</td><td class="num">{{ total_elements.charges|montant }}</td><td class="num">{{ total_elements.resultat|montant }}</td><td></td><td></td></tr>
+    <tr><td><a href="{% url 'analytique:element' axe non_affecte_cle %}?{{ params_periode }}">Non affecté</a> <span class="text-muted">(reste en comptabilité générale)</span></td>
+      <td class="num">{{ non_affecte.produits|montant_ou_vide }}</td><td class="num">{{ non_affecte.charges|montant_ou_vide }}</td><td class="num">{{ non_affecte.resultat|montant }}</td><td></td><td class="num text-muted">{{ non_affecte.lignes }}</td></tr>
+    <tr class="total"><td>Comptabilité générale (classes 6 et 7)</td><td class="num">{{ gl.produits|montant }}</td><td class="num">{{ gl.charges|montant }}</td><td class="num">{{ gl.resultat|montant }}</td><td></td><td class="num text-muted">{{ gl.lignes }}</td></tr>
+  </tfoot>
+</table></div>
+<p class="small {% if rapproche %}text-success{% else %}text-danger{% endif %}"><i class="bi {% if rapproche %}bi-check-circle{% else %}bi-exclamation-triangle{% endif %}"></i>
+  {% if rapproche %}Rapproché : éléments + non affecté = comptabilité générale.{% else %}Écart avec la comptabilité générale : à signaler.{% endif %}</p>
+{% endblock %}

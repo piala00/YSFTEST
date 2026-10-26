@@ -1323,3 +1323,90 @@ class DeuxModulesComptablesTests(TestCase):
         # Les états analytiques s'ouvrent dans le module analytique ; la saisie reste en comptabilité générale
         self.assertEqual(module_pour_chemin(reverse("comptabilite:analytique_vehicules")).code, "analytique")
         self.assertEqual(module_pour_chemin(reverse("comptabilite:ecriture_create")).code, "comptabilite")
+
+
+class PlanAnalytiqueCompletTests(TestCase):
+    """Comptabilité analytique : tout le plan analytique (gares, véhicules, propriétaires, gammes, lignes, voyages,
+    activités, contrats, plans de sections), chaque élément avec ses états détaillés, sur une période choisie."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from .management.commands.simulation import Command
+
+        call_command(Command(), mois="2026-09", jours=2, vehicules=8, salaries=20, echelle=0.1, forcer=True,
+                     stdout=io.StringIO())
+        cls.du, cls.au = datetime.date(2026, 9, 1), datetime.date(2026, 9, 2)
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.client.force_login(get_user_model().objects.create_superuser("chef", "", "x"))
+
+    def test_chaque_axe_se_rapproche_de_la_comptabilite_generale(self):
+        from apps.comptabilite import plan_analytique as pa
+
+        codes = [c for c, _, _ in pa.axes()]
+        for attendu in ("gares", "vehicules", "proprietaires", "gammes", "lignes", "voyages", "activites", "contrats"):
+            self.assertIn(attendu, codes)
+        s = pa.synthese_axes(self.du, self.au)
+        self.assertGreater(s["gl"]["produits"], 0)
+        for code in codes:
+            with self.subTest(axe=code):
+                b = pa.balance_axe(code, self.du, self.au)
+                self.assertTrue(b["rapproche"], code)
+                self.assertEqual(b["gl"]["produits"], s["gl"]["produits"])
+        # Tous les produits du transport sont attribués à une gare, un véhicule et une activité
+        for code in ("gares", "vehicules", "activites"):
+            self.assertEqual(pa.balance_axe(code, self.du, self.au)["non_affecte"]["produits"], 0, code)
+
+    def test_etats_detailles_d_un_element(self):
+        from django.urls import reverse
+
+        from apps.comptabilite import plan_analytique as pa
+
+        gare = pa.balance_axe("gares", self.du, self.au)["elements"][0]
+        periode = "du=2026-09-01&au=2026-09-02"
+        url = reverse("analytique:element", args=["gares", gare["cle"]])
+        for etat, _ in pa.ETATS:
+            with self.subTest(etat=etat):
+                r = self.client.get(f"{url}?{periode}&etat={etat}&axe2=vehicules")
+                self.assertEqual(r.status_code, 200)
+                self.assertContains(r, gare["libelle"])
+        croise = pa.etat_element("gares", gare["cle"], "croise", self.du, self.au, axe2="vehicules")
+        self.assertEqual(sum(g["resultat"] for g in croise["croise"]), gare["resultat"])     # rien ne se perd
+        export = self.client.get(f"{url}?{periode}&etat=grand_livre&export=csv")
+        self.assertEqual(export["Content-Type"], "text/csv; charset=utf-8")
+        self.assertEqual(len(export.content.decode("utf-8-sig").strip().splitlines()) - 1, gare["lignes"])
+        for page in (reverse("analytique:plan"), reverse("analytique:axe", args=["vehicules"]),
+                     reverse("analytique:element", args=["gares", "aucun"]), reverse("analytique:accueil")):
+            self.assertEqual(self.client.get(f"{page}?{periode}").status_code, 200, page)
+        # Période en un clic
+        self.assertEqual(self.client.get(reverse("analytique:plan") + "?periode=mois_precedent").status_code, 200)
+        self.assertEqual(self.client.get(reverse("analytique:axe", args=["inconnu"])).status_code, 404)
+
+    def test_periodes_rapides(self):
+        from apps.comptabilite.plan_analytique import periode, periode_precedente
+
+        j = datetime.date(2026, 10, 26)
+        self.assertEqual(periode({"periode": "semaine"}, j)[:2], (datetime.date(2026, 10, 26), datetime.date(2026, 11, 1)))
+        self.assertEqual(periode({"periode": "mois_precedent"}, j)[:2], (datetime.date(2026, 9, 1), datetime.date(2026, 9, 30)))
+        self.assertEqual(periode({"periode": "trimestre"}, j)[:2], (datetime.date(2026, 10, 1), datetime.date(2026, 12, 31)))
+        self.assertEqual(periode({"du": "2026-09-01", "au": "2026-09-15"}, j)[:2], (datetime.date(2026, 9, 1), datetime.date(2026, 9, 15)))
+        self.assertEqual(periode_precedente(datetime.date(2026, 9, 1), datetime.date(2026, 9, 30)),
+                         (datetime.date(2026, 8, 1), datetime.date(2026, 8, 31)))
+
+    def test_societe_de_commerce_sections_seulement(self):
+        from apps.comptabilite import plan_analytique as pa
+        from apps.comptabilite.models import SectionAnalytique
+        from apps.core.models import Societe
+        from apps.core.navigation import MODULES_PAR_CODE, structure_module
+
+        Societe.objects.update(activite=Societe.ACTIVITE_COMMERCE)
+        SectionAnalytique.objects.create(plan="Services", code="SV-VTE", intitule="Service des ventes")
+        codes = [c for c, _, _ in pa.axes()]
+        self.assertNotIn("vehicules", codes)
+        self.assertIn("plan-services", codes)
+        onglets, _ = structure_module(MODULES_PAR_CODE["analytique"])
+        tout = str(onglets)
+        self.assertNotIn("analytique.vehicules", tout)
+        self.assertIn("analytique.axes.plan-services", tout)

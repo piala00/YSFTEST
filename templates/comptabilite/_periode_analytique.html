@@ -1,0 +1,13 @@
+{# Période en un clic : boutons rapides ou dates libres ; les autres choix de l'écran (état, axe croisé) sont gardés #}
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3 d-print-none" method="get">
+  {% for k, v in autres_params.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Période">
+    {% for code, titre in periodes %}<button type="submit" name="periode" value="{{ code }}"
+      class="btn {% if code == periode_code %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ titre }}</button>{% endfor %}
+  </div>
+  <div><label class="form-label small mb-0" for="pa-du">Du</label><input type="date" id="pa-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="pa-au">Au</label><input type="date" id="pa-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <button class="btn btn-sm btn-primary">Afficher</button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+  {% if export_url %}<a class="btn btn-sm btn-outline-secondary" href="{{ export_url }}"><i class="bi bi-filetype-csv"></i> Exporter</a>{% endif %}
+</form>

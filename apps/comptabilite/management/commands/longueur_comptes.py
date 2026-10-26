@@ -33,7 +33,12 @@ class Command(BaseCommand):
         if len(changements) > 30:
             self.stdout.write(f"  … et {len(changements) - 30} autres")
         for numero in trop_longs:
-            self.stdout.write(f"  {numero} : plus long que {longueur} chiffres, laissé tel quel")
+            self.stdout.write(f"  {numero} : plus long que {longueur} chiffres, conversion interdite")
+        if trop_longs:
+            raise CommandError(
+                f"{len(trop_longs)} compte(s) dépassent {longueur} chiffres : "
+                "établissez un mapping manuel après sauvegarde, aucune modification effectuée."
+            )
         for cible, numeros in sorted(collisions.items()):
             self.stdout.write(f"  COLLISION : {', '.join(numeros)} deviendraient tous {cible}")
         if collisions:
