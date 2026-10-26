@@ -173,6 +173,22 @@ Reprendre un dossier Sage existant (transition, puis bascule) :
   crée avec 1-INSTALLER.bat et se démarre avec 2-DEMARRER-ERP.bat.
 
 
+3 ter. COMPILER LE LOGICIEL EN UN PROGRAMME (.exe)
+--------------------------------------------------
+
+- Après 1-INSTALLER.bat, lancez 9-COMPILER-EXECUTABLE.bat (sans Internet,
+  quelques minutes). Résultat : executable\ERP-OHADA-<Édition>\ avec
+  ERP-OHADA-<Édition>.exe. Copiez tout ce dossier sur un autre poste :
+  il contient le logiciel, Python et le serveur ; rien à installer.
+- Double-clic sur le .exe : au premier lancement il crée sa base (dossier
+  donnees à côté du programme), le plan comptable à 7 chiffres, puis
+  demande l'identifiant et le mot de passe de l'administrateur.
+- Autres usages (invite de commandes, dans le dossier du programme) :
+    ERP-OHADA-Transport.exe reseau          serveur pour tous les postes
+    ERP-OHADA-Transport.exe simulation 3    simulation de 3 mois (fictive)
+    ERP-OHADA-Transport.exe manage <commande>   administration
+
+
 4. EN CAS DE PROBLÈME
 ----------------------
 
@@ -208,6 +224,7 @@ Reprendre un dossier Sage existant (transition, puis bascule) :
 6-SYNCHRONISATION-AUTOMATIQUE.bat    synchronisation horaire du dossier repris
 7-SIMULATION.bat        dossier de simulation (données fictives), port 8001
 8-SUPPRIMER-SIMULATION.bat  efface le dossier de simulation
+9-COMPILER-EXECUTABLE.bat   compile tout le logiciel en programme .exe
 logiciel\               le programme ERP
 python\                 Python 3.12 (Python Software Foundation), utilisé
                         uniquement par l'ERP

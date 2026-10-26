@@ -22,7 +22,7 @@ unzip -q "$TRAVAIL/python.nupkg" "tools/*" -d "$TRAVAIL/nupkg"
 cp -r "$TRAVAIL/nupkg/tools/." "$P/python/"
 
 pip download -q -d "$P/paquets" --only-binary=:all: --python-version 3.12 --platform win_amd64 \
-    -r "$DEPOT/deploy/windows/outils/composants.txt"
+    -r "$DEPOT/deploy/windows/outils/composants.txt" -r "$DEPOT/deploy/windows/outils/compilation.txt"
 
 # Deux paquets distincts : ERP Commerce et ERP Transport (même logiciel, activité fixée à l'installation,
 # ports, titres et tâches planifiées différents pour pouvoir installer les deux sur le même PC)
