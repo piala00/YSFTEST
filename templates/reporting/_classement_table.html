@@ -1,4 +1,4 @@
-{% load erp %}<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+{% load erp %}<div class="card mb-3"><table data-graphique="barres-h" data-colonnes="Résultat" data-titre-graphique="Résultat de chaque élément du classement" class="table table-sm table-hover mb-0 small">
   <thead><tr><th>Élément</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Marge</th></tr></thead>
   <tbody>{% for e in elements %}<tr><td><a href="{% url 'analytique:element' axe e.cle %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}">{{ e.libelle }}</a></td>
     <td class="num">{{ e.produits|montant_ou_vide }}</td><td class="num">{{ e.charges|montant_ou_vide }}</td>

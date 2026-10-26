@@ -8,7 +8,7 @@
   <div><label class="form-label small mb-0" for="p-axe">Regroupement</label><select id="p-axe" name="axe" class="form-select form-select-sm">
     {% for code, lib in axes %}<option value="{{ code }}" {% if code == axe %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select></div>
   <button class="btn btn-sm btn-outline-secondary">Afficher</button></form>
-<div class="card"><table class="table table-sm mb-0">
+<div class="card"><table data-graphique="barres" data-colonnes="Recettes,Dépenses,Marge" data-titre-graphique="Recettes, dépenses et marge" class="table table-sm mb-0">
   <thead><tr><th></th><th class="num">Départs</th><th class="num">Voyageurs</th><th class="num">Remplissage</th><th class="num">Billets</th><th class="num">Colis / fret</th><th class="num">Recettes</th><th class="num">Dépenses</th><th class="num">Marge</th></tr></thead>
   <tbody>{% for l in lignes %}<tr><td>{{ l.libelle }}</td><td class="num">{{ l.departs }}</td><td class="num">{{ l.voyageurs }}</td>
     <td class="num">{% if l.remplissage is not None %}{{ l.remplissage }} %{% endif %}</td><td class="num">{{ l.billets|montant }}</td><td class="num">{{ l.colis|montant }}</td>

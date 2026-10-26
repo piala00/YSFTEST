@@ -1,0 +1,79 @@
+﻿domaine;etat;plan_applicable;base_des_montants;periodes;exports;statut;note
+COMPTABILITE_GENERALE;Balance générale;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Balance des comptes de tiers;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Grand-livre général;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Grand-livre des tiers;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Journal comptable;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Brouillard (isolé);AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Balance âgée clients;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Balance âgée fournisseurs;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Échéancier clients;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Échéancier fournisseurs;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Justificatif de solde;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Compte de résultat;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Bilan SYSCOHADA;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Flux de trésorerie (formules validées);AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Notes annexes (si référentiel validé);AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Récapitulatif TVA (règles validées);AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Situation de caisse et banques;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Rapprochement bancaire;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Contrôles de clôture;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+COMPTABILITE_GENERALE;Variation mensuelle des comptes;AUCUN;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Les états légaux requièrent un référentiel officiellement vérifié.
+ANALYTIQUE;Compte d’exploitation par section;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Balance analytique;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Grand-livre analytique;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Journal analytique;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Produits par section;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Charges par section;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Charges communes / ventilation;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Résultat par section;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Comparatif de sections;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Comparatif de périodes;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Évolution mensuelle par section;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Budget vs réel par section;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Écarts et anomalies d’imputation;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Affecté / non affecté;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Classement de rentabilité;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+ANALYTIQUE;Rapprochement GL/analytique;CHAQUE_PLAN_VISIBLE;GL;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;"Une édition par plan/section ; pas de somme des montants entre plans."
+COMMERCE;Chiffre d’affaires net ventes;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Achats par période;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Marges par famille et article;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Ventes par article;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Ventes par client;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Ventes par commercial;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Recouvrement et retards;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Créances échues;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;État du stock valorisé;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Rotation et ruptures;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Règlements et modes de paiement;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Performance agences et magasins;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+COMMERCE;Avoirs et retours;CONFIGURABLES_COMMERCE;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Rapprocher les produits/charges GL et les données opérationnelles.
+TRANSPORT;CA billetterie Classique/VIP;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Résultat par véhicule;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Résultat par propriétaire (économique);10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Solde dû au propriétaire (tiers);10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Compte d’exploitation par voyage;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Performance par agence/gare;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Rentabilité lignes et itinéraires;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Performance activités et services;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Rentabilité contrats d’exploitation;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Ventes par canal;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Occupation sièges par gamme;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Recettes courrier et colis;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Coûts carburant par véhicule;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Coûts garage / maintenance;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Caisse agence et caisse service;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Règlements et transferts internes;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+TRANSPORT;Décomptes propriétaires;10_PLANS_TRANSPORT;GL+SOURCES_METIER;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Bien distinguer montants comptables, contrats et indicateurs exploitation.
+DIRECTION_ET_SCENARIOS;Tableau de bord direction;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Top/bottom sections analytiques;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Comparatif multisites;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Multi-mois N et N-1;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Trésorerie projetée;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Écart scénario / réel;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Simulation opérationnelle par mois;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Simulation opérationnelle cumulée;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Hypothèses et sensibilités;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Anomalies et exceptions;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Couverture analytique par plan;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.
+DIRECTION_ET_SCENARIOS;Rapport mensuel consolidation;TOUS;GL+ANALYTIQUE+SCENARIOS;LIBRE;PDF|XLSX|CSV;CIBLE_A_IMPLEMENTER_OU_VERIFIER;Distinguer simulation, budget, prévision et réel.

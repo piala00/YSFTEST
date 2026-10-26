@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-title"><h1>Statistiques fournisseurs</h1><span class="fw-semibold">Achats HT : {{ total|montant }}</span></div>
 {% include "comptabilite/_periode.html" with export=1 %}
-<div class="card"><table class="table table-sm table-hover mb-0">
+<div class="card"><table data-graphique="barres-h" data-colonnes="Achats HT,Reste à payer" data-titre-graphique="Achats et reste à payer par fournisseur (code)" class="table table-sm table-hover mb-0">
 <thead><tr><th>Code</th><th>Fournisseur</th><th class="num">Factures</th><th class="num">Achats HT</th><th class="num">TTC</th><th class="num">Reste à payer</th></tr></thead><tbody>
 {% for l in lignes %}<tr><td>{{ l.tiers.code }}</td><td><a href="{% url 'commercial:tiers_detail' l.tiers.pk %}">{{ l.tiers.nom }}</a></td><td class="num">{{ l.nb }}</td>
 <td class="num">{{ l.ca_ht|montant }}</td><td class="num">{{ l.ttc|montant }}</td><td class="num">{{ l.encours|montant_ou_vide }}</td></tr>

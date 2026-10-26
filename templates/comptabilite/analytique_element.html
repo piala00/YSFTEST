@@ -50,7 +50,7 @@
 {% if tronque %}<p class="small text-warning-emphasis">Seules les 1 000 premières lignes sont affichées : l'export les donne toutes, ou réduisez la période.</p>{% endif %}
 
 {% elif etat == "evolution" %}
-<div class="card mb-3" style="max-width:52rem"><table class="table table-sm table-hover mb-0 small">
+<div class="card mb-3" style="max-width:52rem"><table data-graphique="courbes" data-colonnes="1,2,3" data-titre-graphique="Produits, charges et résultat dans le temps" class="table table-sm table-hover mb-0 small">
   <thead><tr><th>{% if par_jour %}Jour{% else %}Mois{% endif %}</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th></tr></thead>
   <tbody>{% for s in series %}<tr><td>{% if par_jour %}{{ s.periode|date:"D d/m/Y" }}{% else %}{{ s.periode|date:"F Y" }}{% endif %}</td>
     <td class="num">{{ s.produits|montant_ou_vide }}</td><td class="num">{{ s.charges|montant_ou_vide }}</td><td class="num {% if s.resultat < 0 %}text-danger{% endif %}">{{ s.resultat|montant }}</td></tr>
@@ -64,7 +64,7 @@
   <div><label class="form-label small mb-0" for="axe2">Ventiler par</label><select id="axe2" name="axe2" class="form-select form-select-sm" onchange="this.form.submit()">
     {% for code, titre in autres_axes %}<option value="{{ code }}" {% if code == axe2 %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
 </form>
-<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+<div class="card mb-3"><table data-graphique="barres" data-colonnes="Produits,Charges,Résultat" class="table table-sm table-hover mb-0 small">
   <thead><tr><th>{{ titre_axe2 }}</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Lignes</th></tr></thead>
   <tbody>{% for g in croise %}<tr><td>{% if g.cle is None %}<span class="text-muted">Non affecté</span>{% else %}<a href="{% url 'analytique:element' axe2 g.cle %}?{{ params_periode }}">{{ g.libelle }}</a>{% endif %}</td>
     <td class="num">{{ g.produits|montant_ou_vide }}</td><td class="num">{{ g.charges|montant_ou_vide }}</td><td class="num {% if g.resultat < 0 %}text-danger{% endif %}">{{ g.resultat|montant }}</td><td class="num text-muted">{{ g.lignes }}</td></tr>
@@ -80,7 +80,7 @@
     <option value="n1" {% if comparer == "n1" %}selected{% endif %}>la même période de l'année précédente (N-1)</option></select></div>
 </form>
 <p class="small text-muted">Comparée à : {{ periode_precedente.0|date:"d/m/Y" }} – {{ periode_precedente.1|date:"d/m/Y" }}. Produits en positif, charges en négatif.</p>
-<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+<div class="card mb-3"><table data-graphique="barres-h" data-colonnes="Période,Période précédente" data-titre-graphique="Période et période précédente, compte par compte" class="table table-sm table-hover mb-0 small">
   <thead><tr><th>Compte</th><th>Intitulé</th><th class="num">Période</th><th class="num">Période précédente</th><th class="num">Écart</th></tr></thead>
   <tbody>{% for c in comparaison %}<tr><td>{{ c.compte }}</td><td>{{ c.intitule }}</td><td class="num">{{ c.actuel|montant }}</td><td class="num">{{ c.precedent|montant }}</td>
     <td class="num {% if c.ecart < 0 %}text-danger{% endif %}">{{ c.ecart|montant }}</td></tr>

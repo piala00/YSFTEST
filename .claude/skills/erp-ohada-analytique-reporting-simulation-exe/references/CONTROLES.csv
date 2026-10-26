@@ -1,0 +1,19 @@
+﻿id;chantier;controle;perimetre;preuve_attendue;si_echec
+C01;GL;Débit = crédit;Par exercice et société;Écritures validées;Bloquer clôture si écart
+C02;ANALYTIQUE;GL produits = affecté + non affecté;Par plan, période, société;Sommes allocations plan;Signaler différence
+C03;ANALYTIQUE;GL charges = affecté + non affecté;Par plan, période, société;Sommes allocations plan;Signaler différence
+C04;ANALYTIQUE;Poids <= 100 %;Par ligne et plan;Somme poids;Refuser allocation excessive
+C05;ANALYTIQUE;Ne pas additionner les plans;Toutes restitutions croisées;Ligne unique par fait financier;Refuser double comptage
+C06;TRANSPORT;Résultat véhicule distinct dette propriétaire;Contrats avec paiements;Écritures tiers et contrat;Ne pas égaliser arbitrairement
+C07;TRANSPORT;VIP et Classique distincts;Véhicule / voyage;Gammes dédiées;Signaler affectation illégale
+C08;TRANSPORT;Transfert entre caisses non recette externe;Consolidation agence;Mouvements internes;Ne pas doubler encaissements
+C09;REPORTING;Totaux reporting = totaux moteur référence;Identiques filtres / période;Services partagés;Bloquer indicateur divergent
+C10;REPORTING;Période choisie non remplacée silencieusement;Jour/mois libre/année;Dates effectives dans métadonnées;Test période multi-exercices
+C11;SIMULATION;Base isolée uniquement;Tout lancement;Marqueur de base et environnement;Refuser production
+C12;SIMULATION;Fin de mois chaque mois;2 mois ou plus;Paie, décompte, soldes;Rejeter mois manquant
+C13;SIMULATION;Pas de doublon à reprise;Relance checkpoint;Clé d’idempotence;Rejeter répétition
+C14;SIMULATION;Simulation ne modifie jamais GL réel;Prospective scénarios;Audit écritures production;Stop si effet indésirable
+C15;SECURITE;Permissions sur API et export;Toutes pages états;Utilisateur/role/société/site;Refuser accès non autorisé
+C16;BUILD;EXE démarrage réel tous modules;Windows sans Python;Test binaire livré;Blocage release si EXE frère manquant
+C17;BUILD;Ressources et données durables;Onefile/onedir;Static, templates, APPDATA;Blocage release si perte
+C18;PLAN7;7 chiffres et aucune collision;Création + migration;Comparaison numéros;Dry-run obligatoire

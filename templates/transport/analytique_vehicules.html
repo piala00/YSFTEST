@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-title"><h1>Comptabilité analytique — Véhicules <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
 {% with avec_agence=True %}{% include "transport/_filtres_analytiques.html" %}{% endwith %}
-<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+<div class="card mb-3"><table data-graphique="barres" data-colonnes="Total produits,Total charges,Résultat pour la société" data-titre-graphique="Produits, charges et résultat pour la société par véhicule" class="table table-sm table-hover mb-0 small">
   <thead><tr><th>Véhicule</th><th>Flotte</th>{% for c, l in produits %}<th class="num">{{ l }}</th>{% endfor %}<th class="num">Total produits</th>
     <th class="num">Total charges</th><th class="num">Résultat d'exploitation</th><th class="num">Part du propriétaire</th><th class="num">Résultat pour la société</th></tr></thead>
   <tbody>{% for g in lignes %}<tr>

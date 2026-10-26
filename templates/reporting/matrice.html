@@ -10,7 +10,7 @@
   <div><label class="form-label small mb-0" for="indicateur">Montant</label><select id="indicateur" name="indicateur" class="form-select form-select-sm" onchange="this.form.submit()">
     {% for code, titre in indicateurs %}<option value="{{ code }}" {% if code == indicateur %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
 </form>
-<div class="card mb-3" style="overflow-x:auto"><table class="table table-sm table-hover mb-0 small">
+<div class="card mb-3" style="overflow-x:auto"><table data-graphique="courbes" data-sens="lignes" data-titre-graphique="Évolution mois par mois des principaux éléments" class="table table-sm table-hover mb-0 small">
   <thead><tr><th>Élément</th>{% for m in mois %}<th class="num text-nowrap">{{ m|date:"M Y" }}</th>{% endfor %}<th class="num">Total</th></tr></thead>
   <tbody>{% for l in lignes %}<tr><td class="text-nowrap">{% if l.cle is None %}<span class="text-muted">Non affecté</span>{% else %}<a href="{% url 'analytique:element' axe l.cle %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}&amp;etat=evolution">{{ l.libelle }}</a>{% endif %}</td>
     {% for v in l.valeurs %}<td class="num {% if v < 0 %}text-danger{% endif %}">{{ v|montant_ou_vide }}</td>{% endfor %}<td class="num fw-semibold">{{ l.total|montant }}</td></tr>

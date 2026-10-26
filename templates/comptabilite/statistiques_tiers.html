@@ -9,7 +9,7 @@
   <div class="col-md-auto"><button class="btn btn-primary btn-sm">Afficher</button> <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i></button>
   <button class="btn btn-outline-success btn-sm" name="export" value="csv"><i class="bi bi-filetype-csv"></i> Export</button></div>
 </div></form>
-<div class="card"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>Tiers</th><th class="num">Report</th>
+<div class="card"><table data-graphique="barres-h" data-colonnes="Solde" data-titre-graphique="Solde par tiers" class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>Tiers</th><th class="num">Report</th>
 <th class="num">{% if type_tiers == 'CLIENT' %}Facturé{% else %}Acheté{% endif %}</th><th class="num">Réglé</th><th class="num">Solde</th><th class="num">Recouvr.</th>
 <th class="num">Factures</th><th class="num">Règlements</th><th>Dernière facture</th><th>Dernier règlement</th></tr></thead><tbody>
 {% for l in lignes %}<tr><td><a href="{% url 'commercial:tiers_detail' l.tiers.pk %}">{{ l.tiers.nom }}</a></td><td class="num">{{ l.report|montant_ou_vide }}</td>

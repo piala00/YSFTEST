@@ -12,7 +12,7 @@
   <button class="btn btn-sm btn-outline-secondary">Comparer</button>
   <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
 </form>
-<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small">
+<div class="card"><div class="table-responsive"><table data-graphique="barres" data-colonnes="3,8" data-titre-graphique="Résultat : période A et période B" class="table table-sm table-hover mb-0 small">
   <thead><tr><th rowspan="2"></th><th colspan="5" class="text-center">A : {{ a_du|date:"d/m/Y" }} – {{ a_au|date:"d/m/Y" }}</th><th colspan="5" class="text-center">B : {{ b_du|date:"d/m/Y" }} – {{ b_au|date:"d/m/Y" }}</th><th colspan="3" class="text-center">Écart A − B</th></tr>
     <tr><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Voyageurs</th><th class="num">Rempl.</th>
       <th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Voyageurs</th><th class="num">Rempl.</th>

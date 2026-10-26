@@ -16,7 +16,7 @@
   <button class="btn btn-sm btn-primary">Comparer</button>
 </form>
 <p class="small">A : du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }} · B : du {{ periode_b.0|date:"d/m/Y" }} au {{ periode_b.1|date:"d/m/Y" }}</p>
-<div class="card mb-3" style="overflow-x:auto"><table class="table table-sm table-hover mb-0 small">
+<div class="card mb-3" style="overflow-x:auto"><table data-graphique="barres" data-colonnes="Résultat A,Résultat B" data-titre-graphique="Résultat de chaque élément : période A et période B" class="table table-sm table-hover mb-0 small">
   <thead><tr><th>Élément</th><th class="num">Produits A</th><th class="num">Charges A</th><th class="num">Résultat A</th>
     <th class="num">Produits B</th><th class="num">Charges B</th><th class="num">Résultat B</th><th class="num">Écart A − B</th><th class="num">Variation</th><th class="num">Produits (var.)</th></tr></thead>
   <tbody>{% for g in lignes %}<tr><td><a href="{% url 'analytique:element' axe g.cle %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}&amp;etat=comparaison">{{ g.libelle }}</a></td>
