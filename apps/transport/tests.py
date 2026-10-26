@@ -1124,3 +1124,61 @@ class ImprevusTests(TestCase):
         self.assertContains(r, "Transbordement vers un autre car")
         self.assertContains(r, "Remorquage")
         self.assertEqual(solde("624"), 15000)
+
+
+class ComparaisonsTransportTests(TestCase):
+    """Reporting comparatif : deux périodes, mêmes écritures que la comptabilité, sans double compte."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        yde = Gare.objects.create(code="YDE", nom="Gare de Yaoundé", ville="Yaoundé")
+        cls.ligne = Ligne.objects.create(code="DLA-YDE", gare_depart=dla, gare_arrivee=yde, prix_billet=6000)
+        cls.ligne_vip = Ligne.objects.create(code="DLA-YDE-VIP", gare_depart=dla, gare_arrivee=yde, prix_billet=10000, gamme="VIP")
+        cls.car = Vehicule.objects.create(immatriculation="LT 601 CP", nombre_places=10)
+        cls.vip = Vehicule.objects.create(immatriculation="LT 602 CP", nombre_places=10, gamme="VIP")
+        cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur")
+
+    def test_comparaison_de_deux_periodes(self):
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+
+        from . import reporting
+
+        jour = datetime.date.today()
+        for car, ligne, n in ((self.car, self.ligne, 2), (self.vip, self.ligne_vip, 1)):
+            d = Depart.objects.create(ligne=ligne, date=jour, heure=datetime.time(7), vehicule=car, chauffeur=self.chauffeur)
+            for k in range(n):
+                Billet(depart=d, voyageur=f"V{k}").vendre()
+            d.partir()
+        avant = jour - datetime.timedelta(days=40)
+        p = ParametresTransport.get()
+        creer_ecriture(Journal.objects.get(code="OD"), avant, "Recette période B",
+                       [{"compte": p.compte_billets_a_voyager, "debit": 5000},
+                        {"compte": p.compte_billets, "credit": 5000, "vehicule": self.car}])
+        loyer = Compte.objects.get_or_create(numero="6222", defaults={"intitule": "Loyers"})[0]
+        creer_ecriture(Journal.objects.get(code="CA"), jour, "Loyer", [{"compte": loyer, "debit": 4000},
+                                                                        {"compte": Compte.objects.get(numero="5711"), "credit": 4000}])
+        a, b = (jour - datetime.timedelta(days=5), jour), (avant - datetime.timedelta(days=5), avant)
+        r = reporting.comparer("vehicule", a, b)
+        lignes = {l["libelle"]: l for l in r["lignes"]}
+        self.assertEqual((lignes["LT 601 CP"]["a"]["produits"], lignes["LT 601 CP"]["b"]["produits"],
+                          lignes["LT 601 CP"]["ecart"], lignes["LT 601 CP"]["variation_produits"]), (12000, 5000, 7000, 140))
+        self.assertEqual(lignes["LT 601 CP"]["a"]["voyageurs"], 2)
+        gammes = {l["libelle"]: l["a"]["produits"] for l in reporting.comparer("gamme", a, b)["lignes"]}
+        self.assertEqual(gammes, {"Classique": 12000, "VIP": 10000})
+        agence = reporting.comparer("agence", a, b)["total"]["a"]
+        self.assertEqual((agence["produits"], agence["charges"], agence["resultat"]), (22000, 4000, 18000))   # loyer compris
+        ligne = {l["libelle"]: l["a"]["produits"] for l in reporting.comparer("ligne", a, b)["lignes"]}
+        self.assertEqual(ligne, {"DLA-YDE": 12000, "DLA-YDE-VIP": 10000, "Hors voyage": 0})   # B : écriture sans départ
+
+    def test_ecrans(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        for axe in ("agence", "gamme", "ligne", "vehicule", "proprietaire"):
+            r = self.client.get(reverse("reporting:comparaisons_transport") + f"?axe={axe}")
+            self.assertEqual(r.status_code, 200, axe)
+            self.assertContains(r, "Écart A − B")

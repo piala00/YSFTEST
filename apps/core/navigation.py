@@ -723,6 +723,14 @@ REPORTING = Module(
                 E("ventes.clients", "Par client", "reporting:ventes", vue="clients"),
                 E("ventes.articles", "Par article", "reporting:ventes", vue="articles"),
             ]),
+            E("transport.comparaisons", "Transport : comparaisons", icone="bi-bar-chart-steps", enfants=[
+                E("transport.comparaisons.agence", "Par agence", "reporting:comparaisons_transport", axe="agence"),
+                E("transport.comparaisons.gamme", "Classique / VIP", "reporting:comparaisons_transport", axe="gamme"),
+                E("transport.comparaisons.ligne", "Par ligne", "reporting:comparaisons_transport", axe="ligne"),
+                E("transport.comparaisons.vehicule", "Par véhicule", "reporting:comparaisons_transport", axe="vehicule"),
+                E("transport.comparaisons.proprietaire", "Par propriétaire", "reporting:comparaisons_transport",
+                  axe="proprietaire"),
+            ]),
             E("tiers.echeances", "Échéanciers", icone="bi-hourglass-split", enfants=[
                 E("tiers.balance_agee_clients", "Clients", "reporting:balance_agee", type="CLIENT"),
                 E("tiers.balance_agee_fournisseurs", "Fournisseurs", "reporting:balance_agee", type="FOURNISSEUR"),

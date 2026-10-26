@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Comparaisons du transport{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Transport : comparaisons {% for c, l in axes %}{% if c == axe %}{{ l|lower }}{% endif %}{% endfor %}</h1></div>
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3 d-print-none">
+  <div><label class="form-label small mb-0" for="c-axe">Regroupement</label><select id="c-axe" name="axe" class="form-select form-select-sm">{% for c, l in axes %}<option value="{{ c }}" {% if c == axe %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="c-g">Flotte</label><select id="c-g" name="gamme" class="form-select form-select-sm"><option value="">Classique et VIP</option>{% for c, l in gammes %}<option value="{{ c }}" {% if c == gamme %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="c-ad">Période A du</label><input id="c-ad" type="date" name="a_du" value="{{ a_du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="c-aa">au</label><input id="c-aa" type="date" name="a_au" value="{{ a_au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="c-bd">Période B du</label><input id="c-bd" type="date" name="b_du" value="{{ b_du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="c-ba">au</label><input id="c-ba" type="date" name="b_au" value="{{ b_au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <button class="btn btn-sm btn-outline-secondary">Comparer</button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+</form>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th rowspan="2"></th><th colspan="5" class="text-center">A : {{ a_du|date:"d/m/Y" }} – {{ a_au|date:"d/m/Y" }}</th><th colspan="5" class="text-center">B : {{ b_du|date:"d/m/Y" }} – {{ b_au|date:"d/m/Y" }}</th><th colspan="3" class="text-center">Écart A − B</th></tr>
+    <tr><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Voyageurs</th><th class="num">Rempl.</th>
+      <th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Voyageurs</th><th class="num">Rempl.</th>
+      <th class="num">Résultat</th><th class="num">Produits %</th><th class="num">Résultat %</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td>{{ l.libelle }}</td>
+    <td class="num">{{ l.a.produits|montant }}</td><td class="num">{{ l.a.charges|montant }}</td><td class="num fw-semibold">{{ l.a.resultat|montant }}</td><td class="num">{{ l.a.voyageurs }}</td><td class="num">{% if l.a.remplissage is not None %}{{ l.a.remplissage }} %{% endif %}</td>
+    <td class="num">{{ l.b.produits|montant }}</td><td class="num">{{ l.b.charges|montant }}</td><td class="num fw-semibold">{{ l.b.resultat|montant }}</td><td class="num">{{ l.b.voyageurs }}</td><td class="num">{% if l.b.remplissage is not None %}{{ l.b.remplissage }} %{% endif %}</td>
+    <td class="num {% if l.ecart < 0 %}text-danger{% endif %}">{{ l.ecart|montant }}</td><td class="num">{% if l.variation_produits is not None %}{{ l.variation_produits }} %{% endif %}</td><td class="num">{% if l.variation_resultat is not None %}{{ l.variation_resultat }} %{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="14" class="text-muted text-center p-4">Aucune donnée sur ces périodes.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td>
+    <td class="num">{{ total.a.produits|montant }}</td><td class="num">{{ total.a.charges|montant }}</td><td class="num">{{ total.a.resultat|montant }}</td><td class="num">{{ total.a.voyageurs }}</td><td class="num">{% if total.a.remplissage is not None %}{{ total.a.remplissage }} %{% endif %}</td>
+    <td class="num">{{ total.b.produits|montant }}</td><td class="num">{{ total.b.charges|montant }}</td><td class="num">{{ total.b.resultat|montant }}</td><td class="num">{{ total.b.voyageurs }}</td><td class="num">{% if total.b.remplissage is not None %}{{ total.b.remplissage }} %{% endif %}</td>
+    <td class="num">{{ total.ecart|montant }}</td><td class="num">{% if total.variation_produits is not None %}{{ total.variation_produits }} %{% endif %}</td><td class="num">{% if total.variation_resultat is not None %}{{ total.variation_resultat }} %{% endif %}</td></tr></tfoot>
+</table></div></div>
+<p class="small text-muted mt-2">Montants : écritures générales validées (date comptable) ; par agence, toute la comptabilité de chaque agence (au siège, données reçues par les échanges) ;
+  pour les autres regroupements, seuls les montants portés sur un véhicule. Voyageurs et remplissage : départs effectués (données d'exploitation).
+  Propriétaire : selon le contrat en vigueur à la date de chaque écriture. Les chiffres d'une agence sont provisoires tant que ses fichiers ne sont pas reçus.</p>
+{% endblock %}

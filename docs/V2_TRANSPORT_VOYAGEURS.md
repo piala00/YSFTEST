@@ -251,3 +251,19 @@ départs du jour, pas dans la caisse du jour. La caisse est lue sur les comptes 
 une fois ; les versements à la banque ou au siège ne sont ni recettes ni dépenses. En-tête : n° `RJ-agence-date`,
 état (provisoire / clôturé), synchronisation ; pied de page : n° et « Page x / y ». Au siège, choix de l'agence
 (données reçues par les échanges).
+
+## Compléments du 26/10
+
+- **Bagages payants** (Billetterie › Vendre un billet) : on demande au voyageur s'il a des bagages ; s'il en a, on
+  les décrit (désignation, nombre, poids) et on fixe leur prix. Payés avec le billet, partagés entre les cars comme le
+  billet, recette du car au départ (70614, à valider) ; rendus en entier si le billet est annulé.
+- **Système comptable** (fiche Société) : système normal ou système minimal de trésorerie (SMT). La saisie est la même ;
+  en SMT, bilan et compte de résultat sont présentés en recettes et dépenses (modèle DSF SMT de la DGI), avec
+  contrôle du résultat. Le « système allégé » de l'ancien SYSCOHADA ne figure plus dans l'Acte uniforme révisé
+  (normal et SMT seulement, art. 26 et 28) : à confirmer avec l'expert-comptable.
+- **Dépenses de fonctionnement** (Direction › Traitement) : demandées par l'agence, autorisées par le siège par les
+  fichiers d'échange (plafond d'autorisation d'office réglable), payées par n'importe quelle agence. Si la dépense
+  appartient à une autre agence : liaison 185 chez le payeur, charge passée automatiquement chez l'agence concernée.
+- **Imprévus de voyage** (fiche du départ) : voir `docs/IMPREVUS_VOYAGE.md`.
+- **Reporting › Transport : comparaisons** : deux périodes par agence, Classique / VIP, ligne, véhicule ou
+  propriétaire ; montants tirés des écritures validées, voyageurs et remplissage des départs.

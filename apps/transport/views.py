@@ -746,3 +746,22 @@ def depenses_fonctionnement(request):
         "vehicules": Vehicule.objects.filter(actif=True),
         "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__isnull=False),
         "plafond": ParametresTransport.get().plafond_depense_sans_autorisation})
+
+
+@login_required
+def comparaisons(request):
+    """Reporting : comparaison de deux périodes par agence, flotte, ligne, véhicule ou propriétaire."""
+    from . import reporting
+    from .models import GAMMES
+
+    aujourd_hui = timezone.localdate()
+    a_fin = _jour(request, "a_au") if request.GET.get("a_au") else aujourd_hui
+    a_debut = _jour(request, "a_du") if request.GET.get("a_du") else a_fin.replace(day=1)
+    duree = a_fin - a_debut
+    b_fin = _jour(request, "b_au") if request.GET.get("b_au") else a_debut - datetime.timedelta(days=1)
+    b_debut = _jour(request, "b_du") if request.GET.get("b_du") else b_fin - duree
+    axe = request.GET.get("axe") if request.GET.get("axe") in dict(reporting.AXES) else "agence"
+    gamme = request.GET.get("gamme", "") if request.GET.get("gamme", "") in dict(GAMMES) else ""
+    return render(request, "transport/comparaisons.html", {
+        "axes": reporting.AXES, "axe": axe, "gammes": GAMMES, "gamme": gamme, "a_du": a_debut, "a_au": a_fin,
+        "b_du": b_debut, "b_au": b_fin, **reporting.comparer(axe, (a_debut, a_fin), (b_debut, b_fin), gamme)})

@@ -56,10 +56,10 @@ Légende : ✅ conforme · 🟡 partiel · ❌ absent · ⚠️ contraire à la 
 
 | Point | Proposition |
 |---|---|
-| Bagages payants | Saisie rattachée au billet et au voyage, produit propre (compte à valider), rubrique déjà prévue. |
+| Bagages payants | ✅ Fait (vente du billet, 70614 à valider). |
 | Charges communes réparties | Clés de répartition validées, ventilation d'une ligne générale sur plusieurs véhicules (somme identique), journalisée. Aujourd'hui elles restent « non affectées ». |
 | Affecter un véhicule à une ligne générale validée | Écran contrôlé et tracé (modifie la dimension, jamais le montant). |
-| Reporting comparatif | Module Reporting : comparaisons agences, périodes, Classique/VIP, lignes, sur les mêmes écritures. |
+| Reporting comparatif | ✅ Fait (Reporting › Transport : comparaisons). |
 | Statut provisoire au siège | Afficher sur les états analytiques la date du dernier fichier reçu de chaque agence. |
-| Correspondance VIP | Placement d'un voyageur VIP en correspondance : imposer la même flotte ou un complément de prix (règle à fixer). |
+| Correspondance VIP | ✅ Traité dans les imprévus : véhicule de remplacement d'une autre flotte (motif tracé), dédommagement des voyageurs déclassés (709). |
 | Comptes | 622 (part du propriétaire), 401, 41911 / 41912 / 41913 : **à valider par l'expert-comptable**. |
