@@ -8,8 +8,8 @@ def remplir_uid(app, modele):
     """Un identifiant différent pour chaque ligne existante (un défaut unique serait partagé par toutes)."""
     def remplir(apps, schema_editor):
         M = apps.get_model(app, modele)
-        for pk in M.objects.filter(uid__isnull=True).values_list("pk", flat=True):
-            M.objects.filter(pk=pk).update(uid=uuid.uuid4())
+        for pk in M.objects.using(schema_editor.connection.alias).filter(uid__isnull=True).values_list("pk", flat=True):
+            M.objects.using(schema_editor.connection.alias).filter(pk=pk).update(uid=uuid.uuid4())
     return remplir
 
 

@@ -160,6 +160,28 @@ else:
         }
     }
 
+# Copie miroir : la société travaille sur SQLite (rapide, hors ligne) et une copie complète est reportée
+# automatiquement dans une seconde base, en général SQL Server (commande « miroir », programme .exe toutes les heures).
+#   MIROIR_DB_ENGINE=mssql  MIROIR_DB_HOST=…  MIROIR_DB_NAME=ERP_MIROIR  MIROIR_DB_USER=… (vide : compte Windows)
+#   MIROIR_DB_PASSWORD=…  MIROIR_DB_PYTHON_DRIVER=mssql_python  (ou postgresql, ou sqlite + MIROIR_SQLITE_FICHIER)
+MIROIR_INTERVALLE_MINUTES = int(env("MIROIR_INTERVALLE_MINUTES", "60"))
+_miroir = env("MIROIR_DB_ENGINE", "").lower()
+if _miroir == "mssql":
+    DATABASES["miroir"] = {
+        "ENGINE": "mssql", "NAME": env("MIROIR_DB_NAME", "ERP_MIROIR"), "USER": env("MIROIR_DB_USER", ""),
+        "PASSWORD": env("MIROIR_DB_PASSWORD", ""), "HOST": env("MIROIR_DB_HOST", "localhost"), "PORT": env("MIROIR_DB_PORT", ""),
+        "OPTIONS": {k: v for k, v in {"python_driver": env("MIROIR_DB_PYTHON_DRIVER", ""), "driver": env("MIROIR_DB_DRIVER", ""),
+                                      "extra_params": env("MIROIR_DB_EXTRA_PARAMS", "TrustServerCertificate=yes")}.items() if v},
+    }
+elif _miroir == "postgresql":
+    DATABASES["miroir"] = {
+        "ENGINE": "django.db.backends.postgresql", "NAME": env("MIROIR_DB_NAME", "erp_miroir"),
+        "USER": env("MIROIR_DB_USER", "erp"), "PASSWORD": env("MIROIR_DB_PASSWORD", ""),
+        "HOST": env("MIROIR_DB_HOST", "localhost"), "PORT": env("MIROIR_DB_PORT", "5432"),
+    }
+elif _miroir == "sqlite":
+    DATABASES["miroir"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / env("MIROIR_SQLITE_FICHIER", "miroir.sqlite3")}
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
 ]

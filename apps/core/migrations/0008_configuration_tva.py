@@ -5,11 +5,11 @@ from django.db import migrations, models
 
 def renommer_assujettie(apps, schema_editor):
     """L'ancien choix « Assujettie à la TVA » devient « Configuration automatique »."""
-    apps.get_model("core", "Societe").objects.filter(regime_tva="ASSUJETTIE").update(regime_tva="AUTOMATIQUE")
+    apps.get_model("core", "Societe").objects.using(schema_editor.connection.alias).filter(regime_tva="ASSUJETTIE").update(regime_tva="AUTOMATIQUE")
 
 
 def revenir(apps, schema_editor):
-    apps.get_model("core", "Societe").objects.filter(regime_tva="AUTOMATIQUE").update(regime_tva="ASSUJETTIE")
+    apps.get_model("core", "Societe").objects.using(schema_editor.connection.alias).filter(regime_tva="AUTOMATIQUE").update(regime_tva="ASSUJETTIE")
 
 
 class Migration(migrations.Migration):

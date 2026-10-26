@@ -224,11 +224,11 @@ class Migration(migrations.Migration):
 def reprendre_remboursements(apps, schema_editor):
     """Billets déjà annulés : le remboursement a été payé à l'annulation, dans la session d'annulation."""
     Billet = apps.get_model("transport", "Billet")
-    for b in Billet.objects.filter(statut="ANNULE"):
+    for b in Billet.objects.using(schema_editor.connection.alias).filter(statut="ANNULE"):
         if b.prix and b.prix - b.retenue:
             b.remboursement, b.session_remboursement_id = "PAYE", b.session_annulation_id
             b.rembourse_par_id, b.rembourse_le = b.annule_par_id, b.annule_le
-            b.save(update_fields=["remboursement", "session_remboursement", "rembourse_par", "rembourse_le"])
+            b.save(using=schema_editor.connection.alias, update_fields=["remboursement", "session_remboursement", "rembourse_par", "rembourse_le"])
 
 
 Migration.operations.append(migrations.RunPython(reprendre_remboursements, migrations.RunPython.noop))

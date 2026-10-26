@@ -77,8 +77,8 @@ def flotte_initiale(apps, schema_editor):
 
     Vehicule = apps.get_model("transport", "Vehicule")
     ChangementGamme = apps.get_model("transport", "ChangementGamme")
-    for v in Vehicule.objects.all():
-        ChangementGamme.objects.create(vehicule=v, gamme=v.gamme, debut=datetime.date(2000, 1, 1))
+    for v in Vehicule.objects.using(schema_editor.connection.alias).all():
+        ChangementGamme.objects.using(schema_editor.connection.alias).create(vehicule=v, gamme=v.gamme, debut=datetime.date(2000, 1, 1))
 
 
 Migration.operations.append(migrations.RunPython(flotte_initiale, migrations.RunPython.noop))

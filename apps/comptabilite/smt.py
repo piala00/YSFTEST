@@ -12,6 +12,10 @@ les liaisons entre agences, les emprunts, apports et immobilisations ne sont ni 
 import datetime
 from collections import OrderedDict
 from decimal import Decimal
+from functools import reduce
+from operator import or_
+
+from django.db.models import Q
 
 from .services import lignes_validees, soldes_par_compte
 
@@ -46,7 +50,7 @@ def _rubrique(numero):
 
 def compte_de_resultat(date_debut, date_fin):
     lignes = lignes_validees(date_debut, date_fin).select_related("compte")
-    ecritures = set(lignes.filter(compte__numero__regex=r"^(52|53|55|56|57)").values_list("ecriture_id", flat=True))
+    ecritures = set(lignes.filter(reduce(or_, (Q(compte__numero__startswith=c) for c in ("52", "53", "55", "56", "57")))).values_list("ecriture_id", flat=True))
     montants = OrderedDict((cle, ZERO) for cle, _ in RECETTES + DEPENSES)
     for l in lignes.filter(ecriture_id__in=ecritures):
         n = l.compte.numero

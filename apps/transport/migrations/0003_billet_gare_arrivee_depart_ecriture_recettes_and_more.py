@@ -9,14 +9,14 @@ from django.db import migrations, models
 def troncons_des_billets_existants(apps, schema_editor):
     """Billets vendus avant les tronçons : un tronçon direct, déjà comptabilisé en produit à la vente."""
     Billet, Troncon = apps.get_model("transport", "Billet"), apps.get_model("transport", "Troncon")
-    for b in Billet.objects.select_related("depart__ligne"):
+    for b in Billet.objects.using(schema_editor.connection.alias).select_related("depart__ligne"):
         statut = {"ANNULE": "ANNULE", "EMBARQUE": "EFFECTUE"}.get(b.statut, "A_VOYAGER")
-        Troncon.objects.create(billet=b, ordre=1, gare_depart_id=b.depart.ligne.gare_depart_id, site_origine=b.site_origine,
+        Troncon.objects.using(schema_editor.connection.alias).create(billet=b, ordre=1, gare_depart_id=b.depart.ligne.gare_depart_id, site_origine=b.site_origine,
                                gare_arrivee_id=b.depart.ligne.gare_arrivee_id, depart=b.depart, siege=b.siege,
                                part=b.prix or 0, statut=statut,
                                vehicule_id=b.depart.vehicule_id if statut == "EFFECTUE" else None)
         b.gare_arrivee_id = b.depart.ligne.gare_arrivee_id
-        b.save(update_fields=["gare_arrivee"])
+        b.save(using=schema_editor.connection.alias, update_fields=["gare_arrivee"])
 
 
 class Migration(migrations.Migration):

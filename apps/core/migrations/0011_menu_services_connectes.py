@@ -14,7 +14,7 @@ def renommer(apps, schema_editor, sens=1):
     for ancien, nouveau in RENOMMAGES.items():
         if sens < 0:
             ancien, nouveau = nouveau, ancien
-        DroitAcces.objects.filter(module="commercial", code=ancien).update(code=nouveau)
+        DroitAcces.objects.using(schema_editor.connection.alias).filter(module="commercial", code=ancien).update(code=nouveau)
 
 
 class Migration(migrations.Migration):

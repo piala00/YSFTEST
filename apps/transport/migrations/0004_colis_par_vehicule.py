@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 def colis_existants(apps, schema_editor):
     """Envois antérieurs : leur port payé a été passé en recette à l'enregistrement."""
-    apps.get_model("transport", "Colis").objects.update(recette_constatee=True)
+    apps.get_model("transport", "Colis").objects.using(schema_editor.connection.alias).update(recette_constatee=True)
 
 
 class Migration(migrations.Migration):

@@ -9,17 +9,17 @@ def reprendre(apps, schema_editor):
     StockDepot = apps.get_model("commercial", "StockDepot")
     Document = apps.get_model("commercial", "Document")
     MouvementStock = apps.get_model("commercial", "MouvementStock")
-    if not Article.objects.exists() and not Document.objects.exists():
+    if not Article.objects.using(schema_editor.connection.alias).exists() and not Document.objects.using(schema_editor.connection.alias).exists():
         return
-    depot = Depot.objects.filter(principal=True).first() or Depot.objects.create(
+    depot = Depot.objects.using(schema_editor.connection.alias).filter(principal=True).first() or Depot.objects.using(schema_editor.connection.alias).create(
         code="DP", intitule="Dépôt principal", principal=True)
-    for article in Article.objects.filter(suivi_stock=True):
+    for article in Article.objects.using(schema_editor.connection.alias).filter(suivi_stock=True):
         if article.stock:
-            StockDepot.objects.get_or_create(article=article, depot=depot, defaults={"quantite": article.stock})
-    Article.objects.filter(cmup=0).update(cmup=F("prix_achat"))
-    Document.objects.filter(depot__isnull=True).exclude(
+            StockDepot.objects.using(schema_editor.connection.alias).get_or_create(article=article, depot=depot, defaults={"quantite": article.stock})
+    Article.objects.using(schema_editor.connection.alias).filter(cmup=0).update(cmup=F("prix_achat"))
+    Document.objects.using(schema_editor.connection.alias).filter(depot__isnull=True).exclude(
         type_document__in=["DEVIS", "COMMANDE", "ACHAT_COMMANDE"]).update(depot=depot)
-    MouvementStock.objects.filter(depot__isnull=True).update(depot=depot)
+    MouvementStock.objects.using(schema_editor.connection.alias).filter(depot__isnull=True).update(depot=depot)
 
 
 class Migration(migrations.Migration):

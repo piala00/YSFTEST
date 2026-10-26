@@ -33,8 +33,10 @@ class Command(BaseCommand):
         with connections["default"].cursor() as cur:
             cur.execute("SELECT name FROM sys.tables")
             tables = [t[0] for t in cur.fetchall()]
-        etrangeres = [t for t in tables if not t.startswith(("django_", "auth_", "core_", "commercial_", "comptabilite_",
-                                                              "reporting_", "authtoken_"))]
+        from django.apps import apps
+
+        prefixes = tuple(f"{a.label}_" for a in apps.get_app_configs()) + ("django_",)    # toutes les applications de l'ERP
+        etrangeres = [t for t in tables if not t.startswith(prefixes)]
         if etrangeres:
             raise CommandError(f"La base {nom} existe déjà et contient d'autres tables ({', '.join(sorted(etrangeres)[:5])}…). "
                                "Ce n'est pas une base de l'ERP : choisissez un autre nom (jamais une base Sage).")

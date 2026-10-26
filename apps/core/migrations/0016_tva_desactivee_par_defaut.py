@@ -9,7 +9,7 @@ from django.db import migrations, models
 def desactiver_si_non_precisee(apps, schema_editor):
     # Société qui n'a jamais choisi sa configuration de TVA : plus de 19,25 % proposés par défaut.
     # Les sociétés qui ont activé la TVA (automatique) et les articles existants ne sont pas modifiés.
-    apps.get_model("core", "Societe").objects.filter(regime_tva="").update(taux_tva_defaut=Decimal("0"))
+    apps.get_model("core", "Societe").objects.using(schema_editor.connection.alias).filter(regime_tva="").update(taux_tva_defaut=Decimal("0"))
 
 
 class Migration(migrations.Migration):

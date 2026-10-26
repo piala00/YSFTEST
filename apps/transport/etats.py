@@ -2,6 +2,8 @@
 from collections import OrderedDict
 from decimal import Decimal
 
+from django.db.models import Q
+
 from .models import Billet, Colis, Depart, DepenseVehicule, Gare
 
 ZERO = Decimal("0")
@@ -87,7 +89,7 @@ def rentabilite(debut, fin, axe="ligne"):
     p = ParametresTransport.get()
     for l in (LigneEcriture.objects.filter(vehicule__isnull=False, ecriture__statut=Ecriture.STATUT_VALIDEE,
                                            ecriture__date__range=(debut, fin))
-              .filter(compte__numero__regex=r"^[67]").select_related("compte", "ecriture", "vehicule")):
+              .filter(Q(compte__numero__startswith="6") | Q(compte__numero__startswith="7")).select_related("compte", "ecriture", "vehicule")):
         d = par_pk.get(pieces.get(l.ecriture.reference) or pieces.get(l.ecriture.origine))
         if d is not None:
             g = groupe(*cle_depart(d))
