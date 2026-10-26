@@ -1,0 +1,32 @@
+# Journaux, comptes et analytique (tous les comptes sont des PROPOSITIONS à valider)
+
+## Journaux
+| Code | Usage |
+|---|---|
+| CA (et CA-xxx au siège) | Caisse espèces de l'agence (5711) |
+| MM | Mobile Money (552 pour les nouveaux dossiers ; 551 = carte carburant) |
+| BQ | Banque (5211) |
+| VT / AC | Ventes et achats en compte |
+| OD | Recettes constatées au départ, décomptes propriétaires, régularisations, transbordements |
+
+## Schémas principaux
+| Fait | Écriture | Véhicule sur la ligne |
+|---|---|---|
+| Vente d'un billet (et bagages) | D caisse / C 41911 | non (avance du voyageur) |
+| Départ du car | D 41911 (ou liaison 185) / C 70611 billets, 70614 bagages | oui (part de chaque tronçon) |
+| Colis port payé | D caisse / C 41912 puis au départ D 41912 / C 70612 ou 70613 | oui au départ |
+| Annulation (retenue) | D 41911 / C caisse ou 41913 / C 70611 retenue | non |
+| Dépense véhicule, carburant, réparation | D 6053, 624… / C caisse ou 401 | oui |
+| Avance de mission | D 47121 / C caisse ; justification D 638, 6181, 6053, 624 / C 47121 | oui |
+| Paie | D 661, 664… / C 422, 431… (taux fixés par l'expert-comptable) | selon la ventilation de l'employé |
+| Droit du propriétaire | D 622 (fixe, variable) / C 467 propriétaire | oui (622) |
+| Avance, retrait, règlement au propriétaire | D 467 / C caisse | non |
+| Dépense de fonctionnement d'une autre agence | payeur D 185 agence / C caisse ; agence concernée D charge / C 185 payeur | si indiqué |
+| Transfert de fonds | D 585 / C caisse puis D banque / C 585 | non |
+| Imprévus | 709 dédommagement, 6228 location de secours, 624 dépannage, 638 voyageurs bloqués, 658 indemnités et amendes, 421 amende imputable au chauffeur | oui |
+| Écart de caisse | D 658 ou 421 / C caisse ; D caisse / C 758 | non |
+
+## Analytique
+- Une seule écriture générale par fait ; le véhicule est une colonne de la ligne (`LigneEcriture.vehicule`), la gare ou l'agence une section analytique.
+- Comptabilité analytique : deux rubriques, **Véhicules** (compte d'exploitation, rapprochement affecté / non affecté) et **Propriétaires** (portefeuille selon le contrat en vigueur à la date de chaque écriture ; situation financière séparée).
+- Reporting : comparaisons par agence, Classique / VIP, ligne, véhicule, propriétaire sur les mêmes écritures.
