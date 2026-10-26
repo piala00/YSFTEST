@@ -129,3 +129,122 @@ class PartenairesTests(TestCase):
                     reverse("partenaires:releve", args=[self.proprio.pk])):
             self.assertEqual(self.client.get(url).status_code, 200, url)
         self.assertContains(self.client.get(reverse("partenaires:releve", args=[self.proprio.pk])), "14")
+
+
+class RemunerationsProprietairesTests(TestCase):
+    """Skill propriétaires : exemples A (fixe garanti + variable) et B (avance sur variable), retraits, compte séparé."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        cls.car = Vehicule.objects.create(immatriculation="BUS EX 01", nombre_places=30)
+        cls.proprio = Tiers.objects.create(code="OWNER1", nom="Propriétaire Exemple", type_tiers=Tiers.FOURNISSEUR)
+        cls.debut, cls.fin = datetime.date(2026, 9, 1), datetime.date(2026, 9, 30)
+
+    def activite(self):
+        """Produits 1 000 000, frais d'exploitation 400 000 (carburant), sur le véhicule, en septembre."""
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+        from apps.transport.models import ParametresTransport
+
+        p = ParametresTransport.get()
+        creer_ecriture(Journal.objects.get(code="OD"), self.fin, "Recettes du mois",
+                       [{"compte": p.compte_billets_a_voyager, "debit": 1000000},
+                        {"compte": p.compte_billets, "credit": 1000000, "vehicule": self.car}])
+        creer_ecriture(Journal.objects.get(code="CA"), self.fin, "Carburant du mois",
+                       [{"compte": p.compte_carburant, "debit": 400000, "vehicule": self.car},
+                        {"compte": Compte.objects.get(numero="5711"), "credit": 400000}])
+
+    def contrat(self, modele, **champs):
+        return ContratPartenaire.objects.create(vehicule=self.car, partenaire=self.proprio, modele=modele, debut=self.debut,
+                                                montant_location=Decimal("150000"), taux_proprietaire=Decimal("40"),
+                                                **champs).activer()
+
+    def test_exemple_a_fixe_garanti_plus_variable_et_retraits(self):
+        from django.contrib.auth import get_user_model
+
+        from apps.transport import analytique
+
+        from .models import DemandeRetrait
+
+        self.activite()
+        d = Decompte.calculer(self.contrat(ContratPartenaire.FIXE_PLUS_VARIABLE), self.debut, self.fin)
+        self.assertEqual((d.fixe, d.variable, d.montant_du), (150000, 180000, 330000))      # 40 % de (600 000 − 150 000)
+        d.approuver()
+        self.assertNotEqual(d.ecriture_fixe_id, d.ecriture_id)                               # fixe et variable : deux écritures
+        self.assertEqual(d.ecriture.lignes.get(credit=180000).compte.numero, "467")         # compte propriétaire, pas 401
+        self.assertEqual(solde_partenaire(self.proprio), 330000)
+        g = next(l for l in analytique.vehicules(self.debut, self.fin)["lignes"] if l["vehicule"] == self.car)
+        self.assertEqual((g["resultat"], g["proprietaire"], g["resultat_societe"]), (600000, 330000, 270000))
+        ca = Journal.objects.get(code="CA")
+        ReglementPartenaire(partenaire=self.proprio, decompte=d, montant=150000, caisse=ca).enregistrer()   # fixe versé
+        U = get_user_model()
+        demandeur, chef = U.objects.create_user("demandeur"), U.objects.create_user("chef")
+        r = DemandeRetrait(partenaire=self.proprio, montant=100000).demander(demandeur)      # disponible 180 000
+        with self.assertRaisesMessage(ValidationError, "propre retrait"):
+            r.decider(True, demandeur)
+        r.decider(True, chef)
+        r.payer(ca)
+        self.assertEqual(solde_partenaire(self.proprio), 80000)
+        with self.assertRaisesMessage(ValidationError, "disponible 80 000"):
+            DemandeRetrait(partenaire=self.proprio, montant=90000).demander(demandeur)
+        self.assertEqual(sum(l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero="622")), 330000)  # pas de double charge
+
+    def test_exemple_b_avance_imputee_sur_le_variable(self):
+        self.activite()
+        c = self.contrat(ContratPartenaire.AVANCE_SUR_VARIABLE)
+        ReglementPartenaire(partenaire=self.proprio, montant=150000, caisse=Journal.objects.get(code="CA"),
+                            nature=ReglementPartenaire.AVANCE).enregistrer()                # avance : pas une charge
+        self.assertEqual(solde_partenaire(self.proprio), -150000)
+        d = Decompte.calculer(c, self.debut, self.fin).approuver()
+        self.assertEqual((d.fixe, d.variable, d.montant_du), (0, 240000, 240000))           # 40 % de 600 000
+        self.assertEqual(solde_partenaire(self.proprio), 90000)                              # 240 000 − 150 000
+        self.assertEqual(sum(l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero="622")), 240000)
+
+    def test_marge_negative_et_plancher_contractuel(self):
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+        from apps.transport.models import ParametresTransport
+
+        p = ParametresTransport.get()
+        creer_ecriture(Journal.objects.get(code="CA"), self.fin, "Carburant",
+                       [{"compte": p.compte_carburant, "debit": 100000, "vehicule": self.car},
+                        {"compte": Compte.objects.get(numero="5711"), "credit": 100000}])
+        sans = Decompte.calculer(self.contrat(ContratPartenaire.VARIABLE), self.debut, datetime.date(2026, 9, 15))
+        self.assertEqual(sans.montant_du, 0)                                                  # carburant du 30 hors période
+        c = ContratPartenaire.objects.get()
+        avec = Decompte.calculer(c, datetime.date(2026, 9, 16), self.fin)
+        self.assertEqual(avec.montant_du, -40000)                                             # sans plancher : dû par le propriétaire
+        c2 = c.avenant(datetime.date(2026, 10, 1), plancher_zero=True)
+        self.assertTrue(c2.plancher_zero)
+
+    def test_compte_proprietaire_distinct_du_compte_fournisseur(self):
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+
+        self.activite()
+        Decompte.calculer(self.contrat(ContratPartenaire.FIXE_PLUS_VARIABLE), self.debut, self.fin).approuver()
+        creer_ecriture(Journal.objects.get(code="OD"), self.fin, "Pièces fournies par le même tiers",
+                       [{"compte": Compte.objects.get_or_create(numero="6042", defaults={"intitule": "Matières consommables"})[0],
+                         "debit": 50000}, {"compte": self.proprio.get_compte_collectif(), "tiers": self.proprio, "credit": 50000}])
+        self.assertEqual(solde_partenaire(self.proprio), 330000)                              # pas de compensation implicite
+        fournisseur = sum(l.credit - l.debit for l in LigneEcriture.objects.filter(tiers=self.proprio, compte__numero="4011"))
+        self.assertEqual(fournisseur, 50000)
+
+    def test_ecran_releve_avance_et_retrait(self):
+        from .models import DemandeRetrait
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        self.activite()
+        Decompte.calculer(self.contrat(ContratPartenaire.FIXE_PLUS_VARIABLE), self.debut, self.fin).approuver()
+        url = reverse("partenaires:releve", args=[self.proprio.pk])
+        ca = Journal.objects.get(code="CA").pk
+        self.client.post(url, {"action": "payer", "nature": "AVANCE", "montant": "50000", "caisse": ca})
+        self.client.post(url, {"action": "retrait", "montant": "100000"})
+        r = DemandeRetrait.objects.get()
+        self.client.post(url, {"action": "autoriser", "retrait": r.pk})
+        self.client.post(url, {"action": "payer_retrait", "retrait": r.pk, "caisse": ca})
+        self.assertEqual(solde_partenaire(self.proprio), 330000 - 50000 - 100000)
+        page = self.client.get(url)
+        for mot in ("FIXE", "VARIABLE", "AVANCE", "RETRAIT", "Disponible pour un retrait"):
+            self.assertContains(page, mot)

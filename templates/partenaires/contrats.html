@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-title"><h1>Véhicules des partenaires : contrats</h1></div>
 <div class="alert alert-info small py-2">Chaque contrat est daté et versionné : une modification (avenant) crée une nouvelle version, l'ancienne
-reste dans l'historique et sert aux décomptes déjà faits. Comptes proposés (622 / 401) <strong>à valider par l'expert-comptable</strong>.</div>
+reste dans l'historique et sert aux décomptes déjà faits. Comptes proposés (622 / 467 propriétaires, séparé des fournisseurs 401) <strong>à valider par l'expert-comptable</strong>.</div>
 <form method="post" class="card card-body mb-3">{% csrf_token %}
   <div class="row g-2">
     {% for champ in form %}{% if champ.field.widget.input_type != "checkbox" %}
@@ -23,7 +23,7 @@ reste dans l'historique et sert aux décomptes déjà faits. Comptes proposés (
 <tbody>{% for c in contrats %}<tr>
   <td>{{ c.numero|default:"—" }} v{{ c.version }}</td><td>{{ c.vehicule.immatriculation }}</td>
   <td><a href="{% url 'partenaires:releve' c.partenaire.pk %}">{{ c.partenaire.nom }}</a></td>
-  <td>{% if c.modele == "COMMISSION" %}Commission {{ c.taux_commission }} %{% else %}Location {{ c.montant_location|montant }} {{ c.get_periodicite_display|lower }}{% endif %}</td>
+  <td>{% if c.modele == "COMMISSION" %}Commission {{ c.taux_commission }} %{% elif c.modele == "LOCATION" %}Location {{ c.montant_location|montant }} {{ c.get_periodicite_display|lower }}{% else %}{{ c.get_modele_display }} : {% if c.montant_location %}fixe {{ c.montant_location|montant }} {{ c.get_periodicite_display|lower }} + {% endif %}{{ c.taux_proprietaire }} % de la marge{% if c.plancher_zero %} (plancher 0){% endif %}{% endif %}</td>
   <td>{{ c.debut|date:"d/m/Y" }} → {{ c.fin|date:"d/m/Y"|default:"…" }}</td>
   <td>{{ c.categories_a_sa_charge|join:", "|default:"aucune" }}</td><td>{{ c.get_statut_display }}</td>
   <td>{% if c.statut == "BROUILLON" %}<form method="post">{% csrf_token %}<input type="hidden" name="contrat" value="{{ c.pk }}"><button class="btn btn-sm btn-outline-success py-0" name="action" value="activer">Mettre en vigueur</button></form>

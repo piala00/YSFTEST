@@ -62,6 +62,10 @@ class ParametresTransport(models.Model):
         "comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
         verbose_name="Billets annulés, remboursement à payer",
         help_text="Remboursement autorisé à l'annulation, payé ensuite en caisse")
+    compte_proprietaires = models.ForeignKey(
+        "comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
+        verbose_name="Propriétaires de véhicules (comptes de contrat)",
+        help_text="Sous-compte des propriétaires, distinct des fournisseurs (401) : droits, avances, retraits, règlements")
     compte_carburant = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
                                          verbose_name="Garage : carburant")
     compte_pieces = models.ForeignKey("comptabilite.Compte", null=True, on_delete=models.PROTECT, related_name="+",
@@ -94,6 +98,7 @@ class ParametresTransport(models.Model):
                "compte_billets_a_voyager": ("41911", "Billets vendus, voyage à effectuer"),
                "compte_colis_a_transporter": ("41912", "Envois encaissés, transport à effectuer"),
                "compte_remboursements": ("41913", "Billets annulés, remboursement à payer"),
+               "compte_proprietaires": ("467", "Propriétaires de véhicules (comptes de contrat)"),
                "compte_carburant": ("6053", "Fournitures non stockables - Autres énergies"),
                "compte_pieces": ("624", "Entretien, réparations et maintenance"),
                "compte_main_oeuvre": ("624", "Entretien, réparations et maintenance")}

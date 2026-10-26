@@ -85,29 +85,58 @@ def decomptes(request):
 
 @login_required
 def releve(request, pk=None):
+    from .models import DemandeRetrait
+
     partenaires = Tiers.objects.filter(contrats_partenaire__isnull=False).distinct().order_by("nom")
     partenaire = get_object_or_404(Tiers, pk=pk) if pk else None
     if partenaire and request.method == "POST":
+        action = request.POST.get("action", "payer")
         try:
-            decompte = Decompte.objects.filter(pk=request.POST.get("decompte") or None, contrat__partenaire=partenaire).first()
-            r = ReglementPartenaire(partenaire=partenaire, decompte=decompte, montant=Decimal(request.POST.get("montant") or 0),
-                                    caisse=get_object_or_404(Journal, pk=request.POST["caisse"]),
-                                    date=_date(request.POST.get("date") or datetime.date.today().isoformat()),
-                                    reference=request.POST.get("reference", ""))
-            r.enregistrer(request.user)
-            messages.success(request, f"Règlement {r.numero} enregistré.")
+            if action == "payer":
+                decompte = Decompte.objects.filter(pk=request.POST.get("decompte") or None, contrat__partenaire=partenaire).first()
+                r = ReglementPartenaire(partenaire=partenaire, decompte=decompte, montant=Decimal(request.POST.get("montant") or 0),
+                                        caisse=get_object_or_404(Journal, pk=request.POST["caisse"]),
+                                        nature=request.POST.get("nature") or ReglementPartenaire.REGLEMENT,
+                                        date=_date(request.POST.get("date") or datetime.date.today().isoformat()),
+                                        reference=request.POST.get("reference", ""))
+                if r.nature == ReglementPartenaire.RETRAIT:
+                    raise ValidationError("Un retrait se demande puis s'autorise (formulaire « Demande de retrait »).")
+                r.enregistrer(request.user)
+                messages.success(request, f"{r.get_nature_display().split(' (')[0]} {r.numero} enregistré.")
+            elif action == "retrait":
+                d = DemandeRetrait(partenaire=partenaire, montant=Decimal(request.POST.get("montant") or 0),
+                                   motif=request.POST.get("motif", "")).demander(request.user)
+                messages.success(request, f"Demande de retrait {d.numero} enregistrée : à autoriser.")
+            elif action in ("autoriser", "refuser"):
+                d = get_object_or_404(DemandeRetrait, pk=request.POST.get("retrait"), partenaire=partenaire)
+                d.decider(action == "autoriser", request.user, request.POST.get("motif", ""))
+                messages.success(request, f"Retrait {d.numero} : {d.get_statut_display().lower()}.")
+            elif action == "payer_retrait":
+                d = get_object_or_404(DemandeRetrait, pk=request.POST.get("retrait"), partenaire=partenaire)
+                d.payer(get_object_or_404(Journal, pk=request.POST["caisse"]), request.user)
+                messages.success(request, f"Retrait {d.numero} payé.")
         except (ValidationError, ArithmeticError, ValueError, KeyError) as exc:
             _erreur(request, exc)
         return redirect(request.path)
     contexte = {"partenaires": [{"tiers": t, "solde": solde_partenaire(t)} for t in partenaires], "partenaire": partenaire}
     if partenaire:
         mouvements = []
-        for d in Decompte.objects.filter(contrat__partenaire=partenaire, statut=Decompte.APPROUVE):
-            mouvements.append({"date": d.fin, "piece": d.numero, "libelle": f"Décompte {d.contrat.vehicule.immatriculation} "
-                               f"du {d.debut:%d/%m} au {d.fin:%d/%m/%Y}", "du": d.montant_du, "paye": Decimal(0)})
-        for r in ReglementPartenaire.objects.filter(partenaire=partenaire):
-            mouvements.append({"date": r.date, "piece": r.numero, "libelle": f"Règlement {r.caisse.code} {r.reference}",
-                               "du": Decimal(0), "paye": r.montant})
+        for d in Decompte.objects.filter(contrat__partenaire=partenaire, statut=Decompte.APPROUVE).select_related(
+                "contrat__vehicule", "ecriture", "ecriture_fixe"):
+            base = {"date": d.fin, "piece": d.numero, "vehicule": d.contrat.vehicule.immatriculation,
+                    "contrat": f"{d.contrat.numero} v{d.contrat.version}", "paye": Decimal(0)}
+            if d.contrat.modele in d.contrat.VARIABLES:
+                if d.fixe:
+                    mouvements.append({**base, "nature": "FIXE", "du": d.fixe, "ecriture": d.ecriture_fixe or d.ecriture})
+                if d.variable:
+                    mouvements.append({**base, "nature": "VARIABLE", "du": d.variable, "ecriture": d.ecriture})
+            else:
+                mouvements.append({**base, "nature": "LOCATION" if d.contrat.modele == d.contrat.LOCATION else "VARIABLE",
+                                   "du": d.montant_du, "ecriture": d.ecriture})
+        for r in ReglementPartenaire.objects.filter(partenaire=partenaire).select_related("caisse", "ecriture"):
+            mouvements.append({"date": r.date, "piece": r.numero, "vehicule": "", "contrat": r.reference,
+                               "nature": {"AVANCE": "AVANCE", "RETRAIT": "RETRAIT"}.get(r.nature, "RÈGLEMENT"),
+                               "du": Decimal(0), "paye": r.montant, "ecriture": r.ecriture})
         mouvements.sort(key=lambda m: (m["date"], m["piece"]))
         cumul = Decimal(0)
         for m in mouvements:
@@ -115,6 +144,9 @@ def releve(request, pk=None):
             m["reste"] = cumul
         contexte.update({
             "mouvements": mouvements, "reste": cumul, "solde_comptable": solde_partenaire(partenaire),
+            "disponible": DemandeRetrait.disponible(partenaire),
+            "retraits": DemandeRetrait.objects.filter(partenaire=partenaire),
+            "natures": [n for n in ReglementPartenaire.NATURES if n[0] != ReglementPartenaire.RETRAIT],
             "contrats": partenaire.contrats_partenaire.select_related("vehicule"),
             "decomptes": Decompte.objects.filter(contrat__partenaire=partenaire, statut=Decompte.APPROUVE),
             "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__isnull=False)})

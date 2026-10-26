@@ -3,11 +3,17 @@
 Contrat versionné par véhicule (jamais écrasé : un avenant crée une nouvelle version datée) :
   - COMMISSION : l'agence garde un pourcentage des recettes du véhicule ; le propriétaire reçoit le reste, moins les
     dépenses que le contrat met à sa charge (carburant, réparations, équipage, frais de route, autres) ;
-  - LOCATION : l'agence paie un forfait par jour ou par mois (au prorata des jours du contrat).
+  - LOCATION : l'agence paie un forfait par jour ou par mois (au prorata des jours du contrat) ;
+  - VARIABLE : le propriétaire reçoit un pourcentage de la marge du véhicule (recettes − dépenses retenues au contrat) ;
+  - FIXE_PLUS_VARIABLE : fixe garanti + complément = % de (marge − fixe) ;
+  - AVANCE_SUR_VARIABLE : droit = % de la marge ; le fixe périodique est versé en AVANCE (règlement), jamais en charge.
+  Le variable négatif n'est ramené à zéro que si le contrat le prévoit (case « plancher à zéro »).
 Décompte de période : calculé depuis la comptabilité du véhicule, figé avec la version du contrat, puis approuvé.
-  Approbation   D 622 rémunération du propriétaire (sur le véhicule) / C 401 compte du partenaire
+  Approbation   D 622 rémunération du propriétaire (fixe et variable, sur le véhicule) / C 467 compte du propriétaire
                 (montant négatif : le propriétaire doit à l'agence, sens inverse)
-  Règlement     D 401 partenaire / C caisse ou banque
+  Avance, retrait, règlement   D 467 propriétaire / C caisse ou banque (jamais une nouvelle charge)
+Le compte du propriétaire (467, paramétrable) est distinct de son éventuel compte fournisseur (401) : pas de
+compensation implicite. « Salaire du propriétaire » est un libellé métier : il ne passe jamais par la paie.
 Schéma « l'agence exploite pour son compte » : à valider par l'expert-comptable selon les contrats réels.
 Le résultat du véhicule (analytique), le décompte (droit contractuel) et le solde du compte partenaire restent distincts.
 """
@@ -30,6 +36,13 @@ def _arrondi(v):
     return Decimal(v).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
 
+def compte_proprietaires():
+    """Sous-compte des propriétaires de véhicules (distinct des fournisseurs), paramétré dans le transport."""
+    from apps.transport.models import ParametresTransport
+
+    return ParametresTransport.get().compte_proprietaires
+
+
 def compte_remuneration():
     from apps.comptabilite.models import Compte
 
@@ -37,8 +50,13 @@ def compte_remuneration():
 
 
 class ContratPartenaire(models.Model):
-    COMMISSION, LOCATION = "COMMISSION", "LOCATION"
-    MODELES = [(COMMISSION, "Commission de l'agence sur les recettes"), (LOCATION, "Location forfaitaire")]
+    COMMISSION, LOCATION, VARIABLE, FIXE_PLUS_VARIABLE, AVANCE_SUR_VARIABLE = (
+        "COMMISSION", "LOCATION", "VARIABLE", "FIXE_VARIABLE", "AVANCE_VARIABLE")
+    MODELES = [(COMMISSION, "Commission de l'agence sur les recettes"), (LOCATION, "Location forfaitaire (fixe seul)"),
+               (VARIABLE, "Part du propriétaire sur la marge (variable)"),
+               (FIXE_PLUS_VARIABLE, "Fixe garanti + complément variable"),
+               (AVANCE_SUR_VARIABLE, "Fixe versé en avance sur le variable")]
+    VARIABLES = (VARIABLE, FIXE_PLUS_VARIABLE, AVANCE_SUR_VARIABLE)
     MOIS, JOUR = "MOIS", "JOUR"
     PERIODICITES = [(MOIS, "Par mois"), (JOUR, "Par jour")]
     BROUILLON, ACTIF, CLOS = "BROUILLON", "ACTIF", "CLOS"
@@ -50,12 +68,17 @@ class ContratPartenaire(models.Model):
     partenaire = models.ForeignKey("commercial.Tiers", on_delete=models.PROTECT, related_name="contrats_partenaire",
                                    help_text="Le propriétaire (fiche fournisseur : son compte reçoit ce qui lui est dû)")
     vehicule = models.ForeignKey("transport.Vehicule", on_delete=models.PROTECT, related_name="contrats_partenaire")
-    modele = models.CharField("Modèle", max_length=12, choices=MODELES, default=COMMISSION)
+    modele = models.CharField("Modèle", max_length=16, choices=MODELES, default=COMMISSION)
     debut = models.DateField("En vigueur du")
     fin = models.DateField("Au", null=True, blank=True)
     taux_commission = models.DecimalField("Commission de l'agence (%)", max_digits=5, decimal_places=2, default=ZERO)
-    montant_location = models.DecimalField("Montant de la location", max_digits=14, decimal_places=0, default=ZERO)
-    periodicite = models.CharField("Location payée", max_length=5, choices=PERIODICITES, default=MOIS)
+    montant_location = models.DecimalField("Montant fixe (location, fixe garanti ou avance)", max_digits=14,
+                                           decimal_places=0, default=ZERO)
+    periodicite = models.CharField("Fixe payé", max_length=5, choices=PERIODICITES, default=MOIS)
+    taux_proprietaire = models.DecimalField("Part du propriétaire sur la marge (%)", max_digits=5, decimal_places=2,
+                                            default=ZERO, help_text="Modèles variables : base = recettes − dépenses retenues")
+    plancher_zero = models.BooleanField("Variable ramené à zéro si la marge est négative", default=False,
+                                        help_text="Seulement si le contrat le prévoit ; sinon la perte est due par le propriétaire")
     charge_carburant = models.BooleanField("Carburant à la charge du propriétaire", default=True)
     charge_reparations = models.BooleanField("Réparations et pièces à sa charge", default=True)
     charge_equipage = models.BooleanField("Salaire de l'équipage à sa charge", default=False)
@@ -78,8 +101,10 @@ class ContratPartenaire(models.Model):
             raise ValidationError("La fin du contrat précède son début.")
         if self.modele == self.COMMISSION and not ZERO <= self.taux_commission <= 100:
             raise ValidationError("La commission est un pourcentage entre 0 et 100.")
-        if self.modele == self.LOCATION and self.montant_location <= 0:
-            raise ValidationError("Indiquez le montant de la location.")
+        if self.modele in (self.LOCATION, self.FIXE_PLUS_VARIABLE, self.AVANCE_SUR_VARIABLE) and self.montant_location <= 0:
+            raise ValidationError("Indiquez le montant fixe.")
+        if self.modele in self.VARIABLES and not ZERO < self.taux_proprietaire <= 100:
+            raise ValidationError("Indiquez la part du propriétaire sur la marge (entre 0 et 100 %).")
 
     def chevauchements(self):
         fin = self.fin or datetime.date.max
@@ -151,10 +176,14 @@ class Decompte(models.Model):
     commission = models.DecimalField(max_digits=14, decimal_places=0, default=ZERO)
     depenses = models.DecimalField("Dépenses à la charge du propriétaire", max_digits=14, decimal_places=0, default=ZERO)
     location = models.DecimalField(max_digits=14, decimal_places=0, default=ZERO)
+    fixe = models.DecimalField("Droit fixe", max_digits=14, decimal_places=0, default=ZERO)
+    variable = models.DecimalField("Droit variable", max_digits=14, decimal_places=0, default=ZERO)
     montant_du = models.DecimalField("Dû au propriétaire", max_digits=14, decimal_places=0, default=ZERO)
     detail = models.JSONField(default=dict, blank=True, help_text="Règles appliquées et détail du calcul (figé)")
     statut = models.CharField(max_length=10, choices=STATUTS, default=BROUILLON)
     ecriture = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    ecriture_fixe = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL,
+                                         related_name="+", help_text="Droit fixe, quand le contrat a fixe et variable")
     approuve_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     approuve_le = models.DateTimeField(null=True, blank=True)
 
@@ -195,24 +224,41 @@ class Decompte(models.Model):
                 c = _categorie_depense(n, p)
                 par_categorie[c] = par_categorie.get(c, ZERO) + l.debit - l.credit
         depenses = sum((m for c, m in par_categorie.items() if c in a_sa_charge), ZERO)
-        commission = location = ZERO
-        if contrat.modele == ContratPartenaire.COMMISSION:
-            commission = _arrondi(recettes * contrat.taux_commission / 100)
-            du = recettes - commission - depenses
-        else:
+        commission = location = fixe = variable = ZERO
+
+        def prorata_fixe():
             jour, total = d, ZERO
             while jour <= f:
                 total += (contrat.montant_location if contrat.periodicite == ContratPartenaire.JOUR
                           else contrat.montant_location / calendar.monthrange(jour.year, jour.month)[1])
                 jour += datetime.timedelta(days=1)
-            location = _arrondi(total)
+            return _arrondi(total)
+
+        marge = recettes - depenses
+        if contrat.modele == ContratPartenaire.COMMISSION:
+            commission = _arrondi(recettes * contrat.taux_commission / 100)
+            du = variable = recettes - commission - depenses
+        elif contrat.modele == ContratPartenaire.LOCATION:
+            location = fixe = prorata_fixe()
             du = location - depenses
+        else:
+            base = marge
+            if contrat.modele == ContratPartenaire.FIXE_PLUS_VARIABLE:
+                fixe = prorata_fixe()                    # dû même si la marge est insuffisante (fixe garanti)
+                base = marge - fixe
+            variable = _arrondi(base * contrat.taux_proprietaire / 100)
+            if contrat.plancher_zero and variable < 0:
+                variable = ZERO
+            du = fixe + variable
         return cls.objects.create(
             contrat=contrat, debut=d, fin=f, recettes=recettes, commission=commission, depenses=depenses, location=location,
-            montant_du=du, numero=Sequence.piece("DCP", f.year),
+            fixe=fixe, variable=variable, montant_du=du, numero=Sequence.piece("DCP", f.year),
             detail={"contrat": contrat.numero, "version": contrat.version, "modele": contrat.modele,
                     "taux_commission": str(contrat.taux_commission), "montant_location": str(contrat.montant_location),
                     "periodicite": contrat.periodicite, "a_sa_charge": sorted(a_sa_charge),
+                    "taux_proprietaire": str(contrat.taux_proprietaire), "plancher_zero": contrat.plancher_zero,
+                    "marge": str(marge), "avance_periodique": str(contrat.montant_location)
+                    if contrat.modele == ContratPartenaire.AVANCE_SUR_VARIABLE else "0",
                     "depenses_par_categorie": {c: str(m) for c, m in sorted(par_categorie.items())}})
 
     @transaction.atomic
@@ -223,22 +269,32 @@ class Decompte(models.Model):
         if self.statut != self.BROUILLON:
             raise ValidationError("Décompte déjà approuvé.")
         partenaire, vehicule = self.contrat.partenaire, self.contrat.vehicule
-        compte_partenaire = {"compte": partenaire.get_compte_collectif(), "tiers": partenaire}
+        compte_partenaire = {"compte": compte_proprietaires(), "tiers": partenaire}
         charge = {"compte": compte_remuneration(), "vehicule": vehicule, "section": vehicule.section}
-        if self.montant_du:
-            m = abs(self.montant_du)
-            lignes = ([{**charge, "debit": m}, {**compte_partenaire, "credit": m}] if self.montant_du > 0
-                      else [{**compte_partenaire, "debit": m}, {**charge, "credit": m}])
-            self.ecriture = creer_ecriture(Journal.objects.get(code="OD"), date or self.fin,
-                                           f"Décompte {self.numero} {vehicule.immatriculation} - {partenaire.nom}", lignes,
-                                           reference=self.numero)
+        journal, date = Journal.objects.get(code="OD"), date or self.fin
+        parts = ([("Droit fixe", self.fixe), ("Droit variable", self.variable)]
+                 if self.contrat.modele in ContratPartenaire.VARIABLES else [("Rémunération", self.montant_du)])
+        ecritures = []
+        for libelle, montant in parts:                  # une écriture par droit : fixe et variable bien distincts
+            if not montant:
+                continue
+            lignes = ([{**charge, "debit": montant}, {**compte_partenaire, "credit": montant}] if montant > 0
+                      else [{**compte_partenaire, "debit": -montant}, {**charge, "credit": -montant}])
+            ecritures.append(creer_ecriture(journal, date, f"{libelle} {self.numero} {vehicule.immatriculation} - {partenaire.nom}",
+                                            lignes, reference=self.numero))
+        self.ecriture = ecritures[-1] if ecritures else None
+        self.ecriture_fixe = ecritures[0] if len(ecritures) == 2 else None
         self.statut, self.approuve_par, self.approuve_le = self.APPROUVE, utilisateur, timezone.now()
         self.save()
         return self
 
 
 class ReglementPartenaire(models.Model):
+    REGLEMENT, AVANCE, RETRAIT = "REGLEMENT", "AVANCE", "RETRAIT"
+    NATURES = [(REGLEMENT, "Règlement"), (AVANCE, "Avance (fixe versé avant le décompte)"), (RETRAIT, "Retrait autorisé")]
+
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    nature = models.CharField(max_length=10, choices=NATURES, default=REGLEMENT)
     numero = models.CharField(max_length=30, unique=True, blank=True)
     partenaire = models.ForeignKey("commercial.Tiers", on_delete=models.PROTECT, related_name="reglements_partenaire")
     decompte = models.ForeignKey(Decompte, null=True, blank=True, on_delete=models.PROTECT, related_name="reglements")
@@ -268,8 +324,9 @@ class ReglementPartenaire(models.Model):
         self.numero = self.numero or Sequence.piece("RGP", self.date.year)
         self.cree_par = utilisateur
         self.save()
-        self.ecriture = creer_ecriture(self.caisse, self.date, f"Règlement {self.numero} - {self.partenaire.nom}",
-                                       [{"compte": self.partenaire.get_compte_collectif(), "tiers": self.partenaire, "debit": self.montant},
+        self.ecriture = creer_ecriture(self.caisse, self.date, f"{self.get_nature_display().split(' (')[0]} {self.numero} - "
+                                                               f"{self.partenaire.nom}",
+                                       [{"compte": compte_proprietaires(), "tiers": self.partenaire, "debit": self.montant},
                                         {"compte": self.caisse.compte_tresorerie, "credit": self.montant}],
                                        reference=self.reference or self.numero)
         self.save(update_fields=["ecriture"])
@@ -277,10 +334,92 @@ class ReglementPartenaire(models.Model):
 
 
 def solde_partenaire(partenaire, jusqua=None):
-    """Solde du compte du partenaire en comptabilité générale (crédit = l'agence lui doit), à une date si donnée."""
+    """Solde du compte du propriétaire en comptabilité générale (crédit = l'agence lui doit), à une date si donnée.
+    Seul le sous-compte propriétaire compte (pas son compte fournisseur) ; les décomptes et règlements passés avant
+    la séparation des comptes (sur 401) restent repris."""
+    from django.db.models import Q
+
     from apps.comptabilite.models import LigneEcriture
 
-    lignes = LigneEcriture.objects.filter(tiers=partenaire, compte=partenaire.get_compte_collectif())
+    anciennes = list(Decompte.objects.filter(contrat__partenaire=partenaire, ecriture__isnull=False).values_list("ecriture_id", flat=True))
+    anciennes += list(Decompte.objects.filter(contrat__partenaire=partenaire, ecriture_fixe__isnull=False)
+                      .values_list("ecriture_fixe_id", flat=True))
+    anciennes += list(ReglementPartenaire.objects.filter(partenaire=partenaire, ecriture__isnull=False).values_list("ecriture_id", flat=True))
+    lignes = LigneEcriture.objects.filter(tiers=partenaire).filter(
+        Q(compte=compte_proprietaires()) | Q(ecriture_id__in=anciennes, compte=partenaire.get_compte_collectif()))
     if jusqua is not None:
         lignes = lignes.filter(ecriture__date__lte=jusqua)
     return sum((l.credit - l.debit for l in lignes), ZERO)
+
+
+class DemandeRetrait(models.Model):
+    """Retrait demandé par le propriétaire : jamais au-delà de ce qui lui est dû et pas encore engagé, autorisé par
+    une autre personne que le demandeur, puis payé (règlement « retrait »). Un résultat positif du véhicule n'ouvre
+    pas à lui seul un droit de retrait : seul le solde comptabilisé de son compte compte."""
+
+    DEMANDE, AUTORISE, REFUSE, PAYE = "DEMANDE", "AUTORISE", "REFUSE", "PAYE"
+    STATUTS = [(DEMANDE, "Demandé"), (AUTORISE, "Autorisé, à payer"), (REFUSE, "Refusé"), (PAYE, "Payé")]
+
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    numero = models.CharField(max_length=30, unique=True, blank=True)
+    partenaire = models.ForeignKey("commercial.Tiers", on_delete=models.PROTECT, related_name="retraits_partenaire")
+    date = models.DateField(default=timezone.localdate)
+    montant = models.DecimalField(max_digits=14, decimal_places=0)
+    motif = models.CharField(max_length=150, blank=True)
+    statut = models.CharField(max_length=10, choices=STATUTS, default=DEMANDE)
+    demande_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    decision_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    reglement = models.OneToOneField(ReglementPartenaire, null=True, blank=True, on_delete=models.SET_NULL, related_name="retrait")
+
+    class Meta:
+        ordering = ["-date", "-numero"]
+        verbose_name = "Demande de retrait"
+
+    @staticmethod
+    def disponible(partenaire, sauf=None):
+        """Dû comptabilisé au propriétaire, moins les retraits déjà autorisés et pas encore payés."""
+        engages = DemandeRetrait.objects.filter(partenaire=partenaire, statut=DemandeRetrait.AUTORISE)
+        if sauf is not None:
+            engages = engages.exclude(pk=sauf.pk)
+        return solde_partenaire(partenaire) - sum((r.montant for r in engages), ZERO)
+
+    def _controler(self):
+        dispo = self.disponible(self.partenaire, sauf=self)
+        if self.montant > dispo:
+            raise ValidationError(f"Retrait de {self.montant:,.0f} refusé : disponible {max(dispo, ZERO):,.0f} FCFA "
+                                  f"(dû comptabilisé moins retraits déjà autorisés).".replace(",", " "))
+
+    @transaction.atomic
+    def demander(self, utilisateur=None):
+        if self.montant is None or self.montant <= 0:
+            raise ValidationError("Le montant doit être positif.")
+        self._controler()
+        self.numero = self.numero or Sequence.piece("RTP", self.date.year)
+        self.demande_par = utilisateur if getattr(utilisateur, "pk", None) else None
+        self.save()
+        return self
+
+    @transaction.atomic
+    def decider(self, autoriser, utilisateur=None, motif=""):
+        if self.statut != self.DEMANDE:
+            raise ValidationError("Cette demande a déjà reçu une décision.")
+        if utilisateur is not None and self.demande_par_id == getattr(utilisateur, "pk", None) and not utilisateur.is_superuser:
+            raise ValidationError("Le demandeur ne peut pas autoriser son propre retrait.")
+        if autoriser:
+            self._controler()                           # le solde a pu changer depuis la demande
+        self.statut = self.AUTORISE if autoriser else self.REFUSE
+        self.decision_par = utilisateur if getattr(utilisateur, "pk", None) else None
+        self.motif = motif.strip() or self.motif
+        self.save()
+        return self
+
+    @transaction.atomic
+    def payer(self, caisse, utilisateur=None):
+        if self.statut != self.AUTORISE:
+            raise ValidationError("Le retrait doit être autorisé avant d'être payé.")
+        r = ReglementPartenaire(partenaire=self.partenaire, montant=self.montant, caisse=caisse, nature=ReglementPartenaire.RETRAIT,
+                                reference=self.numero)
+        r.enregistrer(utilisateur)
+        self.reglement, self.statut = r, self.PAYE
+        self.save(update_fields=["reglement", "statut"])
+        return self

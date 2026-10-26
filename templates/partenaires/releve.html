@@ -9,18 +9,33 @@
 {% empty %}<div class="list-group-item text-muted">Aucun partenaire sous contrat.</div>{% endfor %}</div></div>
 <div class="col-md-9">{% if partenaire %}
   <p class="small">Véhicules : {% for c in contrats %}{{ c.vehicule.immatriculation }} ({{ c.get_modele_display|lower }}, v{{ c.version }}, {{ c.get_statut_display|lower }}){% if not forloop.last %} · {% endif %}{% endfor %}</p>
-  <div class="card mb-3"><table class="table table-sm mb-0 small"><thead><tr><th>Date</th><th>Pièce</th><th>Libellé</th><th class="num">Dû</th><th class="num">Payé</th><th class="num">Reste à payer</th></tr></thead>
-  <tbody>{% for m in mouvements %}<tr><td>{{ m.date|date:"d/m/Y" }}</td><td>{{ m.piece }}</td><td>{{ m.libelle }}</td><td class="num">{{ m.du|montant_ou_vide }}</td><td class="num">{{ m.paye|montant_ou_vide }}</td><td class="num">{{ m.reste|montant }}</td></tr>
-  {% empty %}<tr><td colspan="6" class="text-muted text-center p-3">Aucun décompte approuvé ni règlement.</td></tr>{% endfor %}</tbody>
-  <tfoot><tr class="fw-bold"><td colspan="5">Reste à payer au partenaire</td><td class="num">{{ reste|montant }}</td></tr>
-  {% if solde_comptable != reste %}<tr class="text-warning"><td colspan="5">Solde de son compte en comptabilité (autres opérations comprises)</td><td class="num">{{ solde_comptable|montant }}</td></tr>{% endif %}</tfoot></table></div>
-  <form method="post" class="card card-body d-flex flex-row flex-wrap gap-2 align-items-end">{% csrf_token %}
-    <div><label class="form-label small mb-0" for="r-d">Pour le décompte</label><select id="r-d" name="decompte" class="form-select form-select-sm"><option value="">(acompte, sans décompte)</option>{% for d in decomptes %}<option value="{{ d.pk }}">{{ d.numero }} – {{ d.montant_du|montant }}</option>{% endfor %}</select></div>
+  <div class="card mb-3"><table class="table table-sm mb-0 small"><thead><tr><th>Date</th><th>Pièce</th><th>Nature</th><th>Véhicule</th><th>Contrat / réf.</th><th>Écriture</th><th class="num">Dû</th><th class="num">Payé</th><th class="num">Reste à payer</th></tr></thead>
+  <tbody>{% for m in mouvements %}<tr><td>{{ m.date|date:"d/m/Y" }}</td><td>{{ m.piece }}</td><td>{{ m.nature }}</td><td>{{ m.vehicule }}</td><td>{{ m.contrat }}</td>
+    <td>{% if m.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' m.ecriture.pk %}">{{ m.ecriture.numero }}</a>{% endif %}</td>
+    <td class="num">{{ m.du|montant_ou_vide }}</td><td class="num">{{ m.paye|montant_ou_vide }}</td><td class="num">{{ m.reste|montant }}</td></tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center p-3">Aucun décompte approuvé ni paiement.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="fw-bold"><td colspan="8">Reste à payer au propriétaire</td><td class="num">{{ reste|montant }}</td></tr>
+  {% if solde_comptable != reste %}<tr class="text-warning"><td colspan="8">Solde de son compte propriétaire en comptabilité (autres opérations comprises)</td><td class="num">{{ solde_comptable|montant }}</td></tr>{% endif %}
+  <tr><td colspan="8">Disponible pour un retrait (dû comptabilisé − retraits autorisés non payés)</td><td class="num">{{ disponible|montant }}</td></tr></tfoot></table></div>
+  <form method="post" class="card card-body d-flex flex-row flex-wrap gap-2 align-items-end mb-3">{% csrf_token %}<input type="hidden" name="action" value="payer">
+    <div><label class="form-label small mb-0" for="r-n">Nature</label><select id="r-n" name="nature" class="form-select form-select-sm">{% for c, l in natures %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select></div>
+    <div><label class="form-label small mb-0" for="r-d">Pour le décompte</label><select id="r-d" name="decompte" class="form-select form-select-sm"><option value="">(sans décompte)</option>{% for d in decomptes %}<option value="{{ d.pk }}">{{ d.numero }} – {{ d.montant_du|montant }}</option>{% endfor %}</select></div>
     <div><label class="form-label small mb-0" for="r-m">Montant</label><input id="r-m" name="montant" type="number" min="1" required class="form-control form-control-sm"></div>
     <div><label class="form-label small mb-0" for="r-c">Payé par</label><select id="r-c" name="caisse" class="form-select form-select-sm">{% for c in caisses %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select></div>
     <div><label class="form-label small mb-0" for="r-dt">Date</label><input id="r-dt" type="date" name="date" class="form-control form-control-sm"></div>
     <div><label class="form-label small mb-0" for="r-r">Référence (reçu, chèque)</label><input id="r-r" name="reference" class="form-control form-control-sm"></div>
     <button class="btn btn-sm btn-primary">Payer</button>
-    <div class="form-text w-100">Paiement partiel possible : le reste à payer se met à jour.</div></form>
+    <div class="form-text w-100">Règlement d'un décompte, ou avance (fixe versé avant le décompte, déduit du droit variable) : jamais une nouvelle charge.</div></form>
+  <div class="card"><div class="card-header bg-white small fw-semibold">Retraits du propriétaire</div><div class="card-body small">
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-end mb-2">{% csrf_token %}<input type="hidden" name="action" value="retrait">
+      <input name="montant" type="number" min="1" required class="form-control form-control-sm" style="width:9rem" placeholder="montant" aria-label="Montant du retrait">
+      <input name="motif" class="form-control form-control-sm" style="width:16rem" placeholder="motif" aria-label="Motif">
+      <button class="btn btn-sm btn-outline-primary">Demande de retrait</button></form>
+    <table class="table table-sm mb-0"><tbody>{% for r in retraits %}<tr><td>{{ r.numero }}</td><td>{{ r.date|date:"d/m/Y" }}</td><td class="num">{{ r.montant|montant }}</td><td>{{ r.get_statut_display }}{% if r.motif %} · {{ r.motif }}{% endif %}</td>
+      <td><form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="retrait" value="{{ r.pk }}">
+        {% if r.statut == "DEMANDE" %}<button class="btn btn-sm btn-outline-success py-0" name="action" value="autoriser">Autoriser</button><button class="btn btn-sm btn-outline-danger py-0" name="action" value="refuser">Refuser</button>{% endif %}
+        {% if r.statut == "AUTORISE" %}<select name="caisse" class="form-select form-select-sm py-0 w-auto" aria-label="Caisse">{% for c in caisses %}<option value="{{ c.pk }}">{{ c.code }}</option>{% endfor %}</select><button class="btn btn-sm btn-primary py-0" name="action" value="payer_retrait">Payer</button>{% endif %}</form></td></tr>
+    {% empty %}<tr><td class="text-muted">Aucune demande de retrait.</td></tr>{% endfor %}</tbody></table>
+    <p class="text-muted mb-0 mt-1">Un retrait ne dépasse jamais ce qui est dû et pas encore engagé ; il est autorisé par une autre personne que le demandeur. Le résultat du véhicule n'ouvre pas, à lui seul, un droit de retrait.</p></div></div>
 {% else %}<p class="text-muted">Choisissez un partenaire.</p>{% endif %}</div></div>
 {% endblock %}
