@@ -156,11 +156,13 @@ Reprendre un dossier Sage existant (transition, puis bascule) :
 ---------------------------------------------
 
 - 7-SIMULATION.bat crée, la première fois, un dossier de simulation
-  séparé (logiciel\simulation.sqlite3) : septembre 2026 joué par le
-  logiciel lui-même avec des données FICTIVES (8 gares, 60 cars dont 24
+  séparé (logiciel\simulation.sqlite3) : il demande le nombre de mois
+  (1 par défaut, jusqu'à 24) et joue ces mois à partir de septembre 2026,
+  par le logiciel lui-même avec des données FICTIVES (8 gares, 60 cars dont 24
   VIP et 15 de propriétaires, 5 camions courrier, 300 salariés, billets,
   bagages, colis, carburant, magasin, réparations, loyers, versements en
-  banque, paie, comptes des propriétaires). Comptez environ une heure.
+  banque, paie, comptes des propriétaires). Comptez environ une heure
+  par mois simulé.
   Il demande ensuite un identifiant et un mot de passe, puis ouvre la
   simulation sur http://127.0.0.1:8001. Le bilan et ses contrôles sont
   écrits dans BILAN-SIMULATION.md.

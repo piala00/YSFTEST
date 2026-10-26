@@ -12,13 +12,16 @@ if not exist .env (
 set DB_ENGINE=sqlite
 set SQLITE_FICHIER=simulation.sqlite3
 set CONTROLE_HEURE_DEPART=0
+set NBMOIS=1
+if not exist simulation.sqlite3 set /p NBMOIS=Nombre de mois a simuler a partir de septembre 2026 [1] : 
+if "%NBMOIS%"=="" set NBMOIS=1
 if not exist simulation.sqlite3 (
   echo.
-  echo   Creation du dossier de simulation : septembre 2026, 8 gares, 60 cars, 5 camions, 300 salaries.
-  echo   Comptez environ une heure : plus de 50 000 billets joues un par un. Ne fermez pas la fenetre.
+  echo   Creation du dossier de simulation : %NBMOIS% mois des septembre 2026, 8 agences, 60 cars, 5 camions, 300 salaries.
+  echo   Comptez environ une heure par mois : plus de 50 000 billets par mois joues un par un. Ne fermez pas la fenetre.
   echo.
   "..\python\python.exe" manage.py migrate --noinput || goto erreur
-  "..\python\python.exe" manage.py simulation --mois 2026-09 --rapport "%~dp0BILAN-SIMULATION.md" || goto erreur
+  "..\python\python.exe" manage.py simulation --mois 2026-09 --nombre-mois %NBMOIS% --rapport "%~dp0BILAN-SIMULATION.md" || goto erreur
   echo.
   echo   Choisissez l identifiant et le mot de passe de connexion au dossier de simulation :
   "..\python\python.exe" manage.py createsuperuser || goto erreur

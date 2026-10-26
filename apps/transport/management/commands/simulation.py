@@ -30,6 +30,7 @@ ROUTES = [("DLA", "YDE", 240, 6000, 10000), ("DLA", "BFS", 280, 5000, 9000), ("Y
           ("YDE", "NGD", 620, 10000, 15000), ("NGD", "GAR", 290, 6000, 9000), ("DLA", "KRI", 170, 4000, 7000),
           ("YDE", "EBW", 160, 3500, 6000), ("YDE", "BFS", 300, 5000, 8000)]
 PRIX_LITRE = Decimal("840")
+SAISON = {1: 0.85, 2: 0.9, 7: 1.05, 8: 1.12, 12: 1.15}                    # remplissage relatif (fictif)
 ARTICLES = [("FILT", "Filtre à huile", "PIECE", 100, 5000), ("PLAQ", "Plaquettes de frein", "PIECE", 60, 8000),
             ("PNEU", "Pneu 315/80", "PNEU", 40, 110000), ("HUIL", "Huile moteur (litre)", "LUBRIFIANT", 200, 3500),
             ("CART", "Carton d'emballage", "EMBALLAGE", 2000, 150), ("RUBA", "Ruban adhésif", "EMBALLAGE", 500, 800),
@@ -47,8 +48,9 @@ class Command(BaseCommand):
     help = "Simule un mois d'activité (données fictives) dans le dossier courant, qui doit être un dossier de simulation"
 
     def add_arguments(self, p):
-        p.add_argument("--mois", default="2026-09", help="AAAA-MM")
-        p.add_argument("--jours", type=int, default=0, help="Nombre de jours simulés (0 : tout le mois)")
+        p.add_argument("--mois", default="2026-09", help="Premier mois simulé (AAAA-MM)")
+        p.add_argument("--nombre-mois", type=int, default=1, help="Nombre de mois simulés à la suite (1 à 24)")
+        p.add_argument("--jours", type=int, default=0, help="Jours simulés par mois (0 : le mois entier ; essais rapides)")
         p.add_argument("--vehicules", type=int, default=60, help="Cars voyageurs (40 % VIP, un quart de partenaires)")
         p.add_argument("--salaries", type=int, default=300)
         p.add_argument("--echelle", type=float, default=1.0, help="Fraction des voyageurs et colis (essai rapide : 0.1)")
@@ -67,19 +69,30 @@ class Command(BaseCommand):
             raise CommandError("Ce dossier contient déjà des départs : la simulation se fait dans un dossier SÉPARÉ "
                                "(SQLITE_FICHIER=simulation.sqlite3), jamais dans la vraie société.")
         annee, mois = (int(x) for x in o["mois"].split("-"))
+        if not 1 <= o["nombre_mois"] <= 24:
+            raise CommandError("De 1 à 24 mois.")
         self.r = random.Random(o["graine"])
         self.echelle = o["echelle"]
-        nb_jours = o["jours"] or calendar.monthrange(annee, mois)[1]
-        self.jours = [datetime.date(annee, mois, j) for j in range(1, nb_jours + 1)]
+        self.mois = []                                           # [(premier jour, jours simulés)]
+        for k in range(o["nombre_mois"]):
+            a, m = annee + (mois - 1 + k) // 12, (mois - 1 + k) % 12 + 1
+            nb_jours = min(o["jours"] or 31, calendar.monthrange(a, m)[1])
+            self.mois.append([datetime.date(a, m, j) for j in range(1, nb_jours + 1)])
+        self.jours = [j for jours in self.mois for j in jours]
+        self.exercices()
         self.moment(self.jours[0], 6)
         with horloge(self.maintenant):
             self.preparer(o["vehicules"], o["salaries"])
-        for jour in self.jours:
-            self.journee(jour)
-            self.stdout.write(f"{jour:%d/%m} : {self.compteurs['voyages']} voyages, {self.compteurs['billets']} billets")
-        self.moment(self.jours[-1], 22)
-        with horloge(self.maintenant):
-            self.fin_de_mois()
+        self.par_mois = []
+        for jours in self.mois:
+            self.mois_jours, avant = jours, dict(self.compteurs)
+            for jour in jours:
+                self.journee(jour)
+                self.stdout.write(f"{jour:%d/%m/%Y} : {self.compteurs['voyages']} voyages, {self.compteurs['billets']} billets")
+            self.moment(jours[-1], 22)
+            with horloge(self.maintenant):
+                self.fin_de_mois(jours[0], jours[-1])
+            self.par_mois.append((jours[0], jours[-1], {k: self.compteurs[k] - avant[k] for k in self.compteurs}))
         bilan = self.bilan()
         texte = self.texte_bilan(bilan, o)
         self.stdout.write(texte)
@@ -87,6 +100,14 @@ class Command(BaseCommand):
             with open(o["rapport"], "w", encoding="utf-8") as f:
                 f.write(texte)
         return None
+
+    def exercices(self):
+        """Un exercice comptable par année civile couverte (la simulation peut passer sur l'année suivante)."""
+        from apps.core.models import Exercice
+
+        for a in sorted({j.year for j in self.jours}):
+            Exercice.objects.get_or_create(code=str(a), defaults={"date_debut": datetime.date(a, 1, 1),
+                                                                   "date_fin": datetime.date(a, 12, 31)})
 
     def caisse_pour(self, montant, jour):
         """Le guichet paie en espèces s'il en a assez, sinon la dépense est réglée par la banque."""
@@ -201,19 +222,22 @@ class Command(BaseCommand):
         from apps.garage.models import LigneReparation, OrdreReparation, PleinCarburant
         from apps.garage.models_magasin import AchatMagasin, LigneAchatMagasin, sortir
         from apps.partenaires.models import ContratPartenaire, ReglementPartenaire
-        from apps.transport.models import Billet, Colis, Depart
+        from apps.transport.models import Billet, Colis, Depart, DepenseVehicule
         from apps.transport.models_caisse import TransfertFonds, solde_tresorerie
         from apps.transport.models_depenses import DemandeDepense
 
         r = self.r
         with horloge(self.moment(jour, 5)), transaction.atomic():
-            if jour == self.jours[0]:                           # achats du magasin pour le mois
+            if jour == self.mois_jours[0]:                      # achats du magasin pour le mois
                 achat = AchatMagasin.objects.create(date=jour, fournisseur=self.fournisseur, facture="FICTIVE-01")
                 for code, _, _, qte, prix in ARTICLES:
                     LigneAchatMagasin.objects.create(achat=achat, article=self.articles[code], quantite=qte, prix_unitaire=prix)
                 LigneAchatMagasin.objects.create(achat=achat, destination=LigneAchatMagasin.IMMOBILISATION,
                                                  designation="Imprimante de guichet", prix_unitaire=250000)
                 achat.valider(self.agent)
+                for c in self.cars:                              # assurance et papiers du mois, imputés au véhicule
+                    DepenseVehicule(vehicule=c["vehicule"], nature=DepenseVehicule.ASSURANCE, montant=Decimal(35000),
+                                    libelle="Assurance et papiers du mois (fictif)", caisse=self.bq, date=jour).enregistrer()
             if jour.day == 15 and self.cars:                     # achat direct pour un car précis
                 achat = AchatMagasin.objects.create(date=jour, fournisseur=self.fournisseur, facture="FICTIVE-02")
                 LigneAchatMagasin.objects.create(achat=achat, destination=LigneAchatMagasin.VEHICULE, designation="Pare-brise",
@@ -229,7 +253,8 @@ class Command(BaseCommand):
                 d = Depart.objects.create(ligne=ligne, date=jour, heure=datetime.time(heure), vehicule=c["vehicule"],
                                           chauffeur=c["chauffeur"])
                 if not c.get("courrier"):
-                    voyageurs = max(1, int(d.places * r.uniform(0.55, 0.95) * self.echelle))
+                    saison = SAISON.get(jour.month, 1)                 # fêtes de fin d'année, grandes vacances
+                    voyageurs = max(1, int(d.places * min(r.uniform(0.55, 0.95) * saison, 1) * self.echelle))
                     for k in range(min(voyageurs, d.places)):
                         bagages = r.random() < 0.15
                         Billet(depart=d, voyageur=f"Voyageur {k + 1} (fictif)",
@@ -275,7 +300,7 @@ class Command(BaseCommand):
                                                    prix_unitaire=10000)
                     o.cloturer(caisse=self.caisse_pour(o.cout, jour), date=jour)
                     self.compteurs["reparations"] += 1
-            if jour == self.jours[0]:                            # loyers des gares, autorisés puis payés
+            if jour == self.mois_jours[0]:                       # loyers des gares, autorisés puis payés
                 for g in self.gares.values():
                     dd = DemandeDepense(nature=DemandeDepense.LOYER, libelle=f"Loyer {g.nom} (fictif)", montant=Decimal(150000),
                                         date=jour).demander(self.agent)
@@ -295,19 +320,18 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------------ fin de mois
     @transaction.atomic
-    def fin_de_mois(self):
+    def fin_de_mois(self, debut, fin):
         from apps.comptabilite.models import LigneEcriture
         from apps.comptabilite.services import creer_ecriture
         from apps.partenaires.models import Decompte, ReglementPartenaire
         from apps.personnel.models import PeriodePaie
 
-        fin = self.jours[-1]
         periode = PeriodePaie.objects.create(annee=fin.year, mois=fin.month)
         periode.generer()
         periode.valider(date=fin)
         periode.payer(self.bq, date=fin)
         for ct in self.contrats:
-            d = Decompte.calculer(ct, self.jours[0], fin).approuver(date=fin)
+            d = Decompte.calculer(ct, debut, fin).approuver(date=fin)
             if d.montant_du > 0:                                 # 60 % payés, le reste dû
                 ReglementPartenaire(partenaire=ct.partenaire, decompte=d, montant=(d.montant_du * Decimal("0.6")).quantize(Decimal("1")),
                                     caisse=self.bq, date=fin).enregistrer()
@@ -337,7 +361,15 @@ class Command(BaseCommand):
             return (a["d"] or 0) - (a["c"] or 0)
 
         ana = analytique.vehicules(debut, fin)
-        return {
+
+        def mois_gl(d, f, prefixe):
+            a = (LigneEcriture.objects.filter(ecriture__date__range=(d, f), ecriture__statut=Ecriture.STATUT_VALIDEE,
+                                              compte__numero__startswith=prefixe).aggregate(d=Sum("debit"), c=Sum("credit")))
+            return (a["d"] or 0) - (a["c"] or 0)
+
+        mensuel = [{"debut": d, "fin": f, **n, "produits": -mois_gl(d, f, "7"), "charges": mois_gl(d, f, "6")}
+                   for d, f, n in self.par_mois]
+        return {"mensuel": mensuel,
             **self.compteurs, "ecritures": Ecriture.objects.count(), "debit": tot["d"] or 0, "credit": tot["c"] or 0,
             "produits": -solde("7"), "charges": solde("6"), "billets_70611": -solde("70611"), "bagages_70614": -solde("70614"),
             "colis_70612": -solde("70612"), "carburant": solde("6053"), "pieces_624": solde("624"), "paie_661": solde("661"),
@@ -357,7 +389,7 @@ class Command(BaseCommand):
 
         controles = [
             ("Débit = crédit de toutes les écritures", b["debit"] == b["credit"]),
-            ("Caisse espèces positive en fin de mois", b["caisse_57"] >= 0),
+            ("Caisse espèces positive en fin de période", b["caisse_57"] >= 0),
             ("Fonds en transit soldés (versements reçus)", b["transit_585"] == 0),
             ("Salaires nets payés (422 soldé)", b["net_a_payer_422"] == 0),
             ("Stock comptable (33) = valeur du magasin", abs(b["stock_33"] - b["valeur_magasin"]) <= len(ARTICLES)),
@@ -366,7 +398,11 @@ class Command(BaseCommand):
         ]
         lignes = [
             "# Bilan de la simulation (données FICTIVES)", "",
-            f"Mois simulé : {self.jours[0]:%d/%m/%Y} au {self.jours[-1]:%d/%m/%Y} · échelle {o['echelle']} · graine {o['graine']}", "",
+            f"Période simulée : {self.jours[0]:%d/%m/%Y} au {self.jours[-1]:%d/%m/%Y} ({len(self.mois)} mois) · échelle "
+            f"{o['echelle']} · graine {o['graine']}", "",
+            "| Mois | Voyages | Billets | Colis | Produits | Charges | Résultat |", "|---|---:|---:|---:|---:|---:|---:|",
+            *[f"| {x['debut']:%m/%Y} | {x['voyages']} | {x['billets']} | {x['colis']} | {m(x['produits'])} | {m(x['charges'])} | "
+              f"{m(x['produits'] - x['charges'])} |" for x in b["mensuel"]], "",
             "| Activité | Nombre |", "|---|---:|",
             *[f"| {k} | {b[k]} |" for k in ("voyages", "billets", "bagages", "colis", "pleins", "reparations", "bulletins", "ecritures")],
             "", "| Comptabilité générale | FCFA |", "|---|---:|",
@@ -383,7 +419,7 @@ class Command(BaseCommand):
             *[f"| {p} | {v} | {c} | {m(s)} |" for p, v, c, s in b["proprietaires"]], "",
             "| Contrôle | Résultat |", "|---|---|",
             *[f"| {t} | {'OK' if ok else 'ÉCART'} |" for t, ok in controles], "",
-            "Taux de paie de démonstration (5 % / 10 %), prix, salaires et contrats : fictifs, sans valeur réglementaire.\nNon simulés (le résultat est donc optimiste) : assurances, amortissements, péages, impôts et taxes, imprévus de voyage, annulations et remboursements.",
+            "Taux de paie de démonstration (5 % / 10 %), prix, salaires et contrats : fictifs, sans valeur réglementaire.\nNon simulés (le résultat est donc optimiste) : amortissements, péages, impôts et taxes, imprévus de voyage, annulations et remboursements. Saisonnalité de démonstration : janvier-février plus calmes, août et décembre plus chargés.",
         ]
         self.controles = controles
         return "\n".join(lignes) + "\n"

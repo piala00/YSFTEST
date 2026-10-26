@@ -1297,6 +1297,25 @@ class SimulationTests(TestCase):
         self.assertIn("Bilan de la simulation", sortie.getvalue())
 
 
+class SimulationPlusieursMoisTests(TestCase):
+    def test_deux_mois_a_cheval_sur_deux_annees(self):
+        from apps.core.models import Exercice
+        from apps.partenaires.models import ContratPartenaire, Decompte
+        from apps.personnel.models import PeriodePaie
+
+        from .management.commands.simulation import Command
+
+        commande = Command()
+        call_command(commande, mois="2026-12", nombre_mois=2, jours=2, vehicules=8, salaries=25, echelle=0.1, forcer=True,
+                     stdout=io.StringIO())
+        self.assertTrue(all(ok for _, ok in commande.controles), commande.controles)
+        self.assertEqual(sorted(PeriodePaie.objects.values_list("annee", "mois")), [(2026, 12), (2027, 1)])
+        self.assertTrue({"2026", "2027"} <= set(Exercice.objects.values_list("code", flat=True)))
+        self.assertEqual(Decompte.objects.count(), 2 * ContratPartenaire.objects.count())     # un décompte par mois
+        self.assertEqual([m["debut"] for m in commande.bilan()["mensuel"]], [datetime.date(2026, 12, 1), datetime.date(2027, 1, 1)])
+        self.assertTrue(DepenseVehicule.objects.filter(nature=DepenseVehicule.ASSURANCE).exists())
+
+
 class DeuxModulesComptablesTests(TestCase):
     """Accueil : « Comptabilité générale » et « Comptabilité analytique », deux logiciels sur une seule comptabilité."""
 
