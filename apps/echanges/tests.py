@@ -29,6 +29,12 @@ class ScenarioTroisDossiersTests(SimpleTestCase):
                                                              "70611": ["0.00", "3667.00", "EN 202 BB"]})
         self.assertEqual(r["dla_reversement"]["troncon2"], ["EFFECTUE", "EN 202 BB", "BTA"])
         self.assertNotIn("manquants", r["dla_import2"])
+        # Dépenses autorisées par le siège ; Douala paie le loyer de Bertoua (liaisons compensées au siège)
+        self.assertEqual(r["siege_demandes"], ["DEMANDEE", "DEMANDEE"])
+        self.assertEqual(r["dla_depenses"]["statuts"], ["AUTORISEE", "AUTORISEE"])
+        self.assertEqual(r["dla_depenses"]["lignes"], {"DLA": ["5711", "6222"], "BTA": ["18504", "5711"]})
+        self.assertEqual(r["bta_regularisation"], [["18502", "0.00", "100000.00"], ["6222", "100000.00", "0.00"]])
+        self.assertEqual(r["siege_depenses"], {"loyers": "120000.00", "liaisons_185": "0.00", "loyer_BTA": "100000.00"})
         c = r["siege_consolide"]
         self.assertEqual(c["ecritures"], 10)                                   # + le plein de Bertoua
         self.assertEqual(c["journaux"], ["CA-BTA", "CA-DLA", "CA-YDE", "OD-BTA", "OD-DLA"])

@@ -122,6 +122,15 @@ def serialiser(o):
                               "panne": o.panne, "intervenant": o.intervenant, "statut": o.statut,
                               "lignes": [{"nature": l.nature, "designation": l.designation, "quantite": _d(l.quantite),
                                           "prix_unitaire": _d(l.prix_unitaire)} for l in o.lignes.all()]}, o.date_entree, o.cree_par or ""
+    from apps.transport.models import DemandeDepense
+
+    if isinstance(o, DemandeDepense):
+        return "depense_demande", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "date": _date(o.date),
+                                   "agence": o.agence, "nature": o.nature, "compte": o.compte.numero if o.compte_id else None,
+                                   "libelle": o.libelle, "beneficiaire": o.beneficiaire, "montant": _d(o.montant),
+                                   "vehicule": _uid(o.vehicule), "statut": o.statut, "demande_par": o.demande_par,
+                                   "decision_par": o.decision_par, "motif": o.motif, "payeur": o.payeur,
+                                   "paye_le": _date(o.paye_le)}, o.date, o.demande_par
     raise TypeError(f"Objet non échangeable : {o!r}")
 
 
@@ -503,17 +512,65 @@ def _ecriture(p, origine, local):
         raise Conflit("écriture déséquilibrée")
 
 
+def _depense_demande(p, origine, local):
+    """Au siège : la demande d'une agence, à autoriser (sa décision n'est jamais écrasée par un état antérieur)."""
+    from apps.comptabilite.models import Compte
+    from apps.transport.models import DemandeDepense, Vehicule
+
+    if local.role != local.SIEGE:
+        raise SansObjet("les demandes de dépense sont autorisées au siège")
+    d = _copie(DemandeDepense, p["uid"], origine)
+    d.numero, d.date, d.agence, d.nature = p["numero"], datetime.date.fromisoformat(p["date"]), p.get("agence", ""), p["nature"]
+    d.libelle, d.beneficiaire, d.montant = p["libelle"], p.get("beneficiaire", ""), Decimal(p["montant"])
+    d.demande_par = p.get("demande_par", "")
+    d.compte = (Compte.objects.get_or_create(numero=p["compte"], defaults={"intitule": p["compte"]})[0]
+                if p.get("compte") else None)
+    d.vehicule = Vehicule.objects.filter(uid=p.get("vehicule")).first() if p.get("vehicule") else None
+    if DemandeDepense.ORDRE[p["statut"]] >= DemandeDepense.ORDRE.get(d.statut or "DEMANDEE", 0):
+        d.statut = p["statut"]
+        d.decision_par = p.get("decision_par") or d.decision_par
+        d.motif = p.get("motif") or d.motif
+    d.payeur = p.get("payeur") or d.payeur
+    d.paye_le = datetime.date.fromisoformat(p["paye_le"]) if p.get("paye_le") else d.paye_le
+    _enregistrer(d, "N° de demande", p["numero"])
+
+
+def _depense_decision(p, origine, local):
+    """Dans l'agence qui a demandé : autorisation ou refus du siège."""
+    from apps.transport.models import DemandeDepense
+
+    d = DemandeDepense.objects.filter(uid=p["demande"], site_origine="").first()
+    if d is None:
+        raise SansObjet("demande d'une autre agence")
+    if d.statut == DemandeDepense.DEMANDEE:
+        d.statut, d.decision_par, d.motif = p["statut"], p.get("par", "Siège"), p.get("motif", "")
+        d.decision_le = parse_datetime(p["le"]) if p.get("le") else None
+        d.save(update_fields=["statut", "decision_par", "decision_le", "motif"])
+
+
+def _depense_payee(p, origine, local):
+    """Dans l'agence (ou au siège) à qui appartient la dépense payée ailleurs : sa charge, contre la liaison."""
+    from apps.transport.models_depenses import regulariser_depense_recue
+
+    if p.get("pour_agence") != local.code:
+        if local.role == local.SIEGE:                    # le siège le relaie à l'agence concernée
+            return
+        raise SansObjet("dépense d'une autre agence")
+    regulariser_depense_recue(p, p.get("payeur") or origine.code)
+
+
 INTEGRATIONS = {"agence": _agence, "gare": _gare, "ligne": _ligne, "vehicule": _vehicule, "chauffeur": _chauffeur,
                 "depart": _depart, "billet": _billet, "colis": _colis, "colis_livraison": _colis_livraison,
                 "depart_arrivee": _depart_arrivee, "depense": _depense, "ecriture": _ecriture,
                 "troncon_affecte": _troncon_affecte, "troncon_effectue": _troncon_effectue,
-                "plein": _plein, "reparation": _reparation}
+                "plein": _plein, "reparation": _reparation, "depense_demande": _depense_demande,
+                "depense_decision": _depense_decision, "depense_payee": _depense_payee}
 
 # Ordre d'intégration d'un même lot : les référentiels avant les faits qui les utilisent
 PRIORITE = {"agence": 0, "gare": 1, "vehicule": 1, "chauffeur": 1, "ligne": 2, "depart": 3, "billet": 4, "colis": 4,
             "depense": 4, "plein": 4, "reparation": 4, "colis_livraison": 5, "depart_arrivee": 5, "troncon_affecte": 5, "troncon_effectue": 5,
-            "ecriture": 6}
+            "ecriture": 6, "depense_demande": 4, "depense_decision": 5, "depense_payee": 5}
 
 # Faits qu'une agence doit connaître quand ils viennent d'une autre agence (relais par le siège)
 RELAYES = {"agence", "gare", "ligne", "vehicule", "chauffeur", "depart", "colis", "colis_livraison", "depart_arrivee",
-           "billet", "troncon_affecte", "troncon_effectue"}
+           "billet", "troncon_affecte", "troncon_effectue", "depense_payee"}

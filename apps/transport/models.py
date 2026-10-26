@@ -72,6 +72,9 @@ class ParametresTransport(models.Model):
     sessions_caisse_obligatoires = models.BooleanField(
         "Caisse ouverte obligatoire pour encaisser", default=False,
         help_text="Chaque guichetier ou agent colis ouvre sa caisse (fonds de départ) avant d'encaisser, et la ferme le soir")
+    plafond_depense_sans_autorisation = models.DecimalField(
+        "Dépenses autorisées d'office jusqu'à", max_digits=14, decimal_places=0, default=ZERO,
+        help_text="0 : toute dépense de fonctionnement attend l'autorisation du siège")
     retenue_annulation = models.DecimalField(
         "Retenue sur billet annulé (%)", max_digits=5, decimal_places=2, default=ZERO,
         help_text="Part du prix gardée par l'agence quand un voyageur annule (modifiable à chaque annulation)")
@@ -1317,4 +1320,5 @@ class DepenseVehicule(models.Model):
 
 
 from .models_caisse import ClotureJournee, SessionCaisse, TransfertFonds  # noqa: E402,F401
-from .models_exploitation import AvanceMission, JustificatifMission  # noqa: E402,F401
+from .models_exploitation import AvanceMission, JustificatifMission  # noqa
+from .models_depenses import DemandeDepense  # noqa: E402,F401

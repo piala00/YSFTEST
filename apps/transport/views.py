@@ -651,3 +651,54 @@ def analytique_proprietaires(request):
     filtres, _ = _filtres_analytiques(request)
     return render(request, "transport/analytique_proprietaires.html", {
         **filtres, "portefeuilles": analytique.proprietaires(filtres["du"], filtres["au"], filtres["gamme"])})
+
+
+# ---------------------------------------------------------------- Dépenses de fonctionnement autorisées par le siège
+@login_required
+def depenses_fonctionnement(request):
+    from apps.comptabilite.models import Journal
+    from apps.core.models import Agence
+
+    from .models_depenses import DemandeDepense
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        try:
+            if action == "demander":
+                d = DemandeDepense(
+                    date=_jour(request, "date") if request.POST.get("date") else timezone.localdate(),
+                    agence=request.POST.get("agence", ""), nature=request.POST.get("nature", DemandeDepense.AUTRE),
+                    libelle=request.POST.get("libelle", "").strip(), beneficiaire=request.POST.get("beneficiaire", "").strip(),
+                    montant=Decimal(request.POST.get("montant") or 0),
+                    vehicule=Vehicule.objects.filter(pk=request.POST.get("vehicule") or None).first())
+                if not d.libelle:
+                    raise ValidationError("Indiquez le libellé de la dépense.")
+                d.demander(request.user)
+                messages.success(request, f"Demande {d.numero} enregistrée : {d.get_statut_display().lower()}.")
+            else:
+                d = get_object_or_404(DemandeDepense, pk=request.POST.get("demande"))
+                if action in ("autoriser", "refuser"):
+                    d.decider(action == "autoriser", request.user, request.POST.get("motif", ""))
+                    messages.success(request, f"Demande {d.numero} : {d.get_statut_display().lower()}.")
+                elif action == "payer":
+                    d.payer(get_object_or_404(Journal, pk=request.POST.get("caisse")), request.user)
+                    messages.success(request, f"Dépense {d.numero} payée.")
+                elif action == "annuler":
+                    d.annuler(request.POST.get("motif", ""), request.user)
+                    messages.success(request, f"Demande {d.numero} annulée.")
+        except (ValidationError, ArithmeticError, ValueError) as exc:
+            _erreur(request, exc)
+        return redirect(request.path + (f"?statut={request.GET['statut']}" if request.GET.get("statut") else ""))
+    qs = DemandeDepense.objects.select_related("vehicule", "caisse")
+    if request.GET.get("statut"):
+        qs = qs.filter(statut=request.GET["statut"])
+    from apps.echanges.publication import site_local
+
+    local = site_local()
+    return render(request, "transport/depenses_fonctionnement.html", {
+        "demandes": qs[:300], "natures": DemandeDepense.NATURES, "statuts": DemandeDepense.STATUTS,
+        "statut": request.GET.get("statut", ""), "decision_ici": DemandeDepense.autorisation_locale(),
+        "local": local, "agences": Agence.objects.exclude(code="").order_by("rang", "code"),
+        "vehicules": Vehicule.objects.filter(actif=True),
+        "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__isnull=False),
+        "plafond": ParametresTransport.get().plafond_depense_sans_autorisation})

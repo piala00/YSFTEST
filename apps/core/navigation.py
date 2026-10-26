@@ -845,6 +845,8 @@ TRANSPORT = Module(
             E("traitement.voyages", "Voyages à clôturer, avances de mission", "transport:voyages_a_cloturer", icone="bi-flag"),
             E("traitement.sessions", "Contrôle des caisses des guichets", "transport:sessions_caisse", icone="bi-safe"),
             E("traitement.transferts", "Transferts de fonds (banque, siège)", "transport:transferts", icone="bi-arrow-left-right"),
+            E("traitement.depenses_fonctionnement", "Dépenses de fonctionnement (autorisation du siège)",
+              "transport:depenses_fonctionnement", icone="bi-receipt-cutoff"),
             E("traitement.cloture", "Clôture de la journée", "transport:cloture", icone="bi-lock"),
             SEP(),
             E("traitement.partenaires", "Véhicules des partenaires", icone="bi-people", enfants=[

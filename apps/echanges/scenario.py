@@ -183,6 +183,50 @@ print(json.dumps({"ecritures": Ecriture.objects.filter(site_origine__in=["DLA", 
         r["altere"] = "accepté"
     except RuntimeError as exc:
         r["altere"] = str(exc).splitlines()[-1]
+    # Dépenses de fonctionnement : Douala demande son loyer et paie celui de Bertoua, avec l'autorisation du siège
+    dla.py("""
+from decimal import Decimal
+from apps.transport.models import DemandeDepense
+DemandeDepense(nature="LOYER", libelle="Loyer gare de Douala", montant=Decimal(20000)).demander()
+DemandeDepense(nature="LOYER", libelle="Loyer gare de Bertoua", montant=Decimal(100000), agence="BTA").demander()
+print("null")""")
+    siege.manage("echanges", "importer", lots_de(dla.manage("echanges", "exporter", "--dossier", str(travail)))[0])
+    r["siege_demandes"] = siege.py("""
+import json
+from apps.transport.models import DemandeDepense
+avant = sorted(DemandeDepense.objects.values_list("statut", flat=True))
+for d in DemandeDepense.objects.all():
+    d.decider(True)
+print(json.dumps(avant))""")
+    lots_siege = lots_de(siege.manage("echanges", "exporter", "--vers", "tous", "--dossier", str(travail)))
+    dla.manage("echanges", "importer", [l for l in lots_siege if "vers-DLA" in l][0])
+    r["dla_depenses"] = dla.py("""
+import json
+from apps.comptabilite.models import Journal
+from apps.transport.models import DemandeDepense
+statuts = sorted(DemandeDepense.objects.values_list("statut", flat=True))
+lignes = {}
+for d in DemandeDepense.objects.order_by("montant"):
+    d.payer(Journal.objects.get(code="CA"))
+    lignes[d.agence] = sorted(l.compte.numero for l in d.ecriture.lignes.all())
+print(json.dumps({"statuts": statuts, "lignes": lignes}))""")
+    siege.manage("echanges", "importer", lots_de(dla.manage("echanges", "exporter", "--dossier", str(travail)))[0])
+    lots_siege = lots_de(siege.manage("echanges", "exporter", "--vers", "tous", "--dossier", str(travail)))
+    bta.manage("echanges", "importer", [l for l in lots_siege if "vers-BTA" in l][0])
+    r["bta_regularisation"] = bta.py("""
+import json
+from apps.transport.models import DemandeDepense
+d = DemandeDepense.objects.get(libelle="Loyer gare de Bertoua")
+print(json.dumps(sorted((l.compte.numero, str(l.debit), str(l.credit)) for l in d.ecriture_regularisation.lignes.all())))""")
+    siege.manage("echanges", "importer", lots_de(bta.manage("echanges", "exporter", "--dossier", str(travail)))[0])
+    r["siege_depenses"] = siege.py("""
+import json
+from decimal import Decimal
+from apps.comptabilite.models import LigneEcriture
+def solde(prefixe):
+    return str(sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero__startswith=prefixe)), Decimal(0)))
+print(json.dumps({"loyers": solde("6222"), "liaisons_185": solde("185"),
+                  "loyer_BTA": str(sum((l.debit for l in LigneEcriture.objects.filter(compte__numero="6222", section__code="AG-BTA")), Decimal(0)))}))""")
     return r
 
 

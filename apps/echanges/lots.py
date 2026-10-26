@@ -103,6 +103,10 @@ def _a_relayer(destination):
                  .order_by("site_origine_id", "sequence"))
     retenus = []
     for evt in candidats:
+        if evt.payload.get("pour_agence"):                  # fait adressé à une seule agence
+            if evt.payload["pour_agence"] == destination.code:
+                retenus.append(evt)
+            continue
         gares = _gares_de(evt)
         if gares is None or any(g.agence_id == destination.pk for g in gares):
             retenus.append(evt)

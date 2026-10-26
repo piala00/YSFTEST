@@ -968,3 +968,56 @@ class SystemeMinimalTresorerieTests(TestCase):
         self.assertContains(self.client.get(reverse("comptabilite:bilan") + "?ok=1"), "système minimal de trésorerie")
         self.assertContains(self.client.get(reverse("comptabilite:compte_resultat") + "?ok=1"), "TOTAL DES RECETTES SUR PRODUITS")
         self.assertContains(self.client.get(reverse("comptabilite:bilan") + "?ok=1&systeme=NORMAL"), "Bilan SYSCOHADA")
+
+
+class DepensesFonctionnementTests(TestCase):
+    """Dépenses de fonctionnement : demandées, autorisées (par le siège ou un autre utilisateur), puis payées."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+
+    def test_circuit_dans_un_dossier_sans_echanges(self):
+        from django.contrib.auth import get_user_model
+
+        from .models_depenses import DemandeDepense
+
+        U = get_user_model()
+        agent, chef = U.objects.create_user("agent", password="x"), U.objects.create_user("chef", password="x")
+        d = DemandeDepense(nature=DemandeDepense.LOYER, libelle="Loyer d'octobre", montant=Decimal(75000)).demander(agent)
+        self.assertEqual(d.statut, DemandeDepense.DEMANDEE)
+        with self.assertRaisesMessage(ValidationError, "autorisée avant"):
+            d.payer(Journal.objects.get(code="CA"))
+        with self.assertRaisesMessage(ValidationError, "propre dépense"):
+            d.decider(True, agent)
+        with self.assertRaisesMessage(ValidationError, "motif"):
+            d.decider(False, chef)
+        d.decider(True, chef)
+        d.payer(Journal.objects.get(code="CA"), agent)
+        self.assertEqual((d.statut, solde("6222"), solde("5711")), (DemandeDepense.PAYEE, 75000, -75000))
+
+    def test_plafond_autorisation_d_office(self):
+        from .models_depenses import DemandeDepense
+
+        p = ParametresTransport.get()
+        p.plafond_depense_sans_autorisation = 10000
+        p.save()
+        petite = DemandeDepense(nature=DemandeDepense.TELECOM, libelle="Recharge Internet", montant=Decimal(5000)).demander()
+        grosse = DemandeDepense(nature=DemandeDepense.LOYER, libelle="Loyer", montant=Decimal(50000)).demander()
+        self.assertEqual((petite.statut, grosse.statut), (DemandeDepense.AUTORISEE, DemandeDepense.DEMANDEE))
+
+    def test_ecran(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        from .models_depenses import DemandeDepense
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        url = reverse("transport:depenses_fonctionnement")
+        self.client.post(url, {"action": "demander", "nature": "EAU_ELECTRICITE", "libelle": "Facture d'électricité", "montant": "30000"})
+        d = DemandeDepense.objects.get()
+        self.client.post(url, {"action": "autoriser", "demande": d.pk})
+        self.client.post(url, {"action": "payer", "demande": d.pk, "caisse": Journal.objects.get(code="CA").pk})
+        d.refresh_from_db()
+        self.assertEqual(d.statut, DemandeDepense.PAYEE)
+        self.assertContains(self.client.get(url), "Facture d&#x27;électricité")

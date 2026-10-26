@@ -16,6 +16,7 @@ urlpatterns = [
     path("fiches/<str:genre>/nouvelle/", views.fiche_form, name="fiche_create"),
     path("fiches/<str:genre>/<int:pk>/", views.fiche_form, name="fiche_update"),
     path("etats/rapport-journalier/", views.rapport_journalier, name="rapport_journalier"),
+    path("depenses-fonctionnement/", views.depenses_fonctionnement, name="depenses_fonctionnement"),
     path("etats/rapport-journalier/imprimer/", views.rapport_journalier_imprimer, name="rapport_journalier_imprimer"),
     path("etats/recette/", views.recette_journaliere, name="recette"),
     path("etats/rentabilite/", views.rentabilite, name="rentabilite"),
