@@ -39,7 +39,8 @@ class PartenairesTests(TestCase):
 
     def contrat(self, **champs):
         valeurs = {"vehicule": self.car, "partenaire": self.proprio, "modele": ContratPartenaire.COMMISSION,
-                   "debut": self.debut_mois, "taux_commission": Decimal("20")}
+                   "debut": self.debut_mois, "taux_commission": Decimal("20"),
+                   "charge_autres": False, "charge_equipage": False}       # assurance de ces cas : laissée à la société
         valeurs.update(champs)
         return ContratPartenaire.objects.create(**valeurs).activer()
 
@@ -322,8 +323,8 @@ class CompteDuCamionTests(TestCase):
         self.assertEqual(solde_partenaire(self.proprio), 50000)
 
     def test_contrat_type_fixe_mensuel_plus_compte_du_camion(self):
-        """Contrat type : fixe mensuel + (recettes − dépenses − pourcentage de la société) ; assurance et papiers à la
-        charge de la société, jamais déduits du compte du camion."""
+        """Contrat type : fixe mensuel + (recettes − TOUTES les dépenses du véhicule − pourcentage de la société) ; la
+        société gère et impute chaque dépense au véhicule, sans intervention du propriétaire."""
         from apps.comptabilite.models import Compte
         from apps.comptabilite.services import creer_ecriture
 
@@ -331,7 +332,7 @@ class CompteDuCamionTests(TestCase):
         fin = datetime.date(2026, 9, 30)
         contrat = ContratPartenaire.objects.create(vehicule=self.car, partenaire=self.proprio, modele=ContratPartenaire.COMMISSION,
                                                    debut=debut, taux_commission=10, montant_location=100000).activer()
-        self.assertFalse(contrat.charge_autres)                                    # assurances, papiers : la société
+        self.assertTrue(contrat.charge_autres and contrat.charge_equipage)          # toutes les dépenses du véhicule
         self.mouvement(datetime.date(2026, 9, 10), recette=1000000, charge=300000)
         assurance = Compte.objects.get_or_create(numero="625", defaults={"intitule": "Primes d'assurance"})[0]
         creer_ecriture(Journal.objects.get(code="CA"), datetime.date(2026, 9, 12), "Assurance du camion",
@@ -339,9 +340,9 @@ class CompteDuCamionTests(TestCase):
                         {"compte": Compte.objects.get(numero="5711"), "credit": 50000}])
         d = Decompte.calculer(contrat, debut, fin)
         self.assertEqual((d.recettes, d.commission, d.depenses, d.fixe, d.variable, d.montant_du),
-                         (1000000, 100000, 300000, 100000, 600000, 700000))
+                         (1000000, 100000, 350000, 100000, 550000, 650000))      # carburant 300 000 + assurance 50 000
         d.approuver()
-        self.assertEqual(solde_partenaire(self.proprio), 700000)
+        self.assertEqual(solde_partenaire(self.proprio), 650000)
         self.assertIsNotNone(d.ecriture_fixe)                                       # fixe et compte : deux écritures
         self.assertEqual(d.ecriture_fixe.lignes.get(credit__gt=0).credit, 100000)
-        self.assertEqual(d.ecriture.lignes.get(credit__gt=0).credit, 600000)
+        self.assertEqual(d.ecriture.lignes.get(credit__gt=0).credit, 550000)

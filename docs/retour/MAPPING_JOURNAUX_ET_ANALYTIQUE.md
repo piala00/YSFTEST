@@ -26,7 +26,7 @@ repris d'un autre logiciel garde son plan d'origine tel quel jusqu'à la bascule
 | Avance de mission | D 47121 / C caisse ; justification D 638, 6181, 6053, 624 / C 47121 | oui |
 | Paie | D 661, 664… / C 422, 431… (taux fixés par l'expert-comptable) | selon la ventilation de l'employé |
 | Droit du propriétaire | D 622 (fixe, variable) / C 467 propriétaire | oui (622) |
-| Contrat type du propriétaire (compte du camion) | fixe mensuel éventuel : D 622 / C 467 ; compte du camion = recettes − dépenses à sa charge (carburant, route, réparations) − pourcentage de la société sur les recettes : D 622 / C 467 (ou l'inverse s'il est négatif) ; assurances et papiers : charges de la société, jamais déduites | oui (622) |
+| Contrat type du propriétaire (compte du camion) | fixe mensuel éventuel : D 622 / C 467 ; compte du camion = recettes − toutes les dépenses du véhicule (carburant, route, réparations, pièces, équipage, assurances, papiers ; gérées et imputées par la société sans intervention du propriétaire) − pourcentage de la société sur les recettes : D 622 / C 467 (ou l'inverse s'il est négatif) ; chaque catégorie reste réglable par contrat | oui (622) |
 | Avance, retrait, règlement au propriétaire | D 467 / C caisse | non |
 | Dépense de fonctionnement d'une autre agence | payeur D 185 agence / C caisse ; agence concernée D charge / C 185 payeur | si indiqué |
 | Achat du magasin pour le stock | D 33x stock / C 401 fournisseur (journal AC) ou caisse | non |

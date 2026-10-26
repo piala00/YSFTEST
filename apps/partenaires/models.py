@@ -85,10 +85,11 @@ class ContratPartenaire(models.Model):
                                         help_text="Seulement si le contrat le prévoit ; sinon la perte est due par le propriétaire")
     charge_carburant = models.BooleanField("Carburant à la charge du propriétaire", default=True)
     charge_reparations = models.BooleanField("Réparations et pièces à sa charge", default=True)
-    charge_equipage = models.BooleanField("Salaire de l'équipage à sa charge", default=False)
+    charge_equipage = models.BooleanField("Salaire de l'équipage à sa charge", default=True)
     charge_route = models.BooleanField("Péages et frais de route à sa charge", default=True)
-    charge_autres = models.BooleanField("Assurances, papiers et autres charges du véhicule à sa charge", default=False,
-                                        help_text="Habituellement à la charge de la société")
+    charge_autres = models.BooleanField("Assurances, papiers et autres charges du véhicule à sa charge", default=True,
+                                        help_text="Par défaut, toutes les dépenses du véhicule, gérées et imputées par la "
+                                                  "société sans intervention du propriétaire, vont au compte du camion")
     statut = models.CharField(max_length=10, choices=STATUTS, default=BROUILLON)
     approuve_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     notes = models.CharField(max_length=250, blank=True)
