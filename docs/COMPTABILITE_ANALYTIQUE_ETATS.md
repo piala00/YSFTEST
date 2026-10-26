@@ -56,6 +56,24 @@ Les états spécialisés restent disponibles : comptes d'exploitation, grand-liv
 portefeuilles, relevés et règlements des propriétaires (situation financière **séparée** du résultat du véhicule) ;
 balance analytique des sections.
 
+## Reporting (construit sur ces états)
+
+Reporting › Etat :
+
+- **Catalogue de tous les états** : comptabilité générale (balance, grand-livre, journal, tiers, balance âgée, bilan,
+  compte de résultat, SIG, TVA), comptabilité analytique (plan, balance de chaque axe, états spécialisés) et analyses du
+  reporting, chacun ouvert sur la période choisie.
+- **Évolution de la société** : mois par mois, produits, charges, résultat, marge, trésorerie, créances clients, dettes
+  fournisseurs et sommes dues aux propriétaires.
+- **Comparaison de deux périodes** sur n'importe quel axe : période précédente, N-1 ou dates libres ; écart et variation,
+  avec le non affecté et le rapprochement des deux périodes.
+- **Tableau mensuel par élément** : chaque élément d'un axe, mois par mois (résultat, produits ou charges).
+- **Classements** : les meilleurs et les moins bons éléments d'un axe par résultat, produits, charges ou marge.
+- Comparaisons du transport (avec voyages, voyageurs et remplissage) et tableau de bord, comme avant.
+
+Tous ces chiffres sont lus par le même moteur que la comptabilité analytique : un montant du reporting se retrouve, au
+franc près, dans l'état correspondant (vérifié par les tests).
+
 ## Consulter une période
 
 Sur chaque écran : **Aujourd'hui, Hier, Cette semaine, Ce mois, Mois précédent, Ce trimestre, Cette année, Exercice**,

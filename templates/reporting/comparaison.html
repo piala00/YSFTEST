@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Comparaison — {{ titre_axe }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Comparaison de deux périodes — {{ titre_axe }}</h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<form class="d-flex flex-wrap gap-2 align-items-end mb-2 d-print-none" method="get">
+  <input type="hidden" name="du" value="{{ du|date:'Y-m-d' }}"><input type="hidden" name="au" value="{{ au|date:'Y-m-d' }}">
+  <div><label class="form-label small mb-0" for="axe">Axe analytique</label><select id="axe" name="axe" class="form-select form-select-sm">
+    {% for code, titre in axes %}<option value="{{ code }}" {% if code == axe %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="comparer">Comparer à (période B)</label><select id="comparer" name="comparer" class="form-select form-select-sm">
+    <option value="precedente" {% if comparer == "precedente" %}selected{% endif %}>la période précédente de même durée</option>
+    <option value="n1" {% if comparer == "n1" %}selected{% endif %}>la même période de l'année précédente (N-1)</option>
+    <option value="libre" {% if comparer == "libre" %}selected{% endif %}>des dates libres</option></select></div>
+  <div><label class="form-label small mb-0" for="du_b">B du</label><input type="date" id="du_b" name="du_b" value="{{ periode_b.0|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="au_b">B au</label><input type="date" id="au_b" name="au_b" value="{{ periode_b.1|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <button class="btn btn-sm btn-primary">Comparer</button>
+</form>
+<p class="small">A : du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }} · B : du {{ periode_b.0|date:"d/m/Y" }} au {{ periode_b.1|date:"d/m/Y" }}</p>
+<div class="card mb-3" style="overflow-x:auto"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Élément</th><th class="num">Produits A</th><th class="num">Charges A</th><th class="num">Résultat A</th>
+    <th class="num">Produits B</th><th class="num">Charges B</th><th class="num">Résultat B</th><th class="num">Écart A − B</th><th class="num">Variation</th><th class="num">Produits (var.)</th></tr></thead>
+  <tbody>{% for g in lignes %}<tr><td><a href="{% url 'analytique:element' axe g.cle %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}&amp;etat=comparaison">{{ g.libelle }}</a></td>
+    <td class="num">{{ g.a.produits|montant_ou_vide }}</td><td class="num">{{ g.a.charges|montant_ou_vide }}</td><td class="num fw-semibold">{{ g.a.resultat|montant }}</td>
+    <td class="num">{{ g.b.produits|montant_ou_vide }}</td><td class="num">{{ g.b.charges|montant_ou_vide }}</td><td class="num">{{ g.b.resultat|montant }}</td>
+    <td class="num fw-semibold {% if g.ecart < 0 %}text-danger{% else %}text-success{% endif %}">{{ g.ecart|montant }}</td>
+    <td class="num">{% if g.variation is not None %}{{ g.variation }} %{% endif %}</td><td class="num text-muted">{% if g.variation_produits is not None %}{{ g.variation_produits }} %{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="10" class="text-muted text-center p-3">Aucune imputation validée sur les deux périodes.</td></tr>{% endfor %}</tbody>
+  <tfoot>
+    <tr class="total"><td>Total des éléments</td><td class="num">{{ total_a.produits|montant }}</td><td class="num">{{ total_a.charges|montant }}</td><td class="num">{{ total_a.resultat|montant }}</td>
+      <td class="num">{{ total_b.produits|montant }}</td><td class="num">{{ total_b.charges|montant }}</td><td class="num">{{ total_b.resultat|montant }}</td><td colspan="3"></td></tr>
+    <tr><td>Non affecté</td><td class="num">{{ non_affecte_a.produits|montant_ou_vide }}</td><td class="num">{{ non_affecte_a.charges|montant_ou_vide }}</td><td class="num">{{ non_affecte_a.resultat|montant }}</td>
+      <td class="num">{{ non_affecte_b.produits|montant_ou_vide }}</td><td class="num">{{ non_affecte_b.charges|montant_ou_vide }}</td><td class="num">{{ non_affecte_b.resultat|montant }}</td><td colspan="3"></td></tr>
+    <tr class="total"><td>Comptabilité générale</td><td class="num">{{ gl_a.produits|montant }}</td><td class="num">{{ gl_a.charges|montant }}</td><td class="num">{{ gl_a.resultat|montant }}</td>
+      <td class="num">{{ gl_b.produits|montant }}</td><td class="num">{{ gl_b.charges|montant }}</td><td class="num">{{ gl_b.resultat|montant }}</td><td colspan="3"></td></tr>
+  </tfoot>
+</table></div>
+<p class="small {% if rapproche %}text-success{% else %}text-danger{% endif %}">{% if rapproche %}Rapproché sur les deux périodes : éléments + non affecté = comptabilité générale.{% else %}Écart avec la comptabilité générale : à signaler.{% endif %}</p>
+{% endblock %}

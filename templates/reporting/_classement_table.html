@@ -1,0 +1,7 @@
+{% load erp %}<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Élément</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Marge</th></tr></thead>
+  <tbody>{% for e in elements %}<tr><td><a href="{% url 'analytique:element' axe e.cle %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}">{{ e.libelle }}</a></td>
+    <td class="num">{{ e.produits|montant_ou_vide }}</td><td class="num">{{ e.charges|montant_ou_vide }}</td>
+    <td class="num fw-semibold {% if e.resultat < 0 %}text-danger{% endif %}">{{ e.resultat|montant }}</td><td class="num">{% if e.marge is not None %}{{ e.marge }} %{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center p-3">Aucun élément.</td></tr>{% endfor %}</tbody>
+</table></div>

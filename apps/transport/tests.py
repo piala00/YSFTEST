@@ -1513,3 +1513,67 @@ class AgencesPointsDeVenteTests(TestCase):
         e = pa.etat_element("points_vente", pv.pk, "croise", jour, jour, axe2="vehicules")
         self.assertEqual((e["total"]["produits"], [g["produits"] for g in e["croise"]]), (6000, [6000]))
         self.assertTrue(bonaberi.pk not in points)
+
+
+class ReportingSurLesEtatsTests(TestCase):
+    """Le reporting reprend, au franc près, les états généraux et analytiques ; tous les états sont au catalogue."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from .management.commands.simulation import Command
+
+        call_command(Command(), mois="2026-08", nombre_mois=2, jours=2, vehicules=8, salaries=25, echelle=0.1, forcer=True,
+                     stdout=io.StringIO())
+        cls.aout = (datetime.date(2026, 8, 1), datetime.date(2026, 8, 31))
+        cls.sept = (datetime.date(2026, 9, 1), datetime.date(2026, 9, 30))
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.client.force_login(get_user_model().objects.create_superuser("direction", "", "x"))
+
+    def test_chiffres_identiques_aux_etats(self):
+        from apps.comptabilite import plan_analytique as pa
+        from apps.reporting import analyses
+
+        deux_mois = (self.aout[0], self.sept[1])
+        gl = pa.balance_axe("vehicules", *deux_mois)["gl"]
+        evo = analyses.evolution_societe(*deux_mois)
+        self.assertEqual([l["mois"] for l in evo["lignes"]], [self.aout[0], self.sept[0]])
+        self.assertEqual((evo["total"]["produits"], evo["total"]["charges"]), (gl["produits"], gl["charges"]))
+        comp = analyses.comparaison_axe("vehicules", self.sept, self.aout)
+        self.assertTrue(comp["rapproche"])
+        self.assertEqual(comp["total_a"], pa.balance_axe("vehicules", *self.sept)["total_elements"])
+        mat = analyses.matrice_axe("agences", *deux_mois)
+        self.assertEqual(mat["total"], gl["resultat"])                          # éléments + non affecté = générale
+        balance = {e["cle"]: e["resultat"] for e in pa.balance_axe("agences", *deux_mois)["elements"]}
+        for l in mat["lignes"]:
+            if l["cle"] is not None:
+                self.assertEqual(l["total"], balance[l["cle"]], l["libelle"])
+        top = analyses.classement("vehicules", *deux_mois, critere="resultat", nombre=3)
+        resultats = [e["resultat"] for e in top["meilleurs"]]
+        self.assertEqual(resultats, sorted(resultats, reverse=True))
+        self.assertLessEqual(len(top["meilleurs"]), 3)
+
+    def test_ecrans_exports_et_catalogue(self):
+        from django.urls import reverse
+
+        p = "du=2026-08-01&au=2026-09-30"
+        for nom, extra in (("reporting:catalogue", ""), ("reporting:evolution", ""), ("reporting:comparaison", "&axe=lignes&comparer=n1"),
+                           ("reporting:comparaison", "&axe=gammes&comparer=libre&du_b=2026-08-01&au_b=2026-08-31"),
+                           ("reporting:matrice", "&axe=vehicules&indicateur=produits"),
+                           ("reporting:classement", "&axe=proprietaires&critere=marge&nombre=5")):
+            with self.subTest(nom=nom, extra=extra):
+                r = self.client.get(f"{reverse(nom)}?{p}{extra}")
+                self.assertEqual(r.status_code, 200)
+                self.assertNotContains(r, "{#")
+                if nom != "reporting:catalogue":
+                    csv = self.client.get(f"{reverse(nom)}?{p}{extra}&export=csv")
+                    self.assertEqual(csv["Content-Type"], "text/csv; charset=utf-8")
+        catalogue = self.client.get(reverse("reporting:catalogue") + "?" + p)
+        liens = [l["url"] for _, liens in catalogue.context["familles"] for l in liens]
+        self.assertGreater(len(liens), 25)
+        for url in liens:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertEqual(self.client.get(reverse("reporting:comparaison") + "?axe=inconnu").status_code, 404)

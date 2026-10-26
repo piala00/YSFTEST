@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Tableau mensuel — {{ titre_axe }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Tableau mensuel — {{ titre_axe }} <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<form class="d-flex flex-wrap gap-2 align-items-end mb-2 d-print-none" method="get">
+  <input type="hidden" name="du" value="{{ du|date:'Y-m-d' }}"><input type="hidden" name="au" value="{{ au|date:'Y-m-d' }}">
+  <div><label class="form-label small mb-0" for="axe">Axe analytique</label><select id="axe" name="axe" class="form-select form-select-sm" onchange="this.form.submit()">
+    {% for code, titre in axes %}<option value="{{ code }}" {% if code == axe %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="indicateur">Montant</label><select id="indicateur" name="indicateur" class="form-select form-select-sm" onchange="this.form.submit()">
+    {% for code, titre in indicateurs %}<option value="{{ code }}" {% if code == indicateur %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
+</form>
+<div class="card mb-3" style="overflow-x:auto"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Élément</th>{% for m in mois %}<th class="num text-nowrap">{{ m|date:"M Y" }}</th>{% endfor %}<th class="num">Total</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td class="text-nowrap">{% if l.cle is None %}<span class="text-muted">Non affecté</span>{% else %}<a href="{% url 'analytique:element' axe l.cle %}?du={{ du|date:'Y-m-d' }}&amp;au={{ au|date:'Y-m-d' }}&amp;etat=evolution">{{ l.libelle }}</a>{% endif %}</td>
+    {% for v in l.valeurs %}<td class="num {% if v < 0 %}text-danger{% endif %}">{{ v|montant_ou_vide }}</td>{% endfor %}<td class="num fw-semibold">{{ l.total|montant }}</td></tr>
+  {% empty %}<tr><td colspan="99" class="text-muted text-center p-3">Aucune imputation validée sur la période.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total (comptabilité générale)</td>{% for v in totaux %}<td class="num">{{ v|montant }}</td>{% endfor %}<td class="num">{{ total|montant }}</td></tr></tfoot>
+</table></div>
+{% endblock %}

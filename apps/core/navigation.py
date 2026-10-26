@@ -768,7 +768,16 @@ REPORTING = Module(
         menu_fichier("reporting", "commercial:societe"),
         menu_edition(),
         Onglet("etat", "Etat", "bi-printer", [
+            E("synthese.catalogue", "Catalogue de tous les états", "reporting:catalogue", icone="bi-collection", preuve="AJOUT-ERP"),
             E("synthese.dashboard", "Tableau de bord", "reporting:dashboard", icone="bi-speedometer2"),
+            E("analyses.evolution", "Évolution de la société (mois par mois)", "reporting:evolution", icone="bi-graph-up-arrow",
+              preuve="AJOUT-ERP"),
+            E("analyses.axes", "Analyses par axe analytique", icone="bi-diagram-3", preuve="AJOUT-ERP", enfants=[
+                E("analyses.comparaison", "Comparaison de deux périodes", "reporting:comparaison", preuve="AJOUT-ERP"),
+                E("analyses.matrice", "Tableau mensuel par élément", "reporting:matrice", preuve="AJOUT-ERP"),
+                E("analyses.classement", "Classements (meilleurs, moins bons)", "reporting:classement", preuve="AJOUT-ERP"),
+                E("analytique.plan", "Plan analytique et états détaillés", "analytique:plan", preuve="AJOUT-ERP"),
+            ]),
             E("synthese.rapport_commercial", "Rapport commercial journalier", "reporting:rapport_commercial", icone="bi-cash-stack"),
             SEP(),
             E("ventes.analyses", "Statistiques des ventes", icone="bi-graph-up", enfants=[
@@ -776,7 +785,6 @@ REPORTING = Module(
                 E("ventes.clients", "Par client", "reporting:ventes", vue="clients"),
                 E("ventes.articles", "Par article", "reporting:ventes", vue="articles"),
             ]),
-            E("analytique.plan", "Analyses par axe analytique", "analytique:plan", icone="bi-diagram-3", preuve="AJOUT-ERP"),
             E("transport.comparaisons", "Transport : comparaisons", icone="bi-bar-chart-steps", enfants=[
                 E("transport.comparaisons.agence", "Par agence", "reporting:comparaisons_transport", axe="agence"),
                 E("transport.comparaisons.gamme", "Classique / VIP", "reporting:comparaisons_transport", axe="gamme"),

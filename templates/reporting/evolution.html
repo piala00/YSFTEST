@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Évolution de la société{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Évolution de la société <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<div class="card mb-3" style="overflow-x:auto"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Mois</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Marge</th>
+    <th class="num">Trésorerie (fin de mois)</th><th class="num">Créances clients</th><th class="num">Dettes fournisseurs</th><th class="num">Dû aux propriétaires</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td>{{ l.mois|date:"F Y" }}</td><td class="num">{{ l.produits|montant }}</td><td class="num">{{ l.charges|montant }}</td>
+    <td class="num fw-semibold {% if l.resultat < 0 %}text-danger{% endif %}">{{ l.resultat|montant }}</td>
+    <td class="num text-muted">{% if l.produits %}{% widthratio l.resultat l.produits 100 %} %{% endif %}</td>
+    <td class="num">{{ l.tresorerie|montant }}</td><td class="num">{{ l.clients|montant }}</td><td class="num">{{ l.fournisseurs|montant }}</td><td class="num">{{ l.proprietaires|montant }}</td></tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center p-3">Aucun mois.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td><td class="num">{{ total.produits|montant }}</td><td class="num">{{ total.charges|montant }}</td><td class="num">{{ total.resultat|montant }}</td><td colspan="5"></td></tr></tfoot>
+</table></div>
+<p class="small text-muted">Produits et charges : classes 7 et 6 des écritures validées du mois. Soldes : comptes 5 (trésorerie), 411, 401 et 467 à la fin de chaque mois.</p>
+{% endblock %}

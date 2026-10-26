@@ -30,6 +30,9 @@ Voir `AUDIT_ECARTS.md` (EXISTANT / PARTIEL / ABSENT / BLOQUANT, avec fichiers et
 ## 4. Modifications de cette mise à jour
 | Sujet | Contenu | Migration |
 |---|---|---|
+| Reporting sur les états | catalogue de tous les états généraux et analytiques ; évolution de la société ; comparaison de deux périodes et tableau mensuel sur tout axe ; classements ; CSV ; mêmes chiffres que les états (testé) | — |
+| Simulation sur plusieurs mois | 1 à 24 mois, sur plusieurs exercices ; assurance des véhicules ; saisonnalité ; bilan mois par mois | — |
+| Programme exécutable | `deploy/executable` (lanceur + spécification PyInstaller), `9-COMPILER-EXECUTABLE.bat` (compilation Windows sans Internet) ; vérifié par une construction et un démarrage sous Linux | — |
 | Plan analytique complet | Comptabilité analytique : axes gares, véhicules, propriétaires, gammes, lignes, voyages, activités, contrats et plans de sections ; balance de chaque axe avec non affecté et rapprochement ; six états par élément (exploitation, comptes, grand-livre, évolution, croisé, comparaison) ; périodes en un clic ; CSV. Voir `docs/COMPTABILITE_ANALYTIQUE_ETATS.md`. Repris de l'archive 7 chiffres : refus des comptes trop longs, client bureau analytique ; non repris : inversion de l'ordre des modules (régression), doubles adresses | — |
 | Plan à 7 chiffres | longueur des comptes par société (7 pour un nouveau dossier), numéros complétés par des zéros à droite, recherche par numéro court conservée, commande de conversion avec contrôle des collisions ; reprise : plan d'origine tel quel | `core 0021` |
 | Deux modules comptables | « Comptabilité générale » et « Comptabilité analytique » (Véhicules, Propriétaires, sections) sur une seule comptabilité | — |

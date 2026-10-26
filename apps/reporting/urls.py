@@ -4,7 +4,7 @@ from apps.comptabilite import views as compta_views
 from apps.core import views as core_views
 from apps.transport import views as transport_views
 
-from . import views
+from . import views, views_analyses
 
 app_name = "reporting"
 
@@ -14,6 +14,11 @@ urlpatterns = [
     path("journal-evenements/", core_views.journal_evenements, {"module": "reporting"}, name="journal_evenements"),
     path("sauvegarde/", core_views.sauvegarde, {"module": "reporting"}, name="sauvegarde"),
     path("", views.dashboard, name="dashboard"),
+    path("etats/", views_analyses.catalogue, name="catalogue"),
+    path("evolution/", views_analyses.evolution, name="evolution"),
+    path("comparaison/", views_analyses.comparaison, name="comparaison"),
+    path("mensuel/", views_analyses.matrice, name="matrice"),
+    path("classement/", views_analyses.classement, name="classement"),
     path("ventes/", views.ventes, name="ventes"),
     path("balance-agee/", views.balance_agee, name="balance_agee"),
     path("rapport-commercial/", views.rapport_commercial, name="rapport_commercial"),
