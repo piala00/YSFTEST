@@ -10,9 +10,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.commercial.models import Tiers
+
 from .forms import (BilletForm, ChauffeurForm, ColisForm, DepartForm, DepenseVehiculeForm, GareForm, LigneForm,
                     ParametresTransportForm, VehiculeForm)
 from .models import Billet, Chauffeur, Colis, Depart, DepenseVehicule, Gare, Ligne, ParametresTransport, Vehicule
+from .models_incidents import FraisIncident, Incident
 
 ZERO = Decimal("0")
 
@@ -157,6 +160,8 @@ def depart_detail(request, pk):
                 get_object_or_404(AvanceMission, pk=request.POST.get("avance"), depart=depart).justifier(
                     Decimal(request.POST.get("restitue") or 0), utilisateur=request.user)
                 messages.success(request, "Avance justifiée.")
+            elif action in ("transborder", "recette_bord", "frais", "annuler_compagnie"):
+                _imprevu(request, depart, action)
             elif action == "embarquement":
                 depart.pointer_embarquement(request.POST.getlist("embarques"), request.user)
                 messages.success(request, "Liste d'embarquement enregistrée.")
@@ -182,7 +187,46 @@ def depart_detail(request, pk):
         "recette_billets": depart.recette_billets(), "recette_colis": depart.recette_colis(), "depenses": depart.depenses(),
         "depenses_liste": depart.depenses_vehicule.all(),
         "avances": depart.avances_mission.prefetch_related("justificatifs"), "natures_justificatif": JustificatifMission.NATURES,
-        "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)})
+        "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE),
+        "incidents": depart.incidents.prefetch_related("frais").select_related("vehicule_secours", "ecriture"),
+        "types_incident": Incident.TYPES, "natures_frais": FraisIncident.NATURES, "paiements_frais": FraisIncident.PAIEMENTS,
+        "vehicules_secours": Vehicule.objects.filter(actif=True).exclude(pk=depart.vehicule_id),
+        "departs_report": Depart.objects.filter(statut=Depart.PROGRAMME, ligne=depart.ligne, site_origine="").exclude(pk=depart.pk)
+        .order_by("date", "heure")[:30],
+        "fournisseurs": Tiers.objects.filter(type_tiers=Tiers.FOURNISSEUR, actif=True).order_by("nom")})
+
+
+def _imprevu(request, depart, action):
+    """Imprévus du voyage (docs/IMPREVUS_VOYAGE.md) depuis la fiche du départ."""
+    from apps.comptabilite.models import Journal
+
+    if action == "transborder":
+        secours = Vehicule.objects.filter(pk=request.POST.get("vehicule_secours") or None).first()
+        i = Incident.transborder(depart, request.POST.get("part_restante") or 0, secours, request.POST.get("lieu", ""),
+                                 request.POST.get("description", ""), request.user)
+        messages.success(request, f"Transbordement {i.numero} enregistré" + (" : recette partagée avec le car de secours."
+                                                                             if i.ecriture_id else "."))
+    elif action == "recette_bord":
+        i = Incident.recette_a_bord(depart, request.POST.get("montant") or 0, int(request.POST.get("nombre") or 1),
+                                    get_object_or_404(Journal, pk=request.POST.get("caisse")), request.POST.get("lieu", ""),
+                                    request.user)
+        messages.success(request, f"Recette à bord {i.numero} encaissée.")
+    elif action == "frais":
+        incident = Incident.objects.create(depart=depart, type_incident=request.POST.get("type_incident") or Incident.AUTRE,
+                                           lieu=request.POST.get("lieu", ""), description=request.POST.get("description", ""),
+                                           cree_par=request.user)
+        if request.POST.get("montant"):
+            FraisIncident(incident=incident, nature=request.POST.get("nature") or FraisIncident.AUTRE,
+                          libelle=request.POST.get("libelle", "").strip() or incident.get_type_incident_display(),
+                          montant=Decimal(request.POST["montant"]), paiement=request.POST.get("paiement") or FraisIncident.CAISSE,
+                          caisse=Journal.objects.filter(pk=request.POST.get("caisse") or None).first(),
+                          fournisseur=Tiers.objects.filter(pk=request.POST.get("fournisseur") or None).first()).enregistrer()
+        messages.success(request, f"Imprévu {incident.numero} enregistré.")
+    elif action == "annuler_compagnie":
+        nouveau = Depart.objects.filter(pk=request.POST.get("nouveau_depart") or None).first()
+        reportes, rembourses = depart.annuler_par_la_compagnie(request.POST.get("motif", ""), nouveau, request.user)
+        messages.success(request, f"Départ annulé : {reportes} voyageur(s) reporté(s), {rembourses} remboursement(s) "
+                                  f"autorisé(s) sans retenue.")
 
 
 @login_required

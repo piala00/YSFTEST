@@ -1021,3 +1021,106 @@ class DepensesFonctionnementTests(TestCase):
         d.refresh_from_db()
         self.assertEqual(d.statut, DemandeDepense.PAYEE)
         self.assertContains(self.client.get(url), "Facture d&#x27;électricité")
+
+
+class ImprevusTests(TestCase):
+    """Imprévus de voyage (docs/IMPREVUS_VOYAGE.md) : seules les écritures de ce qui change, jamais de double recette."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", verbosity=0)
+        dla = Gare.objects.create(code="DLA", nom="Gare de Douala", ville="Douala")
+        yde = Gare.objects.create(code="YDE", nom="Gare de Yaoundé", ville="Yaoundé")
+        cls.ligne = Ligne.objects.create(code="DLA-YDE", gare_depart=dla, gare_arrivee=yde, prix_billet=6000)
+        cls.ligne_vip = Ligne.objects.create(code="DLA-YDE-VIP", gare_depart=dla, gare_arrivee=yde, prix_billet=10000, gamme="VIP")
+        cls.car = Vehicule.objects.create(immatriculation="LT 501 IM", nombre_places=30)
+        cls.secours = Vehicule.objects.create(immatriculation="LT 502 IM", nombre_places=30)
+        cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur")
+        cls.ca = Journal.objects.get(code="CA")
+
+    def depart(self, ligne=None, heure=7):
+        return Depart.objects.create(ligne=ligne or self.ligne, date=datetime.date.today(), heure=datetime.time(heure),
+                                     vehicule=self.car, chauffeur=self.chauffeur)
+
+    def recette(self, compte, vehicule):
+        return -sum((l.debit - l.credit for l in LigneEcriture.objects.filter(compte__numero=compte, vehicule=vehicule)), Decimal(0))
+
+    def test_transbordement_vers_un_car_de_la_societe(self):
+        from .models_incidents import Incident
+
+        d = self.depart()
+        for n in range(2):
+            Billet(depart=d, voyageur=f"V{n}", bagages="1 sac", prix_bagages=1000).vendre()
+        d.partir()
+        i = Incident.transborder(d, 40, self.secours, lieu="Edéa")
+        self.assertEqual((self.recette("70611", self.car), self.recette("70611", self.secours)), (7200, 4800))
+        self.assertEqual((self.recette("70614", self.car), self.recette("70614", self.secours)), (1200, 800))
+        self.assertEqual(solde("70611"), -12000)                                 # recette totale inchangée
+        self.assertEqual(i.ecriture.journal.code, "OD")
+
+    def test_car_loue_frais_et_dedommagements(self):
+        from apps.commercial.models import Tiers
+
+        from .models_incidents import FraisIncident, Incident
+
+        d = self.depart()
+        Billet(depart=d, voyageur="V").vendre()
+        d.partir()
+        loue = Incident.transborder(d, 50)                                       # car loué : pas de partage de recette
+        self.assertIsNone(loue.ecriture)
+        loueur = Tiers.objects.create(code="LOUEUR", nom="Transporteur de secours", type_tiers=Tiers.FOURNISSEUR)
+        FraisIncident(incident=loue, nature=FraisIncident.LOCATION, libelle="Car de secours", montant=Decimal(30000),
+                      paiement=FraisIncident.FOURNISSEUR, fournisseur=loueur).enregistrer()
+        dec = Incident.objects.create(depart=d, type_incident=Incident.DECLASSEMENT)
+        FraisIncident(incident=dec, nature=FraisIncident.DEDOMMAGEMENT, libelle="Différence VIP", montant=Decimal(2000),
+                      caisse=self.ca).enregistrer()
+        amende = Incident.objects.create(depart=d, type_incident=Incident.AMENDE)
+        FraisIncident(incident=amende, nature=FraisIncident.AMENDE, libelle="Excès de vitesse", montant=Decimal(5000),
+                      paiement=FraisIncident.CHAUFFEUR, caisse=self.ca).enregistrer()
+        location = LigneEcriture.objects.get(compte__numero="6228")
+        self.assertEqual((location.debit, location.vehicule), (30000, self.car))
+        self.assertEqual((solde("709"), solde("421"), solde("658")), (2000, 5000, 0))   # amende retenue au chauffeur
+        bord = Incident.recette_a_bord(d, 3000, 1, self.ca)
+        self.assertEqual(self.recette("70611", self.car), 6000 + 3000)
+        self.assertEqual(bord.ecriture.lignes.get(debit=3000).compte.numero, "5711")
+
+    def test_annulation_par_la_compagnie(self):
+        d, autre = self.depart(), self.depart(heure=15)
+        b1 = Billet(depart=d, voyageur="Reporté").vendre()
+        reportes, rembourses = d.annuler_par_la_compagnie("Panne avant le départ", nouveau_depart=autre)
+        self.assertEqual((reportes, rembourses, Depart.objects.get(pk=d.pk).statut), (1, 0, Depart.ANNULE))
+        self.assertEqual(b1.troncons.get().depart, autre)
+        d2 = self.depart(heure=9)
+        b2 = Billet(depart=d2, voyageur="Remboursé").vendre()
+        d2.annuler_par_la_compagnie("Route coupée")
+        b2.refresh_from_db()
+        self.assertEqual((b2.statut, b2.retenue, b2.remboursement), (Billet.ANNULE, 0, Billet.AUTORISE))
+        self.assertEqual(solde("41913"), -6000)                                  # à rendre au voyageur, sans retenue
+
+    def test_vehicule_de_remplacement_d_une_autre_flotte(self):
+        d = Depart(ligne=self.ligne_vip, date=datetime.date.today(), heure=datetime.time(10), vehicule=self.car,
+                   chauffeur=self.chauffeur)
+        with self.assertRaises(ValidationError):
+            d.full_clean()
+        d.vehicule_remplacement = True
+        with self.assertRaisesMessage(ValidationError, "motif"):
+            d.full_clean()
+        d.motif_remplacement = "Car VIP en panne"
+        d.full_clean()
+
+    def test_ecran(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "a@example.com", "x"))
+        d = self.depart()
+        Billet(depart=d, voyageur="V").vendre()
+        d.partir()
+        url = reverse("transport:depart_detail", args=[d.pk])
+        self.client.post(url, {"action": "transborder", "vehicule_secours": self.secours.pk, "part_restante": "50"})
+        self.client.post(url, {"action": "frais", "type_incident": "PANNE", "nature": "DEPANNAGE", "libelle": "Remorquage",
+                               "montant": "15000", "paiement": "CAISSE", "caisse": self.ca.pk})
+        r = self.client.get(url)
+        self.assertContains(r, "Transbordement vers un autre car")
+        self.assertContains(r, "Remorquage")
+        self.assertEqual(solde("624"), 15000)

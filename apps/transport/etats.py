@@ -49,7 +49,9 @@ def _depart_des_pieces(departs):
 
     ids = [d.pk for d in departs]
     pieces = {d.numero: d.pk for d in departs}
-    for modele in (Colis, DepenseVehicule, PleinCarburant, AvanceMission):
+    from .models_incidents import Incident
+
+    for modele in (Colis, DepenseVehicule, PleinCarburant, AvanceMission, Incident):
         pieces.update(dict(modele.objects.filter(depart_id__in=ids).values_list("numero", "depart_id")))
     return pieces
 

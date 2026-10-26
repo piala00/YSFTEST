@@ -104,4 +104,44 @@
   <select name="caisse" class="form-select form-select-sm" style="width:12rem" aria-label="Caisse">{% for c in caisses %}<option value="{{ c.pk }}" {% if c.code == "CA" %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
   <button class="btn btn-sm btn-outline-secondary py-0" name="action" value="avance">Remettre une avance de mission</button></form>{% endif %}
 </div></div>
+
+<div class="card mt-3"><div class="card-header bg-white fw-semibold small">Imprévus du voyage <a class="fw-normal ms-2" href="#imprevus-aide">(cas et écritures)</a></div>
+<div class="card-body small">
+{% for i in incidents %}<div class="border rounded p-2 mb-2"><strong>{{ i.numero }}</strong> · {{ i.get_type_incident_display }} · {{ i.date|date:"d/m/Y" }}{% if i.lieu %} · {{ i.lieu }}{% endif %}
+  {% if i.description %}<div>{{ i.description }}</div>{% endif %}
+  {% if i.vehicule_secours %}<div>Car de secours {{ i.vehicule_secours.immatriculation }} pour {{ i.part_restante|floatformat:"-2" }} % du trajet</div>{% endif %}
+  {% if i.ecriture %}<div>Écriture <a href="{% url 'comptabilite:ecriture_detail' i.ecriture.pk %}">{{ i.ecriture.numero }}</a></div>{% endif %}
+  {% for f in i.frais.all %}<div>{{ f.get_nature_display }} : {{ f.libelle }} · {{ f.montant|montant }} ({{ f.get_paiement_display|lower }}){% if f.ecriture %} · <a href="{% url 'comptabilite:ecriture_detail' f.ecriture_id %}">écriture</a>{% endif %}</div>{% endfor %}</div>
+{% empty %}<div class="text-muted mb-2">Aucun imprévu.</div>{% endfor %}
+{% if not depart.site_origine %}
+{% if depart.statut == "PROGRAMME" %}<form method="post" class="d-flex flex-wrap gap-1 mb-2 border-top pt-2">{% csrf_token %}<strong class="w-100">Annuler le départ (imprévu de la compagnie)</strong>
+  <input name="motif" required class="form-control form-control-sm" style="width:16rem" placeholder="motif (panne, route coupée…)" aria-label="Motif">
+  <select name="nouveau_depart" class="form-select form-select-sm" style="width:16rem" aria-label="Report"><option value="">Rembourser sans retenue</option>{% for d in departs_report %}<option value="{{ d.pk }}">Reporter sur {{ d.numero }} {{ d.date|date:"d/m" }} {{ d.heure|time:"H:i" }}</option>{% endfor %}</select>
+  <button class="btn btn-sm btn-outline-danger py-0" name="action" value="annuler_compagnie" onclick="return confirm('Annuler ce départ ?')">Annuler le départ</button></form>{% endif %}
+{% if depart.statut == "PARTI" or depart.statut == "ARRIVE" %}<form method="post" class="d-flex flex-wrap gap-1 mb-2 border-top pt-2">{% csrf_token %}<strong class="w-100">Panne en route : transbordement</strong>
+  <select name="vehicule_secours" class="form-select form-select-sm" style="width:14rem" aria-label="Car de secours"><option value="">Car loué à un transporteur</option>{% for v in vehicules_secours %}<option value="{{ v.pk }}">{{ v.immatriculation }} ({{ v.get_gamme_display }})</option>{% endfor %}</select>
+  <input name="part_restante" type="number" min="1" max="100" step="0.01" required class="form-control form-control-sm" style="width:9rem" placeholder="% trajet restant" aria-label="Part du trajet restant">
+  <input name="lieu" class="form-control form-control-sm" style="width:10rem" placeholder="lieu" aria-label="Lieu">
+  <button class="btn btn-sm btn-outline-warning py-0" name="action" value="transborder">Enregistrer le transbordement</button></form>
+<form method="post" class="d-flex flex-wrap gap-1 mb-2 border-top pt-2">{% csrf_token %}<strong class="w-100">Voyageurs pris en route (recette remise par le convoyeur)</strong>
+  <input name="nombre" type="number" min="1" value="1" class="form-control form-control-sm" style="width:6rem" aria-label="Nombre">
+  <input name="montant" type="number" min="1" required class="form-control form-control-sm" style="width:8rem" placeholder="montant" aria-label="Montant">
+  <select name="caisse" class="form-select form-select-sm" style="width:10rem" aria-label="Caisse">{% for c in caisses %}<option value="{{ c.pk }}" {% if c.code == "CA" %}selected{% endif %}>{{ c.code }}</option>{% endfor %}</select>
+  <button class="btn btn-sm btn-outline-success py-0" name="action" value="recette_bord">Encaisser</button></form>{% endif %}
+<form method="post" class="d-flex flex-wrap gap-1 border-top pt-2">{% csrf_token %}<strong class="w-100">Autre imprévu et ses frais (dédommagement, location, dépannage, indemnité, amende…)</strong>
+  <select name="type_incident" class="form-select form-select-sm" style="width:13rem" aria-label="Imprévu">{% for c, l in types_incident %}{% if c != "TRANSBORDEMENT" and c != "VENTE_A_BORD" and c != "ANNULATION" %}<option value="{{ c }}">{{ l }}</option>{% endif %}{% endfor %}</select>
+  <input name="description" class="form-control form-control-sm" style="width:14rem" placeholder="description" aria-label="Description">
+  <select name="nature" class="form-select form-select-sm" style="width:14rem" aria-label="Nature des frais">{% for c, l in natures_frais %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select>
+  <input name="libelle" class="form-control form-control-sm" style="width:10rem" placeholder="libellé" aria-label="Libellé">
+  <input name="montant" type="number" min="1" class="form-control form-control-sm" style="width:8rem" placeholder="montant (vide : aucun)" aria-label="Montant">
+  <select name="paiement" class="form-select form-select-sm" style="width:14rem" aria-label="Paiement">{% for c, l in paiements_frais %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select>
+  <select name="caisse" class="form-select form-select-sm" style="width:8rem" aria-label="Caisse">{% for c in caisses %}<option value="{{ c.pk }}" {% if c.code == "CA" %}selected{% endif %}>{{ c.code }}</option>{% endfor %}</select>
+  <select name="fournisseur" class="form-select form-select-sm" style="width:12rem" aria-label="Fournisseur"><option value="">(fournisseur)</option>{% for t in fournisseurs %}<option value="{{ t.pk }}">{{ t.nom }}</option>{% endfor %}</select>
+  <button class="btn btn-sm btn-outline-secondary py-0" name="action" value="frais">Enregistrer</button></form>
+{% endif %}
+<p class="text-muted mt-2 mb-0" id="imprevus-aide">Transbordement vers un car de la société : la part du trajet restant de la recette passe à ce car.
+  Car loué : la recette reste à ce car, qui porte la location. Dédommagement : réduit la recette (709). Amende imputable au chauffeur : retenue sur salaire (421).
+  Véhicule remplacé avant le départ par un car d'une autre flotte : modifier le départ, cocher « véhicule de remplacement » et indiquer le motif.
+  Comptes proposés, à valider par l'expert-comptable.</p>
+</div></div>
 {% endblock %}

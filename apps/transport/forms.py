@@ -89,7 +89,8 @@ class ChauffeurForm(BootstrapMixin, forms.ModelForm):
 class DepartForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Depart
-        fields = ("ligne", "date", "heure", "vehicule", "chauffeur", "convoyeur", "places", "km_depart")
+        fields = ("ligne", "date", "heure", "vehicule", "vehicule_remplacement", "motif_remplacement", "chauffeur", "convoyeur",
+                  "places", "km_depart")
         widgets = {"date": DateInput(), "heure": forms.TimeInput(attrs={"type": "time"}, format="%H:%M")}
 
     def __init__(self, *args, **kwargs):

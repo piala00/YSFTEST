@@ -382,6 +382,10 @@ class Depart(models.Model):
     observations = models.CharField("Observations, incidents", max_length=250, blank=True)
     cloture_le = models.DateTimeField(null=True, blank=True)
     cloture_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    vehicule_remplacement = models.BooleanField(
+        "Véhicule de remplacement (imprévu)", default=False,
+        help_text="Panne ou indisponibilité : autorise un car d'une autre flotte (ex. Classique à la place d'un VIP)")
+    motif_remplacement = models.CharField("Motif du remplacement", max_length=150, blank=True)
     embarquement_valide_le = models.DateTimeField("Liste d'embarquement pointée le", null=True, blank=True)
     embarquement_valide_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                                 related_name="+")
@@ -406,6 +410,10 @@ class Depart(models.Model):
         return None
 
     def controler_gamme(self):
+        if self.vehicule_remplacement:                   # imprévu : exception tracée, avec son motif
+            if not self.motif_remplacement.strip():
+                raise ValidationError({"motif_remplacement": "Indiquez le motif du remplacement du véhicule."})
+            return
         if self.vehicule_id and self.ligne_id and self.vehicule.gamme_le(self.date) != self.ligne.gamme:
             raise ValidationError({"vehicule": f"{self.vehicule.immatriculation} est de la flotte "
                                                f"{self.vehicule.get_gamme_display()} : il ne fait pas les départs "
@@ -634,6 +642,33 @@ class Depart(models.Model):
         return self
 
     @transaction.atomic
+    @transaction.atomic
+    def annuler_par_la_compagnie(self, motif, nouveau_depart=None, utilisateur=None):
+        """Imprévu avant le départ : chaque voyageur est reporté sur `nouveau_depart` (sans frais) ou, à défaut,
+        son billet est annulé sans retenue avec un remboursement autorisé, payé quand il se présente."""
+        from .models_incidents import Incident
+
+        _proprietaire(self, f"Le départ {self.numero}")
+        if self.statut != self.PROGRAMME:
+            raise ValidationError("Seul un départ programmé peut être annulé.")
+        if not motif.strip():
+            raise ValidationError("Indiquez le motif de l'annulation.")
+        reportes = rembourses = 0
+        for t in self.troncons.filter(statut=Troncon.A_VOYAGER).select_related("billet"):
+            if nouveau_depart is not None:
+                t.affecter(nouveau_depart)
+                reportes += 1
+            elif t.billet.site_origine or t.billet.troncons.filter(statut=Troncon.EFFECTUE).exists():
+                t.depart, t.siege = None, None                   # voyageur d'une autre agence ou déjà en route : à placer
+                t.save(update_fields=["depart", "siege"])
+            else:
+                t.billet.annuler(retenue=0, utilisateur=utilisateur, rembourser=False)
+                rembourses += 1
+        Incident.objects.create(depart=self, type_incident=Incident.ANNULATION, cree_par=utilisateur,
+                                description=f"{motif.strip()} ; {reportes} reporté(s), {rembourses} à rembourser"[:250])
+        self.annuler()
+        return reportes, rembourses
+
     def annuler(self):
         _proprietaire(self, f"Le départ {self.numero}")
         if self.statut != self.PROGRAMME:
@@ -1321,4 +1356,5 @@ class DepenseVehicule(models.Model):
 
 from .models_caisse import ClotureJournee, SessionCaisse, TransfertFonds  # noqa: E402,F401
 from .models_exploitation import AvanceMission, JustificatifMission  # noqa
-from .models_depenses import DemandeDepense  # noqa: E402,F401
+from .models_depenses import DemandeDepense  # noqa
+from .models_incidents import FraisIncident, Incident  # noqa: E402,F401
