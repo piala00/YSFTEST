@@ -52,7 +52,7 @@ def compte_remuneration():
 class ContratPartenaire(models.Model):
     COMMISSION, LOCATION, VARIABLE, FIXE_PLUS_VARIABLE, AVANCE_SUR_VARIABLE = (
         "COMMISSION", "LOCATION", "VARIABLE", "FIXE_VARIABLE", "AVANCE_VARIABLE")
-    MODELES = [(COMMISSION, "Compte du camion : recettes − charges (− commission éventuelle de la société)"),
+    MODELES = [(COMMISSION, "Compte du camion : recettes − dépenses − pourcentage de la société (+ fixe mensuel éventuel)"),
                (LOCATION, "Salaire mensuel fixe du propriétaire (forfait)"),
                (VARIABLE, "Part du propriétaire sur la marge (variable)"),
                (FIXE_PLUS_VARIABLE, "Fixe garanti + complément variable"),
@@ -72,9 +72,12 @@ class ContratPartenaire(models.Model):
     modele = models.CharField("Modèle", max_length=16, choices=MODELES, default=COMMISSION)
     debut = models.DateField("En vigueur du")
     fin = models.DateField("Au", null=True, blank=True)
-    taux_commission = models.DecimalField("Commission de l'agence (%)", max_digits=5, decimal_places=2, default=ZERO)
-    montant_location = models.DecimalField("Montant fixe (location, fixe garanti ou avance)", max_digits=14,
-                                           decimal_places=0, default=ZERO)
+    taux_commission = models.DecimalField("Pourcentage de la société sur les recettes (%)", max_digits=5, decimal_places=2,
+                                          default=ZERO)
+    montant_location = models.DecimalField("Montant fixe (fixe mensuel, location, fixe garanti ou avance)", max_digits=14,
+                                           decimal_places=0, default=ZERO,
+                                           help_text="Compte du camion : fixe versé chaque mois EN PLUS du compte (0 si le "
+                                                     "contrat n'en prévoit pas)")
     periodicite = models.CharField("Fixe payé", max_length=5, choices=PERIODICITES, default=MOIS)
     taux_proprietaire = models.DecimalField("Part du propriétaire sur la marge (%)", max_digits=5, decimal_places=2,
                                             default=ZERO, help_text="Modèles variables : base = recettes − dépenses retenues")
@@ -84,7 +87,8 @@ class ContratPartenaire(models.Model):
     charge_reparations = models.BooleanField("Réparations et pièces à sa charge", default=True)
     charge_equipage = models.BooleanField("Salaire de l'équipage à sa charge", default=False)
     charge_route = models.BooleanField("Péages et frais de route à sa charge", default=True)
-    charge_autres = models.BooleanField("Autres dépenses du véhicule à sa charge", default=False)
+    charge_autres = models.BooleanField("Assurances, papiers et autres charges du véhicule à sa charge", default=False,
+                                        help_text="Habituellement à la charge de la société")
     statut = models.CharField(max_length=10, choices=STATUTS, default=BROUILLON)
     approuve_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     notes = models.CharField(max_length=250, blank=True)
@@ -231,8 +235,11 @@ class Decompte(models.Model):
 
         marge = recettes - depenses
         if contrat.modele == ContratPartenaire.COMMISSION:
+            # Compte du camion : recettes − dépenses à sa charge − pourcentage de la société, plus le fixe mensuel éventuel
             commission = _arrondi(recettes * contrat.taux_commission / 100)
-            du = variable = recettes - commission - depenses
+            variable = recettes - commission - depenses
+            fixe = prorata_fixe() if contrat.montant_location > 0 else ZERO
+            du = fixe + variable
         elif contrat.modele == ContratPartenaire.LOCATION:
             location = fixe = prorata_fixe()
             du = location - depenses
@@ -289,8 +296,12 @@ class Decompte(models.Model):
         compte_partenaire = {"compte": compte_proprietaires(), "tiers": partenaire}
         charge = {"compte": compte_remuneration(), "vehicule": vehicule, "section": vehicule.section}
         journal, date = Journal.objects.get(code="OD"), date or self.fin
-        parts = ([("Droit fixe", self.fixe), ("Droit variable", self.variable)]
-                 if self.contrat.modele in ContratPartenaire.VARIABLES else [("Rémunération", self.montant_du)])
+        if self.contrat.modele in ContratPartenaire.VARIABLES:
+            parts = [("Droit fixe", self.fixe), ("Droit variable", self.variable)]
+        elif self.contrat.modele == ContratPartenaire.COMMISSION and self.fixe:
+            parts = [("Fixe mensuel", self.fixe), ("Compte du camion", self.variable)]
+        else:
+            parts = [("Rémunération", self.montant_du)]
         ecritures = []
         for libelle, montant in parts:                  # une écriture par droit : fixe et variable bien distincts
             if not montant:

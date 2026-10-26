@@ -177,7 +177,7 @@ class Command(BaseCommand):
                                    salaire_base=salaire)
             n += 1
         # Propriétaires partenaires : un car sur quatre, quatre types de contrat
-        modeles = [dict(modele=ContratPartenaire.COMMISSION, taux_commission=0, charge_equipage=True, charge_autres=True),
+        modeles = [dict(modele=ContratPartenaire.COMMISSION, taux_commission=10, montant_location=50000),  # contrat type
                    dict(modele=ContratPartenaire.LOCATION, montant_location=400000, charge_carburant=False,
                         charge_reparations=False, charge_route=False),
                    dict(modele=ContratPartenaire.FIXE_PLUS_VARIABLE, montant_location=150000, taux_proprietaire=40),

@@ -320,3 +320,28 @@ class CompteDuCamionTests(TestCase):
         self.assertContains(self.client.get(url), "Compte du camion CAMION 01 en cours")
         self.client.post(url, {"action": "arreter", "contrat": contrat.pk})
         self.assertEqual(solde_partenaire(self.proprio), 50000)
+
+    def test_contrat_type_fixe_mensuel_plus_compte_du_camion(self):
+        """Contrat type : fixe mensuel + (recettes − dépenses − pourcentage de la société) ; assurance et papiers à la
+        charge de la société, jamais déduits du compte du camion."""
+        from apps.comptabilite.models import Compte
+        from apps.comptabilite.services import creer_ecriture
+
+        debut = datetime.date(2026, 9, 1)
+        fin = datetime.date(2026, 9, 30)
+        contrat = ContratPartenaire.objects.create(vehicule=self.car, partenaire=self.proprio, modele=ContratPartenaire.COMMISSION,
+                                                   debut=debut, taux_commission=10, montant_location=100000).activer()
+        self.assertFalse(contrat.charge_autres)                                    # assurances, papiers : la société
+        self.mouvement(datetime.date(2026, 9, 10), recette=1000000, charge=300000)
+        assurance = Compte.objects.get_or_create(numero="625", defaults={"intitule": "Primes d'assurance"})[0]
+        creer_ecriture(Journal.objects.get(code="CA"), datetime.date(2026, 9, 12), "Assurance du camion",
+                       [{"compte": assurance, "debit": 50000, "vehicule": self.car},
+                        {"compte": Compte.objects.get(numero="5711"), "credit": 50000}])
+        d = Decompte.calculer(contrat, debut, fin)
+        self.assertEqual((d.recettes, d.commission, d.depenses, d.fixe, d.variable, d.montant_du),
+                         (1000000, 100000, 300000, 100000, 600000, 700000))
+        d.approuver()
+        self.assertEqual(solde_partenaire(self.proprio), 700000)
+        self.assertIsNotNone(d.ecriture_fixe)                                       # fixe et compte : deux écritures
+        self.assertEqual(d.ecriture_fixe.lignes.get(credit__gt=0).credit, 100000)
+        self.assertEqual(d.ecriture.lignes.get(credit__gt=0).credit, 600000)

@@ -1,5 +1,5 @@
 plan;code skill;axe ERP;etat;statut;preuve (test)
-Agences / gares;AGC;gares;balance, compte d'exploitation, comptes, grand-livre, évolution, croisé, comparaison, journal;FAIT;PlanAnalytiqueCompletTests
+Agences / gares;AGC;agences (+ villes);balance, compte d'exploitation, comptes, grand-livre, évolution, croisé, comparaison, journal;FAIT;PlanAnalytiqueCompletTests
 Véhicules;VEH;vehicules;idem + états spécialisés (comptes d'exploitation, grand-livre, balance des véhicules);FAIT;PlanAnalytiqueCompletTests, ComptabiliteAnalytiqueTests
 Propriétaires;PRT;proprietaires;idem + portefeuilles, relevés (situation financière séparée);FAIT;PlanAnalytiqueCompletTests, RemunerationsProprietairesTests
 Services;DEP;services;idem;FAIT (règles : section du service sur la paie hors véhicule, sinon service producteur du fait);test_services_periodes_journal_et_reporting_identique
@@ -8,7 +8,7 @@ Gammes Classique / VIP;GAM;gammes;idem;FAIT;PlanAnalytiqueCompletTests
 Lignes;LIG;lignes;idem;FAIT;PlanAnalytiqueCompletTests
 Voyages;VOY;voyages;idem;FAIT;PlanAnalytiqueCompletTests
 Contrats;CTR;contrats;idem;FAIT;PlanAnalytiqueCompletTests
-Canaux de vente;CAN;—;—;ABSENT (toutes les ventes passent par le guichet ; le mode de paiement n'est pas un canal ; ventilation fractionnée requise);—
+Canaux de vente;CAN;points_vente;idem (recette répartie au prorata exact des billets vendus par chaque point);FAIT;AgencesPointsDeVenteTests
 Plans de sections libres;—;plan-<nom>;idem;FAIT;test_societe_de_commerce_sections_seulement
 États communs;—;tous;compte d'exploitation;FAIT;test_etats_detailles_d_un_element
 États communs;—;tous;balance par sections + non affecté + rapprochement;FAIT;test_chaque_axe_se_rapproche_de_la_comptabilite_generale
@@ -25,5 +25,5 @@ Périodes;—;—;jour, hier, semaine, mois, mois précédent, trimestre, année
 Reporting;—;—;comparaisons transport sur le même moteur, égalité au franc près;FAIT;test_services_periodes_journal_et_reporting_identique
 Statut;—;—;écritures au brouillard signalées et exclues;FAIT (bandeau);—
 Statut;—;—;fraîcheur de synchronisation par agence sur les états;PARTIEL (visible dans Fichier › Échanges, pas sur les états);—
-Droits;—;—;agent de gare limité à sa gare, partenaire à son compte;ABSENT (droits par logiciel et par menu seulement);—
+Droits;—;—;agent de gare limité à sa gare, partenaire à son compte;DÉCIDÉ : droits réglés localement sur le serveur de chaque agence;—
 Ventilation fractionnée;—;—;une ligne répartie 60/40 sur deux éléments d'un même plan;ABSENT (une ligne = un élément par axe);—

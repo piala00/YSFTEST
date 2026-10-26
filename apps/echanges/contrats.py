@@ -61,7 +61,8 @@ def serialiser(o):
                           "rang": o.rang, "actif": o.actif}, None, ""
     if isinstance(o, Gare):
         return "gare", {"v": VERSION, "uid": str(o.uid), "code": o.code, "nom": o.nom, "ville": o.ville,
-                        "agence": _uid(o.agence), "actif": o.actif}, None, ""
+                        "agence": _uid(o.agence), "actif": o.actif, "type_gare": o.type_gare,
+                        "rattachement": _uid(o.rattachement)}, None, ""
     if isinstance(o, Ligne):
         return "ligne", {"v": VERSION, "uid": str(o.uid), "code": o.code, "gare_depart": _uid(o.gare_depart),
                          "gare_arrivee": _uid(o.gare_arrivee), "distance_km": o.distance_km, "duree": o.duree,
@@ -181,6 +182,8 @@ def _gare(p, origine, local):
     g = _copie(Gare, p["uid"], origine)
     g.code, g.nom, g.ville, g.actif = p["code"], p["nom"], p["ville"], p.get("actif", True)
     g.agence = Agence.objects.filter(uid=p["agence"]).first() if p.get("agence") else None
+    g.type_gare = p.get("type_gare") or Gare.AGENCE
+    g.rattachement = Gare.objects.filter(uid=p["rattachement"]).first() if p.get("rattachement") else None
     _enregistrer(g, "Code de gare", p["code"])
 
 

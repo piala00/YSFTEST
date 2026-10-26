@@ -14,7 +14,7 @@ def _caisses():
 class GareForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Gare
-        fields = ("code", "nom", "ville", "agence", "caisse", "mobile_money", "actif")
+        fields = ("code", "nom", "ville", "type_gare", "rattachement", "agence", "caisse", "mobile_money", "actif")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -15,7 +15,9 @@ Parcours : **plan** (tous les axes) → **axe** (tous ses éléments) → **él�
 
 | Axe | Éléments | D'où vient l'attribution |
 |---|---|---|
-| Agences (gares) | chaque gare | section de gare de la ligne, sinon gare de départ du voyage, sinon l'agence (si une seule gare) |
+| Agences | chaque agence de voyage (gare de départ ; plusieurs possibles dans une grande ville) | section de gare de la ligne, sinon gare de départ du voyage ; un point de vente compte pour son agence de rattachement |
+| Points de vente | chaque lieu de vente : guichet d'agence ou point de vente rattaché (par exemple entre deux villes) | recette billets et bagages d'un départ **répartie** selon le point qui a vendu chaque billet (au prorata exact des parts) ; charge portant la section du point |
+| Villes | chaque ville | ville de l'agence |
 | Véhicules | chaque car et camion | véhicule porté par la ligne d'écriture |
 | Propriétaires | chaque propriétaire, et « Société (véhicules propres) » | contrat du véhicule **en vigueur à la date** de l'écriture |
 | Services | billetterie, colis, conduite, garage, administration… | section du service posée par la paie (salaires hors véhicule) ; sinon le service qui produit le fait (billets → billetterie, colis → colis, carburant et route → conduite, garage → garage) |
@@ -63,9 +65,9 @@ Chaque état s'imprime et s'exporte en CSV (Excel).
 
 ## Limites connues
 
-- Une charge d'agence (section AG-) d'une agence qui a plusieurs gares reste « non affectée » sur l'axe Gares
-  (elle n'est pas répartie d'office entre les gares).
-- L'axe « canal de vente » n'existe pas : toutes les ventes passent par les guichets (Mobile Money est un mode de
-  paiement). Une ligne n'est attribuée qu'à un élément par axe : pas encore de répartition 60/40 avec clés.
+- Agences, points de vente : Transport › Structure › Agences et points de vente (type « Agence » ou « Point de vente
+  rattaché à une agence »). Le point de vente tient lieu de canal de vente.
+- Une charge commune (assurance de flotte, siège…) n'est jamais répartie d'office : pas de clé de répartition tant que
+  la société n'en a pas fixé.
 - Le reporting comparatif (Reporting › Transport : comparaisons) lit ses montants dans ce même moteur.
 - Liste complète des écarts : `docs/retour/analytique/ECARTS_A_CORRIGER.md`.

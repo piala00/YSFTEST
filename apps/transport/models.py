@@ -168,7 +168,11 @@ def _caisse_par_defaut():
 
 
 class Gare(models.Model):
-    """Gare routière / point de vente de l'agence (une ville peut avoir plusieurs gares)."""
+    """Agence de voyage (gare de départ ; une grande ville peut en avoir plusieurs) ou point de vente rattaché à une
+    agence (par exemple entre deux villes) : il vend des billets pour les départs de son agence."""
+
+    AGENCE, POINT_VENTE = "AGENCE", "POINT_VENTE"
+    TYPES = [(AGENCE, "Agence (gare de départ)"), (POINT_VENTE, "Point de vente rattaché à une agence")]
 
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False,
@@ -176,6 +180,10 @@ class Gare(models.Model):
     code = models.CharField(max_length=10, unique=True)
     nom = models.CharField(max_length=100)
     ville = models.CharField(max_length=80)
+    type_gare = models.CharField("Type", max_length=12, choices=TYPES, default=AGENCE)
+    rattachement = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="points_vente",
+                                     limit_choices_to={"type_gare": "AGENCE"}, verbose_name="Agence de rattachement",
+                                     help_text="Point de vente : l'agence à laquelle ses ventes sont rattachées")
     agence = models.ForeignKey("core.Agence", null=True, blank=True, on_delete=models.PROTECT, related_name="gares",
                                help_text="Agence (dossier) dont dépend la gare, si la société en a plusieurs")
     caisse = models.ForeignKey("comptabilite.Journal", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
@@ -193,6 +201,19 @@ class Gare(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.nom}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.type_gare == self.POINT_VENTE and not self.rattachement_id:
+            raise ValidationError({"rattachement": "Indiquez l'agence de rattachement du point de vente."})
+        if self.type_gare == self.AGENCE:
+            self.rattachement = None
+
+    @property
+    def agence_de_rattachement(self):
+        """L'agence elle-même, ou celle du point de vente."""
+        return self.rattachement if self.type_gare == self.POINT_VENTE and self.rattachement_id else self
 
     def save(self, *args, **kwargs):
         if not self.section_id:

@@ -5,18 +5,23 @@ VALIDÉE. On ne crée aucun montant ; on attribue chaque ligne aux éléments de
 peut pas être attribué reste visible en « Non affecté », et chaque axe se rapproche de la comptabilité générale :
 total des éléments + non affecté = produits et charges de la période.
 
-Axes du transport (plan analytique du skill « erp-transport-plan-analytique ») :
-  gares (agences de voyage), véhicules, propriétaires, gammes (Classique / VIP), lignes, voyages (départs),
-  activités, contrats des propriétaires ; puis chaque plan de sections créé dans Structure › Plan analytique
-  (services, projets…). Une société de commerce n'a que ses plans de sections.
+Axes du transport (plan analytique du skill « erp-transport-analytique-multiplans ») :
+  agences (gares de départ ; plusieurs possibles dans une grande ville), points de vente (rattachés à une agence),
+  villes, véhicules, propriétaires, services, activités, gammes (Classique / VIP), lignes, voyages (départs),
+  contrats des propriétaires ; puis chaque plan de sections créé dans Structure › Plan analytique.
+  Une société de commerce n'a que ses plans de sections.
 
 Comment une ligne est attribuée :
   véhicule  : porté par la ligne d'écriture ;
   voyage    : la pièce de l'écriture est celle d'un départ, d'un colis, d'un plein, d'une dépense, d'une avance de
               mission ou d'un imprévu rattachés au départ ;
   ligne, gamme : celles du voyage (à défaut, la flotte du véhicule à la date) ;
-  gare      : section de gare portée par la ligne, sinon la gare de départ du voyage, sinon l'agence (section AG-)
-              quand elle n'a qu'une gare ;
+  agence    : section de gare portée par la ligne, sinon la gare de départ du voyage, sinon l'agence (section AG-)
+              quand elle n'a qu'une gare ; un point de vente compte pour son agence de rattachement ; ville : celle de
+              l'agence ;
+  point de vente : la recette billets et bagages d'un départ est RÉPARTIE selon le point qui a vendu chaque billet,
+              au prorata des parts des billets (la recette constatée au départ est exactement la somme de ces parts) ;
+              une charge portant la section d'un point de vente va à ce point ;
   propriétaire, contrat : contrat du véhicule EN VIGUEUR À LA DATE de l'écriture (jamais le propriétaire actuel) ;
   activité  : produits selon leur compte (voyageurs, bagages, colis…) ; charges des véhicules ou de structure.
 """
@@ -32,7 +37,10 @@ ZERO = Decimal("0")
 NON_AFFECTE = "aucun"
 
 AXES_TRANSPORT = [
-    ("gares", "Agences (gares)", "Recettes et charges de chaque gare : ventes constatées au départ, colis, loyers, frais"),
+    ("agences", "Agences", "Chaque agence (gare de départ) : départs, colis, loyers et frais, avec ses points de vente rattachés"),
+    ("points_vente", "Points de vente", "Où les billets sont vendus : recette de chaque départ répartie selon le point de "
+                                        "vente de chaque billet ; charges propres du point"),
+    ("villes", "Villes", "Toutes les agences d'une même ville"),
     ("vehicules", "Véhicules", "Compte d'exploitation de chaque car et camion"),
     ("proprietaires", "Propriétaires", "Véhicules des partenaires selon le contrat en vigueur à la date"),
     ("services", "Services", "Billetterie, colis, conduite, garage, administration : produits et coûts de chaque service"),
@@ -201,6 +209,7 @@ class _Contexte:
         self.contrats = _contrats_par_vehicule(debut, fin)
         self.vehicules = {v.pk: v for v in Vehicule.objects.all()}
         self.gares = {g.pk: g for g in Gare.objects.select_related("agence")}
+        self.agence_de = {g.pk: g.agence_de_rattachement.pk for g in self.gares.values()}
         self.gare_de_section = {g.section_id: g.pk for g in self.gares.values() if g.section_id}
         par_agence = {}
         for g in self.gares.values():
@@ -211,6 +220,16 @@ class _Contexte:
         departs = list(Depart.objects.filter(date__range=(debut - marge, fin + marge)).select_related("ligne"))
         self.departs = {d.pk: d for d in departs}
         self.depart_de_piece = _depart_des_pieces(departs)
+        # Parts des billets de chaque départ selon leur point de vente (base de la recette constatée au départ)
+        from apps.transport.models import Troncon
+
+        self.ventes = {}
+        for t in (Troncon.objects.filter(depart_id__in=self.departs, statut=Troncon.EFFECTUE)
+                  .values("depart_id", "part", "part_bagages", "billet__gare_id", "depart__ligne__gare_depart_id")):
+            g = t["billet__gare_id"] or t["depart__ligne__gare_depart_id"]
+            v = self.ventes.setdefault(t["depart_id"], {"billets": {}, "bagages": {}})
+            v["billets"][g] = v["billets"].get(g, ZERO) + t["part"]
+            v["bagages"][g] = v["bagages"].get(g, ZERO) + t["part_bagages"]
         self.gammes = {}
         from apps.partenaires.models import compte_remuneration
         from apps.transport.models import ParametresTransport
@@ -237,6 +256,22 @@ class _Contexte:
         if r == "personnel" and not vehicule_id:
             return None
         return SERVICES_RUBRIQUES.get(r)
+
+    def repartition_ventes(self, numero, depart_id, montant):
+        """[(point de vente, montant)] d'une recette billets ou bagages d'un départ, au prorata des parts vendues."""
+        nature = ("billets" if numero == getattr(self.parametres.compte_billets, "numero", None) else
+                  "bagages" if numero == getattr(self.parametres.compte_bagages, "numero", None) else None)
+        parts = self.ventes.get(depart_id, {}).get(nature) if nature else None
+        base = sum(parts.values(), ZERO) if parts else ZERO
+        if not base:
+            return None
+        cles, resultat, reste = sorted(parts, key=str), [], montant
+        for g in cles[:-1]:
+            m = (montant * parts[g] / base).quantize(Decimal("0.01"))
+            resultat.append((g, m))
+            reste -= m
+        resultat.append((cles[-1], reste))                       # le reste d'arrondi : rien ne se perd
+        return [(g, m) for g, m in resultat if m]
 
     def activite(self, numero, vehicule_id, depart_id):
         if not self.transport:
@@ -282,10 +317,18 @@ def faits(debut, fin, ctx=None):
             if gare is None and section and section["code"].startswith("AG-"):
                 gare = ctx.gare_d_agence.get(section["code"][3:])
             contrat = ctx._contrat_le(ctx.contrats, v, jour) if v else None
+            agence = ctx.agence_de.get(gare)
+            point = ctx.gare_de_section.get(l["section_id"])
+            if numero.startswith("7") and dep_id:
+                repartition = ctx.repartition_ventes(numero, dep_id, f["montant"])
+                if repartition:
+                    f["_parts"] = {"points_vente": repartition}
+                    point = repartition[0][0] if len(repartition) == 1 else point
             f.update({
+                "agences": agence, "villes": ctx.gares[agence].ville if agence else None, "points_vente": point,
                 "vehicules": v, "voyages": dep_id if depart else None, "lignes": depart.ligne_id if depart else None,
                 "gammes": (depart.ligne.gamme if depart else None) or (ctx.gamme(v, jour) if v else None),
-                "gares": gare, "contrats": contrat.pk if contrat else None,
+                "contrats": contrat.pk if contrat else None,
                 "proprietaires": (contrat.partenaire_id if contrat else "societe") if v else None,
                 "activites": ctx.activite(numero, v, dep_id), "services": ctx.service(numero, v, section)})
         yield f
@@ -295,9 +338,12 @@ def faits(debut, fin, ctx=None):
 def libelles(axe, cles):
     """{clé: libellé} des éléments d'un axe."""
     cles = [c for c in cles if c not in (None, NON_AFFECTE)]
-    if axe == "gares":
+    if axe in ("agences", "points_vente"):
         from apps.transport.models import Gare
-        return {g.pk: f"{g.code} — {g.nom}" for g in Gare.objects.filter(pk__in=cles)}
+        return {g.pk: f"{g.code} — {g.nom}" + (f" (rattaché à {g.rattachement.code})" if g.rattachement_id else "")
+                for g in Gare.objects.filter(pk__in=cles).select_related("rattachement")}
+    if axe == "villes":
+        return {c: c for c in cles}
     if axe == "vehicules":
         from apps.transport.models import Vehicule
         return {v.pk: f"{v.immatriculation} — {v.designation}".rstrip(" —") for v in Vehicule.objects.filter(pk__in=cles)}
@@ -338,7 +384,7 @@ def cle_depuis_url(axe, valeur):
     """Clé d'élément lue dans l'URL (identifiant numérique, code de gamme ou d'activité, « aucun »)."""
     if valeur == NON_AFFECTE:
         return None
-    if axe in ("gammes", "activites", "services") or (axe == "proprietaires" and valeur == "societe"):
+    if axe in ("gammes", "activites", "services", "villes") or (axe == "proprietaires" and valeur == "societe"):
         return valeur
     try:
         return int(valeur)
@@ -347,6 +393,18 @@ def cle_depuis_url(axe, valeur):
 
 
 # ---------------------------------------------------------------- États
+def parts(f, axe):
+    """[(élément, montant)] d'une ligne sur un axe : un seul élément, ou la répartition exacte (points de vente)."""
+    return f.get("_parts", {}).get(axe) or [(f.get(axe), f["montant"])]
+
+
+def _sur_axe(lignes, axe):
+    """Les lignes vues sur un axe : une ligne répartie devient une ligne par élément, avec sa part."""
+    for f in lignes:
+        for cle, montant in parts(f, axe):
+            yield cle, (f if montant == f["montant"] else {**f, "montant": montant, "partiel": True})
+
+
 def _somme(lignes):
     p = sum((f["montant"] for f in lignes if f["produit"]), ZERO)
     c = -sum((f["montant"] for f in lignes if not f["produit"]), ZERO)
@@ -369,9 +427,10 @@ def synthese_axes(debut, fin):
         sens = "produits" if f["produit"] else "charges"
         gl[sens] += abs(f["montant"])
         for code in par_axe:
-            if f.get(code) is not None:
-                par_axe[code]["elements"].add(f[code])
-                par_axe[code][sens] += abs(f["montant"])
+            for cle, montant in parts(f, code):
+                if cle is not None:
+                    par_axe[code]["elements"].add(cle)
+                    par_axe[code][sens] += abs(montant)
     return {"gl": gl, "axes": [{"code": code, "titre": titre, "description": desc, "elements": len(par_axe[code]["elements"]),
                                 "produits": par_axe[code]["produits"], "charges": par_axe[code]["charges"],
                                 "produits_non_affectes": gl["produits"] - par_axe[code]["produits"],
@@ -382,9 +441,9 @@ def synthese_axes(debut, fin):
 def balance_axe(axe, debut, fin):
     """Tous les éléments d'un axe : produits, charges, résultat ; non affecté ; rapprochement avec la générale."""
     groupes, tout = OrderedDict(), []
-    for f in faits(debut, fin):
-        tout.append(f)
-        groupes.setdefault(f.get(axe), []).append(f)
+    tout = list(faits(debut, fin))
+    for cle, f in _sur_axe(tout, axe):
+        groupes.setdefault(cle, []).append(f)
     noms = libelles(axe, list(groupes))
     elements = [{"cle": c, "libelle": noms.get(c, str(c)), **_somme(ls)} for c, ls in groupes.items() if c is not None]
     elements.sort(key=lambda e: e["libelle"])
@@ -408,7 +467,7 @@ def etat_element(axe, cle, etat, debut, fin, axe2="", comparer="precedente"):
     from .models import Compte
 
     ctx = _Contexte(debut, fin)
-    lignes = [f for f in faits(debut, fin, ctx) if f.get(axe) == cle]
+    lignes = [f for c, f in _sur_axe(faits(debut, fin, ctx), axe) if c == cle]
     total = _somme(lignes)
     r = {"total": total, "lignes": lignes}
     if etat == "exploitation":
@@ -449,8 +508,8 @@ def etat_element(axe, cle, etat, debut, fin, axe2="", comparer="precedente"):
         r["series"], r["par_jour"] = sorted(series.values(), key=lambda g: g["periode"]), par_jour
     elif etat == "croise":
         groupes = OrderedDict()
-        for f in lignes:
-            groupes.setdefault(f.get(axe2), []).append(f)
+        for c, f in _sur_axe(lignes, axe2):
+            groupes.setdefault(c, []).append(f)
         noms = libelles(axe2, list(groupes))
         croise = [{"cle": c, "libelle": noms.get(c, str(c)) if c is not None else "Non affecté", **_somme(ls)}
                   for c, ls in groupes.items()]
@@ -458,11 +517,15 @@ def etat_element(axe, cle, etat, debut, fin, axe2="", comparer="precedente"):
     elif etat == "journal":
         noms = {code: libelles(code, list({f.get(code) for f in lignes})) for code, _, _ in axes() if code != axe}
         r["journal_axes"] = [(code, titre) for code, titre, _ in axes() if code != axe]
-        r["journal"] = [{**f, "attributions": [noms[code].get(f.get(code), "—") if f.get(code) is not None else "—"
-                                               for code, _ in r["journal_axes"]]} for f in lignes[:1000]]
+        def attribution(f, code):
+            if len(parts(f, code)) > 1:
+                return f"réparti sur {len(parts(f, code))} éléments"
+            return noms[code].get(f.get(code), "—") if f.get(code) is not None else "—"
+
+        r["journal"] = [{**f, "attributions": [attribution(f, code) for code, _ in r["journal_axes"]]} for f in lignes[:1000]]
     elif etat == "comparaison":
         d0, f0 = annee_precedente(debut, fin) if comparer == "n1" else periode_precedente(debut, fin)
-        avant = [f for f in faits(d0, f0) if f.get(axe) == cle]
+        avant = [f for c, f in _sur_axe(faits(d0, f0), axe) if c == cle]
         par_compte = OrderedDict()
         for quand, ls in (("actuel", lignes), ("precedent", avant)):
             for f in ls:

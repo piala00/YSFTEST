@@ -33,7 +33,7 @@ def _jour(request, cle="date"):
 
 # ---------------------------------------------------------------- Structure : gares, lignes, véhicules, chauffeurs
 FICHES = {
-    "gares": (Gare, GareForm, "Gares", ["code", "nom", "ville", "caisse"]),
+    "gares": (Gare, GareForm, "Agences et points de vente", ["code", "nom", "ville", "type_gare", "rattachement", "caisse"]),
     "lignes": (Ligne, LigneForm, "Lignes et tarifs", ["code", "gare_depart", "gare_arrivee", "distance_km", "duree", "prix_billet",
                                                      "colis_forfait", "colis_prix_kg"]),
     "vehicules": (Vehicule, VehiculeForm, "Véhicules", ["immatriculation", "designation", "type_vehicule", "nombre_places"]),

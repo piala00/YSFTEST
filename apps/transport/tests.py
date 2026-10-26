@@ -1346,7 +1346,7 @@ class PlanAnalytiqueCompletTests(TestCase):
         from apps.comptabilite import plan_analytique as pa
 
         codes = [c for c, _, _ in pa.axes()]
-        for attendu in ("gares", "vehicules", "proprietaires", "gammes", "lignes", "voyages", "activites", "contrats"):
+        for attendu in ("agences", "points_vente", "villes", "vehicules", "proprietaires", "services", "gammes", "lignes", "voyages", "activites", "contrats"):
             self.assertIn(attendu, codes)
         s = pa.synthese_axes(self.du, self.au)
         self.assertGreater(s["gl"]["produits"], 0)
@@ -1356,7 +1356,7 @@ class PlanAnalytiqueCompletTests(TestCase):
                 self.assertTrue(b["rapproche"], code)
                 self.assertEqual(b["gl"]["produits"], s["gl"]["produits"])
         # Tous les produits du transport sont attribués à une gare, un véhicule et une activité
-        for code in ("gares", "vehicules", "activites"):
+        for code in ("agences", "points_vente", "villes", "vehicules", "activites"):
             self.assertEqual(pa.balance_axe(code, self.du, self.au)["non_affecte"]["produits"], 0, code)
 
     def test_etats_detailles_d_un_element(self):
@@ -1364,21 +1364,21 @@ class PlanAnalytiqueCompletTests(TestCase):
 
         from apps.comptabilite import plan_analytique as pa
 
-        gare = pa.balance_axe("gares", self.du, self.au)["elements"][0]
+        gare = pa.balance_axe("agences", self.du, self.au)["elements"][0]
         periode = "du=2026-09-01&au=2026-09-02"
-        url = reverse("analytique:element", args=["gares", gare["cle"]])
+        url = reverse("analytique:element", args=["agences", gare["cle"]])
         for etat, _ in pa.ETATS:
             with self.subTest(etat=etat):
                 r = self.client.get(f"{url}?{periode}&etat={etat}&axe2=vehicules")
                 self.assertEqual(r.status_code, 200)
                 self.assertContains(r, gare["libelle"])
-        croise = pa.etat_element("gares", gare["cle"], "croise", self.du, self.au, axe2="vehicules")
+        croise = pa.etat_element("agences", gare["cle"], "croise", self.du, self.au, axe2="vehicules")
         self.assertEqual(sum(g["resultat"] for g in croise["croise"]), gare["resultat"])     # rien ne se perd
         export = self.client.get(f"{url}?{periode}&etat=grand_livre&export=csv")
         self.assertEqual(export["Content-Type"], "text/csv; charset=utf-8")
         self.assertEqual(len(export.content.decode("utf-8-sig").strip().splitlines()) - 1, gare["lignes"])
         for page in (reverse("analytique:plan"), reverse("analytique:axe", args=["vehicules"]),
-                     reverse("analytique:element", args=["gares", "aucun"]), reverse("analytique:accueil")):
+                     reverse("analytique:element", args=["agences", "aucun"]), reverse("analytique:accueil")):
             self.assertEqual(self.client.get(f"{page}?{periode}").status_code, 200, page)
         # Période en un clic
         self.assertEqual(self.client.get(reverse("analytique:plan") + "?periode=mois_precedent").status_code, 200)
@@ -1443,8 +1443,8 @@ class PlanAnalytiqueCompletTests(TestCase):
         r = self.client.get(reverse("analytique:plan") + "?du=2026-09-30&au=2026-09-01")
         self.assertContains(r, "La date de début est après la date de fin")
         # Journal des imputations : chaque ligne avec ses autres axes ; comparaison N-1 ; classement
-        gare = pa.balance_axe("gares", self.du, self.au)["elements"][0]
-        url = reverse("analytique:element", args=["gares", gare["cle"]])
+        gare = pa.balance_axe("agences", self.du, self.au)["elements"][0]
+        url = reverse("analytique:element", args=["agences", gare["cle"]])
         j = self.client.get(f"{url}?du=2026-09-01&au=2026-09-02&etat=journal")
         self.assertContains(j, "Véhicules")
         self.assertEqual(len(j.context["journal"]), gare["lignes"])
@@ -1453,3 +1453,44 @@ class PlanAnalytiqueCompletTests(TestCase):
         classe = self.client.get(reverse("analytique:axe", args=["vehicules"]) + "?du=2026-09-01&au=2026-09-02&tri=resultat")
         resultats = [e["resultat"] for e in classe.context["elements"]]
         self.assertEqual(resultats, sorted(resultats, reverse=True))
+
+
+class AgencesPointsDeVenteTests(TestCase):
+    """Agences de voyage (plusieurs par grande ville) et points de vente rattachés : la recette d'un départ revient à
+    l'agence qui l'exploite, et se répartit entre les points qui ont vendu les billets."""
+
+    def test_recette_repartie_selon_le_point_de_vente(self):
+        from django.core.exceptions import ValidationError
+
+        from apps.comptabilite import plan_analytique as pa
+
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+        dla = Gare.objects.create(code="DLA", nom="Agence de Douala Akwa", ville="Douala")
+        bonaberi = Gare.objects.create(code="DLA2", nom="Agence de Douala Bonabéri", ville="Douala")
+        pv = Gare(code="PK14", nom="Point de vente PK14", ville="Douala", type_gare=Gare.POINT_VENTE)
+        with self.assertRaises(ValidationError):
+            pv.full_clean()                                               # rattachement obligatoire
+        pv.rattachement = dla
+        pv.full_clean()
+        pv.save()
+        yde = Gare.objects.create(code="YDE", nom="Agence de Yaoundé", ville="Yaoundé")
+        ligne = Ligne.objects.create(code="DLA-YDE", gare_depart=dla, gare_arrivee=yde, prix_billet=6000)
+        car = Vehicule.objects.create(immatriculation="LT 900 PV", nombre_places=30)
+        jour = datetime.date.today()
+        d = Depart.objects.create(ligne=ligne, date=jour, heure=datetime.time(6), vehicule=car,
+                                  chauffeur=Chauffeur.objects.create(nom="Chauffeur"))
+        for k, gare in enumerate((dla, dla, pv)):
+            Billet(depart=d, voyageur=f"V{k}", gare=gare).vendre()
+        d.partir()
+        points = {e["cle"]: e["produits"] for e in pa.balance_axe("points_vente", jour, jour)["elements"]}
+        self.assertEqual(points, {dla.pk: 12000, pv.pk: 6000})
+        agences = pa.balance_axe("agences", jour, jour)
+        self.assertEqual({e["cle"]: e["produits"] for e in agences["elements"]}, {dla.pk: 18000})
+        self.assertTrue(agences["rapproche"])
+        villes = pa.balance_axe("villes", jour, jour)
+        self.assertEqual({e["cle"]: e["produits"] for e in villes["elements"]}, {"Douala": 18000})
+        self.assertEqual(pa.libelles("points_vente", [pv.pk])[pv.pk], "PK14 — Point de vente PK14 (rattaché à DLA)")
+        # Fiche du point de vente : sa part seulement, détaillée par véhicule
+        e = pa.etat_element("points_vente", pv.pk, "croise", jour, jour, axe2="vehicules")
+        self.assertEqual((e["total"]["produits"], [g["produits"] for g in e["croise"]]), (6000, [6000]))
+        self.assertTrue(bonaberi.pk not in points)
