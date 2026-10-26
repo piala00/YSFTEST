@@ -6,6 +6,7 @@
 {% url 'analytique:element' axe cle as url_el %}
 {% with export_url=url_el|add:"?"|add:params_periode|add:"&etat="|add:etat|add:"&axe2="|add:axe2|add:"&export=csv" %}{% include "comptabilite/_periode_analytique.html" %}{% endwith %}
 
+{% if not total.lignes %}<div class="alert alert-secondary py-1 small">Aucune imputation validée pour cet élément sur la période : ce n'est pas un résultat nul définitif.</div>{% endif %}
 <div class="row g-2 mb-3">
   <div class="col-auto"><div class="card card-body py-2 px-3"><div class="small text-muted">Produits</div><div class="fs-5">{{ total.produits|montant }}</div></div></div>
   <div class="col-auto"><div class="card card-body py-2 px-3"><div class="small text-muted">Charges</div><div class="fs-5">{{ total.charges|montant }}</div></div></div>
@@ -72,7 +73,13 @@
 </table></div>
 
 {% elif etat == "comparaison" %}
-<p class="small text-muted">Période choisie comparée à la période précédente ({{ periode_precedente.0|date:"d/m/Y" }} – {{ periode_precedente.1|date:"d/m/Y" }}). Produits en positif, charges en négatif.</p>
+<form class="d-flex gap-2 align-items-end mb-2 d-print-none" method="get">
+  <input type="hidden" name="du" value="{{ du|date:'Y-m-d' }}"><input type="hidden" name="au" value="{{ au|date:'Y-m-d' }}"><input type="hidden" name="etat" value="comparaison">
+  <div><label class="form-label small mb-0" for="comparer">Comparer à</label><select id="comparer" name="comparer" class="form-select form-select-sm" onchange="this.form.submit()">
+    <option value="precedente" {% if comparer != "n1" %}selected{% endif %}>la période précédente de même durée</option>
+    <option value="n1" {% if comparer == "n1" %}selected{% endif %}>la même période de l'année précédente (N-1)</option></select></div>
+</form>
+<p class="small text-muted">Comparée à : {{ periode_precedente.0|date:"d/m/Y" }} – {{ periode_precedente.1|date:"d/m/Y" }}. Produits en positif, charges en négatif.</p>
 <div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
   <thead><tr><th>Compte</th><th>Intitulé</th><th class="num">Période</th><th class="num">Période précédente</th><th class="num">Écart</th></tr></thead>
   <tbody>{% for c in comparaison %}<tr><td>{{ c.compte }}</td><td>{{ c.intitule }}</td><td class="num">{{ c.actuel|montant }}</td><td class="num">{{ c.precedent|montant }}</td>
@@ -80,6 +87,14 @@
   {% empty %}<tr><td colspan="5" class="text-muted text-center p-3">Aucun mouvement sur les deux périodes.</td></tr>{% endfor %}</tbody>
   <tfoot><tr class="total"><td colspan="2">Résultat</td><td class="num">{{ total.resultat|montant }}</td><td class="num">{{ total_precedent.resultat|montant }}</td>
     <td class="num">{{ ecart_resultat|montant }}</td></tr></tfoot>
+</table></div>
+{% elif etat == "journal" %}
+<p class="small text-muted">Chaque ligne d'écriture de l'élément et son attribution sur tous les autres axes (une ligne compte une fois par axe).</p>
+<div class="card mb-3" style="overflow-x:auto"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Date</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Montant</th>{% for code, titre in journal_axes %}<th>{{ titre }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for f in journal %}<tr><td>{{ f.date|date:"d/m/Y" }}</td><td><a href="{% url 'comptabilite:ecriture_detail' f.ecriture_id %}">{{ f.piece }}</a></td>
+    <td>{{ f.compte }}</td><td>{{ f.libelle }}</td><td class="num">{{ f.montant|montant }}</td>{% for a in f.attributions %}<td class="text-nowrap">{{ a }}</td>{% endfor %}</tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center p-3">Aucune imputation validée.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endif %}
 <p class="small text-muted">Montants : lignes de charges et produits des écritures validées de la comptabilité générale attribuées à cet élément.

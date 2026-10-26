@@ -1333,7 +1333,7 @@ class PlanAnalytiqueCompletTests(TestCase):
     def setUpTestData(cls):
         from .management.commands.simulation import Command
 
-        call_command(Command(), mois="2026-09", jours=2, vehicules=8, salaries=20, echelle=0.1, forcer=True,
+        call_command(Command(), mois="2026-09", jours=2, vehicules=8, salaries=30, echelle=0.1, forcer=True,
                      stdout=io.StringIO())
         cls.du, cls.au = datetime.date(2026, 9, 1), datetime.date(2026, 9, 2)
 
@@ -1410,3 +1410,46 @@ class PlanAnalytiqueCompletTests(TestCase):
         tout = str(onglets)
         self.assertNotIn("analytique.vehicules", tout)
         self.assertIn("analytique.axes.plan-services", tout)
+
+    def test_services_periodes_journal_et_reporting_identique(self):
+        from django.urls import reverse
+
+        from apps.comptabilite import plan_analytique as pa
+        from apps.comptabilite.models import LigneEcriture
+
+        from . import reporting
+
+        # Services : la paie hors véhicule porte la section de son service ; l'axe se rapproche de la générale
+        self.assertTrue(LigneEcriture.objects.filter(section__code__startswith="SV-", compte__numero__startswith="66").exists())
+        services = pa.balance_axe("services", self.du, self.au)
+        self.assertTrue(services["rapproche"])
+        self.assertTrue({"BILLETTERIE", "CONDUITE"} <= {e["cle"] for e in services["elements"]})
+        # Reporting = état analytique, au franc près, même période
+        vehicules = {e["libelle"].split(" — ")[0]: e for e in pa.balance_axe("vehicules", self.du, self.au)["elements"]}
+        for l in reporting.comparer("vehicule", (self.du, self.au), (self.du, self.au))["lignes"]:
+            if l["libelle"] in vehicules:
+                self.assertEqual((l["a"]["produits"], l["a"]["charges"]),
+                                 (vehicules[l["libelle"]]["produits"], vehicules[l["libelle"]]["charges"]), l["libelle"])
+        # Périodes : Du > Au refusé, ← →, N-1, mois choisi
+        p = pa.lire_periode({"du": "2026-09-30", "au": "2026-09-01"})
+        self.assertTrue(p["erreur"])
+        self.assertEqual(pa.decaler(datetime.date(2026, 9, 1), datetime.date(2026, 9, 30), -1),
+                         (datetime.date(2026, 8, 1), datetime.date(2026, 8, 31)))
+        self.assertEqual(pa.decaler(datetime.date(2026, 9, 1), datetime.date(2026, 9, 7), 1),
+                         (datetime.date(2026, 9, 8), datetime.date(2026, 9, 14)))
+        self.assertEqual(pa.annee_precedente(datetime.date(2028, 2, 29), datetime.date(2028, 2, 29)),
+                         (datetime.date(2027, 2, 28), datetime.date(2027, 2, 28)))
+        self.assertEqual(pa.periode({"mois": "2026-02"})[:2], (datetime.date(2026, 2, 1), datetime.date(2026, 2, 28)))
+        r = self.client.get(reverse("analytique:plan") + "?du=2026-09-30&au=2026-09-01")
+        self.assertContains(r, "La date de début est après la date de fin")
+        # Journal des imputations : chaque ligne avec ses autres axes ; comparaison N-1 ; classement
+        gare = pa.balance_axe("gares", self.du, self.au)["elements"][0]
+        url = reverse("analytique:element", args=["gares", gare["cle"]])
+        j = self.client.get(f"{url}?du=2026-09-01&au=2026-09-02&etat=journal")
+        self.assertContains(j, "Véhicules")
+        self.assertEqual(len(j.context["journal"]), gare["lignes"])
+        self.assertEqual(self.client.get(f"{url}?du=2026-09-01&au=2026-09-02&etat=comparaison&comparer=n1").context[
+            "periode_precedente"], (datetime.date(2025, 9, 1), datetime.date(2025, 9, 2)))
+        classe = self.client.get(reverse("analytique:axe", args=["vehicules"]) + "?du=2026-09-01&au=2026-09-02&tri=resultat")
+        resultats = [e["resultat"] for e in classe.context["elements"]]
+        self.assertEqual(resultats, sorted(resultats, reverse=True))

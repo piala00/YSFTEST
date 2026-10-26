@@ -35,10 +35,11 @@ AXES_TRANSPORT = [
     ("gares", "Agences (gares)", "Recettes et charges de chaque gare : ventes constatées au départ, colis, loyers, frais"),
     ("vehicules", "Véhicules", "Compte d'exploitation de chaque car et camion"),
     ("proprietaires", "Propriétaires", "Véhicules des partenaires selon le contrat en vigueur à la date"),
+    ("services", "Services", "Billetterie, colis, conduite, garage, administration : produits et coûts de chaque service"),
+    ("activites", "Activités", "Voyageurs, bagages, colis et fret, autres produits ; charges des véhicules et de structure"),
     ("gammes", "Gammes (Classique / VIP)", "Flottes distinctes Classique et VIP"),
     ("lignes", "Lignes (itinéraires)", "Résultat de chaque itinéraire"),
     ("voyages", "Voyages (départs)", "Résultat de chaque départ"),
-    ("activites", "Activités", "Voyageurs, bagages, colis et fret, autres produits ; charges des véhicules et de structure"),
     ("contrats", "Contrats des propriétaires", "Résultat sous chaque contrat"),
 ]
 
@@ -49,7 +50,11 @@ ETATS = [
     ("evolution", "Évolution"),
     ("croise", "Ventilation croisée"),
     ("comparaison", "Comparaison de périodes"),
+    ("journal", "Journal des imputations"),
 ]
+
+SERVICES_RUBRIQUES = {"billetterie": "BILLETTERIE", "bagages": "BILLETTERIE", "colis": "COLIS", "carburant": "CONDUITE",
+                      "route": "CONDUITE", "garage": "GARAGE", "personnel": "CONDUITE"}
 
 ACTIVITES = OrderedDict([
     ("voyageurs", "Transport de voyageurs"), ("bagages", "Bagages payants"), ("colis", "Colis, courrier et fret"),
@@ -59,10 +64,57 @@ ACTIVITES = OrderedDict([
 
 
 # ---------------------------------------------------------------- Période
+def lire_periode(params, aujourdhui=None):
+    """Période demandée : {du, au, code, erreur}. Du > Au est refusé (message), la période par défaut est gardée."""
+    du, au, code = periode(params, aujourdhui)
+    erreur = ""
+    if not params.get("periode") and not params.get("mois") and params.get("du") and params.get("au") \
+            and params.get("du") > params.get("au"):
+        erreur = "La date de début est après la date de fin : période non prise en compte."
+    return {"du": du, "au": au, "code": code, "erreur": erreur}
+
+
+def decaler(debut, fin, sens):
+    """Période précédente (sens = -1) ou suivante (+1) de même durée ; mois entiers → mois entiers."""
+    if debut.day == 1 and fin.day == calendar.monthrange(fin.year, fin.month)[1]:
+        mois = (fin.year - debut.year) * 12 + fin.month - debut.month + 1
+        rang = debut.year * 12 + debut.month - 1 + sens * mois
+        d = datetime.date(rang // 12, rang % 12 + 1, 1)
+        rang_fin = rang + mois - 1
+        a, m = rang_fin // 12, rang_fin % 12 + 1
+        return d, datetime.date(a, m, calendar.monthrange(a, m)[1])
+    jours = (fin - debut).days + 1
+    return debut + datetime.timedelta(days=sens * jours), fin + datetime.timedelta(days=sens * jours)
+
+
+def annee_precedente(debut, fin):
+    """Même période l'année précédente (N-1)."""
+    def recul(d):
+        try:
+            return d.replace(year=d.year - 1)
+        except ValueError:                                         # 29 février
+            return d.replace(year=d.year - 1, day=28)
+    return recul(debut), recul(fin)
+
+
 def periode(params, aujourdhui=None):
-    """(début, fin, code) d'après ?du=&au= ou ?periode=jour|hier|semaine|mois|mois_precedent|trimestre|annee."""
+    """(début, fin, code) d'après ?du=&au=, ?mois=AAAA-MM ou ?periode=jour|hier|semaine|mois|mois_precedent|trimestre|
+    annee|exercice."""
     j = aujourdhui or datetime.date.today()
     code = params.get("periode", "")
+    if code == "exercice":
+        from apps.core.models import Exercice
+
+        e = Exercice.objects.filter(date_debut__lte=j, date_fin__gte=j).first()
+        if e:
+            return e.date_debut, e.date_fin, code
+        return datetime.date(j.year, 1, 1), datetime.date(j.year, 12, 31), code
+    if params.get("mois") and not code:
+        try:
+            a, m = (int(x) for x in params["mois"].split("-"))
+            return datetime.date(a, m, 1), datetime.date(a, m, calendar.monthrange(a, m)[1]), "mois_choisi"
+        except (ValueError, TypeError):
+            pass
     if code == "jour":
         return j, j, code
     if code == "hier":
@@ -114,7 +166,7 @@ def _plans_sections():
     """Plans de sections libres (hors Gares, Véhicules et Agences, déjà portés par les axes du transport)."""
     from .models import SectionAnalytique
 
-    exclus = {"Gares", "Véhicules", "Agences"} if _transport() else set()
+    exclus = {"Gares", "Véhicules", "Agences", "Services"} if _transport() else set()
     plans = sorted(set(SectionAnalytique.objects.values_list("plan", flat=True)) - exclus)
     return [(f"plan-{slugify(p)}", p, f"Sections du plan « {p} »") for p in plans]
 
@@ -139,7 +191,8 @@ class _Contexte:
 
         from .models import SectionAnalytique
 
-        self.transport = _transport()
+        # Attribution du transport dès qu'il existe des gares ou des véhicules (l'affichage, lui, suit l'activité)
+        self.transport = Vehicule.objects.exists() or Gare.objects.exists()
         self.sections = {s["id"]: s for s in SectionAnalytique.objects.values("id", "plan", "code", "intitule")}
         self.slug_plan = {p: f"plan-{slugify(p)}" for p in {s["plan"] for s in self.sections.values()}}
         if not self.transport:
@@ -170,6 +223,21 @@ class _Contexte:
             self.gammes[cle] = self.vehicules[vehicule_id].gamme_le(jour)
         return self.gammes[cle]
 
+    def service(self, numero, vehicule_id, section):
+        """Section du plan Services portée par la ligne (paie hors véhicule…), sinon le service qui produit le fait :
+        billetterie, colis ; carburant, route et salaires répartis sur un véhicule : conduite ; garage. Le reste
+        (assurances, loyers, frais généraux sans section) reste non affecté."""
+        if section and section["plan"] == "Services" and section["code"].startswith("SV-"):
+            return section["code"][3:]
+        if not self.transport:
+            return None
+        from apps.transport.analytique import _rubrique
+
+        r = _rubrique(numero, self.parametres, self.remuneration)
+        if r == "personnel" and not vehicule_id:
+            return None
+        return SERVICES_RUBRIQUES.get(r)
+
     def activite(self, numero, vehicule_id, depart_id):
         if not self.transport:
             return None
@@ -192,20 +260,21 @@ def faits(debut, fin, ctx=None):
           .filter(Q(compte__numero__startswith="6") | Q(compte__numero__startswith="7"))
           .values("id", "debit", "credit", "libelle", "vehicule_id", "section_id", "compte__numero", "compte__intitule",
                   "ecriture_id", "ecriture__date", "ecriture__numero", "ecriture__reference", "ecriture__libelle",
-                  "ecriture__journal__code")
+                  "ecriture__origine", "ecriture__journal__code", "ecriture__site_origine")
           .order_by("ecriture__date", "ecriture__numero", "id"))
     for l in qs:
         numero = l["compte__numero"]
         f = {"id": l["id"], "date": l["ecriture__date"], "piece": l["ecriture__numero"], "ecriture_id": l["ecriture_id"],
              "journal": l["ecriture__journal__code"], "libelle": l["libelle"] or l["ecriture__libelle"],
              "compte": numero, "compte_intitule": l["compte__intitule"], "produit": numero.startswith("7"),
-             "montant": l["credit"] - l["debit"]}
+             "montant": l["credit"] - l["debit"], "site": l["ecriture__site_origine"]}
         section = ctx.sections.get(l["section_id"])
         if section:
             f[ctx.slug_plan[section["plan"]]] = section["id"]
         if ctx.transport:
             v, jour = l["vehicule_id"], l["ecriture__date"]
-            dep_id = ctx.depart_de_piece.get(l["ecriture__reference"]) or ctx.depart_de_piece.get(l["ecriture__numero"])
+            dep_id = (ctx.depart_de_piece.get(l["ecriture__reference"]) or ctx.depart_de_piece.get(l["ecriture__origine"])
+                      or ctx.depart_de_piece.get(l["ecriture__numero"]))
             depart = ctx.departs.get(dep_id)
             gare = ctx.gare_de_section.get(l["section_id"])
             if gare is None and depart is not None:
@@ -218,7 +287,7 @@ def faits(debut, fin, ctx=None):
                 "gammes": (depart.ligne.gamme if depart else None) or (ctx.gamme(v, jour) if v else None),
                 "gares": gare, "contrats": contrat.pk if contrat else None,
                 "proprietaires": (contrat.partenaire_id if contrat else "societe") if v else None,
-                "activites": ctx.activite(numero, v, dep_id)})
+                "activites": ctx.activite(numero, v, dep_id), "services": ctx.service(numero, v, section)})
         yield f
 
 
@@ -252,6 +321,9 @@ def libelles(axe, cles):
                 for d in Depart.objects.filter(pk__in=cles).select_related("ligne", "vehicule")}
     if axe == "activites":
         return {c: ACTIVITES.get(c, c) for c in cles}
+    if axe == "services":
+        from apps.personnel.models import Employe
+        return {c: dict(Employe.SERVICES).get(c, c) for c in cles}
     if axe == "contrats":
         from apps.partenaires.models import ContratPartenaire
         return {c.pk: f"{c.numero} v{c.version} — {c.partenaire.nom} — {c.vehicule.immatriculation}"
@@ -266,7 +338,7 @@ def cle_depuis_url(axe, valeur):
     """Clé d'élément lue dans l'URL (identifiant numérique, code de gamme ou d'activité, « aucun »)."""
     if valeur == NON_AFFECTE:
         return None
-    if axe in ("gammes", "activites") or (axe == "proprietaires" and valeur == "societe"):
+    if axe in ("gammes", "activites", "services") or (axe == "proprietaires" and valeur == "societe"):
         return valeur
     try:
         return int(valeur)
@@ -279,6 +351,13 @@ def _somme(lignes):
     p = sum((f["montant"] for f in lignes if f["produit"]), ZERO)
     c = -sum((f["montant"] for f in lignes if not f["produit"]), ZERO)
     return {"produits": p, "charges": c, "resultat": p - c, "lignes": len(lignes)}
+
+
+def ecritures_provisoires(debut, fin):
+    """Écritures encore au brouillard sur la période : exclues des états (vue provisoire à part)."""
+    from .models import Ecriture
+
+    return Ecriture.objects.filter(statut=Ecriture.STATUT_BROUILLARD, date__range=(debut, fin)).count()
 
 
 def synthese_axes(debut, fin):
@@ -324,7 +403,7 @@ def _rubrique_generale(numero, intitules):
     return prefixe, intitules.get(normaliser_numero(prefixe)) or intitules.get(prefixe) or f"Comptes {prefixe}"
 
 
-def etat_element(axe, cle, etat, debut, fin, axe2=""):
+def etat_element(axe, cle, etat, debut, fin, axe2="", comparer="precedente"):
     """État détaillé d'un élément (cle=None : le non affecté de l'axe)."""
     from .models import Compte
 
@@ -376,8 +455,13 @@ def etat_element(axe, cle, etat, debut, fin, axe2=""):
         croise = [{"cle": c, "libelle": noms.get(c, str(c)) if c is not None else "Non affecté", **_somme(ls)}
                   for c, ls in groupes.items()]
         r["croise"] = sorted(croise, key=lambda g: (g["cle"] is None, g["libelle"]))
+    elif etat == "journal":
+        noms = {code: libelles(code, list({f.get(code) for f in lignes})) for code, _, _ in axes() if code != axe}
+        r["journal_axes"] = [(code, titre) for code, titre, _ in axes() if code != axe]
+        r["journal"] = [{**f, "attributions": [noms[code].get(f.get(code), "—") if f.get(code) is not None else "—"
+                                               for code, _ in r["journal_axes"]]} for f in lignes[:1000]]
     elif etat == "comparaison":
-        d0, f0 = periode_precedente(debut, fin)
+        d0, f0 = annee_precedente(debut, fin) if comparer == "n1" else periode_precedente(debut, fin)
         avant = [f for f in faits(d0, f0) if f.get(axe) == cle]
         par_compte = OrderedDict()
         for quand, ls in (("actuel", lignes), ("precedent", avant)):

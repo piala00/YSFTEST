@@ -65,6 +65,13 @@ class Employe(models.Model):
     def __str__(self):
         return f"{self.matricule} - {self.nom}"
 
+    def section_service(self):
+        """Section analytique de son service (plan « Services ») : y vont ses charges hors véhicules."""
+        from apps.comptabilite.models import SectionAnalytique
+
+        return SectionAnalytique.objects.get_or_create(
+            code=f"SV-{self.service}"[:20], defaults={"plan": "Services", "intitule": self.get_service_display()[:100]})[0]
+
     def avances_a_reprendre(self):
         return sum((a.montant for a in self.avances.filter(bulletin__isnull=True, ecriture__isnull=False)), ZERO)
 
@@ -228,10 +235,12 @@ class PeriodePaie(models.Model):
             b.calculer()
             repartition = b.employe.repartition(debut, self.fin_de_mois)
 
+            service = b.employe.section_service()
+
             def charges(compte, montant, libelle):
-                """Charge répartie sur les véhicules selon le mode d'imputation de l'employé (reste : agence)."""
+                """Charge répartie sur les véhicules selon le mode d'imputation de l'employé ; sinon sur son service."""
                 if not repartition:
-                    return [{"compte": compte, "debit": montant, "libelle": libelle}]
+                    return [{"compte": compte, "debit": montant, "section": service, "libelle": libelle}]
                 parts = [_arrondi(montant * f) for _, f in repartition[:-1]]
                 parts.append(montant - sum(parts, ZERO))
                 return [{"compte": compte, "debit": m, "vehicule": v, "section": v.section, "libelle": libelle}

@@ -4,6 +4,11 @@
 <div class="page-title"><h1>{{ titre_axe }} <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1>
   <a class="small d-print-none" href="{% url 'analytique:plan' %}?{{ params_periode }}">← Plan analytique</a></div>
 {% url 'analytique:axe' axe as url_axe %}{% with export_url=url_axe|add:"?"|add:params_periode|add:"&export=csv" %}{% include "comptabilite/_periode_analytique.html" %}{% endwith %}
+<form class="d-flex gap-2 align-items-end mb-2 d-print-none" method="get">
+  <input type="hidden" name="du" value="{{ du|date:'Y-m-d' }}"><input type="hidden" name="au" value="{{ au|date:'Y-m-d' }}">
+  <div><label class="form-label small mb-0" for="tri">Classer par</label><select id="tri" name="tri" class="form-select form-select-sm" onchange="this.form.submit()">
+    {% for code, titre in tris %}<option value="{{ code }}" {% if code == tri %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
+</form>
 <div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
   <thead><tr><th>Élément</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Marge</th><th class="num">Lignes</th></tr></thead>
   <tbody>{% for e in elements %}<tr>

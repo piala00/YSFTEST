@@ -9,15 +9,29 @@ from django.shortcuts import render
 from . import plan_analytique as pa
 
 PERIODES_RAPIDES = [("jour", "Aujourd'hui"), ("hier", "Hier"), ("semaine", "Cette semaine"), ("mois", "Ce mois"),
-                    ("mois_precedent", "Mois précédent"), ("trimestre", "Ce trimestre"), ("annee", "Cette année")]
+                    ("mois_precedent", "Mois précédent"), ("trimestre", "Ce trimestre"), ("annee", "Cette année"),
+                    ("exercice", "Exercice")]
+MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre",
+        "Décembre"]
+TRIS = [("libelle", "Nom"), ("resultat", "Résultat"), ("produits", "Produits"), ("charges", "Charges")]
 
 
 def _contexte_periode(request):
-    du, au, code = pa.periode(request.GET)
-    autres = {k: v for k, v in request.GET.items() if k not in ("du", "au", "periode", "export")}
-    return {"du": du, "au": au, "periode_code": code, "periodes": PERIODES_RAPIDES,
-            "params_periode": urlencode({"du": du.isoformat(), "au": au.isoformat()}),
-            "autres_params": autres}
+    p = pa.lire_periode(request.GET)
+    du, au = p["du"], p["au"]
+    autres = {k: v for k, v in request.GET.items() if k not in ("du", "au", "periode", "mois", "export")}
+
+    def lien(d, f):
+        return "?" + urlencode({**autres, "du": d.isoformat(), "au": f.isoformat()})
+
+    annee = du.year
+    return {"du": du, "au": au, "periode_code": p["code"], "periodes": PERIODES_RAPIDES, "erreur_periode": p["erreur"],
+            "params_periode": urlencode({"du": du.isoformat(), "au": au.isoformat()}), "autres_params": autres,
+            "lien_precedent": lien(*pa.decaler(du, au, -1)), "lien_suivant": lien(*pa.decaler(du, au, 1)),
+            "mois_choix": [(f"{annee}-{i:02d}", f"{nom} {annee}") for i, nom in enumerate(MOIS, 1)]
+            + [(f"{annee - 1}-{i:02d}", f"{nom} {annee - 1}") for i, nom in enumerate(MOIS, 1)],
+            "mois_courant": f"{du:%Y-%m}" if du.day == 1 and du.month == au.month and du.year == au.year else "",
+            "provisoires": pa.ecritures_provisoires(du, au)}
 
 
 def _csv(nom, entetes, lignes):
@@ -50,13 +64,16 @@ def axe(request, axe):
     titre = _axe_ou_404(axe)
     p = _contexte_periode(request)
     b = pa.balance_axe(axe, p["du"], p["au"])
+    tri = request.GET.get("tri", "libelle")
+    if tri in ("resultat", "produits", "charges"):                 # classement des éléments
+        b["elements"].sort(key=lambda e: e[tri], reverse=True)
     if request.GET.get("export") == "csv":
         lignes = [[e["libelle"], e["produits"], e["charges"], e["resultat"], e["lignes"]] for e in b["elements"]]
         lignes.append(["Non affecté", b["non_affecte"]["produits"], b["non_affecte"]["charges"], b["non_affecte"]["resultat"],
                        b["non_affecte"]["lignes"]])
         return _csv(f"analytique-{axe}-{p['du']}-{p['au']}", ["Élément", "Produits", "Charges", "Résultat", "Lignes"], lignes)
-    return render(request, "comptabilite/analytique_axe.html", {**p, **b, "axe": axe, "titre_axe": titre,
-                                                                "non_affecte_cle": pa.NON_AFFECTE})
+    return render(request, "comptabilite/analytique_axe.html", {**p, **b, "axe": axe, "titre_axe": titre, "tri": tri,
+                                                                "tris": TRIS, "non_affecte_cle": pa.NON_AFFECTE})
 
 
 @login_required
@@ -72,7 +89,8 @@ def element(request, axe, cle):
     axe2 = request.GET.get("axe2") or (autres_axes[0][0] if autres_axes else "")
     if axe2 not in dict(autres_axes):
         axe2 = autres_axes[0][0] if autres_axes else ""
-    r = pa.etat_element(axe, cle_interne, etat, p["du"], p["au"], axe2=axe2)
+    comparer = "n1" if request.GET.get("comparer") == "n1" else "precedente"
+    r = pa.etat_element(axe, cle_interne, etat, p["du"], p["au"], axe2=axe2, comparer=comparer)
     libelle = "Non affecté" if cle_interne is None else pa.libelles(axe, [cle_interne]).get(cle_interne, cle)
     if request.GET.get("export") == "csv":
         nom = f"analytique-{axe}-{cle}-{etat}-{p['du']}-{p['au']}"
@@ -88,10 +106,14 @@ def element(request, axe, cle):
         if etat == "comparaison":
             return _csv(nom, ["Compte", "Intitulé", "Période", "Période précédente", "Écart"],
                         [[c["compte"], c["intitule"], c["actuel"], c["precedent"], c["ecart"]] for c in r["comparaison"]])
+        if etat == "journal":
+            return _csv(nom, ["Date", "Pièce", "Compte", "Libellé", "Montant"] + [t for _, t in r["journal_axes"]],
+                        [[f["date"], f["piece"], f["compte"], f["libelle"], f["montant"], *f["attributions"]]
+                         for f in r["journal"]])
         return _csv(nom, ["Date", "Pièce", "Journal", "Compte", "Libellé", "Produit (+) / charge (−)"],
                     [[f["date"], f["piece"], f["journal"], f["compte"], f["libelle"], f["montant"]] for f in r["lignes"]])
     lignes_gl = r["lignes"][:1000] if etat == "grand_livre" else []
     return render(request, "comptabilite/analytique_element.html", {
         **p, **r, "axe": axe, "titre_axe": titre, "cle": cle, "libelle": libelle, "etat": etat, "etats": pa.ETATS,
-        "axe2": axe2, "autres_axes": autres_axes, "titre_axe2": dict(autres_axes).get(axe2, ""),
+        "axe2": axe2, "autres_axes": autres_axes, "comparer": comparer, "titre_axe2": dict(autres_axes).get(axe2, ""),
         "lignes_gl": lignes_gl, "tronque": etat == "grand_livre" and len(r["lignes"]) > 1000})

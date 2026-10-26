@@ -11,8 +11,8 @@
   <tbody>{% for a in axes %}<tr>
     <td><a class="fw-semibold" href="{% url 'analytique:axe' a.code %}?{{ params_periode }}">{{ a.titre }}</a><br><span class="text-muted">{{ a.description }}</span></td>
     <td class="num">{{ a.elements }}</td><td class="num">{{ a.produits|montant }}</td><td class="num">{{ a.charges|montant }}</td>
-    <td class="num {% if a.produits_non_affectes %}text-warning-emphasis{% endif %}">{{ a.produits_non_affectes|montant_ou_vide }}</td>
-    <td class="num">{{ a.charges_non_affectees|montant_ou_vide }}</td></tr>
+    <td class="num {% if a.produits_non_affectes %}text-warning-emphasis{% endif %}"><a href="{% url 'analytique:element' a.code 'aucun' %}?{{ params_periode }}&amp;etat=grand_livre">{{ a.produits_non_affectes|montant_ou_vide }}</a></td>
+    <td class="num"><a href="{% url 'analytique:element' a.code 'aucun' %}?{{ params_periode }}&amp;etat=grand_livre">{{ a.charges_non_affectees|montant_ou_vide }}</a></td></tr>
   {% empty %}<tr><td colspan="6" class="text-muted text-center p-4">Aucun axe : créez des sections dans Structure › Plan analytique.</td></tr>{% endfor %}</tbody>
 </table></div>
 <p class="small text-muted">Une même ligne d'écriture apparaît dans chaque axe (sa gare, son véhicule, sa ligne…) mais ne compte qu'une fois par axe :

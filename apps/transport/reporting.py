@@ -5,7 +5,6 @@ Montants : lignes d'écritures générales validées (source unique), jamais rec
 Voyages, voyageurs et remplissage : données d'exploitation des départs, affichées à part.
 Base de date : date comptable des écritures ; date du départ pour les données d'exploitation.
 """
-from collections import OrderedDict
 from decimal import Decimal
 
 ZERO = Decimal("0")
@@ -18,22 +17,19 @@ def _vide():
 
 
 def _periode(axe, debut, fin, gamme=""):
-    from django.db.models import Q
-
-    from apps.comptabilite.models import Ecriture, LigneEcriture
+    from apps.commercial.models import Tiers
     from apps.echanges.publication import site_local
 
-    from .analytique import _contrat_le, _contrats_par_vehicule, _Gammes
-    from .etats import _depart_des_pieces
-    from .models import Depart
+    from .analytique import _contrat_le, _contrats_par_vehicule
+    from .models import GAMMES, Depart, Ligne, Vehicule
 
     local = site_local()
     ici = local.code if local else "Ce dossier"
-    gammes, contrats = _Gammes(), _contrats_par_vehicule(debut, fin)
+    contrats = _contrats_par_vehicule(debut, fin)
     departs = list(Depart.objects.filter(date__range=(debut, fin)).exclude(statut__in=[Depart.ANNULE, Depart.PROGRAMME])
                    .select_related("ligne", "vehicule"))
-    par_pk, pieces = {d.pk: d for d in departs}, _depart_des_pieces(departs)
     groupes = {}
+    contrats_noms = dict(Tiers.objects.filter(contrats_partenaire__isnull=False).values_list("pk", "nom").distinct())
 
     def cle_depart(d):
         if axe == "agence":
@@ -54,31 +50,32 @@ def _periode(axe, debut, fin, gamme=""):
         g["voyages"] += 1
         g["voyageurs"] += d.places_vendues
         g["places"] += d.places
-    lignes = (LigneEcriture.objects.filter(ecriture__statut=Ecriture.STATUT_VALIDEE, ecriture__date__range=(debut, fin))
-              .filter(Q(compte__numero__startswith="6") | Q(compte__numero__startswith="7"))
-              .select_related("compte", "ecriture", "vehicule"))
-    if axe != "agence" or gamme:
-        lignes = lignes.filter(vehicule__isnull=False)            # hors agence : seuls les montants des véhicules
-    for l in lignes:
-        if gamme and (l.vehicule is None or gammes(l.vehicule, l.ecriture.date) != gamme):
+    # Montants : le moteur du plan analytique (mêmes lignes validées, même attribution que les états analytiques)
+    from apps.comptabilite import plan_analytique as pa
+
+    noms = {"vehicule": {v.pk: v.immatriculation for v in Vehicule.objects.all()},
+            "ligne": dict(Ligne.objects.values_list("pk", "code")), "gamme": dict(GAMMES)}
+    for f in pa.faits(debut, fin):
+        if (axe != "agence" or gamme) and f.get("vehicules") is None:
+            continue                                              # hors agence : seuls les montants des véhicules
+        if gamme and f.get("gammes") != gamme:
             continue
         if axe == "agence":
-            cle = l.ecriture.site_origine or ici
+            cle = f["site"] or ici
         elif axe == "gamme":
-            cle = dict([("CLASSIQUE", "Classique"), ("VIP", "VIP")])[gammes(l.vehicule, l.ecriture.date)]
+            cle = noms["gamme"].get(f["gammes"], f["gammes"])
         elif axe == "ligne":
-            d = par_pk.get(pieces.get(l.ecriture.reference) or pieces.get(l.ecriture.origine))
-            cle = d.ligne.code if d else "Hors voyage"
+            cle = noms["ligne"].get(f["lignes"], "Hors voyage")
         elif axe == "vehicule":
-            cle = l.vehicule.immatriculation
+            cle = noms["vehicule"][f["vehicules"]]
         else:
-            c = _contrat_le(contrats, l.vehicule_id, l.ecriture.date)
-            cle = c.partenaire.nom if c else "Véhicules de la société"
+            p = f["proprietaires"]
+            cle = "Véhicules de la société" if p == "societe" else contrats_noms.get(p) or str(p)
         g = groupes.setdefault(cle, _vide())
-        if l.compte.numero.startswith("7"):
-            g["produits"] += l.credit - l.debit
+        if f["produit"]:
+            g["produits"] += f["montant"]                         # crédit − débit
         else:
-            g["charges"] += l.debit - l.credit
+            g["charges"] -= f["montant"]                          # débit − crédit
     for g in groupes.values():
         g["resultat"] = g["produits"] - g["charges"]
         g["remplissage"] = round(100 * g["voyageurs"] / g["places"]) if g["places"] else None

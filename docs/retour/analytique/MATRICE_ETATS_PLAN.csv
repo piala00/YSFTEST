@@ -1,0 +1,29 @@
+plan;code skill;axe ERP;etat;statut;preuve (test)
+Agences / gares;AGC;gares;balance, compte d'exploitation, comptes, grand-livre, évolution, croisé, comparaison, journal;FAIT;PlanAnalytiqueCompletTests
+Véhicules;VEH;vehicules;idem + états spécialisés (comptes d'exploitation, grand-livre, balance des véhicules);FAIT;PlanAnalytiqueCompletTests, ComptabiliteAnalytiqueTests
+Propriétaires;PRT;proprietaires;idem + portefeuilles, relevés (situation financière séparée);FAIT;PlanAnalytiqueCompletTests, RemunerationsProprietairesTests
+Services;DEP;services;idem;FAIT (règles : section du service sur la paie hors véhicule, sinon service producteur du fait);test_services_periodes_journal_et_reporting_identique
+Activités;ACT;activites;idem;FAIT;PlanAnalytiqueCompletTests
+Gammes Classique / VIP;GAM;gammes;idem;FAIT;PlanAnalytiqueCompletTests
+Lignes;LIG;lignes;idem;FAIT;PlanAnalytiqueCompletTests
+Voyages;VOY;voyages;idem;FAIT;PlanAnalytiqueCompletTests
+Contrats;CTR;contrats;idem;FAIT;PlanAnalytiqueCompletTests
+Canaux de vente;CAN;—;—;ABSENT (toutes les ventes passent par le guichet ; le mode de paiement n'est pas un canal ; ventilation fractionnée requise);—
+Plans de sections libres;—;plan-<nom>;idem;FAIT;test_societe_de_commerce_sections_seulement
+États communs;—;tous;compte d'exploitation;FAIT;test_etats_detailles_d_un_element
+États communs;—;tous;balance par sections + non affecté + rapprochement;FAIT;test_chaque_axe_se_rapproche_de_la_comptabilite_generale
+États communs;—;tous;grand-livre analytique lié aux pièces;FAIT;test_etats_detailles_d_un_element
+États communs;—;tous;journal des imputations (attribution sur tous les axes);FAIT;test_services_periodes_journal_et_reporting_identique
+États communs;—;tous;détail des produits / des charges par compte;FAIT (un seul état, deux colonnes);test_etats_detailles_d_un_element
+États communs;—;tous;coûts directs / indirects avec clés de répartition;ABSENT (aucune clé définie par l'utilisateur ; rien n'est réparti d'office);—
+États communs;—;tous;évolution jour / mois;FAIT;test_etats_detailles_d_un_element
+États communs;—;tous;comparaison période précédente et N-1;FAIT;test_services_periodes_journal_et_reporting_identique
+États communs;—;tous;classement des sections;FAIT (tri de la balance);test_services_periodes_journal_et_reporting_identique
+États communs;—;tous;anomalies / non affecté;FAIT (élément « Non affecté » de chaque axe, grand-livre);test_etats_detailles_d_un_element
+États communs;—;tous;justificatifs (pièce source);FAIT (lien vers l'écriture) ; pièce scannée : ABSENT;—
+Périodes;—;—;jour, hier, semaine, mois, mois précédent, trimestre, année, exercice, mois + année, dates libres, ←/→, Du > Au refusé;FAIT;test_periodes_rapides, test_services_periodes_journal_et_reporting_identique
+Reporting;—;—;comparaisons transport sur le même moteur, égalité au franc près;FAIT;test_services_periodes_journal_et_reporting_identique
+Statut;—;—;écritures au brouillard signalées et exclues;FAIT (bandeau);—
+Statut;—;—;fraîcheur de synchronisation par agence sur les états;PARTIEL (visible dans Fichier › Échanges, pas sur les états);—
+Droits;—;—;agent de gare limité à sa gare, partenaire à son compte;ABSENT (droits par logiciel et par menu seulement);—
+Ventilation fractionnée;—;—;une ligne répartie 60/40 sur deux éléments d'un même plan;ABSENT (une ligne = un élément par axe);—

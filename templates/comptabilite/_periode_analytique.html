@@ -1,13 +1,24 @@
-{# Période en un clic : boutons rapides ou dates libres ; les autres choix de l'écran (état, axe croisé) sont gardés #}
-<form class="d-flex flex-wrap gap-2 align-items-end mb-3 d-print-none" method="get">
+{# Période en un clic : boutons rapides, mois + année, dates libres, ← période précédente / suivante → ;
+   les autres choix de l'écran (état, axe croisé, tri) sont gardés #}
+<form class="d-flex flex-wrap gap-2 align-items-end mb-2 d-print-none" method="get">
   {% for k, v in autres_params.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ lien_precedent }}" title="Période précédente"><i class="bi bi-chevron-left"></i></a>
   <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Période">
     {% for code, titre in periodes %}<button type="submit" name="periode" value="{{ code }}"
       class="btn {% if code == periode_code %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ titre }}</button>{% endfor %}
   </div>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ lien_suivant }}" title="Période suivante"><i class="bi bi-chevron-right"></i></a>
+</form>
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3 d-print-none" method="get">
+  {% for k, v in autres_params.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <div><label class="form-label small mb-0" for="pa-mois">Mois</label><select id="pa-mois" name="mois" class="form-select form-select-sm" onchange="this.form.du.value='';this.form.au.value='';this.form.submit()">
+    <option value="">—</option>{% for code, titre in mois_choix %}<option value="{{ code }}" {% if code == mois_courant %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
   <div><label class="form-label small mb-0" for="pa-du">Du</label><input type="date" id="pa-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
   <div><label class="form-label small mb-0" for="pa-au">Au</label><input type="date" id="pa-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
-  <button class="btn btn-sm btn-primary">Afficher</button>
+  <button class="btn btn-sm btn-primary" onclick="this.form.mois.value=''">Afficher</button>
   <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
   {% if export_url %}<a class="btn btn-sm btn-outline-secondary" href="{{ export_url }}"><i class="bi bi-filetype-csv"></i> Exporter</a>{% endif %}
 </form>
+{% if erreur_periode %}<div class="alert alert-warning py-1 small">{{ erreur_periode }}</div>{% endif %}
+{% if provisoires %}<div class="alert alert-info py-1 small d-print-none">{{ provisoires }} écriture(s) de la période sont encore au brouillard :
+  elles ne sont pas comprises (données provisoires). <a href="{% url 'comptabilite:ecritures' %}?statut=BROUILLARD">Les voir</a></div>{% endif %}

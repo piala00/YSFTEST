@@ -18,6 +18,7 @@ Parcours : **plan** (tous les axes) → **axe** (tous ses éléments) → **él�
 | Agences (gares) | chaque gare | section de gare de la ligne, sinon gare de départ du voyage, sinon l'agence (si une seule gare) |
 | Véhicules | chaque car et camion | véhicule porté par la ligne d'écriture |
 | Propriétaires | chaque propriétaire, et « Société (véhicules propres) » | contrat du véhicule **en vigueur à la date** de l'écriture |
+| Services | billetterie, colis, conduite, garage, administration… | section du service posée par la paie (salaires hors véhicule) ; sinon le service qui produit le fait (billets → billetterie, colis → colis, carburant et route → conduite, garage → garage) |
 | Gammes | Classique, VIP | gamme de la ligne du voyage, sinon flotte du véhicule à la date |
 | Lignes (itinéraires) | chaque ligne | ligne du voyage |
 | Voyages (départs) | chaque départ | pièce du départ, du colis, du plein, de la dépense, de l'avance de mission ou de l'imprévu |
@@ -33,7 +34,7 @@ Pour **chaque axe** : la balance de l'axe — produits, charges, résultat et ma
 (qui reste en comptabilité générale, jamais réparti d'office) et le rapprochement : éléments + non affecté =
 comptabilité générale.
 
-Pour **chaque élément** (une gare, un véhicule, un propriétaire…), six états :
+Pour **chaque élément** (une gare, un véhicule, un propriétaire…), sept états :
 
 1. **Compte d'exploitation** : produits et charges par rubrique (billetterie, bagages, colis ; carburant, route,
    garage, personnel, part du propriétaire…), résultat.
@@ -42,7 +43,12 @@ Pour **chaque élément** (une gare, un véhicule, un propriétaire…), six ét
 4. **Évolution** : par jour (période de deux mois au plus) ou par mois.
 5. **Ventilation croisée** : l'élément détaillé selon un autre axe (une gare par véhicule, un véhicule par ligne, un
    propriétaire par véhicule, les voyageurs par gamme…) ; chaque ligne mène à l'élément correspondant.
-6. **Comparaison de périodes** : période choisie et période précédente de même durée, par compte, avec l'écart.
+6. **Comparaison de périodes** : avec la période précédente de même durée ou la même période de l'année précédente
+   (N-1), par compte, avec l'écart.
+7. **Journal des imputations** : chaque ligne de l'élément avec son attribution sur tous les autres axes.
+
+La balance d'un axe se **classe** par résultat, produits, charges ou nom. Le **non affecté** de chaque axe (anomalies
+à examiner) s'ouvre depuis le plan.
 
 Les états spécialisés restent disponibles : comptes d'exploitation, grand-livre et balance des véhicules ;
 portefeuilles, relevés et règlements des propriétaires (situation financière **séparée** du résultat du véhicule) ;
@@ -50,14 +56,16 @@ balance analytique des sections.
 
 ## Consulter une période
 
-Sur chaque écran : **Aujourd'hui, Hier, Cette semaine, Ce mois, Mois précédent, Ce trimestre, Cette année**, ou des
-dates libres. Chaque état s'imprime et s'exporte en CSV (Excel).
+Sur chaque écran : **Aujourd'hui, Hier, Cette semaine, Ce mois, Mois précédent, Ce trimestre, Cette année, Exercice**,
+un **mois au choix** (mois + année), des dates libres, et les flèches **← période précédente / suivante →**. Une date de
+début après la date de fin est refusée. Les écritures encore au brouillard sont signalées et ne sont pas comprises.
+Chaque état s'imprime et s'exporte en CSV (Excel).
 
 ## Limites connues
 
 - Une charge d'agence (section AG-) d'une agence qui a plusieurs gares reste « non affectée » sur l'axe Gares
   (elle n'est pas répartie d'office entre les gares).
-- L'axe « canal de vente » du plan d'origine n'est pas encore un axe : le mode de paiement est porté par le billet,
-  pas par l'écriture de produit.
-- Le reporting comparatif (Reporting › Transport : comparaisons) calcule encore ses propres totaux ; il sera reporté
-  sur ces états.
+- L'axe « canal de vente » n'existe pas : toutes les ventes passent par les guichets (Mobile Money est un mode de
+  paiement). Une ligne n'est attribuée qu'à un élément par axe : pas encore de répartition 60/40 avec clés.
+- Le reporting comparatif (Reporting › Transport : comparaisons) lit ses montants dans ce même moteur.
+- Liste complète des écarts : `docs/retour/analytique/ECARTS_A_CORRIGER.md`.
