@@ -47,6 +47,12 @@ for chemin in textes:
     t = t.replace("ERP OHADA", f"ERP OHADA {edition}").replace("C:\\ERP-OHADA", f"C:\\ERP-OHADA-{edition}")
     for a, b in ports.items():
         t = t.replace(a, b)
+    if chemin.endswith("LISEZ-MOI.txt"):
+        autre = "Transport" if edition == "Commerce" else "Commerce"
+        t = t.replace("aucune connexion Internet n'est nécessaire.\n", "aucune connexion Internet n'est nécessaire.\n\n"
+                      f"Ce paquet est l'ERP {edition.upper()} (activité fixée à l'installation). L'ERP {autre} est un\n"
+                      f"autre paquet (ERP-OHADA-{autre}-Windows.zip). Les deux peuvent être installés sur le même PC,\n"
+                      "dans deux dossiers différents : ERP Commerce sur le port 8000, ERP Transport sur le port 8100.\n", 1)
     if edition == "Commerce" and chemin.endswith("LISEZ-MOI.txt"):
         t = re.sub(r"\n3 bis\. ESSAYER.*?(?=\n4\. EN CAS)", "\n", t, flags=re.S)
         t = re.sub(r"\n[78]-S[A-Z-]*\.bat[^\n]*", "", t)

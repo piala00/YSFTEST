@@ -34,7 +34,7 @@ Pour la base SQL Server (facultatif), il faut SQL Server 2017 ou plus récent.
      Modifiable ensuite dans Fichier > Paramètres de la société
      (« Configuration de la TVA »).
 
-   - Vente en gros et au détail : pour ne pas ouvrir les cartons dans les
+   - Vente en gros et au détail (ERP Commerce) : pour ne pas ouvrir les cartons dans les
      magasins de gros, vous pouvez réserver la vente au détail à une ou deux
      boutiques. Les magasins les approvisionnent par transfert. Donnez le
      nom de vos boutiques. Ce réglage reste modifiable ensuite dans
