@@ -78,12 +78,12 @@ class PagesEtApiTests(TestCase):
         self.assertGreater(total, 80)
 
     def test_menus_comme_sage(self):
-        from apps.core.navigation import MODULES
+        from apps.core.navigation import MODULES_PAR_CODE as M
 
         attendu = ["Fichier", "Édition", "Structure", "Traitement", "Etat", "Fenêtre", "?"]
-        for module in MODULES[:2]:
-            self.assertEqual([o.titre for o in module.onglets], attendu)
-        self.assertEqual([o.titre for o in MODULES[2].onglets], ["Fichier", "Édition", "Etat", "Fenêtre", "?"])
+        for code in ("commercial", "comptabilite", "analytique"):
+            self.assertEqual([o.titre for o in M[code].onglets], attendu)
+        self.assertEqual([o.titre for o in M["reporting"].onglets], ["Fichier", "Édition", "Etat", "Fenêtre", "?"])
 
     def test_preuves_et_matrice_d_audit(self):
         import io

@@ -10,6 +10,8 @@ urlpatterns = [
     path("connexion/", auth_views.LoginView.as_view(), name="login"),
     path("deconnexion/", auth_views.LogoutView.as_view(), name="logout"),
     path("commercial/", include("apps.commercial.urls")),
+    # Comptabilité analytique : module distinct, mêmes écritures (préfixe plus précis d'abord)
+    path("comptabilite/analytique/", include("apps.comptabilite.urls_analytique")),
     path("comptabilite/", include("apps.comptabilite.urls")),
     path("reporting/", include("apps.reporting.urls")),
     # Logiciels des services du transport : leurs pages communes, puis les écrans (espace de noms « transport »)

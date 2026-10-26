@@ -1295,3 +1295,31 @@ class SimulationTests(TestCase):
                          {datetime.date(2026, 9, 1), datetime.date(2026, 9, 2)})
         self.assertTrue(ArticleMagasin.objects.filter(quantite__gt=0).exists())
         self.assertIn("Bilan de la simulation", sortie.getvalue())
+
+
+class DeuxModulesComptablesTests(TestCase):
+    """Accueil : « Comptabilité générale » et « Comptabilité analytique », deux logiciels sur une seule comptabilité."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "", "x"))
+
+    def test_deux_modules_au_portail_et_accueil_analytique(self):
+        from django.urls import reverse
+
+        from apps.core.navigation import module_pour_chemin
+
+        portail = self.client.get(reverse("core:portail"))
+        self.assertContains(portail, "Comptabilité générale")
+        self.assertContains(portail, "Comptabilité analytique")
+        self.assertContains(portail, 'href="/comptabilite/analytique/"')
+        accueil = self.client.get(reverse("analytique:accueil"))
+        self.assertEqual(accueil.status_code, 200)
+        self.assertContains(accueil, "Comptes d&#x27;exploitation")
+        self.assertContains(accueil, "Résultat des véhicules")
+        self.assertEqual(self.client.get(reverse("analytique:sections")).status_code, 200)
+        # Les états analytiques s'ouvrent dans le module analytique ; la saisie reste en comptabilité générale
+        self.assertEqual(module_pour_chemin(reverse("comptabilite:analytique_vehicules")).code, "analytique")
+        self.assertEqual(module_pour_chemin(reverse("comptabilite:ecriture_create")).code, "comptabilite")

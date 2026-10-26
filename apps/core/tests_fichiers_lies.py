@@ -68,7 +68,7 @@ class FichiersLiesTests(TestCase):
         # Aucun accès au Reporting : logiciel refusé, et absent du portail (chacun ne voit que ses logiciels)
         self.assertEqual(self.client.get(reverse("reporting:dashboard")).status_code, 403)
         portail = self.client.get(reverse("core:portail"))
-        self.assertContains(portail, "Comptabilité OHADA")
+        self.assertContains(portail, "Comptabilité générale")
         self.assertNotContains(portail, 'href="/reporting/"')
         # L'administrateur garde l'accès à tout
         AccesLogiciel.objects.create(utilisateur=self.admin, module="reporting", acces=d.AUCUN)

@@ -130,6 +130,51 @@ def comptabilite():
     }
 
 
+def analytique():
+    """Comptabilité analytique : lue sur les écritures générales validées (véhicule, section), jamais ressaisie."""
+    from apps.reporting import services
+    from apps.transport import analytique as ana
+
+    debut, fin = services._periode()
+    fin_effective = min(fin, datetime.date.today()) if debut <= datetime.date.today() else fin
+    r = ana.vehicules(debut, fin_effective)
+    c = r["controle"]
+    vehicules = sorted((l for l in r["lignes"] if l["produits"] or l["charges"]), key=lambda l: l["resultat_societe"])
+    return {
+        "raccourcis": [
+            {"groupe": "Véhicules", "liens": [
+                _raccourci("Comptes d'exploitation", "bi-bus-front", "comptabilite:analytique_vehicules"),
+                _raccourci("Grand-livre des véhicules", "bi-book", "comptabilite:grand_livre_vehicules"),
+                _raccourci("Balance des véhicules", "bi-table", "comptabilite:balance_vehicules"),
+            ]},
+            {"groupe": "Propriétaires", "liens": [
+                _raccourci("Portefeuilles et résultats", "bi-people", "comptabilite:analytique_proprietaires"),
+                _raccourci("Relevés et règlements", "bi-receipt", "comptabilite:analytique_releves"),
+            ]},
+            {"groupe": "Sections", "liens": [
+                _raccourci("Balance analytique", "bi-diagram-2", "comptabilite:balance_analytique"),
+                _raccourci("Affecter une section", "bi-pencil-square", "comptabilite:ventilation"),
+                _raccourci("Plan analytique", "bi-list-ol", "analytique:sections"),
+            ]},
+        ],
+        "indicateurs": [
+            _indicateur("Produits affectés aux véhicules", c["produits_affectes"], reverse("comptabilite:analytique_vehicules"),
+                        detail=f"sur {c['produits_gl']:,.0f} en comptabilité générale".replace(",", " ")),
+            _indicateur("Charges affectées aux véhicules", c["charges_affectees"], reverse("comptabilite:analytique_vehicules")),
+            _indicateur("Charges non affectées", c["charges_non_affectees"], reverse("comptabilite:analytique_vehicules"),
+                        alerte=bool(c["produits_non_affectes"]), detail="frais généraux, siège, gares"),
+            _indicateur("Résultat des véhicules", r["total"]["resultat_societe"], reverse("comptabilite:analytique_vehicules")),
+        ],
+        "dernieres": [
+            {"date": fin_effective, "piece": l["vehicule"].immatriculation, "libelle": str(l["vehicule"]),
+             "montant": l["resultat_societe"], "statut": "résultat de la période",
+             "url": reverse("comptabilite:analytique_vehicule", args=[l["vehicule"].pk])}
+            for l in vehicules[:8]
+        ],
+        "titre_dernieres": "Véhicules au résultat le plus faible",
+    }
+
+
 def transport():
     from apps.transport.models import Billet, Colis, Depart
 
@@ -292,5 +337,5 @@ def personnel():
     }
 
 
-PAGES = {"commercial": commercial, "comptabilite": comptabilite, "transport": transport, "billetterie": billetterie,
+PAGES = {"commercial": commercial, "comptabilite": comptabilite, "analytique": analytique, "transport": transport, "billetterie": billetterie,
          "colis": colis, "garage": garage, "personnel": personnel}

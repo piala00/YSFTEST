@@ -245,12 +245,13 @@ def menu_aide(module):
     ])
 
 
-MODULES_ACCUEIL = {"commercial": "commercial:accueil", "comptabilite": "comptabilite:accueil", "reporting": "reporting:dashboard",
+MODULES_ACCUEIL = {"commercial": "commercial:accueil", "comptabilite": "comptabilite:accueil", "analytique": "analytique:accueil", "reporting": "reporting:dashboard",
                    "transport": "transport:accueil", "billetterie": "billetterie:accueil", "colis": "colis:accueil",
                    "garage": "garage:accueil", "personnel": "personnel:accueil"}
 AUTRES_LOGICIELS = [
     ("commercial", "Gestion commerciale", "commercial:accueil", "bi-shop"),
-    ("comptabilite", "Comptabilité OHADA", "comptabilite:accueil", "bi-calculator"),
+    ("comptabilite", "Comptabilité générale", "comptabilite:accueil", "bi-calculator"),
+    ("analytique", "Comptabilité analytique", "analytique:accueil", "bi-diagram-3"),
     ("reporting", "Reporting", "reporting:dashboard", "bi-bar-chart-line"),
     ("transport", "Direction de l'agence", "transport:accueil", "bi-building-gear"),
     ("billetterie", "Billetterie", "billetterie:accueil", "bi-ticket-perforated"),
@@ -560,7 +561,7 @@ GESTION_COMMERCIALE = Module(
 # ---------------------------------------------------------------------------
 COMPTABILITE = Module(
     code="comptabilite",
-    titre="Comptabilité OHADA",
+    titre="Comptabilité générale",
     description="Plan SYSCOHADA, saisie, journaux, grand livre, balance, états financiers",
     icone="bi-calculator",
     couleur="#2e7d32",
@@ -664,19 +665,8 @@ COMPTABILITE = Module(
                 E("etats.analytique.balance", "Balance analytique", "comptabilite:balance_analytique", preuve="ERG-CLASSIQUE"),
             ]),
             SEP(),
-            E("analytique.vehicules", "Comptabilité analytique : Véhicules", icone="bi-bus-front", preuve="AJOUT-ERP", enfants=[
-                E("analytique.vehicules.comptes", "Comptes d'exploitation des véhicules", "comptabilite:analytique_vehicules",
-                  preuve="AJOUT-ERP"),
-                E("analytique.vehicules.grand_livre", "Grand-livre des véhicules", "comptabilite:grand_livre_vehicules",
-                  preuve="AJOUT-ERP"),
-                E("analytique.vehicules.balance", "Balance des véhicules", "comptabilite:balance_vehicules", preuve="AJOUT-ERP"),
-            ]),
-            E("analytique.proprietaires", "Comptabilité analytique : Propriétaires", icone="bi-people", preuve="AJOUT-ERP", enfants=[
-                E("analytique.proprietaires.portefeuilles", "Portefeuilles et résultats", "comptabilite:analytique_proprietaires",
-                  preuve="AJOUT-ERP"),
-                E("analytique.proprietaires.releves", "Relevés et règlements", "comptabilite:analytique_releves",
-                  preuve="AJOUT-ERP"),
-            ]),
+            E("etats.analytique_module", "Comptabilité analytique (Véhicules, Propriétaires)", "analytique:accueil",
+              icone="bi-diagram-3", preuve="AJOUT-ERP"),
             SEP(),
             E("etats.budgetaires", "Etats budgétaires", icone="bi-bullseye", preuve="INDICATIF"),
             SEP(),
@@ -697,6 +687,55 @@ COMPTABILITE = Module(
         ]),
         menu_fenetre("comptabilite"),
         menu_aide("comptabilite"),
+    ],
+)
+
+# ---------------------------------------------------------------------------
+# Comptabilité analytique : logiciel distinct à l'écran, mais une seule comptabilité. Chaque montant analytique est
+# lu sur une ligne d'écriture générale validée (véhicule, section) ; rien n'est saisi deux fois.
+# ---------------------------------------------------------------------------
+ANALYTIQUE = Module(
+    code="analytique",
+    titre="Comptabilité analytique",
+    description="Véhicules, propriétaires et sections, issus des écritures de la comptabilité générale",
+    icone="bi-diagram-3",
+    couleur="#00695c",
+    prefixe="/comptabilite/analytique/",
+    accueil="analytique:accueil",
+    onglets=[
+        menu_fichier("analytique", "commercial:societe"),
+        menu_edition(),
+        Onglet("structure", "Structure", "bi-diagram-3", [
+            E("structure.sections", "Plan analytique (sections)", "analytique:sections", icone="bi-diagram-2", preuve="AJOUT-ERP"),
+            E("structure.vehicules", "Véhicules", "transport:vehicules", icone="bi-bus-front", preuve="AJOUT-ERP"),
+            E("structure.contrats", "Contrats des propriétaires", "partenaires:contrats", icone="bi-file-earmark-text",
+              preuve="AJOUT-ERP"),
+        ]),
+        Onglet("traitement", "Traitement", "bi-gear-wide-connected", [
+            E("traitement.ventilation", "Affecter une section aux écritures", "comptabilite:ventilation", icone="bi-diagram-2",
+              preuve="AJOUT-ERP"),
+        ]),
+        Onglet("etat", "Etat", "bi-printer", [
+            E("analytique.vehicules", "Comptabilité analytique : Véhicules", icone="bi-bus-front", preuve="AJOUT-ERP", enfants=[
+                E("analytique.vehicules.comptes", "Comptes d'exploitation des véhicules", "comptabilite:analytique_vehicules",
+                  preuve="AJOUT-ERP"),
+                E("analytique.vehicules.grand_livre", "Grand-livre des véhicules", "comptabilite:grand_livre_vehicules",
+                  preuve="AJOUT-ERP"),
+                E("analytique.vehicules.balance", "Balance des véhicules", "comptabilite:balance_vehicules", preuve="AJOUT-ERP"),
+            ]),
+            E("analytique.proprietaires", "Comptabilité analytique : Propriétaires", icone="bi-people", preuve="AJOUT-ERP", enfants=[
+                E("analytique.proprietaires.portefeuilles", "Portefeuilles et résultats", "comptabilite:analytique_proprietaires",
+                  preuve="AJOUT-ERP"),
+                E("analytique.proprietaires.releves", "Relevés et règlements", "comptabilite:analytique_releves",
+                  preuve="AJOUT-ERP"),
+            ]),
+            SEP(),
+            E("analytique.sections", "Sections analytiques", icone="bi-diagram-2", preuve="AJOUT-ERP", enfants=[
+                E("analytique.sections.balance", "Balance analytique", "comptabilite:balance_analytique", preuve="AJOUT-ERP"),
+            ]),
+        ]),
+        menu_fenetre("analytique"),
+        menu_aide("analytique"),
     ],
 )
 
@@ -892,14 +931,14 @@ TRANSPORT = Module(
 )
 
 # Ordre : les préfixes les plus précis d'abord (/transport/billetterie/ avant /transport/)
-MODULES = [GESTION_COMMERCIALE, COMPTABILITE, REPORTING, BILLETTERIE, COLIS, GARAGE, TRANSPORT, PERSONNEL]
+MODULES = [GESTION_COMMERCIALE, ANALYTIQUE, COMPTABILITE, REPORTING, BILLETTERIE, COLIS, GARAGE, TRANSPORT, PERSONNEL]
 SERVICES_TRANSPORT = {"transport", "billetterie", "colis", "garage"}
 MODULES_PAR_CODE = {m.code: m for m in MODULES}
 
 
 def modules_proposes(societe):
     """Logiciels proposés selon l'activité de la société (ceux du métier en premier)."""
-    ordre = ["transport", "billetterie", "colis", "garage", "personnel", "commercial", "comptabilite", "reporting"]
+    ordre = ["transport", "billetterie", "colis", "garage", "personnel", "commercial", "comptabilite", "analytique", "reporting"]
     if societe.activite == societe.ACTIVITE_COMMERCE:
         return [m for m in MODULES if m.code not in SERVICES_TRANSPORT]
     modules = sorted(MODULES, key=lambda m: ordre.index(m.code))

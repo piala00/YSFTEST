@@ -4,4 +4,4 @@ from django.apps import AppConfig
 class ComptabiliteConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.comptabilite"
-    verbose_name = "Comptabilité OHADA"
+    verbose_name = "Comptabilité générale"
