@@ -17,6 +17,9 @@ LOGICIEL = RACINE / "logiciel"
 PAQUETS = RACINE / "paquets"
 ENV = LOGICIEL / ".env"
 PY = sys.executable
+# Paquet « Commerce » ou « Transport » : edition.txt fixe l'activité (absent : choix à l'installation)
+_EDITION = Path(__file__).resolve().parent / "edition.txt"
+EDITION = _EDITION.read_text(encoding="utf-8").strip().lower() if _EDITION.exists() else ""
 
 
 def titre(texte):
@@ -105,11 +108,15 @@ def preparer_base():
     lancer("manage.py", "collectstatic", "--noinput", "-v0")
     from_zero = not (LOGICIEL / ".initialise").exists()
     if from_zero:
-        print("\nActivité de la société :")
-        print("  1. Commerce (achat-revente de marchandises, stocks)")
-        print("  2. Transport de voyageurs (billetterie des cars, colis et courrier, logistique)")
-        print("  3. Les deux")
-        activite = {"1": "commerce", "2": "transport", "3": "mixte"}.get(demander("Votre choix", "1"), "commerce")
+        if EDITION in ("commerce", "transport"):
+            activite = EDITION
+            print(f"\nERP {EDITION.capitalize()} : activité « {EDITION} ».")
+        else:
+            print("\nActivité de la société :")
+            print("  1. Commerce (achat-revente de marchandises, stocks)")
+            print("  2. Transport de voyageurs (billetterie des cars, colis et courrier, logistique)")
+            print("  3. Les deux")
+            activite = {"1": "commerce", "2": "transport", "3": "mixte"}.get(demander("Votre choix", "1"), "commerce")
         demo = oui("Ajouter les données de démonstration (fictives) ?", "O")
         print("\nTVA : par défaut, aucune TVA n'est appliquée (modifiable ensuite dans les Paramètres de la société).")
         tva = oui("La société facture-t-elle la TVA (taux du Cameroun : 19,25 %, 11 %, 0 %) ?", "N")
