@@ -1,13 +1,13 @@
 # Tests exécutés
 
-Date : 2026-10-26 00:49 UTC. Commit de départ : voir `git log` (branche ccr-5592a371-fusjt2).
+Date : 2026-10-26 08:25 UTC. Commit de départ : voir `git log` (branche ccr-5592a371-fusjt2).
 Environnement : Linux, Python 3.13, Django 6.1.2, SQLite (bases de test créées puis détruites).
 
 ## Suite complète du projet
 
 ```
 python manage.py test -v 2
-Ran 268 tests in 108.964s
+Ran 279 tests in 284.761s
 OK
 ```
 
@@ -96,3 +96,14 @@ OK — écritures GA équilibrées, imputations toutes sourcées, résultat véh
 - Import de la simulation « septembre 2026 » (8 agences, 300 salariés, 35 883 billets) dans une base de l'ERP : non fait (voir `BILAN_SIMULATION_SEPTEMBRE_2026.md`).
 - Tests de charge, de concurrence réelle sur plusieurs postes, et sur PostgreSQL / SQL Server.
 - Rendu imprimé : le rapport A4 a été contrôlé en PDF (navigateur Chromium) le 26/10 sur des données fictives.
+
+## Ajouts du 26/10 (matin)
+
+| Classe | Ce qui est vérifié |
+|---|---|
+| `apps.garage.tests.MagasinTests` | achat pour le stock (CMUP), pour un véhicule, en immobilisation ; sortie au coût moyen ; refus au-delà du stock ; pièce du magasin sur l'ordre de réparation ; écrans |
+| `apps.partenaires.tests.CompteDuCamionTests` | compte du camion consultable, arrêt à date, retrait d'un solde positif, solde négatif compensé par les recettes suivantes, salaire mensuel fixe |
+| `apps.transport.tests.SimulationTests` | refus hors dossier de simulation ; deux jours joués : contrôles OK, écritures datées des jours simulés, paie, décomptes, sorties du magasin |
+
+Simulation complète (hors tests automatiques) : `python manage.py simulation --mois 2026-09`, 55 minutes, 6 contrôles OK —
+voir `BILAN_SIMULATION_RESULTATS.md`.
