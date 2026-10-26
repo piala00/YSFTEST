@@ -20,3 +20,7 @@
 
 ## Contrats de démonstration
 15 bus privés, 10 partenaires. `70 % × MAX(0, recettes affectées au véhicule − charges contributives validées avant redevance)` est une **pure hypothèse pédagogique**, pas une norme de rémunération des propriétaires. La simulation comptabilise une redevance externe et paie 60 % du montant reconnu au 30/09, laissant 40 % dû. En production, signature du contrat, périmètre juridique des recettes et charges, TVA/taxes, rémunération brute ou nette et retenues déterminent la règle légale.
+
+
+## Extension propriétaire 2026-10 : rémunération fixe et retraits
+La distinction des partenaires propriétaires et fournisseurs et la gestion `FIXE_GARANTI_PLUS_VARIABLE` / `FIXE_AVANCE_SUR_VARIABLE` sont décrites intégralement dans `../../erp-transport-partenaires-proprietaires/SKILL.md`. Ne pas comptabiliser les paiements une deuxième fois en charge. Les CSV existants `situations_partenaires.csv` illustrent **uniquement une formule variable** et ne doivent pas être interprétés comme s'ils contenaient un fixe supplémentaire déjà comptabilisé.
