@@ -379,11 +379,11 @@ class Command(BaseCommand):
             "| Analytique véhicules | FCFA |", "|---|---:|",
             *[f"| {k} | {m(v)} |" for k, v in b["analytique"].items()],
             f"| Résultat des véhicules pour la société | {m(b['resultat_vehicules'])} |", "",
-            "| Propriétaire | Véhicule | Contrat | Solde dû (467) |", "|---|---|---|---:|",
+            "| Propriétaire | Véhicule | Contrat | Solde du propriétaire, tous ses véhicules (467) |", "|---|---|---|---:|",
             *[f"| {p} | {v} | {c} | {m(s)} |" for p, v, c, s in b["proprietaires"]], "",
             "| Contrôle | Résultat |", "|---|---|",
             *[f"| {t} | {'OK' if ok else 'ÉCART'} |" for t, ok in controles], "",
-            "Taux de paie de démonstration (5 % / 10 %), prix, salaires et contrats : fictifs, sans valeur réglementaire.",
+            "Taux de paie de démonstration (5 % / 10 %), prix, salaires et contrats : fictifs, sans valeur réglementaire.\nNon simulés (le résultat est donc optimiste) : assurances, amortissements, péages, impôts et taxes, imprévus de voyage, annulations et remboursements.",
         ]
         self.controles = controles
         return "\n".join(lignes) + "\n"
