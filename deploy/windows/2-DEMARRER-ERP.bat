@@ -12,6 +12,6 @@ echo.
 echo   ERP OHADA demarre sur http://127.0.0.1:8000
 echo   Gardez cette fenetre ouverte pendant l utilisation ; fermez-la pour arreter le logiciel.
 echo.
-start "" cmd /c "timeout /t 4 >/dev/null & start http://127.0.0.1:8000"
+start "" cmd /c "timeout /t 4 >nul & start http://127.0.0.1:8000"
 "..\python\python.exe" -m waitress --listen=127.0.0.1:8000 --threads=8 erp.wsgi:application
 pause

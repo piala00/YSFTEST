@@ -152,6 +152,25 @@ Reprendre un dossier Sage existant (transition, puis bascule) :
     le seul logiciel de saisie ; la synchronisation s'arrête.
 
 
+3 bis. ESSAYER LE LOGICIEL SUR UNE SIMULATION
+---------------------------------------------
+
+- 7-SIMULATION.bat crée, la première fois, un dossier de simulation
+  séparé (logiciel\simulation.sqlite3) : septembre 2026 joué par le
+  logiciel lui-même avec des données FICTIVES (8 gares, 60 cars dont 24
+  VIP et 15 de propriétaires, 5 camions courrier, 300 salariés, billets,
+  bagages, colis, carburant, magasin, réparations, loyers, versements en
+  banque, paie, comptes des propriétaires). Comptez environ une heure.
+  Il demande ensuite un identifiant et un mot de passe, puis ouvre la
+  simulation sur http://127.0.0.1:8001. Le bilan et ses contrôles sont
+  écrits dans BILAN-SIMULATION.md.
+- Les taux de paie de la simulation (5 % / 10 %) et tous les prix sont
+  inventés, sans valeur réglementaire.
+- La vraie société n'est jamais touchée. Quand l'essai est réussi :
+  8-SUPPRIMER-SIMULATION.bat efface la simulation ; la vraie société se
+  crée avec 1-INSTALLER.bat et se démarre avec 2-DEMARRER-ERP.bat.
+
+
 4. EN CAS DE PROBLÈME
 ----------------------
 
@@ -185,6 +204,8 @@ Reprendre un dossier Sage existant (transition, puis bascule) :
 4-DEMARRER-SERVEUR-RESEAU.bat      serveur pour tous les postes de l'agence
 5-DEMARRAGE-AUTOMATIQUE-SERVEUR.bat  démarrage du serveur à l'ouverture de session
 6-SYNCHRONISATION-AUTOMATIQUE.bat    synchronisation horaire du dossier repris
+7-SIMULATION.bat        dossier de simulation (données fictives), port 8001
+8-SUPPRIMER-SIMULATION.bat  efface le dossier de simulation
 logiciel\               le programme ERP
 python\                 Python 3.12 (Python Software Foundation), utilisé
                         uniquement par l'ERP

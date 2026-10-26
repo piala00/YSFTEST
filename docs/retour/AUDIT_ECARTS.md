@@ -29,9 +29,10 @@ Projet : ERP OHADA (Django 6.1, Python 3.13, SQLite / PostgreSQL / SQL Server), 
 | QR anti-réutilisation | ABSENT (choix) | Embarquement sur liste choisi par l'utilisateur | — |
 | Colis : bordereau, car transporteur, statut | EXISTANT | `Colis` | — |
 | Achats : demande → devis → BC → réception → facture | PARTIEL | Gestion commerciale : demande d'achat, commande, réception, facture fournisseur, avoirs, règlements | Pas de comparatif de devis fournisseurs ni de rapprochement 3 pièces bloquant |
-| Stock = actif, consommation = charge | **ÉCART** | Les achats sont passés en charge à la facture (60x, inventaire intermittent) ; CMUP tenu en quantités | À décider : inventaire permanent (31x à l'achat, charge à la sortie) |
-| Pièce garage sortie du stock sur ordre de réparation | ABSENT | Les réparations achètent leurs pièces directement | Magasin du garage (étape P5) |
-| Immobilisation d'un matériel durable | PARTIEL | Comptes de classe 2 disponibles en saisie | Pas de fichier des immobilisations ni d'amortissements automatiques |
+| Stock = actif, consommation = charge | EXISTANT (garage) | Magasin du garage : achat pour le stock D 33x (pièces 338, bureau 334, emballages 335, consommables 331), sortie D charge / C stock au CMUP (`models_magasin.sortir`, `MagasinTests`) | La gestion commerciale (négoce) reste en inventaire intermittent |
+| Pièce garage sortie du stock sur ordre de réparation | EXISTANT | Ligne « pièce du magasin » de l'ordre de réparation, sortie au CMUP à la clôture, charge sur le véhicule | — |
+| Achat décidé « pour le stock » ou « pour un véhicule » | EXISTANT | Destination de chaque ligne d'achat : STOCK, VÉHICULE (charge directe sur le véhicule), IMMOBILISATION (classe 2) | — |
+| Immobilisation d'un matériel durable | PARTIEL | Ligne d'achat « immobilisation » (D 244 par défaut, compte modifiable) | Pas de fichier des immobilisations ni d'amortissements automatiques |
 | Transfert inter-dépôts neutre | EXISTANT | `STOCK_VIREMENT` | — |
 | GA source unique, analytique sourcée | EXISTANT | Le véhicule est une colonne de la ligne d'écriture générale (aucune ventilation orpheline possible) | Répartition 60/40 d'une ligne sur plusieurs véhicules : ABSENT |
 | Non affecté visible | EXISTANT | Rapprochement affecté / non affecté (Comptabilité analytique › Véhicules) | — |
@@ -49,6 +50,7 @@ Projet : ERP OHADA (Django 6.1, Python 3.13, SQLite / PostgreSQL / SQL Server), 
 | Contrats versionnés (fixe, variable, fixe + variable, avance, location) | EXISTANT | `ContratPartenaire` (avenants datés) | Clauses de suspension du fixe (sinistre) : à décrire |
 | Fixe et variable en écritures distinctes | EXISTANT | `Decompte.approuver` : deux écritures | — |
 | Avance imputée sur le variable, sans double charge | EXISTANT | Règlement « avance » D 467 / C caisse | Test exemple B |
+| Compte du camion consultable, retrait si positif, compensation si négatif | EXISTANT | Relevé : compte en cours depuis le dernier arrêté, bouton « Arrêter le compte à aujourd'hui » (`CompteDuCamionTests`) | — |
 | Retraits autorisés, contrôle du disponible | EXISTANT | `DemandeRetrait` | Autorisation par le siège via les échanges : PARTIEL (autorisation locale par une autre personne) |
 | « Salaire du propriétaire » hors paie | EXISTANT | Le propriétaire n'est pas un employé ; aucun lien avec la paie | — |
 | Relevé par nature avec écriture GL | EXISTANT | Relevé (FIXE, VARIABLE, AVANCE, RETRAIT, RÈGLEMENT) | — |
@@ -57,5 +59,5 @@ Projet : ERP OHADA (Django 6.1, Python 3.13, SQLite / PostgreSQL / SQL Server), 
 ## 4. Points BLOQUANTS pour une mise en production
 
 1. Plan comptable de la société non fourni : tous les comptes proposés restent à valider (liste dans `MAPPING_JOURNAUX_ET_ANALYTIQUE.md`).
-2. Choix de la méthode de stock (intermittent actuel ou permanent demandé par le skill).
+2. Méthode de stock : inventaire permanent retenu pour le magasin du garage ; comptes de stock proposés à valider.
 3. Barèmes sociaux et fiscaux de paie : à saisir par l'expert-comptable (aucun taux n'est imposé par le logiciel).

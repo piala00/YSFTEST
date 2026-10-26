@@ -17,7 +17,7 @@ partenaires. »
 | `apps/comptabilite` | Plan SYSCOHADA, journaux, écritures (une seule source monétaire), états normal et SMT, analytique par section |
 | `apps/commercial` | Tiers, articles, dépôts, ventes, achats (demande, commande, réception, facture), stock CMUP, caisse |
 | `apps/transport` | Gares, lignes (arrêts, gamme), véhicules (flotte datée), départs, billets (tronçons, bagages), colis, caisses et sessions, clôtures, rapport journalier A4, dépenses autorisées par le siège, imprévus, analytique, reporting comparatif |
-| `apps/garage` | Pleins (consommation), ordres de réparation |
+| `apps/garage` | Pleins (consommation), ordres de réparation, magasin (stock permanent au CMUP, achats pour le stock / un véhicule / une immobilisation, sorties) |
 | `apps/personnel` | Employés, rubriques de paie (sans taux imposé), bulletins, paiement, ventilation du salaire sur les véhicules |
 | `apps/partenaires` | Contrats propriétaires versionnés, décomptes, compte propriétaire séparé, avances, retraits, relevés |
 | `apps/echanges` | Synchronisation hors ligne par fichiers signés (HMAC), outbox, inbox idempotente, relais par le siège |
@@ -30,6 +30,9 @@ Voir `AUDIT_ECARTS.md` (EXISTANT / PARTIEL / ABSENT / BLOQUANT, avec fichiers et
 ## 4. Modifications de cette mise à jour
 | Sujet | Contenu | Migration |
 |---|---|---|
+| Magasin du garage | inventaire permanent : achat D 33x, sortie D charge (véhicule) / C 33x au CMUP ; achat direct pour un véhicule ; immobilisation ; pièce du magasin sur l'ordre de réparation | `garage 0002` |
+| Compte du camion | relevé du propriétaire : compte en cours depuis le dernier arrêté, arrêt à la demande, retrait si positif, compensation si négatif ; contrat « salaire mensuel fixe » | `partenaires 0003` (libellés) |
+| Simulation | commande `simulation` : un mois joué par le logiciel dans un dossier séparé ; `7-SIMULATION.bat`, `8-SUPPRIMER-SIMULATION.bat` | — |
 | Anomalies RJ | caisse négative bloquante, transfert limité aux espèces, départ futur refusé, heure réelle de départ, rapprochement des billets, car des colis, Mobile Money 552 | `transport 0014` |
 | Propriétaires | compte 467 séparé du 401, contrats variable / fixe + variable / avance sur variable, plancher contractuel, décompte en deux écritures, avances, retraits autorisés, relevé par nature | `transport 0015`, `partenaires 0002` |
 | Plus tôt (même journée) | bagages payants, système SMT, dépenses autorisées par le siège, imprévus de voyage, reporting comparatif, analytique Véhicules / Propriétaires, flottes Classique / VIP | `transport 0009` à `0013`, `core 0020` |
@@ -42,25 +45,28 @@ Toutes les migrations sont additives ; aucune donnée existante n'est supprimée
 - Le rapport distingue les départs du jour (date de départ, heure réelle) et la caisse (date de paiement), avec un rapprochement chiffré.
 
 ## 6. Simulation septembre 2026
-Validée sur ses CSV ; **non importée** dans l'ERP. Voir `BILAN_SIMULATION_SEPTEMBRE_2026.md`.
+Les CSV fournis ont été validés (`BILAN_SIMULATION_SEPTEMBRE_2026.md`). La simulation est maintenant **jouée par le logiciel
+lui-même** (`python manage.py simulation`), jour après jour, dans un dossier séparé : ventes de billets et bagages,
+colis, départs et arrivées, carburant, magasin, réparations, loyers autorisés, versements en banque, paie, décomptes et
+règlements des propriétaires. Résultats et contrôles : `BILAN_SIMULATION_RESULTATS.md`.
 
 ## 7. Achats et stock
-Existant : demande d'achat, commande, réception, facture fournisseur, avoirs, règlements, dépôts, transferts, inventaires,
-CMUP. Écart principal : l'achat est passé en charge à la facture (inventaire intermittent) ; le skill demande l'inventaire
-permanent avec sortie de stock sur l'ordre de réparation. Décision à prendre (`AUDIT_ECARTS.md` § 4).
+Gestion commerciale : demande d'achat, commande, réception, facture fournisseur, avoirs, règlements, dépôts, transferts,
+inventaires, CMUP (inventaire intermittent, inchangé). Magasin du garage : inventaire permanent ; au moment de l'achat, chaque
+ligne est destinée au stock, à un véhicule précis ou aux immobilisations ; la sortie du stock passe la charge, sur le
+véhicule s'il est indiqué.
 
 ## 8. Comptabilité, partenaires, sécurité, hors ligne
 - Entièrement codé et testé : source unique, analytique sur la ligne d'écriture, rapprochement affecté / non affecté,
   propriétaires (exemples A et B du skill), caisses et clôtures, échanges hors ligne idempotents (4 bases).
 - Partiel : droits par agence (ABAC), portail partenaire, autorisation des retraits par le siège via les échanges.
-- À développer : magasin du garage et inventaire permanent, quotas de sièges inter-agences, import de la simulation.
+- À développer : quotas de sièges inter-agences, fichier des immobilisations et amortissements.
 
 ## 9. Décisions ouvertes
 1. Plan comptable de la société (tous les comptes sont des propositions).
-2. Méthode de stock : intermittente (actuelle) ou permanente.
-3. Pour les contrats propriétaires : rôle de la société (exploitant ou intermédiaire pour le compte du propriétaire), et
+2. Pour les contrats propriétaires : rôle de la société (exploitant ou intermédiaire pour le compte du propriétaire), et
    traitement fiscal (retenues, TVA) — à fixer avec l'expert-comptable.
-4. Répartition des charges communes (clés) et droits par agence.
+3. Répartition des charges communes (clés) et droits par agence.
 
 ## 10. Sécurité et packaging
 Voir `SECURITE_ET_EXPORT.md` ; manifeste et empreinte SHA-256 dans `MANIFESTE.txt` de l'export.

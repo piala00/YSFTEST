@@ -22,6 +22,10 @@
 | Droit du propriétaire | D 622 (fixe, variable) / C 467 propriétaire | oui (622) |
 | Avance, retrait, règlement au propriétaire | D 467 / C caisse | non |
 | Dépense de fonctionnement d'une autre agence | payeur D 185 agence / C caisse ; agence concernée D charge / C 185 payeur | si indiqué |
+| Achat du magasin pour le stock | D 33x stock / C 401 fournisseur (journal AC) ou caisse | non |
+| Achat pour un véhicule précis | D charge (624, 6047…) / C 401 ou caisse | oui |
+| Achat d'un matériel durable | D classe 2 (244 par défaut) / C 401 ou caisse | non |
+| Sortie du magasin (réparation, emballage, bureau) | D charge au coût moyen / C 33x | oui si un véhicule est indiqué |
 | Transfert de fonds | D 585 / C caisse puis D banque / C 585 | non |
 | Imprévus | 709 dédommagement, 6228 location de secours, 624 dépannage, 638 voyageurs bloqués, 658 indemnités et amendes, 421 amende imputable au chauffeur | oui |
 | Écart de caisse | D 658 ou 421 / C caisse ; D caisse / C 758 | non |

@@ -1,4 +1,5 @@
 import datetime
+import io
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -1263,3 +1264,34 @@ def timezone_maintenant():
     from django.utils import timezone
 
     return timezone.localtime()
+
+
+class SimulationTests(TestCase):
+    """Commande « simulation » : un mois fictif joué par le logiciel, dans un dossier séparé."""
+
+    def test_refusee_hors_dossier_de_simulation(self):
+        from django.core.management.base import CommandError
+
+        with self.assertRaisesMessage(CommandError, "simulation"):
+            call_command("simulation", jours=1, vehicules=4, salaries=10, echelle=0.1, stdout=io.StringIO())
+
+    def test_deux_jours_a_petite_echelle(self):
+        from apps.comptabilite.models import Ecriture
+        from apps.garage.models_magasin import ArticleMagasin, MouvementMagasin
+        from apps.partenaires.models import Decompte
+        from apps.personnel.models import Bulletin
+
+        from .management.commands.simulation import Command
+
+        commande, sortie = Command(), io.StringIO()
+        call_command(commande, mois="2026-09", jours=2, vehicules=8, salaries=25, echelle=0.1, forcer=True, stdout=sortie)
+        self.assertTrue(all(ok for _, ok in commande.controles), commande.controles)
+        self.assertGreater(Billet.objects.count(), 0)
+        self.assertEqual(Depart.objects.exclude(statut=Depart.ARRIVE).count(), 0)
+        self.assertEqual(Bulletin.objects.count(), 25)
+        self.assertEqual(Decompte.objects.count(), 2)
+        self.assertTrue(MouvementMagasin.objects.filter(sens=MouvementMagasin.SORTIE).exists())
+        self.assertEqual(set(Ecriture.objects.values_list("date", flat=True)),
+                         {datetime.date(2026, 9, 1), datetime.date(2026, 9, 2)})
+        self.assertTrue(ArticleMagasin.objects.filter(quantite__gt=0).exists())
+        self.assertIn("Bilan de la simulation", sortie.getvalue())
