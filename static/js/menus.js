@@ -46,8 +46,20 @@
     champ.selectionStart = champ.selectionEnd = debut + texte.length;
     champ.dispatchEvent(new Event('input', { bubbles: true }));
   }
+  // Une commande explicite de la fenêtre prime sur la recherche fragile d'un lien par son icône.
+  // La fenêtre reste responsable des contrôles métier ; l'interface ne contourne jamais le serveur.
+  function actionContextuelle(nom) {
+    const cible = main()?.querySelector(`[data-erp-action="${nom}"]`);
+    if (!cible) return false;
+    if (cible.disabled || cible.getAttribute('aria-disabled') === 'true') {
+      signaler('Sélectionnez d’abord une ligne autorisée pour cette commande.');
+    } else {
+      cible.click();
+    }
+    return true;
+  }
   const ACTIONS = {
-    imprimer: () => window.print(),
+    imprimer: () => { if (!actionContextuelle('imprimer')) window.print(); },
     actualiser: () => window.location.reload(),
     fermer: () => {
       if (mdi() && mdi().active()) return mdi().fermer(mdi().active());
@@ -79,18 +91,35 @@
     copier: () => {
       const texte = dernierChamp && dernierChamp.selectionStart !== dernierChamp.selectionEnd
         ? dernierChamp.value.slice(dernierChamp.selectionStart, dernierChamp.selectionEnd)
-        : String(window.getSelection());
+        : String(window.getSelection() || '');
       if (!texte) return signaler('Rien à copier : sélectionnez du texte.');
-      navigator.clipboard?.writeText(texte).then(() => signaler('Copié dans le presse-papiers.'));
+      if (typeof navigator.clipboard?.writeText !== 'function')
+        return signaler('Utilisez Ctrl+C : accès au presse-papiers indisponible.');
+      Promise.resolve().then(() => navigator.clipboard.writeText(texte))
+        .then(() => signaler('Copié dans le presse-papiers.'))
+        .catch(() => signaler('Copie annulée : accès au presse-papiers refusé.'));
     },
     coller: () => {
-      if (!dernierChamp) return signaler('Cliquez d\'abord dans le champ à compléter.');
-      if (!navigator.clipboard?.readText) return signaler('Utilisez Ctrl+V : le navigateur bloque la lecture du presse-papiers.');
-      navigator.clipboard.readText().then(t => { remplacerSelection(dernierChamp, t); dernierChamp.focus(); })
+      const c = dernierChamp;
+      if (!c) return signaler('Cliquez d\'abord dans le champ à compléter.');
+      if (c.disabled || c.readOnly) return signaler('Ce champ est protégé contre les modifications.');
+      if (typeof navigator.clipboard?.readText !== 'function')
+        return signaler('Utilisez Ctrl+V : lecture du presse-papiers indisponible.');
+      const valeurInitiale = c.value, debut = c.selectionStart, fin = c.selectionEnd;
+      Promise.resolve().then(() => navigator.clipboard.readText())
+        .then(texte => {
+          if (c.disabled || c.readOnly || c.value !== valeurInitiale)
+            return signaler('Le champ a changé : collage annulé.');
+          c.focus();
+          c.setSelectionRange(debut, fin);
+          remplacerSelection(c, texte);
+        })
         .catch(() => signaler('Utilisez Ctrl+V : accès au presse-papiers refusé.'));
     },
     effacer: () => {
       if (!dernierChamp) return;
+      if (dernierChamp.disabled || dernierChamp.readOnly)
+        return signaler('Ce champ est protégé contre les modifications.');
       if (dernierChamp.selectionStart !== dernierChamp.selectionEnd) remplacerSelection(dernierChamp, '');
       else { dernierChamp.value = ''; dernierChamp.dispatchEvent(new Event('input', { bubbles: true })); }
       dernierChamp.focus();
@@ -101,12 +130,14 @@
       const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(plage);
     },
     ajouter: () => {
+      if (actionContextuelle('ajouter')) return;
       const lien = lienAvecIcone('bi-plus') || lienAvecIcone('bi-plus-square');
       if (lien) window.location.href = lien.href;
       else if (document.getElementById('ajout-ligne')) document.getElementById('ajout-ligne').click();
       else signaler('Aucune création possible depuis cette fenêtre.');
     },
     modifier: () => {
+      if (actionContextuelle('modifier')) return;
       const lien = lienAvecIcone('bi-pencil');
       if (lien) window.location.href = lien.href; else signaler('Aucune fiche à modifier dans cette fenêtre.');
     },
