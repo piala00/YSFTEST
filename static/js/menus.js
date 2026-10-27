@@ -46,8 +46,20 @@
     champ.selectionStart = champ.selectionEnd = debut + texte.length;
     champ.dispatchEvent(new Event('input', { bubbles: true }));
   }
+  // Une commande explicite de la fenêtre prime sur la recherche fragile d'un lien par son icône.
+  // La fenêtre reste responsable des contrôles métier ; l'interface ne contourne jamais le serveur.
+  function actionContextuelle(nom) {
+    const cible = main()?.querySelector(`[data-erp-action="${nom}"]`);
+    if (!cible) return false;
+    if (cible.disabled || cible.getAttribute('aria-disabled') === 'true') {
+      signaler('Sélectionnez d’abord une ligne autorisée pour cette commande.');
+    } else {
+      cible.click();
+    }
+    return true;
+  }
   const ACTIONS = {
-    imprimer: () => window.print(),
+    imprimer: () => { if (!actionContextuelle('imprimer')) window.print(); },
     actualiser: () => window.location.reload(),
     fermer: () => {
       if (mdi() && mdi().active()) return mdi().fermer(mdi().active());
@@ -57,24 +69,59 @@
     annuler: () => { if (dernierChamp) { dernierChamp.focus(); document.execCommand('undo'); } },
     couper: () => {
       if (!dernierChamp) return signaler('Sélectionnez du texte dans un champ.');
-      const c = dernierChamp, texte = c.value.slice(c.selectionStart, c.selectionEnd);
-      navigator.clipboard?.writeText(texte); remplacerSelection(c, ''); c.focus();
+      const c = dernierChamp;
+      if (c.readOnly || c.disabled || !Number.isInteger(c.selectionStart) || !Number.isInteger(c.selectionEnd)) {
+        return signaler('Ce champ ne permet pas de couper le texte.');
+      }
+      const debut = c.selectionStart, fin = c.selectionEnd, valeurInitiale = c.value;
+      const texte = valeurInitiale.slice(debut, fin);
+      if (!texte) return signaler('Sélectionnez le texte à couper.');
+      // Ne jamais supprimer localement si la copie échoue ou est refusée par le navigateur.
+      if (typeof navigator.clipboard?.writeText !== 'function') {
+        return signaler('Utilisez Ctrl+X : accès au presse-papiers indisponible.');
+      }
+      navigator.clipboard.writeText(texte).then(() => {
+        // Une écriture asynchrone ne doit pas écraser une saisie effectuée entre-temps.
+        if (c.value !== valeurInitiale) return signaler('Le champ a changé : coupe annulée.');
+        c.focus();
+        c.setSelectionRange(debut, fin);
+        remplacerSelection(c, '');
+      }).catch(() => signaler('Coupe annulée : accès au presse-papiers refusé.'));
     },
     copier: () => {
       const texte = dernierChamp && dernierChamp.selectionStart !== dernierChamp.selectionEnd
         ? dernierChamp.value.slice(dernierChamp.selectionStart, dernierChamp.selectionEnd)
-        : String(window.getSelection());
+        : String(window.getSelection() || '');
       if (!texte) return signaler('Rien à copier : sélectionnez du texte.');
-      navigator.clipboard?.writeText(texte).then(() => signaler('Copié dans le presse-papiers.'));
+      if (typeof navigator.clipboard?.writeText !== 'function')
+        return signaler('Utilisez Ctrl+C : accès au presse-papiers indisponible.');
+      Promise.resolve().then(() => navigator.clipboard.writeText(texte))
+        .then(() => signaler('Copié dans le presse-papiers.'))
+        .catch(() => signaler('Copie annulée : accès au presse-papiers refusé.'));
     },
     coller: () => {
-      if (!dernierChamp) return signaler('Cliquez d\'abord dans le champ à compléter.');
-      if (!navigator.clipboard?.readText) return signaler('Utilisez Ctrl+V : le navigateur bloque la lecture du presse-papiers.');
-      navigator.clipboard.readText().then(t => { remplacerSelection(dernierChamp, t); dernierChamp.focus(); })
+      const c = dernierChamp;
+      if (!c) return signaler('Cliquez d\'abord dans le champ à compléter.');
+      if (c.disabled || c.readOnly) return signaler('Ce champ est protégé contre les modifications.');
+      if (!Number.isInteger(c.selectionStart) || !Number.isInteger(c.selectionEnd))
+        return signaler('Le collage dans ce type de champ n’est pas pris en charge.');
+      if (typeof navigator.clipboard?.readText !== 'function')
+        return signaler('Utilisez Ctrl+V : lecture du presse-papiers indisponible.');
+      const valeurInitiale = c.value, debut = c.selectionStart, fin = c.selectionEnd;
+      Promise.resolve().then(() => navigator.clipboard.readText())
+        .then(texte => {
+          if (c.disabled || c.readOnly || c.value !== valeurInitiale)
+            return signaler('Le champ a changé : collage annulé.');
+          c.focus();
+          c.setSelectionRange(debut, fin);
+          remplacerSelection(c, texte);
+        })
         .catch(() => signaler('Utilisez Ctrl+V : accès au presse-papiers refusé.'));
     },
     effacer: () => {
       if (!dernierChamp) return;
+      if (dernierChamp.disabled || dernierChamp.readOnly)
+        return signaler('Ce champ est protégé contre les modifications.');
       if (dernierChamp.selectionStart !== dernierChamp.selectionEnd) remplacerSelection(dernierChamp, '');
       else { dernierChamp.value = ''; dernierChamp.dispatchEvent(new Event('input', { bubbles: true })); }
       dernierChamp.focus();
@@ -85,12 +132,14 @@
       const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(plage);
     },
     ajouter: () => {
+      if (actionContextuelle('ajouter')) return;
       const lien = lienAvecIcone('bi-plus') || lienAvecIcone('bi-plus-square');
       if (lien) window.location.href = lien.href;
       else if (document.getElementById('ajout-ligne')) document.getElementById('ajout-ligne').click();
       else signaler('Aucune création possible depuis cette fenêtre.');
     },
     modifier: () => {
+      if (actionContextuelle('modifier')) return;
       const lien = lienAvecIcone('bi-pencil');
       if (lien) window.location.href = lien.href; else signaler('Aucune fiche à modifier dans cette fenêtre.');
     },

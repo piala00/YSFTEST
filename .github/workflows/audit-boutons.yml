@@ -1,0 +1,30 @@
+# Contrôle ciblé des commandes interface de la branche GPT.
+name: Audit boutons - JavaScript
+on:
+  push:
+    branches:
+      - gpt/audit-boutons-sage-v12
+  pull_request:
+    branches:
+      - ccr-5592a371-fusjt2
+
+permissions:
+  contents: read
+
+jobs:
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Vérifier la syntaxe
+        run: |
+          node --check static/js/menus.js
+          node --check tests_js/test_menus_couper.js
+          node --check tests_js/test_menus_actions.js
+      - name: Tester la commande Couper
+        run: node tests_js/test_menus_couper.js
+      - name: Tester les commandes contextuelles
+        run: node tests_js/test_menus_actions.js
