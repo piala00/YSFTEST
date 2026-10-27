@@ -300,6 +300,42 @@ class Command(BaseCommand):
                 bilan["types_documents_stock"],
             )
         )
+        par_menu = {}
+        for ligne in lignes:
+            if ligne["famille"] != "menu_commande":
+                continue
+            menu = ligne["chemin"].split(" › ", 1)[0]
+            if menu not in par_menu:
+                par_menu[menu] = Counter()
+            par_menu[menu]["total"] += 1
+            if ligne["etat_code"] == "grise_sans_cible":
+                par_menu[menu]["grise"] += 1
+            else:
+                par_menu[menu]["cible_declaree"] += 1
+        texte += (
+            "## Répartition détaillée par menu principal\n\n"
+            "| Menu | Commandes terminales | Avec cible / action | Grisées sans cible |\n"
+            "|---|---:|---:|---:|\n"
+            + "".join(
+                "| %s | %d | %d | %d |\n" % (
+                    nom, valeurs["total"], valeurs["cible_declaree"], valeurs["grise"]
+                )
+                for nom, valeurs in par_menu.items()
+            )
+            + "\n"
+        )
+        compte_par_ecran = Counter(
+            e["fichier_ou_menu"] for e in lignes if e["famille"] == "controle_html"
+        )
+        texte += (
+            "## Répartition des contrôles HTML par fenêtre / template\n\n"
+            "| Template | Occurrences source |\n|---|---:|\n"
+            + "".join(
+                "| " + nom + " | " + str(n) + " |\n"
+                for nom, n in sorted(compte_par_ecran.items())
+            )
+            + "\n"
+        )
         texte += (
             "## État statique des commandes et contrôles\n\n"
             "| État | Occurrences |\n|---|---:|\n" + repartition + "\n\n"
