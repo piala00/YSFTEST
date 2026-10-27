@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -136,6 +137,18 @@ def _port_libre():
         return s.getsockname()[1]
 
 
+def arreter_programmes(donnees):
+    """Arrête les programmes lancés pour l'essai, reconnus à leur dossier de données (jamais un autre processus)."""
+    for _ in range(3):
+        for environ in Path("/proc").glob("[0-9]*/environ"):
+            try:
+                if f"ERP_DONNEES={donnees}\0".encode() in environ.read_bytes():
+                    os.kill(int(environ.parent.name), 9)
+            except (OSError, ValueError):
+                pass
+        time.sleep(1)
+
+
 class Navigateur:
     def __init__(self, base):
         self.base = base
@@ -226,11 +239,62 @@ class ProgrammeLanceTests(SimpleTestCase):
                         time.sleep(0.5)
                 self.assertIn("Base de données", page)
             finally:
-                for environ in Path("/proc").glob("[0-9]*/environ"):     # le programme relancé (même dossier de données)
-                    try:
-                        if f"ERP_DONNEES={donnees}\0".encode() in environ.read_bytes():
-                            os.kill(int(environ.parent.name), 15)
-                    except (OSError, ValueError):
-                        pass
+                arreter_programmes(donnees)                               # le programme relancé (même dossier)
                 serveur.terminate()
                 serveur.wait(30)
+
+
+class ChoixDeBaseALInstallationTests(SimpleTestCase):
+    """La base choisie dans l'installateur (installation-base.env) ; SQL Server injoignable → SQLite, erreur montrée."""
+
+    def test_reglages_repris_dans_la_configuration(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("lanceur", settings.BASE_DIR / "deploy" / "executable" / "erp_ohada.py")
+        lanceur = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lanceur)
+        with tempfile.TemporaryDirectory() as donnees, mock.patch.dict(os.environ, {"ERP_DONNEES": donnees}, clear=False):
+            Path(donnees, "installation-base.env").write_text(
+                "MIROIR_DB_ENGINE=mssql\nMIROIR_DB_HOST=SRV\\SQLEXPRESS\nMIROIR_DB_NAME=ERP_COPIE\n", encoding="utf-8")
+            for cle in ("MIROIR_DB_ENGINE", "MIROIR_DB_HOST", "MIROIR_DB_NAME"):
+                os.environ.pop(cle, None)
+            try:
+                lanceur.preparer_environnement()
+                config = Path(donnees, "configuration.env").read_text(encoding="utf-8")
+                self.assertIn("MIROIR_DB_ENGINE=mssql", config)
+                self.assertIn("MIROIR_DB_HOST=SRV\\SQLEXPRESS", config)
+                self.assertNotIn("# MIROIR_DB_ENGINE=mssql", config)
+                self.assertFalse(Path(donnees, "installation-base.env").exists())
+                self.assertTrue(Path(donnees, "installation-base.env.applique").exists())
+            finally:
+                for cle in ("MIROIR_DB_ENGINE", "MIROIR_DB_HOST", "MIROIR_DB_NAME", "SQLITE_FICHIER", "ERP_DOSSIER_DONNEES"):
+                    os.environ.pop(cle, None)
+
+    @unittest.skipUnless(__import__("importlib").util.find_spec("mssql"), "pilote SQL Server absent")
+    def test_sqlserver_injoignable_retour_sur_sqlite(self):
+        with tempfile.TemporaryDirectory() as donnees:
+            Path(donnees, "installation-base.env").write_text(
+                "DB_ENGINE=mssql\nDB_HOST=127.0.0.1,1\nDB_NAME=ERP_INJOIGNABLE\nDB_USER=sa\nDB_PASSWORD=x\n"
+                "DB_PYTHON_DRIVER=mssql_python\n", encoding="utf-8")
+            port = _port_libre()
+            env = {k: v for k, v in os.environ.items() if not k.startswith(("SQLITE_", "DB_", "ERP_", "DJANGO_"))}
+            env.update(ERP_DONNEES=donnees, ERP_PORT=str(port), ERP_SANS_NAVIGATEUR="1", ERP_RESEAU="0", ERP_EDITION="transport",
+                       ERP_ADMIN="chef", ERP_ADMIN_MDP="Chef-2026-ok")
+            programme = [sys.executable, str(settings.BASE_DIR / "deploy" / "executable" / "erp_ohada.py")]
+            sortie = Path(donnees, "sortie.txt")
+            with open(sortie, "w") as f:                          # le programme relancé garde sa propre sortie
+                subprocess.Popen(programme, env=env, stdout=f, stderr=subprocess.STDOUT).wait(180)
+            try:
+                self.assertIn("retour sur SQLite", sortie.read_text())
+                self.assertIn("DB_ENGINE=sqlite", Path(donnees, "configuration.env").read_text(encoding="utf-8"))
+                nav = Navigateur(f"http://127.0.0.1:{port}")
+                for _ in range(240):                                        # relancé tout seul, sur SQLite
+                    try:
+                        nav.get("/connexion/")
+                        break
+                    except (urllib.error.URLError, OSError):
+                        time.sleep(0.5)
+                self.assertTrue(Path(donnees, "erp.sqlite3").exists())
+                self.assertIn("inutilisable", Path(donnees, "erreur-base.txt").read_text(encoding="utf-8"))
+            finally:
+                arreter_programmes(donnees)

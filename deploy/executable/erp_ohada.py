@@ -118,6 +118,11 @@ def preparer_environnement(base="erp.sqlite3"):
             "# ECHANGES_RELAIS_URL=https://relais.exemple.com", "# ECHANGES_RELAIS_JETON=",
             "#   ou dossier partagé (réseau, disque synchronisé) :",
             "# ECHANGES_DOSSIER_PARTAGE=\\\\SERVEUR\\Echanges-ERP", "# ECHANGES_INTERVALLE_MINUTES=5", ""]), encoding="utf-8")
+    choix = donnees / "installation-base.env"                    # base choisie dans l'installateur
+    if choix.exists():
+        valeurs = dict(l.split("=", 1) for l in choix.read_text(encoding="utf-8").splitlines() if "=" in l)
+        modifier_configuration(donnees, {k.strip(): v.strip() for k, v in valeurs.items()})
+        choix.replace(donnees / "installation-base.env.applique")
     for ligne in config.read_text(encoding="utf-8").splitlines():
         if "=" in ligne and not ligne.lstrip().startswith("#"):
             cle, valeur = ligne.split("=", 1)
@@ -143,6 +148,12 @@ def modifier_configuration(donnees, valeurs):
             lignes[i] = f"# {cle}=" if valeur is None else f"{cle}={valeur}"
     lignes += [f"{cle}={valeur}" for cle, valeur in restantes.items() if valeur is not None]
     config.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+    for cle, valeur in valeurs.items():                           # sauvegardes et vérifications : sans redémarrage
+        if cle.startswith(("ERP_SAUVEGARDE_", "ERP_VERIFICATION_")):
+            if valeur is None:
+                os.environ.pop(cle, None)
+            else:
+                os.environ[cle] = str(valeur)
 
 
 def base_sqlite():
@@ -288,23 +299,36 @@ def commande(*args):
     return sortie.getvalue().strip().splitlines()[-1:] or [""]
 
 
+PLANIFICATEUR = {"objet": None}
+
+
+def sauvegarde_immediate(donnees):
+    """Sauvegarde de la base de travail : fichier SQLite contrôlé, ou .bak SQL Server vérifié."""
+    def faire():
+        base = base_sqlite()
+        if base is None:
+            from apps.core.base_donnees import sauvegarder_sqlserver
+
+            return sauvegarder_sqlserver()
+        return sauvegarder(base, donnees).name
+    return faire
+
+
 def demarrer_taches(donnees):
     from django.conf import settings
 
-    taches = []
-    base = base_sqlite()
-    if base is not None:
-        heures = float(os.environ.get("ERP_SAUVEGARDE_HEURES") or 4)
-        tache_periodique("Sauvegarde", heures * 3600, lambda: journal(f"Sauvegarde : {sauvegarder(base, donnees).name}"))
-        taches.append(f"sauvegardes toutes les {heures:g} h → {donnees / 'sauvegardes'}"
-                      + (f" et {os.environ['ERP_SAUVEGARDE_COPIE']}" if os.environ.get("ERP_SAUVEGARDE_COPIE") else ""))
-    elif settings.DATABASES["default"]["ENGINE"] == "mssql":
-        from apps.core.base_donnees import sauvegarder_sqlserver
+    from apps.core import base_donnees, planification
 
-        heures = float(os.environ.get("ERP_SAUVEGARDE_HEURES") or 4)
-        tache_periodique("Sauvegarde SQL Server", heures * 3600, lambda: journal(f"Sauvegarde SQL Server : {sauvegarder_sqlserver()}"),
-                         attendre_d_abord=True)
-        taches.append(f"sauvegardes SQL Server (.bak) toutes les {heures:g} h, sur le serveur SQL")
+    taches = []
+    planificateur = planification.Planificateur(donnees, sauvegarde_immediate(donnees), base_donnees.verifier, journal)
+    PLANIFICATEUR["objet"] = planificateur
+    tache_periodique("Planificateur", 60, planificateur.passage)
+    r = planification.reglages()
+    taches.append({"heures": f"sauvegardes toutes les {r['heures']:g} h", "quotidien": f"sauvegarde chaque jour à {r['heure']}",
+                   "desactive": "sauvegardes automatiques DÉSACTIVÉES"}[r["mode"]]
+                  + (" (SQL Server : .bak sur le serveur SQL)" if base_sqlite() is None else f" → {donnees / 'sauvegardes'}")
+                  + (f" et {r['copie']}" if r["copie"] else "")
+                  + ("" if r["verification"] == "desactive" else " ; vérification de la base chaque semaine"))
     if "miroir" in settings.DATABASES:
         minutes = settings.MIROIR_INTERVALLE_MINUTES
         cible = settings.DATABASES["miroir"]
@@ -349,7 +373,8 @@ def demarrer_simulation(donnees, port, arguments=None):
     from django.contrib.auth import get_user_model
 
     env = {k: v for k, v in os.environ.items()
-           if k not in ("SQLITE_FICHIER", "ERP_ASSISTANT", "ERP_LICENCE", "ERP_DOSSIER_DONNEES") and not k.startswith(("MIROIR_", "ECHANGES_"))}
+           if k not in ("SQLITE_FICHIER", "ERP_ASSISTANT", "ERP_LICENCE", "ERP_DOSSIER_DONNEES", "ERP_SERVICE")
+           and not k.startswith("DB_") and not k.startswith(("MIROIR_", "ECHANGES_"))}
     env.update(ERP_SANS_NAVIGATEUR="1", ERP_SOUS_PROCESSUS="1", PYTHONUNBUFFERED="1",
                ERP_ADMIN_COMPTES=json.dumps(list(get_user_model().objects.filter(is_superuser=True, is_active=True)
                                                  .values_list("username", "password"))))
@@ -403,16 +428,53 @@ def supprimer_simulation(donnees):
     journal("Simulation supprimée")
 
 
+def preparer_sqlserver(donnees):
+    """Base SQL Server choisie : créée si elle n'existe pas, refusée si elle contient d'autres tables.
+    En cas d'échec, la configuration revient à SQLite (le logiciel reste utilisable) et l'erreur est montrée à
+    l'écran Base de données / dans l'assistant. Renvoie False s'il faut relancer le programme."""
+    from django.conf import settings
+
+    reglage = settings.DATABASES["default"]
+    if reglage["ENGINE"] != "mssql":
+        return True
+    try:
+        from apps.core.management.commands.miroir import controler_tables, creer_base_sqlserver
+
+        creer_base_sqlserver(reglage, journal)
+        controler_tables("default")
+        (donnees / "erreur-base.txt").unlink(missing_ok=True)
+        return True
+    except Exception as exc:
+        message = f"SQL Server {reglage.get('HOST')} / {reglage['NAME']} inutilisable : {exc}"[:600]
+        journal(message + " — retour sur SQLite")
+        (donnees / "erreur-base.txt").write_text(message, encoding="utf-8")
+        modifier_configuration(donnees, {"DB_ENGINE": "sqlite"})
+        return False
+
+
+def relancer():
+    """Nouveau départ avec la configuration relue (en service Windows : le service se relance tout seul)."""
+    if os.environ.get("ERP_SERVICE"):
+        return 1
+    programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
+    options = {"creationflags": subprocess.CREATE_NEW_CONSOLE} if os.name == "nt" else {"start_new_session": True}
+    subprocess.Popen(programme + ["redemarrage"], env=dict(ENVIRONNEMENT_INITIAL), stdin=subprocess.DEVNULL, **options)
+    return 0
+
+
 def redemarrer(port):
     """Relance le programme (nouvelle fenêtre) puis arrête celui-ci : le nouveau attend que le port se libère."""
     p = SIMULATION["processus"]
     if p is not None and p.poll() is None:
         p.terminate()
+    journal("Redémarrage demandé à l'écran")
+    if os.environ.get("ERP_SERVICE"):                             # service Windows : il se relance tout seul
+        threading.Timer(1.5, os._exit, [3]).start()
+        return f"Redémarrage du service (port {port})"
     programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
     env = {**ENVIRONNEMENT_INITIAL, "ERP_SANS_NAVIGATEUR": "1"}
     options = {"creationflags": subprocess.CREATE_NEW_CONSOLE} if os.name == "nt" else {"start_new_session": True}
     subprocess.Popen(programme + ["redemarrage"], env=env, stdin=subprocess.DEVNULL, **options)
-    journal("Redémarrage demandé à l'écran")
     threading.Timer(1.5, os._exit, [0]).start()
     return f"Redémarrage en cours (port {port})"
 
@@ -540,6 +602,7 @@ def enregistrer_actions(donnees, port):
             "taille_base": base.stat().st_size if base and base.exists() else 0,
             "windows": os.name == "nt", "demarrage_auto": os.name == "nt" and lien_demarrage().exists(),
             "demarrage_installateur": os.name == "nt" and lien_installateur().exists(),
+            "service": bool(os.environ.get("ERP_SERVICE")),
             "sauvegarde_heures": os.environ.get("ERP_SAUVEGARDE_HEURES") or "4",
             "sauvegarde_garder": os.environ.get("ERP_SAUVEGARDE_GARDER") or "60",
             "sauvegarde_copie": os.environ.get("ERP_SAUVEGARDE_COPIE", ""),
@@ -549,14 +612,9 @@ def enregistrer_actions(donnees, port):
             "simulation": etat_simulation(donnees, port), "mois_courant": f"{datetime.date.today():%Y}-01"}
 
     def sauvegarder_maintenant():
-        base = base_sqlite()
-        if base is None:
-            from apps.core.base_donnees import sauvegarder_sqlserver
-
-            return sauvegarder_sqlserver()
-        fichier = sauvegarder(base, donnees)
-        journal(f"Sauvegarde (à l'écran) : {fichier.name}")
-        return fichier.name
+        resultat = sauvegarde_immediate(donnees)()
+        journal(f"Sauvegarde (à l'écran) : {resultat}")
+        return resultat
 
     poste.ACTIONS.update(
         etat=etat, sauvegarder=sauvegarder_maintenant,
@@ -565,6 +623,9 @@ def enregistrer_actions(donnees, port):
         simulation_supprimer=lambda: supprimer_simulation(donnees),
         demarrage_auto_basculer=demarrage_automatique,
         configurer=lambda valeurs: modifier_configuration(donnees, valeurs),
+        planification=lambda: PLANIFICATEUR["objet"].resume() if PLANIFICATEUR["objet"] else {},
+        erreur_base=lambda: ((donnees / "erreur-base.txt").read_text(encoding="utf-8")
+                             if (donnees / "erreur-base.txt").exists() else ""),
         redemarrer=lambda: redemarrer(port),
         nouveau_fichier_sqlite=lambda: donnees / ("erp.sqlite3" if not (donnees / "erp.sqlite3").exists()
                                                   else f"erp-{datetime.datetime.now():%Y%m%d-%H%M%S}.sqlite3"),
@@ -580,9 +641,19 @@ def main(argv):
     edition_ = edition()
     port = int(os.environ.get("ERP_PORT") or PORTS.get(edition_, 8000))
     action = argv[0] if argv else ""
-    if action == "sans-navigateur":                               # raccourci « Démarrage » posé par l'installateur
+    if action in ("sans-navigateur", "service"):                  # démarrage Windows, ou service Windows
         os.environ["ERP_SANS_NAVIGATEUR"] = "1"
+        if action == "service":
+            os.environ["ERP_SERVICE"] = "1"
         action, argv = "", argv[1:]
+    if action == "ouvrir":                                        # le serveur tourne en service : ouvrir le navigateur
+        for _ in range(240):
+            if deja_demarre(port):
+                webbrowser.open(f"http://127.0.0.1:{port}")
+                return 0
+            time.sleep(0.5)
+        print(f"Le serveur ne répond pas sur le port {port} : vérifiez le service « ERP OHADA {edition_.capitalize()} ».")
+        return 1
     if action == "dossier":
         print(dossier_donnees())
         return 0
@@ -598,6 +669,7 @@ def main(argv):
     if action == "simulation":
         os.environ["CONTROLE_HEURE_DEPART"] = "0"
         os.environ["MIROIR_DB_ENGINE"] = ""                     # jamais de copie miroir d'un dossier fictif
+        os.environ["DB_ENGINE"] = "sqlite"                      # toujours son propre fichier, jamais la vraie base SQL
         for cle in ("ECHANGES_RELAIS_URL", "ECHANGES_DOSSIER_PARTAGE"):
             os.environ[cle] = ""                                # ni d'échange avec les vraies agences
         donnees = preparer_environnement(base="simulation.sqlite3")
@@ -658,6 +730,8 @@ def main(argv):
     import django
 
     django.setup()
+    if not preparer_sqlserver(donnees):
+        return relancer()
     marqueur = donnees / "restaurer-sqlserver.txt"
     if marqueur.exists():                                         # demandée à l'écran Base de données
         from django.conf import settings

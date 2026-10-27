@@ -5,6 +5,10 @@
   <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-rocket-takeoff"></i> Première configuration</h1>
     <div class="text-muted">{% if etape == "base" %}Étape 4 sur 4 : la base de données{% elif etape == "role" %}Étape 3 sur 4 : le rôle de ce serveur{% else %}Étape 2 sur 4 : la société{% endif %}</div></div>
   {% if etape == "base" %}
+  {% if erreur_base %}<div class="alert alert-danger small">{{ erreur_base }}<br>Le logiciel fonctionne sur SQLite en attendant : corrigez les informations ci-dessous.</div>{% endif %}
+  {% if base_actuelle %}<div class="alert alert-secondary small d-flex align-items-center gap-2"><i class="bi bi-database"></i>
+    <span>Base actuelle : <strong>{{ base_actuelle.libelle }}</strong> — {{ base_actuelle.emplacement }}{% if base_actuelle.miroir %} · copie miroir vers SQL Server active{% endif %}</span>
+    {% if base_actuelle.moteur == "mssql" or base_actuelle.miroir %}<form method="post" class="ms-auto">{% csrf_token %}<button class="btn btn-sm btn-primary" name="action" value="sqlite">Garder et terminer</button></form>{% endif %}</div>{% endif %}
   {% if changement.etat %}<div class="alert alert-{% if changement.etat == 'erreur' %}danger{% elif changement.etat == 'termine' %}success{% else %}info{% endif %} d-flex align-items-center gap-2">
     {% if changement.etat == "en_cours" %}<span class="spinner-border spinner-border-sm"></span><meta http-equiv="refresh" content="5">{% endif %}<span>{{ changement.message }}</span>
     {% if changement.etat == "termine" %}<form method="post" class="ms-auto">{% csrf_token %}<button class="btn btn-sm btn-primary" name="action" value="redemarrer">Redémarrer sur SQL Server</button></form>{% endif %}</div>{% endif %}

@@ -1,0 +1,22 @@
+<!-- Service Windows du serveur ERP OHADA (WinSW) : tourne en arrière-plan, démarre avec l'ordinateur,
+     se relance tout seul en cas d'arrêt. Généré pour chaque édition par la compilation (@EDITION@, @PORT@). -->
+<service>
+  <id>ERP-OHADA-@EDITION@</id>
+  <name>ERP OHADA @EDITION@</name>
+  <description>Serveur de l'ERP OHADA @EDITION@ (port @PORT@). Les postes du réseau l'ouvrent dans leur navigateur.</description>
+  <executable>%BASE%\ERP-OHADA-@EDITION@.exe</executable>
+  <arguments>service</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <onfailure action="restart" delay="5 sec"/>
+  <onfailure action="restart" delay="20 sec"/>
+  <onfailure action="restart" delay="60 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>30 sec</stoptimeout>
+  <logpath>%BASE%\journaux-service</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+</service>
