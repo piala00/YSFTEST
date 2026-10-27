@@ -38,7 +38,13 @@
       <table class="table table-sm mb-0" id="grille">
         <thead><tr>{% for cle, libelle in colonnes %}<th class="{% if libelle == 'Hors taxe' or libelle == 'Solde dû' or libelle == 'Valeur' %}num{% endif %}">{% if cle %}<a href="?{% if base_tri %}{{ base_tri }}&amp;{% endif %}tri={{ cle }}&amp;sens={% if tri == cle and sens == 'asc' %}desc{% else %}asc{% endif %}">{{ libelle }}{% if tri == cle %} <i class="bi bi-caret-{% if sens == 'asc' %}up{% else %}down{% endif %}-fill"></i>{% endif %}</a>{% else %}{{ libelle }}{% endif %}</th>{% endfor %}</tr></thead>
         <tbody>
-        {% for d in object_list %}<tr data-url="{% url 'commercial:document_detail' d.pk %}" data-modifiable="{% if d.statut == 'BROUILLON' %}1{% else %}0{% endif %}" data-annuler="{% url 'commercial:document_annuler' d.pk %}" data-imprimer="{% url 'commercial:document_print' d.pk %}" tabindex="0">
+        {% for d in object_list %}<tr data-url="{% url 'commercial:document_detail' d.pk %}" data-modifiable="{% if d.statut == 'BROUILLON' %}1{% else %}0{% endif %}" data-annuler="{% url 'commercial:document_annuler' d.pk %}" data-imprimer="{% url 'commercial:document_print' d.pk %}"
+          data-modifier="{% url 'commercial:document_update' d.pk %}"
+          data-valider="{% url 'commercial:document_valider' d.pk %}"
+          data-transformer="{% if d.transformations_possibles %}1{% else %}0{% endif %}"
+          data-reglement="{% if d.est_facturation and not d.est_avoir and d.statut == 'VALIDE' and d.reste_a_payer > 0 %}{% url 'commercial:reglement_create' %}?document={{ d.pk }}{% endif %}"
+          data-acompte="{% if d.statut == 'VALIDE' and d.type_document == 'COMMANDE' or d.statut == 'VALIDE' and d.type_document == 'ACHAT_COMMANDE' %}{% url 'commercial:reglement_create' %}?commande={{ d.pk }}{% endif %}"
+          data-ecriture="{% if d.ecriture_id %}{% url 'comptabilite:ecriture_detail' d.ecriture_id %}{% endif %}" tabindex="0">
           <td><span class="type-piece type-{{ d.type_document|lower }}" title="{{ d.get_type_document_display }}">{{ prefixes|valeur:d.type_document }}</span></td>
           {% if domaine == "stocks" %}
           <td>{{ d.date|date:"dmy" }}</td><td><a href="{% url 'commercial:document_detail' d.pk %}" data-nouvelle-fenetre>{{ d.numero_affiche }}</a></td><td>{{ d.reference_externe }}</td>
@@ -60,6 +66,13 @@
     <div class="dropdown">
       <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Actions</button>
       <ul class="dropdown-menu">
+        <li><button type="button" class="dropdown-item" data-liste="modifier" disabled>Modifier le brouillon</button></li>
+        <li><button type="button" class="dropdown-item" data-liste="valider" disabled>Valider la pièce…</button></li>
+        <li><button type="button" class="dropdown-item" data-liste="transformer" disabled>Choisir une transformation…</button></li>
+        <li><button type="button" class="dropdown-item" data-liste="reglement" disabled>Saisir un règlement…</button></li>
+        <li><button type="button" class="dropdown-item" data-liste="acompte" disabled>Saisir un acompte…</button></li>
+        <li><button type="button" class="dropdown-item" data-liste="ecriture" disabled>Voir l'écriture comptable</button></li>
+        <li><hr class="dropdown-divider"></li>
         <li><button type="button" class="dropdown-item" data-liste="imprimer" data-erp-action="imprimer" disabled>Imprimer la pièce sélectionnée</button></li>
         <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}">Actualiser la liste</a></li>
       </ul>
@@ -71,12 +84,13 @@
         <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-erp-action="ajouter" data-bs-toggle="dropdown" title="Choisir le type du nouveau document">Nouveau</button>
         <ul class="dropdown-menu dropdown-menu-end">{% for code, lib in types %}<li><a class="dropdown-item" data-nouvelle-fenetre href="{% url 'commercial:document_create' code %}">{{ lib }}</a></li>{% endfor %}</ul>
       </div>
-      <button type="button" class="btn btn-sm btn-outline-secondary" data-liste="supprimer" disabled>Supprimer</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-liste="annuler" disabled>Annuler le brouillon</button>
       <button type="button" class="btn btn-sm btn-outline-secondary" data-liste="fermer">Fermer</button>
     </div>
   </div>
   <div class="liste-etat" id="liste-etat" data-total="{{ total }}">{{ total }} élément{{ total|pluralize }} dans la liste</div>
-  <form method="post" id="form-supprimer" hidden>{% csrf_token %}<input type="hidden" name="suivant" value="{{ request.get_full_path }}"></form>
+  <form method="post" id="form-valider" hidden>{% csrf_token %}<input type="hidden" name="suivant" value="{{ request.get_full_path }}"></form>
+  <form method="post" id="form-annuler" hidden>{% csrf_token %}<input type="hidden" name="suivant" value="{{ request.get_full_path }}"></form>
 </div>
 {% endblock %}
 {% block scripts %}<script>
@@ -92,9 +106,16 @@
     });
     ligne = tr; tr.classList.add('selection');
     tr.setAttribute('aria-selected', 'true');
+    const brouillon = tr.dataset.modifiable === '1';
     boutons('ouvrir').disabled = false;
     boutons('imprimer').disabled = false;
-    boutons('supprimer').disabled = tr.dataset.modifiable !== '1';
+    boutons('modifier').disabled = !brouillon;
+    boutons('valider').disabled = !brouillon;
+    boutons('transformer').disabled = tr.dataset.transformer !== '1';
+    boutons('reglement').disabled = !tr.dataset.reglement;
+    boutons('acompte').disabled = !tr.dataset.acompte;
+    boutons('ecriture').disabled = !tr.dataset.ecriture;
+    boutons('annuler').disabled = !brouillon;
     etat.textContent = `1 élément sélectionné sur ${total} éléments de la liste`;
   };
   grille.querySelectorAll('tbody tr[data-url]').forEach(tr => {
@@ -106,10 +127,31 @@
     });
   });
   boutons('ouvrir').addEventListener('click', () => ligne && ouvrirUrl(ligne.dataset.url));
+  boutons('modifier').addEventListener('click', () => {
+    if (ligne?.dataset.modifiable === '1') ouvrirUrl(ligne.dataset.modifier);
+  });
+  // La liste ouvre le choix des transformations dans la fiche, sans créer de pièce sans type cible.
+  boutons('transformer').addEventListener('click', () => {
+    if (ligne?.dataset.transformer === '1') ouvrirUrl(ligne.dataset.url + '#piece-transformer');
+  });
+  boutons('reglement').addEventListener('click', () => {
+    if (ligne?.dataset.reglement) ouvrirUrl(ligne.dataset.reglement);
+  });
+  boutons('acompte').addEventListener('click', () => {
+    if (ligne?.dataset.acompte) ouvrirUrl(ligne.dataset.acompte);
+  });
+  boutons('ecriture').addEventListener('click', () => {
+    if (ligne?.dataset.ecriture) ouvrirUrl(ligne.dataset.ecriture);
+  });
   boutons('imprimer').addEventListener('click', () => ligne && window.open(ligne.dataset.imprimer, '_blank'));
-  boutons('supprimer').addEventListener('click', () => {
+  boutons('valider').addEventListener('click', () => {
+    if (!ligne || ligne.dataset.modifiable !== '1') return;
+    if (!confirm('Valider définitivement ce document ? Les mouvements de stock et écritures comptables éventuels seront créés.')) return;
+    const f = document.getElementById('form-valider'); f.action = ligne.dataset.valider; f.submit();
+  });
+  boutons('annuler').addEventListener('click', () => {
     if (!ligne || ligne.dataset.modifiable !== '1' || !confirm('Annuler ce document en brouillon ?')) return;
-    const f = document.getElementById('form-supprimer'); f.action = ligne.dataset.annuler; f.submit();
+    const f = document.getElementById('form-annuler'); f.action = ligne.dataset.annuler; f.submit();
   });
   boutons('fermer').addEventListener('click', () => {
     if (window.parent !== window && window.parent.erpFenetres) window.parent.erpFenetres.fermerCadre(window.frameElement);

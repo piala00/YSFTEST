@@ -104,3 +104,13 @@ class LiaisonComptableTests(TestCase):
         self.facture()
         reponse = self.client.get(url + "?ok=1")
         self.assertContains(reponse, "Aucune anomalie")
+
+    def test_ecritures_d_autres_modules_dans_ac_ne_sont_pas_orphelines(self):
+        """Achat du magasin (ACM…), billet ou colis en compte : écrits dans AC / VT sans pièce commerciale."""
+        from apps.comptabilite.models import Compte
+
+        charge = Compte.objects.get_or_create(numero="6011000", defaults={"intitule": "Achats"})[0]
+        caisse = Compte.objects.get_or_create(numero="5711000", defaults={"intitule": "Caisse"})[0]
+        services.creer_ecriture(Journal.objects.get(code="AC"), self.exercice.date_debut, "Achat du magasin",
+                                [{"compte": charge, "debit": 100}, {"compte": caisse, "credit": 100}], origine="ACM2026-00001")
+        self.assertEqual(self.controle()["anomalies"], [])

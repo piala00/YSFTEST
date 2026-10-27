@@ -132,6 +132,7 @@ def catalogue():
         ("Compte de résultat", "comptabilite:compte_resultat", (), {}, "Charges et produits de l'exercice"),
         ("Soldes intermédiaires de gestion", "comptabilite:compte_resultat", (), {"vue": "sig"}, "Marge, valeur ajoutée, EBE…"),
         ("Déclaration de TVA", "comptabilite:tva", (), {}, "Taxes collectées et déductibles"),
+        ("Trésorerie projetée", "comptabilite:tresorerie_projetee", (), {}, "Échéances, prévisions et budget, mois par mois"),
     ]
     analytique = [("Plan analytique (tous les axes)", "analytique:plan", (), {}, "Ce qui est affecté à chaque axe et le non affecté")]
     analytique += [(f"Balance : {titre}", "analytique:axe", (code,), {}, desc) for code, titre, desc in pa.axes()]
