@@ -14,7 +14,8 @@ Les données ne sont PAS dans le dossier du programme (on peut le remplacer ou l
 
     ERP-OHADA-Transport.exe                     démarre tout et ouvre le navigateur
     ERP-OHADA-Transport.exe local               ce poste seulement (pas d'accès réseau)
-    ERP-OHADA-Transport.exe simulation 3        dossier de simulation séparé (3 mois fictifs), puis démarrage
+    ERP-OHADA-Transport.exe simulation 3        dossier de simulation séparé (3 mois fictifs dès 09/2026), puis démarrage
+    ERP-OHADA-Transport.exe simulation 2026-01  simulation de janvier 2026 jusqu'à aujourd'hui (2026-01 6 : six mois)
     ERP-OHADA-Transport.exe sauvegarder         sauvegarde immédiate
     ERP-OHADA-Transport.exe restaurer [fichier] remet la dernière sauvegarde (ou le fichier indiqué)
     ERP-OHADA-Transport.exe demarrage-auto      démarrage à l'ouverture de session Windows (relancer pour retirer)
@@ -397,9 +398,13 @@ def main(argv):
 
         call_command("migrate", interactive=False, verbosity=0)
         if not Depart.objects.exists():
-            mois = argv[1] if len(argv) > 1 else "1"
-            print(f"Simulation de {mois} mois (données fictives) : comptez environ une heure par mois.")
-            call_command("simulation", "--mois", "2026-09", "--nombre-mois", mois,
+            # simulation 3 (3 mois dès 09/2026) · simulation 2026-01 (jusqu'à aujourd'hui) · simulation 2026-01 6
+            debut = next((a for a in argv[1:] if "-" in a), None)
+            duree = next((a for a in argv[1:] if "-" not in a), None)
+            periode = ["--nombre-mois", duree or "1"] if duree or not debut else ["--jusqu-au", "aujourdhui"]
+            print(f"Simulation à partir de {debut or '2026-09'} ({duree + ' mois' if duree else 'jusqu à aujourd hui' if debut else '1 mois'}, "
+                  "données fictives) : comptez environ une heure par mois.")
+            call_command("simulation", "--mois", debut or "2026-09", *periode,
                          "--rapport", str(donnees / "BILAN-SIMULATION.md"))
         initialiser(edition_, donnees, demander_compte=not os.environ.get("ERP_SOUS_PROCESSUS"))
         servir(port + 1, reseau=os.environ.get("ERP_RESEAU", "1") != "0")

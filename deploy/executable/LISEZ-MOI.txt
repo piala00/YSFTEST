@@ -71,7 +71,9 @@ DB_ENGINE=mssql, DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PYTHON_DRIVER=mssql_
 5. AUTRES COMMANDES
 -------------------
     ERP-OHADA-<Édition>.exe local             ce poste seulement (pas de réseau)
-    ERP-OHADA-<Édition>.exe simulation 3      simulation fictive de 3 mois (dossier séparé)
+    ERP-OHADA-<Édition>.exe simulation 3      simulation fictive de 3 mois dès 09/2026 (dossier séparé)
+    ERP-OHADA-<Édition>.exe simulation 2026-01    de janvier 2026 jusqu'à aujourd'hui
+    ERP-OHADA-<Édition>.exe simulation 2026-01 6  six mois à partir de janvier 2026
     ERP-OHADA-<Édition>.exe demarrage-auto    démarrer à l'ouverture de session Windows
                                               (relancer pour retirer)
     ERP-OHADA-<Édition>.exe manage <commande> administration (echanges, longueur_comptes…)

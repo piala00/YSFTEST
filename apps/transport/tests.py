@@ -1315,6 +1315,25 @@ class SimulationPlusieursMoisTests(TestCase):
         self.assertEqual([m["debut"] for m in commande.bilan()["mensuel"]], [datetime.date(2026, 12, 1), datetime.date(2027, 1, 1)])
         self.assertTrue(DepenseVehicule.objects.filter(nature=DepenseVehicule.ASSURANCE).exists())
 
+    def test_jusqu_a_une_date_le_dernier_mois_s_arrete_a_ce_jour(self):
+        from .management.commands.simulation import Command
+
+        commande = Command()
+        call_command(commande, mois="2026-01", jusqu_au="2026-03-02", vehicules=8, salaries=25, echelle=0.05, forcer=True,
+                     stdout=io.StringIO())
+        self.assertTrue(all(ok for _, ok in commande.controles), commande.controles)
+        self.assertEqual([(j[0], j[-1]) for j in commande.mois],
+                         [(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31)), (datetime.date(2026, 2, 1), datetime.date(2026, 2, 28)),
+                          (datetime.date(2026, 3, 1), datetime.date(2026, 3, 2))])
+        self.assertFalse(Depart.objects.filter(date__gt=datetime.date(2026, 3, 2)).exists())
+
+    def test_dates_incorrectes_refusees(self):
+        from django.core.management.base import CommandError
+
+        for options in ({"mois": "2026-13"}, {"mois": "2026-05", "jusqu_au": "2026-04-30"}, {"mois": "2026-01", "jusqu_au": "demain"}):
+            with self.subTest(**options), self.assertRaises(CommandError):
+                call_command("simulation", forcer=True, stdout=io.StringIO(), **options)
+
 
 class DeuxModulesComptablesTests(TestCase):
     """Accueil : « Comptabilité générale » et « Comptabilité analytique », deux logiciels sur une seule comptabilité."""

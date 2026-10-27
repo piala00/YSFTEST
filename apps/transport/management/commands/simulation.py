@@ -50,6 +50,8 @@ class Command(BaseCommand):
     def add_arguments(self, p):
         p.add_argument("--mois", default="2026-09", help="Premier mois simulé (AAAA-MM)")
         p.add_argument("--nombre-mois", type=int, default=1, help="Nombre de mois simulés à la suite (1 à 24)")
+        p.add_argument("--jusqu-au", default="", help="Dernier jour simulé (AAAA-MM-JJ, ou « aujourdhui ») : "
+                                                       "remplace --nombre-mois, le dernier mois s'arrête à ce jour")
         p.add_argument("--jours", type=int, default=0, help="Jours simulés par mois (0 : le mois entier ; essais rapides)")
         p.add_argument("--vehicules", type=int, default=60, help="Cars voyageurs (40 % VIP, un quart de partenaires)")
         p.add_argument("--salaries", type=int, default=300)
@@ -68,7 +70,21 @@ class Command(BaseCommand):
         if Depart.objects.exists() and not o["forcer"]:
             raise CommandError("Ce dossier contient déjà des départs : la simulation se fait dans un dossier SÉPARÉ "
                                "(SQLITE_FICHIER=simulation.sqlite3), jamais dans la vraie société.")
-        annee, mois = (int(x) for x in o["mois"].split("-"))
+        try:
+            annee, mois = (int(x) for x in o["mois"].split("-"))
+            premier = datetime.date(annee, mois, 1)
+        except ValueError:
+            raise CommandError("--mois doit être au format AAAA-MM (ex. 2026-01).")
+        fin = None
+        if o["jusqu_au"]:
+            try:
+                fin = (timezone.localdate() if o["jusqu_au"].replace("'", "").lower() == "aujourdhui"
+                       else datetime.date.fromisoformat(o["jusqu_au"]))
+            except ValueError:
+                raise CommandError("--jusqu-au doit être une date AAAA-MM-JJ ou « aujourdhui ».")
+            if fin < premier:
+                raise CommandError(f"Le dernier jour ({fin:%d/%m/%Y}) est avant le premier mois ({premier:%m/%Y}).")
+            o["nombre_mois"] = (fin.year - annee) * 12 + fin.month - mois + 1
         if not 1 <= o["nombre_mois"] <= 24:
             raise CommandError("De 1 à 24 mois.")
         self.r = random.Random(o["graine"])
@@ -77,7 +93,7 @@ class Command(BaseCommand):
         for k in range(o["nombre_mois"]):
             a, m = annee + (mois - 1 + k) // 12, (mois - 1 + k) % 12 + 1
             nb_jours = min(o["jours"] or 31, calendar.monthrange(a, m)[1])
-            self.mois.append([datetime.date(a, m, j) for j in range(1, nb_jours + 1)])
+            self.mois.append([d for d in (datetime.date(a, m, j) for j in range(1, nb_jours + 1)) if fin is None or d <= fin])
         self.jours = [j for jours in self.mois for j in jours]
         self.exercices()
         self.moment(self.jours[0], 6)
