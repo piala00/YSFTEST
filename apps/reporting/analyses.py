@@ -140,6 +140,7 @@ def catalogue():
         ("Portefeuilles des propriétaires", "comptabilite:analytique_proprietaires", (), {}, "Résultats et situation financière séparée"),
         ("Relevés des propriétaires", "comptabilite:analytique_releves", (), {}, "Compte du véhicule, règlements, retraits"),
         ("Balance analytique des sections", "comptabilite:balance_analytique", (), {}, "Plans de sections"),
+        ("Budgets et budget / réel", "analytique:budgets", (), {}, "Par plan ou pour la société : écarts et réalisation"),
     ]
     reporting = [
         ("Évolution de la société", "reporting:evolution", (), {}, "Produits, charges, résultat, trésorerie, créances et dettes, mois par mois"),

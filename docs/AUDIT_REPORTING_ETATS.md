@@ -60,7 +60,7 @@ voyages, contrats, et les plans de sections créés par l'utilisateur.
 | Comparatif de périodes | Existe | `analytique:element` « comparaison », `reporting:comparaison` (précédente, N-1, libre) | oui |
 | Évolution mensuelle | Existe | `analytique:element` « evolution », `reporting:matrice` | oui |
 | Ventilation croisée (un plan par un autre) | Existe | `analytique:element` « croise » | oui |
-| Budget vs réel | Absent | aucun budget saisi dans le logiciel | — |
+| Budget vs réel | Existe | `analytique:budgets` → budget / réel (société ou un plan : par élément et par compte, hors budget, écarts favorables / défavorables) | oui |
 | Écarts et anomalies d'imputation | Partiel | non-affecté et rapprochement sur chaque balance ; pas de liste des anomalies | — |
 | Affecté / non affecté | Existe | `analytique:plan` (tous les plans) | oui |
 | Classement de rentabilité | Existe | `reporting:classement` (résultat, produits, charges, marge) | oui |
@@ -125,16 +125,16 @@ voyages, contrats, et les plans de sections créés par l'utilisateur.
 | Domaine | États | Existe | Partiel | Absent | Volontairement absent |
 |---|---:|---:|---:|---:|---:|
 | Comptabilité générale | 19 | 14 | 3 | 0 | 2 |
-| Analytique | 16 | 13 | 2 | 1 | 0 |
+| Analytique | 16 | 14 | 2 | 0 | 0 |
 | Commerce | 10 | 5 | 4 | 1 | 0 |
 | Transport | 17 | 16 | 1 | 0 | 0 |
 | Direction et scénarios | 11 | 5 | 3 | 3 | 0 |
-| **Total** | **73** | **53** | **13** | **5** | **2** |
+| **Total** | **73** | **54** | **13** | **4** | **2** |
 
 Ces totaux portent sur les lignes de ce document. Les deux balances âgées et les deux échéanciers du catalogue sont regroupés en une ligne chacun.
 
 **Priorités proposées** (rien n'est commencé sans accord) :
-1. Budget, avec un état budget / réel par plan.
+1. ~~Budget, avec un état budget / réel par plan~~ — fait le 27/10/2026.
 2. Trésorerie projetée.
 3. Vendeur sur les documents de vente, avec un état des ventes par commercial.
 4. Canal de vente (guichet, Mobile Money, en ligne) comme plan analytique.

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Budgets{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Budgets</h1></div>
+<p class="small text-muted">Un budget couvre un exercice, soit pour toute la société, soit pour les éléments d'un seul plan analytique (agences,
+  véhicules, lignes…) : on ne mélange jamais deux plans. Le réel est lu dans les écritures validées, comme les états analytiques.</p>
+<div class="card mb-3"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Budget</th><th>Exercice</th><th>Plan</th><th>Statut</th><th class="num">Lignes</th><th></th></tr></thead>
+  <tbody>{% for b, plan in budgets %}<tr><td><a href="{% url 'analytique:budget' b.pk %}">{{ b.nom }}</a></td><td>{{ b.exercice }}</td><td>{{ plan }}</td>
+    <td>{{ b.get_statut_display }}</td><td class="num">{{ b.lignes.count }}</td>
+    <td><a class="btn btn-sm btn-outline-primary" href="{% url 'analytique:budget_reel' b.pk %}">Budget / réel</a></td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center p-3">Aucun budget.</td></tr>{% endfor %}</tbody>
+</table></div>
+<form method="post" class="card p-3 d-flex flex-row flex-wrap gap-2 align-items-end" style="max-width:56rem">{% csrf_token %}
+  <div><label class="form-label small mb-0" for="nom">Nouveau budget</label><input id="nom" name="nom" class="form-control form-control-sm" placeholder="ex. Budget 2027" required></div>
+  <div><label class="form-label small mb-0" for="exercice">Exercice</label><select id="exercice" name="exercice" class="form-select form-select-sm">
+    {% for e in exercices %}<option value="{{ e.pk }}">{{ e }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="axe">Pour</label><select id="axe" name="axe" class="form-select form-select-sm">
+    <option value="">La société entière</option>{% for code, titre in axes %}<option value="{{ code }}">Chaque élément : {{ titre }}</option>{% endfor %}</select></div>
+  <button class="btn btn-sm btn-primary">Créer</button>
+</form>
+{% endblock %}

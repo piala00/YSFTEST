@@ -7,7 +7,7 @@ from django.urls import path
 
 from apps.core import views as core_views
 
-from . import views, views_analytique
+from . import views, views_analytique, views_budget
 
 app_name = "analytique"
 
@@ -22,4 +22,7 @@ urlpatterns = [
     path("plan/", views_analytique.plan, name="plan"),
     path("plan/<str:axe>/", views_analytique.axe, name="axe"),
     path("plan/<str:axe>/<str:cle>/", views_analytique.element, name="element"),
+    path("budgets/", views_budget.budgets, name="budgets"),
+    path("budgets/<int:pk>/", views_budget.budget, name="budget"),
+    path("budgets/<int:pk>/reel/", views_budget.budget_reel, name="budget_reel"),
 ]

@@ -323,3 +323,71 @@ class LigneEcriture(models.Model):
             raise ValidationError("Une ligne ne peut être à la fois au débit et au crédit.")
         if not self.debit and not self.credit:
             raise ValidationError("Saisir un montant au débit ou au crédit.")
+
+
+class Budget(models.Model):
+    """Budget d'un exercice, pour la société entière (axe vide) ou pour les éléments d'UN plan analytique.
+
+    Un budget ne mélange jamais deux plans (on n'additionne pas des agences et des véhicules) ; plusieurs budgets
+    peuvent coexister (société, agences, véhicules…). Montants positifs : produits (classe 7) et charges (classe 6).
+    """
+
+    BROUILLON, VALIDE = "BROUILLON", "VALIDE"
+    STATUTS = [(BROUILLON, "En préparation"), (VALIDE, "Validé")]
+
+    exercice = models.ForeignKey("core.Exercice", on_delete=models.PROTECT, related_name="budgets")
+    nom = models.CharField(max_length=100)
+    axe = models.CharField("Plan analytique", max_length=60, blank=True, help_text="Vide : budget de la société entière")
+    statut = models.CharField(max_length=10, choices=STATUTS, default=BROUILLON)
+    notes = models.TextField(blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+    cree_par = models.CharField(max_length=150, blank=True)
+
+    class Meta:
+        ordering = ["-exercice__date_debut", "nom"]
+        unique_together = ("exercice", "nom")
+
+    def __str__(self):
+        return f"{self.nom} ({self.exercice})"
+
+
+class LigneBudget(models.Model):
+    """Un compte (ou une racine de comptes : 62, 6222000…) pour un élément du plan, mois par mois de l'exercice."""
+
+    MOIS = [f"m{i:02d}" for i in range(1, 13)]
+
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE, related_name="lignes")
+    element = models.CharField("Élément du plan", max_length=60, blank=True)
+    compte = models.CharField("Compte ou racine", max_length=10)
+    libelle = models.CharField(max_length=100, blank=True)
+    m01 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m02 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m03 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m04 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m05 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m06 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m07 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m08 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m09 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m10 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m11 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    m12 = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["element", "compte"]
+        unique_together = ("budget", "element", "compte")
+
+    def __str__(self):
+        return f"{self.element or 'Société'} · {self.compte}"
+
+    @property
+    def produit(self):
+        return self.compte.startswith("7")
+
+    @property
+    def mois(self):
+        return [getattr(self, m) for m in self.MOIS]
+
+    @property
+    def total(self):
+        return sum(self.mois, Decimal("0"))

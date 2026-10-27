@@ -723,6 +723,7 @@ ANALYTIQUE = Module(
             E("structure.vehicules", "Véhicules", "transport:vehicules", icone="bi-bus-front", preuve="AJOUT-ERP"),
             E("structure.contrats", "Contrats des propriétaires", "partenaires:contrats", icone="bi-file-earmark-text",
               preuve="AJOUT-ERP"),
+            E("structure.budgets", "Budgets", "analytique:budgets", icone="bi-calculator", preuve="AJOUT-ERP"),
         ]),
         Onglet("traitement", "Traitement", "bi-gear-wide-connected", [
             E("traitement.ventilation", "Affecter une section aux écritures", "comptabilite:ventilation", icone="bi-diagram-2",
@@ -730,6 +731,7 @@ ANALYTIQUE = Module(
         ]),
         Onglet("etat", "Etat", "bi-printer", [
             E("analytique.plan", "Plan analytique (tous les axes)", "analytique:plan", icone="bi-diagram-3", preuve="AJOUT-ERP"),
+            E("analytique.budget_reel", "Budget / réel", "analytique:budgets", icone="bi-calculator", preuve="AJOUT-ERP", vue="reel"),
             E("analytique.axes", "États par axe", icone="bi-list-nested", preuve="AJOUT-ERP", dyn=_axes_analytiques),
             SEP(),
             E("analytique.vehicules", "Comptabilité analytique : Véhicules", icone="bi-bus-front", preuve="AJOUT-ERP", enfants=[

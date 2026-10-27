@@ -50,6 +50,15 @@ def dossier_programme():
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, str(dossier_programme()))
 
+# Sortie redirigée vers un fichier sous Windows (démarrage automatique, service…) : encodage cp1252 qui ne connaît pas
+# tous les caractères (→, …) ; le programme ne doit jamais s'arrêter pour un caractère affiché
+for _flux in (sys.stdout, sys.stderr):
+    if _flux is not None and hasattr(_flux, "reconfigure"):
+        try:
+            _flux.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 
 def edition():
     """Commerce ou Transport : fixée à la compilation (edition.txt dans le programme), sinon ERP_EDITION."""
