@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-title"><h1>{{ object.nom }} <small class="text-muted fs-6">{{ object.code }} · {{ object.get_type_tiers_display }}</small></h1>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'commercial:tiers_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier</a>
+    <a class="btn btn-outline-secondary btn-sm" data-erp-action="modifier" href="{% url 'commercial:tiers_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier</a>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'comptabilite:grand_livre' %}?tiers={{ object.pk }}&ok=1"><i class="bi bi-book"></i> Relevé de compte</a>
     <a class="btn btn-outline-primary btn-sm" href="{% url 'commercial:reglement_create' %}?tiers={{ object.pk }}"><i class="bi bi-cash"></i> Règlement</a>
     <a class="btn btn-primary btn-sm" href="{% url 'commercial:document_create' object.est_client|yesno:'FACTURE,ACHAT_FACTURE' %}?tiers={{ object.pk }}"><i class="bi bi-plus"></i> Facture</a>
