@@ -10,6 +10,12 @@ from . import services
 
 @login_required
 def dashboard(request):
+    from apps.core.models import Societe
+
+    if Societe.get().activite == Societe.ACTIVITE_TRANSPORT:          # accueil du reporting : celui du métier
+        from .views_analyses import transport_tableau_de_bord
+
+        return transport_tableau_de_bord(request)
     data = services.tableau_de_bord()
     graph = {
         "labels": [m["mois"] for m in data["ca_mensuel"]],

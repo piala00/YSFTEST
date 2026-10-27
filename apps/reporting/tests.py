@@ -253,3 +253,78 @@ class PagesEtApiTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()["statut"], "VALIDE")
         self.assertEqual(APIClient().get("/api/tiers/").status_code, 401)
+
+
+class MenusDuTransportTests(TestCase):
+    """Le logiciel de transport a son plan tiers (partenaires, pas de clients), son plan analytique (10 axes) et son
+    reporting ; chaque commande de ses menus mène à une page valide."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", "--demo", verbosity=0)
+        cls.user = get_user_model().objects.create_superuser("test", "", "pwd")
+
+    def setUp(self):
+        self.client.force_login(self.user)
+
+    def test_menus_propres_au_transport(self):
+        from apps.core.navigation import MODULES_PAR_CODE as M, structure_module
+
+        def codes(module):
+            def tous(noeuds):
+                for n in noeuds:
+                    yield n["code"]
+                    yield from tous(n["enfants"])
+            return {c for o in structure_module(M[module])[0] for c in tous(o["elements"])}
+        compta, analytique, reporting = codes("comptabilite"), codes("analytique"), codes("reporting")
+        self.assertIn("structure.plan_tiers.partenaires", compta)
+        self.assertNotIn("structure.plan_tiers.clients", compta)
+        self.assertIn("structure.plan_analytique_transport", compta)
+        self.assertNotIn("structure.plan_analytique", compta)
+        self.assertIn("structure.plan_transport.agences", analytique)
+        self.assertIn("analytique.vehicules", analytique)
+        for code in ("transport.tableau_de_bord", "transport.recettes.billetterie", "transport.recettes.colis",
+                     "transport.rentabilite.vehicules", "transport.flotte.consommation", "transport.proprietaires.liste"):
+            self.assertIn(code, reporting)
+        for code in ("synthese.rapport_commercial", "ventes.analyses", "tiers.balance_agee_clients"):
+            self.assertNotIn(code, reporting)
+        # Accueil du reporting : le tableau de bord du transport
+        self.assertContains(self.client.get(reverse("reporting:dashboard") + "?seul=1"), "Tableau de bord du transport")
+        catalogue = self.client.get(reverse("reporting:catalogue") + "?seul=1")
+        self.assertContains(catalogue, "Billetterie par point de vente")
+        self.assertNotContains(catalogue, "Rapport commercial journalier")
+
+    def test_toutes_les_commandes_du_transport(self):
+        from apps.core.navigation import MODULES, structure_module, modules_proposes
+        from apps.core.models import Societe
+
+        def parcourir(noeuds):
+            for n in noeuds:
+                if n["url"]:
+                    yield n
+                yield from parcourir(n["enfants"])
+
+        total = 0
+        for module in modules_proposes(Societe.get()):
+            onglets, _ = structure_module(module)
+            for onglet in onglets:
+                for noeud in parcourir(onglet["elements"]):
+                    with self.subTest(module=module.code, element=noeud["code"]):
+                        self.assertEqual(self.client.get(noeud["url"]).status_code, 200)
+                    total += 1
+        self.assertGreater(total, 150)
+
+    def test_etats_du_transport_coherents(self):
+        import datetime
+
+        from apps.transport import reporting as tr
+
+        debut, fin = datetime.date(2020, 1, 1), datetime.date(2035, 12, 31)
+        b, c = tr.activite_billetterie(debut, fin), tr.activite_colis(debut, fin, "liaison")
+        self.assertEqual(b["total"]["total"], b["total"]["especes"] + b["total"]["mobile"] + b["total"]["compte"])
+        self.assertEqual(c["total"]["envois"], c["total"]["livres"] + c["total"]["attente"])
+        tdb = tr.tableau_de_bord(debut, fin)
+        self.assertEqual(len(tdb["indicateurs"]), 9)
+        for url in ("reporting:transport_billetterie", "reporting:transport_colis", "reporting:transport_tableau_de_bord"):
+            self.assertEqual(self.client.get(reverse(url) + "?seul=1&export=csv" if url != "reporting:transport_tableau_de_bord"
+                                             else reverse(url) + "?seul=1").status_code, 200)

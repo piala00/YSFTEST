@@ -107,3 +107,105 @@ def comparer(axe, periode_a, periode_b, gamme=""):
     total["variation_produits"] = _variation(total["a"]["produits"], total["b"]["produits"])
     total["variation_resultat"] = _variation(total["a"]["resultat"], total["b"]["resultat"])
     return {"lignes": resultat, "total": total}
+
+
+# ---------------------------------------------------------------- États du reporting du Transport
+def activite_billetterie(debut, fin):
+    """Par point de vente : billets vendus et annulés, recettes des billets et des bagages, par mode de paiement.
+    Données de billetterie (date de vente) ; les montants comptables sont dans les états analytiques."""
+    from .models import Billet
+
+    modes = {Billet.ESPECES: "especes", Billet.MOBILE_MONEY: "mobile", Billet.COMPTE: "compte"}
+    groupes = {}
+    for b in Billet.objects.filter(date_vente__range=(debut, fin)).select_related("gare"):
+        cle = b.gare.nom if b.gare_id else "Sans point de vente"
+        g = groupes.setdefault(cle, {"agence": cle, "billets": 0, "annules": 0, "bagages_nombre": 0, "billets_montant": ZERO,
+                                     "bagages_montant": ZERO, "especes": ZERO, "mobile": ZERO, "compte": ZERO})
+        if b.statut == Billet.ANNULE:
+            g["annules"] += 1
+            continue
+        montant, bagages = b.prix or ZERO, b.prix_bagages or ZERO
+        g["billets"] += 1
+        g["bagages_nombre"] += b.bagages_nombre
+        g["billets_montant"] += montant
+        g["bagages_montant"] += bagages
+        g[modes.get(b.paiement, "especes")] += montant + bagages
+    lignes = sorted(groupes.values(), key=lambda g: -(g["billets_montant"] + g["bagages_montant"]))
+    for l in lignes:
+        l["total"] = l["billets_montant"] + l["bagages_montant"]
+    total = {k: sum((l[k] for l in lignes), ZERO if k not in ("billets", "annules", "bagages_nombre") else 0)
+             for k in ("billets", "annules", "bagages_nombre", "billets_montant", "bagages_montant", "especes", "mobile",
+                       "compte", "total")}
+    return {"lignes": lignes, "total": total}
+
+
+def activite_colis(debut, fin, axe="depart"):
+    """Colis, courrier et fret par agence de départ, d'arrivée ou par liaison : envois, pièces, poids, recettes,
+    port dû, contre-remboursements, livrés et en attente (date d'enregistrement)."""
+    from .models import Colis
+
+    groupes = {}
+    for c in Colis.objects.filter(date__range=(debut, fin)).select_related("gare_depart", "gare_arrivee"):
+        if axe == "arrivee":
+            cle = c.gare_arrivee.nom
+        elif axe == "liaison":
+            cle = f"{c.gare_depart.nom} → {c.gare_arrivee.nom}"
+        else:
+            cle = c.gare_depart.nom
+        g = groupes.setdefault(cle, {"cle": cle, "envois": 0, "annules": 0, "pieces": 0, "poids": ZERO, "recette": ZERO,
+                                     "port_du": ZERO, "remboursements": ZERO, "livres": 0, "attente": 0})
+        if c.statut == Colis.ANNULE:
+            g["annules"] += 1
+            continue
+        g["envois"] += 1
+        g["pieces"] += c.nombre
+        g["poids"] += c.poids or ZERO
+        g["recette"] += c.prix or ZERO
+        if c.port == Colis.DU:
+            g["port_du"] += c.prix or ZERO
+        g["remboursements"] += c.contre_remboursement or ZERO
+        if c.statut == Colis.LIVRE:
+            g["livres"] += 1
+        else:
+            g["attente"] += 1
+    lignes = sorted(groupes.values(), key=lambda g: -g["recette"])
+    total = {k: sum((l[k] for l in lignes), ZERO if k in ("poids", "recette", "port_du", "remboursements") else 0)
+             for k in ("envois", "annules", "pieces", "poids", "recette", "port_du", "remboursements", "livres", "attente")}
+    return {"lignes": lignes, "total": total}
+
+
+def tableau_de_bord(debut, fin):
+    """Indicateurs du transport sur la période, comparés à la période précédente de même durée."""
+    import datetime
+
+    from .models import Billet, Colis
+
+    def resume(d, f):
+        agences = _periode("agence", d, f)
+        t = {k: sum((g[k] for g in agences.values()), ZERO if k in ("produits", "charges") else 0)
+             for k in ("produits", "charges", "voyages", "voyageurs", "places")}
+        t["resultat"] = t["produits"] - t["charges"]
+        t["remplissage"] = round(100 * t["voyageurs"] / t["places"]) if t["places"] else None
+        t["billets"] = Billet.objects.filter(date_vente__range=(d, f)).exclude(statut=Billet.ANNULE).count()
+        colis = Colis.objects.filter(date__range=(d, f)).exclude(statut=Colis.ANNULE)
+        t["colis"] = colis.count()
+        t["colis_recette"] = sum((c.prix or ZERO for c in colis), ZERO)
+        return t
+
+    duree = fin - debut
+    precedent_fin = debut - datetime.timedelta(days=1)
+    actuel, precedent = resume(debut, fin), resume(precedent_fin - duree, precedent_fin)
+    indicateurs = []
+    for cle, libelle, genre in (("produits", "Produits", "montant"), ("charges", "Charges", "montant"),
+                                ("resultat", "Résultat", "montant"), ("voyages", "Voyages effectués", "nombre"),
+                                ("voyageurs", "Voyageurs", "nombre"), ("remplissage", "Remplissage", "pourcent"),
+                                ("billets", "Billets vendus", "nombre"), ("colis", "Colis et fret", "nombre"),
+                                ("colis_recette", "Recette colis et fret", "montant")):
+        a, b = actuel[cle], precedent[cle]
+        indicateurs.append({"cle": cle, "libelle": libelle, "genre": genre, "valeur": a, "precedent": b,
+                            "variation": _variation(a, b) if a is not None and b is not None else None})
+    vehicules = sorted(({"libelle": k, **v} for k, v in _periode("vehicule", debut, fin).items()), key=lambda v: -v["resultat"])
+    lignes = sorted(({"libelle": k, **v} for k, v in _periode("ligne", debut, fin).items()), key=lambda v: -v["resultat"])
+    agences = sorted(({"libelle": k, **v} for k, v in _periode("agence", debut, fin).items()), key=lambda v: -v["resultat"])
+    return {"indicateurs": indicateurs, "meilleurs": vehicules[:5], "moins_bons": vehicules[-5:][::-1] if len(vehicules) > 5 else [],
+            "lignes": lignes, "agences": agences, "precedent_du": precedent_fin - duree, "precedent_au": precedent_fin}

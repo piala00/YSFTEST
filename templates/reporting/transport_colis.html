@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Colis, courrier et fret{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Colis, courrier et fret <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<div class="btn-group btn-group-sm mb-2 d-print-none">{% for c, l in axes_colis %}<a class="btn {% if c == axe %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="?axe={{ c }}&du={{ du|date:'Y-m-d' }}&au={{ au|date:'Y-m-d' }}">{{ l }}</a>{% endfor %}</div>
+<div class="card"><div class="table-responsive"><table data-graphique="barres" data-colonnes="5" class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>{% for c, l in axes_colis %}{% if c == axe %}{{ l }}{% endif %}{% endfor %}</th><th class="num">Envois</th><th class="num">Annulés</th><th class="num">Pièces</th><th class="num">Poids (kg)</th>
+    <th class="num">Recette</th><th class="num">Port dû</th><th class="num">Contre-remboursements</th><th class="num">Livrés</th><th class="num">En attente</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td>{{ l.cle }}</td><td class="num">{{ l.envois }}</td><td class="num">{{ l.annules }}</td><td class="num">{{ l.pieces }}</td>
+    <td class="num">{{ l.poids|floatformat:1 }}</td><td class="num fw-semibold">{{ l.recette|montant }}</td><td class="num">{{ l.port_du|montant }}</td>
+    <td class="num">{{ l.remboursements|montant }}</td><td class="num">{{ l.livres }}</td><td class="num {% if l.attente %}text-warning-emphasis{% endif %}">{{ l.attente }}</td></tr>
+  {% empty %}<tr><td colspan="10" class="text-muted text-center p-4">Aucun envoi sur la période.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td><td class="num">{{ total.envois }}</td><td class="num">{{ total.annules }}</td><td class="num">{{ total.pieces }}</td>
+    <td class="num">{{ total.poids|floatformat:1 }}</td><td class="num">{{ total.recette|montant }}</td><td class="num">{{ total.port_du|montant }}</td>
+    <td class="num">{{ total.remboursements|montant }}</td><td class="num">{{ total.livres }}</td><td class="num">{{ total.attente }}</td></tr></tfoot>
+</table></div></div>
+{% endblock %}

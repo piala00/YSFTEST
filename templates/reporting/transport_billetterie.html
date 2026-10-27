@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Billetterie par point de vente{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Billetterie par point de vente <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<div class="card"><div class="table-responsive"><table data-graphique="barres" data-colonnes="4,5" class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Point de vente</th><th class="num">Billets</th><th class="num">Annulés</th><th class="num">Bagages</th><th class="num">Recette billets</th>
+    <th class="num">Recette bagages</th><th class="num">Espèces</th><th class="num">Mobile Money</th><th class="num">En compte</th><th class="num">Total</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td>{{ l.agence }}</td><td class="num">{{ l.billets }}</td><td class="num">{{ l.annules }}</td><td class="num">{{ l.bagages_nombre }}</td>
+    <td class="num">{{ l.billets_montant|montant }}</td><td class="num">{{ l.bagages_montant|montant }}</td><td class="num">{{ l.especes|montant }}</td>
+    <td class="num">{{ l.mobile|montant }}</td><td class="num">{{ l.compte|montant }}</td><td class="num fw-semibold">{{ l.total|montant }}</td></tr>
+  {% empty %}<tr><td colspan="10" class="text-muted text-center p-4">Aucun billet sur la période.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td><td class="num">{{ total.billets }}</td><td class="num">{{ total.annules }}</td><td class="num">{{ total.bagages_nombre }}</td>
+    <td class="num">{{ total.billets_montant|montant }}</td><td class="num">{{ total.bagages_montant|montant }}</td><td class="num">{{ total.especes|montant }}</td>
+    <td class="num">{{ total.mobile|montant }}</td><td class="num">{{ total.compte|montant }}</td><td class="num">{{ total.total|montant }}</td></tr></tfoot>
+</table></div></div>
+<p class="small text-muted mt-2">Données de la billetterie (date de vente, billets annulés exclus des montants). Les montants comptables par agence sont
+  dans le tableau de bord et les états analytiques.</p>
+{% endblock %}

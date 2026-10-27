@@ -118,3 +118,42 @@ def classement(request):
                     [[i, e["libelle"], e["produits"], e["charges"], e["resultat"], e["marge"]] for i, e in enumerate(r["meilleurs"], 1)])
     return render(request, "reporting/classement.html", {**p, **r, "axe": axe, "axes": axes, "titre_axe": dict(axes)[axe],
                                                         "critere": critere, "criteres": analyses.CRITERES, "nombre": nombre})
+
+
+# ---------------------------------------------------------------- Reporting du Transport
+@login_required
+def transport_tableau_de_bord(request):
+    from apps.transport import reporting as tr
+
+    p = _contexte(request)
+    return render(request, "reporting/transport_tableau_de_bord.html", {**p, **tr.tableau_de_bord(p["du"], p["au"])})
+
+
+@login_required
+def transport_billetterie(request):
+    from apps.transport import reporting as tr
+
+    p = _contexte(request)
+    r = tr.activite_billetterie(p["du"], p["au"])
+    if request.GET.get("export") == "csv":
+        return _csv(f"billetterie-{p['du']}-{p['au']}", ["Point de vente", "Billets", "Annulés", "Bagages", "Recette billets",
+                                                         "Recette bagages", "Espèces", "Mobile Money", "En compte", "Total"],
+                    [[l["agence"], l["billets"], l["annules"], l["bagages_nombre"], l["billets_montant"], l["bagages_montant"],
+                      l["especes"], l["mobile"], l["compte"], l["total"]] for l in r["lignes"]])
+    return render(request, "reporting/transport_billetterie.html", {**p, **r})
+
+
+@login_required
+def transport_colis(request):
+    from apps.transport import reporting as tr
+
+    p = _contexte(request)
+    axe = request.GET.get("axe") if request.GET.get("axe") in ("depart", "arrivee", "liaison") else "depart"
+    r = tr.activite_colis(p["du"], p["au"], axe)
+    if request.GET.get("export") == "csv":
+        return _csv(f"colis-{p['du']}-{p['au']}", ["Regroupement", "Envois", "Annulés", "Pièces", "Poids (kg)", "Recette",
+                                                   "Port dû", "Contre-remboursements", "Livrés", "En attente"],
+                    [[l["cle"], l["envois"], l["annules"], l["pieces"], l["poids"], l["recette"], l["port_du"],
+                      l["remboursements"], l["livres"], l["attente"]] for l in r["lignes"]])
+    return render(request, "reporting/transport_colis.html", {**p, **r, "axe": axe, "axes_colis": [
+        ("depart", "Agence de départ"), ("arrivee", "Agence d'arrivée"), ("liaison", "Liaison")]})

@@ -151,4 +151,39 @@ def catalogue():
         ("Comparaisons du transport", "reporting:comparaisons_transport", (), {}, "Avec voyages, voyageurs et remplissage"),
         ("Tableau de bord", "reporting:dashboard", (), {}, "Indicateurs du moment"),
     ]
-    return [("Comptabilité générale", general), ("Comptabilité analytique", analytique), ("Analyses du reporting", reporting)]
+    from apps.core.models import Societe
+
+    activite = Societe.get().activite
+    transport = activite != Societe.ACTIVITE_COMMERCE
+    commerce = activite != Societe.ACTIVITE_TRANSPORT
+    if not transport:                                         # commerce : ni véhicules, ni propriétaires
+        analytique = [e for e in analytique if "véhicule" not in e[0].lower() and "propriétaire" not in e[0].lower()]
+        reporting = [e for e in reporting if "transport" not in e[1]]
+    familles = [("Comptabilité générale", general), ("Comptabilité analytique", analytique), ("Analyses du reporting", reporting)]
+    if transport:
+        familles.insert(0, ("Transport", [
+            ("Tableau de bord du transport", "reporting:transport_tableau_de_bord", (), {}, "Produits, charges, résultat, voyages, remplissage, colis"),
+            ("Rapport journalier d'agence", "transport:rapport_journalier", (), {}, "Billets, bagages, colis, sorties, caisse"),
+            ("Recette du jour par agence", "transport:recette", (), {}, "Recettes constatées par agence et par service"),
+            ("Billetterie par point de vente", "reporting:transport_billetterie", (), {}, "Billets, annulations, bagages, modes de paiement"),
+            ("Colis, courrier et fret", "reporting:transport_colis", (), {}, "Envois, poids, recettes, port dû, livraisons"),
+            ("Rentabilité par véhicule", "transport:rentabilite", (), {}, "Produits, charges et résultat de chaque véhicule"),
+            ("Balance des véhicules", "transport:balance_vehicules", (), {}, "Mouvements et soldes par véhicule"),
+            ("Grand-livre des véhicules", "transport:grand_livre_vehicules", (), {}, "Chaque écriture de chaque véhicule"),
+            ("Consommation de carburant", "garage:consommation", (), {}, "Litres et coût par véhicule"),
+            ("Réparations", "garage:reparations", (), {}, "Ordres de réparation et pièces"),
+            ("Échéances des véhicules", "garage:echeances", (), {}, "Papiers et entretiens à renouveler"),
+            ("Partenaires propriétaires", "partenaires:proprietaires", (), {}, "Véhicules, contrats et soldes"),
+            ("Décomptes des propriétaires", "partenaires:decomptes", (), {}, "Ce qui revient à chaque propriétaire"),
+            ("Sessions de caisse", "transport:sessions_caisse", (), {}, "Ouvertures, clôtures et écarts"),
+        ]))
+    if commerce:
+        familles.insert(1 if transport else 0, ("Gestion commerciale", [
+            ("Tableau de bord commercial", "reporting:dashboard", (), {}, "Chiffre d'affaires, clients, achats"),
+            ("Rapport commercial journalier", "reporting:rapport_commercial", (), {}, "Ventes, encaissements, sorties, caisse"),
+            ("Statistiques des ventes", "reporting:ventes", (), {"vue": "clients"}, "Par mois, client et article"),
+            ("Rotation des stocks et ruptures", "commercial:statistique", ("rotation_stocks",), {}, "Rotation, couverture, alertes"),
+            ("Avoirs et retours clients", "commercial:statistique", ("avoirs_retours",), {}, "Pièce d'origine, part du CA"),
+            ("Règlements par mode de paiement", "commercial:statistique", ("reglements_modes",), {}, "Espèces, chèque, virement, Mobile Money"),
+        ]))
+    return familles

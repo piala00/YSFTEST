@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Tableau de bord du transport{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Tableau de bord du transport <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<div class="row g-2 mb-3">{% for i in indicateurs %}
+  <div class="col-6 col-md-4 col-xl"><div class="card card-body py-2 h-100">
+    <div class="small text-muted">{{ i.libelle }}</div>
+    <div class="fs-5 fw-semibold {% if i.cle == 'resultat' and i.valeur < 0 %}text-danger{% endif %}">{% if i.valeur is None %}—{% elif i.genre == "montant" %}{{ i.valeur|montant }}{% elif i.genre == "pourcent" %}{{ i.valeur }} %{% else %}{{ i.valeur }}{% endif %}</div>
+    <div class="small {% if i.variation is not None and i.variation < 0 %}text-danger{% else %}text-success{% endif %}">{% if i.variation is not None %}{% if i.variation > 0 %}+{% endif %}{{ i.variation }} %{% else %}&nbsp;{% endif %}
+      <span class="text-muted">/ période précédente</span></div></div></div>{% endfor %}</div>
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header bg-white fw-semibold small">Agences</div>
+    <table data-graphique="barres" data-colonnes="1,2,3" class="table table-sm mb-0 small"><thead><tr><th>Agence</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Voyages</th><th class="num">Rempl.</th></tr></thead>
+    <tbody>{% for a in agences %}<tr><td>{{ a.libelle }}</td><td class="num">{{ a.produits|montant }}</td><td class="num">{{ a.charges|montant }}</td><td class="num fw-semibold">{{ a.resultat|montant }}</td><td class="num">{{ a.voyages }}</td><td class="num">{% if a.remplissage is not None %}{{ a.remplissage }} %{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6" class="text-muted text-center p-3">Aucune activité sur la période.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header bg-white fw-semibold small">Lignes (itinéraires)</div>
+    <table data-graphique="barres" data-colonnes="3" class="table table-sm mb-0 small"><thead><tr><th>Ligne</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Voyageurs</th><th class="num">Rempl.</th></tr></thead>
+    <tbody>{% for l in lignes %}<tr><td>{{ l.libelle }}</td><td class="num">{{ l.produits|montant }}</td><td class="num">{{ l.charges|montant }}</td><td class="num fw-semibold {% if l.resultat < 0 %}text-danger{% endif %}">{{ l.resultat|montant }}</td><td class="num">{{ l.voyageurs }}</td><td class="num">{% if l.remplissage is not None %}{{ l.remplissage }} %{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6" class="text-muted text-center p-3">Aucune ligne exploitée.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header bg-white fw-semibold small">Véhicules : les 5 meilleurs résultats</div>
+    <table class="table table-sm mb-0 small"><tbody>{% for v in meilleurs %}<tr><td>{{ v.libelle }}</td><td class="num">{{ v.voyages }} voyage(s)</td><td class="num fw-semibold">{{ v.resultat|montant }}</td></tr>
+    {% empty %}<tr><td class="text-muted text-center p-3">—</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header bg-white fw-semibold small">Véhicules : les 5 moins bons</div>
+    <table class="table table-sm mb-0 small"><tbody>{% for v in moins_bons %}<tr><td>{{ v.libelle }}</td><td class="num">{{ v.voyages }} voyage(s)</td><td class="num fw-semibold {% if v.resultat < 0 %}text-danger{% endif %}">{{ v.resultat|montant }}</td></tr>
+    {% empty %}<tr><td class="text-muted text-center p-3">—</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+<p class="small text-muted mt-2">Montants : écritures générales validées, attribuées par le plan analytique du transport ; voyages, voyageurs et
+  remplissage : départs effectués. Comparaison avec la période du {{ precedent_du|date:"d/m/Y" }} au {{ precedent_au|date:"d/m/Y" }}.</p>
+{% endblock %}

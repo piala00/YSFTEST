@@ -41,6 +41,7 @@ class Element:
     action: str = ""                   # imprimer | fermer | quitter | actualiser | couper | copier…
     separateur: bool = False
     preuve: str = ""                   # DOC-V12 | ERG-CLASSIQUE | INDICATIF | AJOUT-ERP (voir PREUVES)
+    edition: str = ""                  # "transport" | "commerce" : entrée propre à un métier (vide : les deux)
 
     def lien(self):
         if not self.url:
@@ -73,8 +74,8 @@ class Module:
     onglets: list
 
 
-def E(code, titre, url="", *args, icone="", enfants=None, dyn=None, action="", preuve="", **query):
-    return Element(code, titre, url, args, query, icone, enfants or [], dyn, action, preuve=preuve)
+def E(code, titre, url="", *args, icone="", enfants=None, dyn=None, action="", preuve="", edition="", **query):
+    return Element(code, titre, url, args, query, icone, enfants or [], dyn, action, preuve=preuve, edition=edition)
 
 
 # Niveaux de preuve (skill « sage-100-gescom-v12-ui ») : origine de chaque entrée de menu
@@ -582,10 +583,17 @@ COMPTABILITE = Module(
         Onglet("structure", "Structure", "bi-diagram-3", [
             E("structure.plan", "Plan comptable", "comptabilite:comptes", icone="bi-list-ol"),
             E("structure.plan_tiers", "Plan tiers", icone="bi-people", enfants=[
-                E("structure.plan_tiers.clients", "Clients", "commercial:clients"),
+                E("structure.plan_tiers.clients", "Clients", "commercial:clients", edition="commerce"),
+                E("structure.plan_tiers.partenaires", "Partenaires (propriétaires de véhicules)", "partenaires:proprietaires",
+                  preuve="AJOUT-ERP", edition="transport"),
                 E("structure.plan_tiers.fournisseurs", "Fournisseurs", "commercial:fournisseurs"),
+                E("structure.plan_tiers.personnel", "Personnel (salariés)", "personnel:employes", preuve="AJOUT-ERP",
+                  edition="transport"),
             ]),
-            E("structure.plan_analytique", "Plan analytique", "comptabilite:structure", "sections", icone="bi-diagram-2"),
+            E("structure.plan_analytique", "Plan analytique", "comptabilite:structure", "sections", icone="bi-diagram-2",
+              edition="commerce"),
+            E("structure.plan_analytique_transport", "Plan analytique du transport (11 axes)", "analytique:plan",
+              icone="bi-diagram-3", preuve="AJOUT-ERP", edition="transport"),
             E("structure.plan_reporting", "Plan reporting"),
             SEP(),
             E("structure.taux_taxes", "Taux de taxes", "comptabilite:structure", "taxes", icone="bi-percent"),
@@ -713,10 +721,6 @@ def _axes_analytiques():
     return [E(f"analytique.axes.{code}", titre, "analytique:axe", code, preuve="AJOUT-ERP") for code, titre, _ in axes()]
 
 
-# Entrées du logiciel analytique propres au transport, masquées pour une société de commerce
-ANALYTIQUE_TRANSPORT = {"structure.vehicules", "structure.contrats", "analytique.vehicules", "analytique.proprietaires"}
-
-
 ANALYTIQUE = Module(
     code="analytique",
     titre="Comptabilité analytique",
@@ -729,10 +733,27 @@ ANALYTIQUE = Module(
         menu_fichier("analytique", "commercial:societe"),
         menu_edition(),
         Onglet("structure", "Structure", "bi-diagram-3", [
-            E("structure.sections", "Plan analytique (sections)", "analytique:sections", icone="bi-diagram-2", preuve="AJOUT-ERP"),
-            E("structure.vehicules", "Véhicules", "transport:vehicules", icone="bi-bus-front", preuve="AJOUT-ERP"),
-            E("structure.contrats", "Contrats des propriétaires", "partenaires:contrats", icone="bi-file-earmark-text",
-              preuve="AJOUT-ERP"),
+            E("structure.plan_transport", "Plan analytique du transport", icone="bi-diagram-3",
+              preuve="AJOUT-ERP", edition="transport", enfants=[
+                E("structure.plan_transport.tous", "Les 11 axes et leurs éléments", "analytique:plan", preuve="AJOUT-ERP",
+                  vue="structure"),
+                E("structure.plan_transport.agences", "Agences et points de vente", "transport:fiches", "gares", preuve="AJOUT-ERP"),
+                E("structure.vehicules", "Véhicules", "transport:vehicules", icone="bi-bus-front", preuve="AJOUT-ERP"),
+                E("structure.plan_transport.proprietaires", "Propriétaires (partenaires)", "partenaires:proprietaires",
+                  preuve="AJOUT-ERP"),
+                E("structure.contrats", "Contrats des propriétaires", "partenaires:contrats", icone="bi-file-earmark-text",
+                  preuve="AJOUT-ERP"),
+                E("structure.plan_transport.lignes", "Lignes (itinéraires) et tarifs", "transport:fiches", "lignes", preuve="AJOUT-ERP"),
+                E("structure.plan_transport.services", "Services", "analytique:axe", "services", preuve="AJOUT-ERP", vue="structure"),
+                E("structure.plan_transport.activites", "Activités", "analytique:axe", "activites", preuve="AJOUT-ERP", vue="structure"),
+                E("structure.plan_transport.gammes", "Gammes (Classique / VIP)", "analytique:axe", "gammes", preuve="AJOUT-ERP", vue="structure"),
+                E("structure.plan_transport.villes", "Villes", "analytique:axe", "villes", preuve="AJOUT-ERP", vue="structure"),
+                E("structure.plan_transport.voyages", "Voyages (départs)", "transport:departs", preuve="AJOUT-ERP"),
+            ]),
+            E("structure.sections", "Plan analytique (sections)", "analytique:sections", icone="bi-diagram-2", preuve="AJOUT-ERP",
+              edition="commerce"),
+            E("structure.sections_libres", "Autres plans (sections libres)", "analytique:sections", icone="bi-diagram-2",
+              preuve="AJOUT-ERP", edition="transport"),
             E("structure.budgets", "Budgets", "analytique:budgets", icone="bi-calculator", preuve="AJOUT-ERP"),
         ]),
         Onglet("traitement", "Traitement", "bi-gear-wide-connected", [
@@ -744,14 +765,16 @@ ANALYTIQUE = Module(
             E("analytique.budget_reel", "Budget / réel", "analytique:budgets", icone="bi-calculator", preuve="AJOUT-ERP", vue="reel"),
             E("analytique.axes", "États par axe", icone="bi-list-nested", preuve="AJOUT-ERP", dyn=_axes_analytiques),
             SEP(),
-            E("analytique.vehicules", "Comptabilité analytique : Véhicules", icone="bi-bus-front", preuve="AJOUT-ERP", enfants=[
+            E("analytique.vehicules", "Comptabilité analytique : Véhicules", icone="bi-bus-front", preuve="AJOUT-ERP",
+              edition="transport", enfants=[
                 E("analytique.vehicules.comptes", "Comptes d'exploitation des véhicules", "comptabilite:analytique_vehicules",
                   preuve="AJOUT-ERP"),
                 E("analytique.vehicules.grand_livre", "Grand-livre des véhicules", "comptabilite:grand_livre_vehicules",
                   preuve="AJOUT-ERP"),
                 E("analytique.vehicules.balance", "Balance des véhicules", "comptabilite:balance_vehicules", preuve="AJOUT-ERP"),
             ]),
-            E("analytique.proprietaires", "Comptabilité analytique : Propriétaires", icone="bi-people", preuve="AJOUT-ERP", enfants=[
+            E("analytique.proprietaires", "Comptabilité analytique : Propriétaires", icone="bi-people", preuve="AJOUT-ERP",
+              edition="transport", enfants=[
                 E("analytique.proprietaires.portefeuilles", "Portefeuilles et résultats", "comptabilite:analytique_proprietaires",
                   preuve="AJOUT-ERP"),
                 E("analytique.proprietaires.releves", "Relevés et règlements", "comptabilite:analytique_releves",
@@ -783,7 +806,9 @@ REPORTING = Module(
         menu_edition(),
         Onglet("etat", "Etat", "bi-printer", [
             E("synthese.catalogue", "Catalogue de tous les états", "reporting:catalogue", icone="bi-collection", preuve="AJOUT-ERP"),
-            E("synthese.dashboard", "Tableau de bord", "reporting:dashboard", icone="bi-speedometer2"),
+            E("synthese.dashboard", "Tableau de bord", "reporting:dashboard", icone="bi-speedometer2", edition="commerce"),
+            E("transport.tableau_de_bord", "Tableau de bord du transport", "reporting:transport_tableau_de_bord",
+              icone="bi-speedometer2", preuve="AJOUT-ERP", edition="transport"),
             E("analyses.evolution", "Évolution de la société (mois par mois)", "reporting:evolution", icone="bi-graph-up-arrow",
               preuve="AJOUT-ERP"),
             E("analyses.axes", "Analyses par axe analytique", icone="bi-diagram-3", preuve="AJOUT-ERP", enfants=[
@@ -792,14 +817,50 @@ REPORTING = Module(
                 E("analyses.classement", "Classements (meilleurs, moins bons)", "reporting:classement", preuve="AJOUT-ERP"),
                 E("analytique.plan", "Plan analytique et états détaillés", "analytique:plan", preuve="AJOUT-ERP"),
             ]),
-            E("synthese.rapport_commercial", "Rapport commercial journalier", "reporting:rapport_commercial", icone="bi-cash-stack"),
+            E("synthese.rapport_commercial", "Rapport commercial journalier", "reporting:rapport_commercial", icone="bi-cash-stack",
+              edition="commerce"),
             SEP(),
-            E("ventes.analyses", "Statistiques des ventes", icone="bi-graph-up", enfants=[
+            E("transport.recettes", "Recettes et caisses", icone="bi-cash-coin", preuve="AJOUT-ERP", edition="transport", enfants=[
+                E("transport.recettes.journalier", "Rapport journalier d'agence", "transport:rapport_journalier", preuve="AJOUT-ERP"),
+                E("transport.recettes.jour", "Recette du jour par agence", "transport:recette", preuve="AJOUT-ERP"),
+                E("transport.recettes.billetterie", "Billetterie par point de vente", "reporting:transport_billetterie",
+                  preuve="AJOUT-ERP"),
+                E("transport.recettes.colis", "Colis, courrier et fret", "reporting:transport_colis", preuve="AJOUT-ERP"),
+                E("transport.recettes.sessions", "Sessions de caisse", "transport:sessions_caisse", preuve="AJOUT-ERP"),
+                E("transport.recettes.transferts", "Transferts entre caisses", "transport:transferts", preuve="AJOUT-ERP"),
+            ]),
+            E("transport.rentabilite", "Rentabilité", icone="bi-graph-up-arrow", preuve="AJOUT-ERP", edition="transport", enfants=[
+                E("transport.rentabilite.vehicules", "Par véhicule", "transport:rentabilite", preuve="AJOUT-ERP"),
+                E("transport.rentabilite.comptes", "Comptes d'exploitation des véhicules", "comptabilite:analytique_vehicules",
+                  preuve="AJOUT-ERP"),
+                E("transport.rentabilite.balance", "Balance des véhicules", "transport:balance_vehicules", preuve="AJOUT-ERP"),
+                E("transport.rentabilite.grand_livre", "Grand-livre des véhicules", "transport:grand_livre_vehicules",
+                  preuve="AJOUT-ERP"),
+                E("transport.rentabilite.lignes", "Par ligne", "analytique:axe", "lignes", preuve="AJOUT-ERP"),
+                E("transport.rentabilite.agences", "Par agence", "analytique:axe", "agences", preuve="AJOUT-ERP"),
+                E("transport.rentabilite.services", "Par service", "analytique:axe", "services", preuve="AJOUT-ERP"),
+                E("transport.rentabilite.gammes", "Classique / VIP", "analytique:axe", "gammes", preuve="AJOUT-ERP"),
+            ]),
+            E("transport.flotte", "Flotte et garage", icone="bi-tools", preuve="AJOUT-ERP", edition="transport", enfants=[
+                E("transport.flotte.consommation", "Consommation de carburant", "garage:consommation", preuve="AJOUT-ERP"),
+                E("transport.flotte.reparations", "Réparations", "garage:reparations", preuve="AJOUT-ERP"),
+                E("transport.flotte.echeances", "Échéances des véhicules (papiers, entretien)", "garage:echeances",
+                  preuve="AJOUT-ERP"),
+                E("transport.flotte.magasin", "Stock du magasin", "garage:magasin_stock", preuve="AJOUT-ERP"),
+            ]),
+            E("transport.proprietaires", "Propriétaires", icone="bi-people", preuve="AJOUT-ERP", edition="transport", enfants=[
+                E("transport.proprietaires.liste", "Partenaires et soldes", "partenaires:proprietaires", preuve="AJOUT-ERP"),
+                E("transport.proprietaires.portefeuilles", "Portefeuilles et résultats", "comptabilite:analytique_proprietaires",
+                  preuve="AJOUT-ERP"),
+                E("transport.proprietaires.decomptes", "Décomptes", "partenaires:decomptes", preuve="AJOUT-ERP"),
+                E("transport.proprietaires.releves", "Relevés", "partenaires:releves", preuve="AJOUT-ERP"),
+            ]),
+            E("ventes.analyses", "Statistiques des ventes", icone="bi-graph-up", edition="commerce", enfants=[
                 E("ventes.mois", "Évolution mensuelle", "reporting:ventes", vue="mois"),
                 E("ventes.clients", "Par client", "reporting:ventes", vue="clients"),
                 E("ventes.articles", "Par article", "reporting:ventes", vue="articles"),
             ]),
-            E("transport.comparaisons", "Transport : comparaisons", icone="bi-bar-chart-steps", enfants=[
+            E("transport.comparaisons", "Comparaisons de deux périodes", icone="bi-bar-chart-steps", edition="transport", enfants=[
                 E("transport.comparaisons.agence", "Par agence", "reporting:comparaisons_transport", axe="agence"),
                 E("transport.comparaisons.gamme", "Classique / VIP", "reporting:comparaisons_transport", axe="gamme"),
                 E("transport.comparaisons.ligne", "Par ligne", "reporting:comparaisons_transport", axe="ligne"),
@@ -808,7 +869,7 @@ REPORTING = Module(
                   axe="proprietaire"),
             ]),
             E("tiers.echeances", "Échéanciers", icone="bi-hourglass-split", enfants=[
-                E("tiers.balance_agee_clients", "Clients", "reporting:balance_agee", type="CLIENT"),
+                E("tiers.balance_agee_clients", "Clients", "reporting:balance_agee", type="CLIENT", edition="commerce"),
                 E("tiers.balance_agee_fournisseurs", "Fournisseurs", "reporting:balance_agee", type="FOURNISSEUR"),
             ]),
             SEP(),
@@ -1137,15 +1198,22 @@ def premier_lien(noeuds):
     return None
 
 
-def elements_selon_activite(module, onglet):
-    """Comptabilité analytique d'une société de commerce : ses sections seulement (ni véhicules ni propriétaires)."""
-    if module.code != "analytique":
-        return onglet.elements
+def _metier():
+    """Métiers affichés : transport, commerce, ou les deux (activité mixte)."""
     from .models import Societe
 
-    if Societe.get().activite != Societe.ACTIVITE_COMMERCE:
-        return onglet.elements
-    return [e for e in onglet.elements if e.code not in ANALYTIQUE_TRANSPORT]
+    activite = Societe.get().activite
+    return {"transport"} if activite == Societe.ACTIVITE_TRANSPORT else (
+        {"commerce"} if activite == Societe.ACTIVITE_COMMERCE else {"transport", "commerce"})
+
+
+def selon_metier(elements, metiers):
+    """Entrées du métier de la société : le Transport et le Commerce n'ont ni le même plan tiers, ni le même plan
+    analytique, ni le même reporting (une entrée sans métier est commune)."""
+    import dataclasses
+
+    return [dataclasses.replace(e, enfants=selon_metier(e.enfants, metiers)) if e.enfants else e
+            for e in elements if not e.edition or e.edition in metiers]
 
 
 def structure_module(module, chemin="", parametres=None):
@@ -1153,9 +1221,10 @@ def structure_module(module, chemin="", parametres=None):
     parametres = parametres or {}
     meilleur = {"score": None, "noeud": None}
     onglets = []
+    metiers = _metier()
     for onglet in module.onglets:
         avant = meilleur["noeud"]
-        arbre = _arbre(module, elements_selon_activite(module, onglet), chemin, parametres, meilleur)
+        arbre = _arbre(module, selon_metier(onglet.elements, metiers), chemin, parametres, meilleur)
         onglets.append({"code": onglet.code, "titre": onglet.titre, "icone": onglet.icone, "elements": arbre,
                         "url": premier_lien(arbre), "contient_actif": False})
         if meilleur["noeud"] is not avant:

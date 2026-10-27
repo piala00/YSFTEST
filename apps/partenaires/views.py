@@ -161,3 +161,16 @@ def releve(request, pk=None):
             "decomptes": Decompte.objects.filter(contrat__partenaire=partenaire, statut=Decompte.APPROUVE),
             "caisses": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__isnull=False)})
     return render(request, "partenaires/releve.html", contexte)
+
+
+@login_required
+def proprietaires(request):
+    """Plan tiers du transport : les partenaires propriétaires de véhicules, leurs véhicules, contrats et solde."""
+    from django.db.models import Q
+
+    partenaires = (Tiers.objects.filter(Q(contrats_partenaire__isnull=False) | Q(vehicules__isnull=False))
+                   .distinct().order_by("nom").prefetch_related("vehicules", "contrats_partenaire"))
+    lignes = [{"tiers": t, "vehicules": [v.immatriculation for v in t.vehicules.all()],
+               "contrats": sum(1 for c in t.contrats_partenaire.all() if c.statut == ContratPartenaire.ACTIF),
+               "solde": solde_partenaire(t)} for t in partenaires]
+    return render(request, "partenaires/proprietaires.html", {"titre": "Partenaires propriétaires", "lignes": lignes})
