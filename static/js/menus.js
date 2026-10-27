@@ -103,6 +103,8 @@
       const c = dernierChamp;
       if (!c) return signaler('Cliquez d\'abord dans le champ à compléter.');
       if (c.disabled || c.readOnly) return signaler('Ce champ est protégé contre les modifications.');
+      if (!Number.isInteger(c.selectionStart) || !Number.isInteger(c.selectionEnd))
+        return signaler('Le collage dans ce type de champ n’est pas pris en charge.');
       if (typeof navigator.clipboard?.readText !== 'function')
         return signaler('Utilisez Ctrl+V : lecture du presse-papiers indisponible.');
       const valeurInitiale = c.value, debut = c.selectionStart, fin = c.selectionEnd;
