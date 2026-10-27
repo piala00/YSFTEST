@@ -159,6 +159,30 @@ jobs:
           if ($LASTEXITCODE -eq 0) { throw "Règle du pare-feu restée après désinstallation" }
           $global:LASTEXITCODE = 0
           Write-Output "Installateur ${{ matrix.nom }} : fabriqué, installé sans question (siège), démarré, désinstallé, données conservées."
+      - name: Outil d'émission des licences (propriétaire, jamais livré aux clients)
+        if: matrix.edition == 'transport'
+        shell: pwsh
+        run: |
+          python -m PyInstaller deploy/licences/licences.py --onefile --name ERP-OHADA-Licences --noconfirm --workpath build-licences --distpath dist-licences
+          $outil = "dist-licences\ERP-OHADA-Licences.exe"
+          $env:ERP_LICENCES_MDP = "Essai-CI-uniquement-2026"
+          $cles = "$env:RUNNER_TEMP\cles-essai"
+          & $outil cles --dossier $cles
+          if ($LASTEXITCODE -ne 0) { throw "Création des clés en échec" }
+          & $outil emettre --cle "$cles\cle-privee.pem" --client "Société Essai" --edition transport --role siege --postes 5 --code T-AAAA-BBBB-CCCC-DDDD --sortie $cles
+          if ($LASTEXITCODE -ne 0) { throw "Émission en échec" }
+          $lic = Get-ChildItem "$cles\LIC-*.erplic" | Select-Object -First 1
+          & $outil verifier $lic.FullName --publique "$cles\cle-publique.txt"
+          if ($LASTEXITCODE -ne 0) { throw "Vérification en échec" }
+          if (Get-ChildItem -Recurse "dist\ERP-OHADA-${{ matrix.nom }}" -Filter "licences.py*") { throw "L'outil du propriétaire ne doit pas être dans le programme client" }
+          Remove-Item -Recurse -Force $cles
+          $global:LASTEXITCODE = 0
+      - uses: actions/upload-artifact@v4
+        if: matrix.edition == 'transport'
+        with:
+          name: ERP-OHADA-Licences-PROPRIETAIRE
+          path: dist-licences/ERP-OHADA-Licences.exe
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: ERP-OHADA-${{ matrix.nom }}-Installation

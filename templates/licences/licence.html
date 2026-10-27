@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Licence{% endblock %}
+{% block content %}
+<div class="page-title"><h1><i class="bi bi-key" style="color:var(--module)"></i> Licence</h1></div>
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6">État</h2>
+    {% if etat.mode == "licence" %}
+    <table class="table table-sm small mb-2"><tbody>
+      <tr><th>Licence</th><td>{{ etat.licence.numero }}</td></tr>
+      <tr><th>Client</th><td>{{ etat.licence.client }}{% if etat.licence.niu %} · NIU {{ etat.licence.niu }}{% endif %}</td></tr>
+      <tr><th>Édition</th><td>{{ etat.licence.edition|capfirst }}</td></tr>
+      <tr><th>Rôle du serveur</th><td>{% for k, v in roles.items %}{% if k == etat.licence.role %}{{ v }}{% endif %}{% endfor %}{% if etat.licence.site %} ({{ etat.licence.site }}){% endif %}</td></tr>
+      <tr><th>Postes</th><td>{{ etat.postes }} · {{ actifs }} compte(s) actif(s)</td></tr>
+      <tr><th>Valable jusqu'au</th><td>{% if etat.echeance %}{{ etat.echeance|date:"d/m/Y" }}{% else %}licence définitive{% endif %}</td></tr>
+      {% if etat.licence.maj_jusqu_au %}<tr><th>Mises à jour jusqu'au</th><td>{{ etat.licence.maj_jusqu_au }}</td></tr>{% endif %}
+    </tbody></table>
+    {% else %}
+    <p class="small mb-2">Version d'essai : {{ etat.postes }} postes, {% if etat.lecture_seule %}<strong class="text-danger">terminée</strong>{% else %}encore <strong>{{ etat.jours }} jour(s)</strong>{% endif %}
+      ({{ actifs }} compte(s) actif(s)).</p>
+    {% endif %}
+    {% if etat.message %}<div class="alert alert-{% if etat.lecture_seule %}danger{% elif etat.statut == 'grace' %}warning{% else %}info{% endif %} small py-2 mb-2">{{ etat.message }}</div>{% endif %}
+    {% if etat.probleme %}<div class="alert alert-warning small py-2 mb-2">Licence déposée non appliquée : {{ etat.probleme }}</div>{% endif %}
+    {% if etat.horloge_reculee %}<div class="alert alert-warning small py-2 mb-2">La date de cet ordinateur a reculé : vérifiez l'horloge de Windows.</div>{% endif %}
+    <div class="form-text">Une licence expirée ne bloque jamais la consultation, les états, les exports ni les sauvegardes.</div>
+  </div></div>
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6">Obtenir ou renouveler la licence</h2>
+    <p class="small mb-1">1. Envoyez ce <strong>code d'activation</strong> à l'éditeur, avec le nom de la société et le rôle du serveur :</p>
+    <div class="input-group input-group-sm mb-2"><input id="code-activation" class="form-control font-monospace" value="{{ code }}" readonly aria-label="Code d'activation">
+      <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('code-activation').value)">Copier</button></div>
+    <p class="small mb-1">2. Déposez le fichier de licence reçu (<code>.erplic</code>) :</p>
+    <form method="post" enctype="multipart/form-data" class="d-flex gap-2">{% csrf_token %}
+      <input type="file" name="fichier" accept=".erplic" class="form-control form-control-sm" required aria-label="Fichier de licence">
+      <button class="btn btn-sm btn-primary text-nowrap">Installer la licence</button></form>
+    <div class="form-text">Le code change si le serveur change (nouveau PC, Windows réinstallé) : demandez alors une nouvelle licence.</div>
+    {% if not cles %}<div class="alert alert-secondary small py-2 mt-2 mb-0">Cette version ne contient pas encore la clé de vérification de l'éditeur : elle fonctionne en version d'essai.</div>{% endif %}
+  </div></div>
+  {% if historique %}<div class="col-12"><div class="card">
+    <div class="card-header bg-white fw-semibold small">Licences déposées</div>
+    <table class="table table-sm small mb-0"><thead><tr><th>Date</th><th>Par</th><th>Numéro</th><th>Client</th><th>Résultat</th></tr></thead><tbody>
+    {% for h in historique %}<tr><td>{{ h.deposee_le|date:"d/m/Y H:i" }}</td><td>{{ h.deposee_par|default:"" }}</td><td>{{ h.numero }}</td><td>{{ h.client }}</td>
+      <td>{% if h.valide %}<span class="text-success">acceptée</span>{% else %}<span class="text-danger">refusée</span> : {{ h.motif }}{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div></div>{% endif %}
+</div>
+{% endblock %}

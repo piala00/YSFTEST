@@ -1,0 +1,4 @@
+# Clé(s) publique(s) Ed25519 du propriétaire, en base64, une par ligne.
+# Elles permettent seulement de VÉRIFIER une licence : sans danger dans le dépôt.
+# La clé privée (qui fabrique les licences) reste sur l'ordinateur du propriétaire, jamais ici.
+# Tant qu'aucune clé n'est inscrite, le logiciel fonctionne en période d'essai seulement.

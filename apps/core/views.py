@@ -126,6 +126,8 @@ def autorisations(request, module):
     url = f"{request.path}?logiciel={logiciel.code}"
 
     if request.method == "POST":
+        from apps.licences.licence import peut_activer_un_compte
+
         action = request.POST.get("action")
         if action == "profil_creer" and request.POST.get("nom", "").strip():
             profil, _ = Group.objects.get_or_create(name=request.POST["nom"].strip()[:150])
@@ -137,6 +139,17 @@ def autorisations(request, module):
                 messages.success(request, f"Profil « {profil} » supprimé.")
                 profil.delete()
                 profil = None
+        elif action == "activer":
+            cible = User.objects.filter(username=request.POST.get("nom_utilisateur", "")).exclude(pk=request.user.pk).first()
+            permis, motif = peut_activer_un_compte()
+            if cible is None:
+                messages.error(request, "Utilisateur introuvable.")
+            elif not cible.is_active and not permis:
+                messages.error(request, motif)
+            else:
+                cible.is_active = not cible.is_active
+                cible.save(update_fields=["is_active"])
+                messages.success(request, f"Compte « {cible} » {'réactivé' if cible.is_active else 'désactivé (il ne peut plus se connecter)'}.")
         elif action == "utilisateur":
             nom = request.POST.get("nom_utilisateur", "").strip()
             cible = Group.objects.filter(pk=request.POST.get("profil_utilisateur")).first()
@@ -145,6 +158,8 @@ def autorisations(request, module):
                 messages.error(request, "Indiquez le nom de l'utilisateur.")
             elif utilisateur is None and not request.POST.get("mot_de_passe"):
                 messages.error(request, "Nouvel utilisateur : indiquez un mot de passe.")
+            elif utilisateur is None and not peut_activer_un_compte()[0]:
+                messages.error(request, peut_activer_un_compte()[1])
             else:
                 if utilisateur is None:
                     utilisateur = User.objects.create_user(nom, "", request.POST["mot_de_passe"])

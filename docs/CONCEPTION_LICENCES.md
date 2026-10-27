@@ -1,7 +1,23 @@
 # Licences de l'ERP OHADA — note de conception (à valider par le propriétaire)
 
-**Statut : proposition. Aucun code ne sera écrit avant la validation du propriétaire.**
-Les choix marqués **[À DÉCIDER]** sont repris dans les questions de la fin.
+**Statut : validé par le propriétaire le 27/10/2026 (« choisir les meilleures options et appliquer ») ; implémenté.**
+
+Choix appliqués : postes = **comptes utilisateurs actifs** ; licence **annuelle ou définitive** au choix à
+l'émission (annuelle par défaut) ; **essai 30 jours, 3 postes** ; rappel 30 jours avant, **15 jours de grâce puis
+lecture seule** ; **une licence par serveur** (direction, chaque agence, site unique), regroupées par client.
+Code : `apps/licences/` (contrôle), `deploy/licences/licences.py` (outil du propriétaire).
+
+## Mise en route pour le propriétaire (une seule fois)
+
+1. Télécharger **ERP-OHADA-Licences.exe** (artefact « ERP-OHADA-Licences-PROPRIETAIRE » de la CI) sur VOTRE ordinateur.
+2. Double-clic → **1. Créer la paire de clés** → choisir un mot de passe solide (10 caractères ou plus).
+   Sauvegarder le dossier `ERP-OHADA-Licences` (clé privée + registre) sur une clé USB gardée au coffre.
+3. Envoyer à Claude le contenu de **cle-publique.txt** (une ligne, sans danger) : il est ajouté dans
+   `apps/licences/cle_publique.txt` et les programmes suivants savent vérifier vos licences.
+4. Pour chaque client : il vous envoie le **code d'activation** (écran *Licence*) → double-clic sur l'outil →
+   **2. Émettre une licence** → envoyez-lui le fichier `.erplic` produit.
+
+Les sections suivantes gardent la proposition d'origine ; les **[À DÉCIDER]** sont tranchés comme ci-dessus.
 
 ## 1. Principes
 

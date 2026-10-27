@@ -141,4 +141,7 @@ def administration_poste(request):
     simulation = etat.get("simulation") or {}
     if simulation.get("port"):
         simulation["url"] = f"{request.scheme}://{hote}:{simulation['port']}/"
-    return render(request, "core/poste.html", {"titre": "Administration du poste", "etat": etat, "simulation": simulation})
+    from apps.licences.licence import etat as etat_licence
+
+    return render(request, "core/poste.html", {"titre": "Administration du poste", "etat": etat, "simulation": simulation,
+                                               "licence_etat": etat_licence()})

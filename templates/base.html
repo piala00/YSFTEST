@@ -113,6 +113,8 @@
       <div class="fenetre-contenu">
     {% endif %}
     {% if fil_ariane and not est_accueil %}<nav class="fil-ariane d-print-none"><span>{{ onglet_actif.titre }}</span>{% for n in fil_ariane %} <i class="bi bi-chevron-right"></i> <span>{{ n.titre }}</span>{% endfor %}</nav>{% endif %}
+    {% if licence_bandeau %}<div class="alert alert-{% if licence_bandeau.lecture_seule %}danger{% elif licence_bandeau.statut == "grace" %}warning{% else %}info{% endif %} py-2 small d-print-none d-flex align-items-center gap-2">
+      <i class="bi bi-key"></i><span>{{ licence_bandeau.message }}</span>{% if user.is_superuser %}<a class="ms-auto" href="{% url 'licence' %}" target="_top">Licence</a>{% endif %}</div>{% endif %}
     {% include "core/_messages.html" %}
     {% if selection %}<div class="barre-selection d-print-none"><i class="bi bi-funnel"></i> <span>{{ selection.texte|default:"Sélection" }}</span>
       <span class="ms-auto d-flex gap-2"><a class="btn btn-sm btn-outline-secondary" href="{{ selection.modifier }}"><i class="bi bi-sliders"></i> Modifier la sélection</a>

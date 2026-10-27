@@ -123,6 +123,7 @@ def preparer_environnement(base="erp.sqlite3"):
             os.environ.setdefault(cle.strip(), valeur.strip())
     os.environ.setdefault("SQLITE_FICHIER", str(donnees / base))   # chemin absolu, dans le dossier des données
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "erp.settings")
+    os.environ.setdefault("ERP_DOSSIER_DONNEES", str(donnees))    # mémoire de l'essai hors de la base
     return donnees
 
 
@@ -323,7 +324,7 @@ def demarrer_simulation(donnees, port, arguments=None):
     from django.contrib.auth import get_user_model
 
     env = {k: v for k, v in os.environ.items()
-           if k not in ("SQLITE_FICHIER", "ERP_ASSISTANT") and not k.startswith(("MIROIR_", "ECHANGES_"))}
+           if k not in ("SQLITE_FICHIER", "ERP_ASSISTANT", "ERP_LICENCE", "ERP_DOSSIER_DONNEES") and not k.startswith(("MIROIR_", "ECHANGES_"))}
     env.update(ERP_SANS_NAVIGATEUR="1", ERP_SOUS_PROCESSUS="1", PYTHONUNBUFFERED="1",
                ERP_ADMIN_COMPTES=json.dumps(list(get_user_model().objects.filter(is_superuser=True, is_active=True)
                                                  .values_list("username", "password"))))
@@ -597,6 +598,7 @@ def main(argv):
     if not controler_base(donnees):
         return 1
     os.environ.setdefault("ERP_ASSISTANT", "1")                   # premier démarrage : assistant dans le navigateur
+    os.environ.setdefault("ERP_LICENCE", "1")                     # essai, échéance, lecture seule, postes
     import django
 
     django.setup()

@@ -17,7 +17,9 @@
     <div class="card">
       <div class="card-header bg-white fw-semibold">Utilisateurs</div>
       <table class="table table-sm mb-0 small"><tbody>
-        {% for u in utilisateurs %}<tr><td><i class="bi bi-person"></i> {{ u.username }}</td><td class="text-muted">{% if u.is_superuser %}Administrateur (tous les droits){% else %}{{ u.groups.all.0.name|default:"Sans profil (tous les droits)" }}
+        {% for u in utilisateurs %}<tr{% if not u.is_active %} class="text-muted"{% endif %}><td><i class="bi bi-person"></i> {{ u.username }}{% if not u.is_active %} <span class="badge text-bg-secondary">désactivé</span>{% endif %}
+          {% if u != user %}<form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="activer"><input type="hidden" name="logiciel" value="{{ logiciel.code }}"><input type="hidden" name="nom_utilisateur" value="{{ u.username }}">
+            <button class="btn btn-link btn-sm p-0 ms-1 small">{% if u.is_active %}désactiver{% else %}réactiver{% endif %}</button></form>{% endif %}</td><td class="text-muted">{% if u.is_superuser %}Administrateur (tous les droits){% else %}{{ u.groups.all.0.name|default:"Sans profil (tous les droits)" }}
           <div>{% for l, code, libelle in u.acces_par_logiciel %}{% if code != "UTILISATEUR" %}<span class="badge text-bg-{% if code == 'AUCUN' %}danger{% else %}warning{% endif %} me-1" title="{{ l.titre }}">{{ l.titre }} : {{ libelle }}</span>{% endif %}{% endfor %}</div>{% endif %}</td></tr>{% endfor %}
       </tbody></table>
       <form method="post" class="card-body border-top">{% csrf_token %}<input type="hidden" name="action" value="utilisateur"><input type="hidden" name="logiciel" value="{{ logiciel.code }}">{% if profil %}<input type="hidden" name="profil" value="{{ profil.pk }}">{% endif %}

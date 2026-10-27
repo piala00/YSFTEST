@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "apps.partenaires",
     "apps.api",
     "apps.relais",
+    "apps.licences",
 ]
 
 MIDDLEWARE = [
@@ -83,6 +84,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "apps.core.middleware.PremiereConfigurationMiddleware",  # premier démarrage du programme compilé
+    "apps.licences.middleware.LicenceMiddleware",        # lecture seule après expiration, postes
     "apps.core.middleware.AutorisationsMiddleware",      # Fichier › Autorisations d'accès
     "apps.core.journal.RequeteCouranteMiddleware",       # utilisateur du journal des événements
     "apps.core.selection.SelectionMiddleware",           # fenêtre de sélection avant les états
@@ -105,6 +107,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.core.context_processors.societe",
+                "apps.licences.context_processors.licence",
             ],
         },
     },
@@ -187,6 +190,8 @@ elif _miroir == "sqlite":
 # Relais Internet des échanges entre sites (à activer seulement sur le serveur en ligne qui sert de boîte aux lettres)
 # Programme compilé : assistant de premier démarrage (compte administrateur créé depuis le navigateur)
 ERP_ASSISTANT = env_bool("ERP_ASSISTANT", False)
+# Programme compilé : licence contrôlée (essai, échéance, lecture seule, nombre de postes)
+ERP_LICENCE = env_bool("ERP_LICENCE", False)
 RELAIS_ACTIF = env_bool("RELAIS_ACTIF", False)
 RELAIS_DOSSIER = Path(env("RELAIS_DOSSIER", str(BASE_DIR / "relais-stockage")))
 

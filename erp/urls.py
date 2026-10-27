@@ -3,6 +3,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
 from apps.core.urls_communes import urls_communes
+from apps.licences import views as licences_views
 
 urlpatterns = [
     path("", include("apps.core.urls")),
@@ -23,4 +24,5 @@ urlpatterns = [
     path("personnel/", include("apps.personnel.urls")),
     path("api/", include("apps.api.urls")),
     path("relais/", include("apps.relais.urls")),
+    path("licence/", licences_views.licence, name="licence"),
 ]
