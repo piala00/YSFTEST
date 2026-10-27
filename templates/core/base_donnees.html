@@ -53,6 +53,36 @@
 
   {% if compile %}
   <div class="col-12"><div class="card card-body">
+    <h2 class="h6"><i class="bi bi-alarm"></i> Sauvegardes et vérifications automatiques</h2>
+    <div class="row g-2 small mb-2">
+      <div class="col-md-4">Dernière sauvegarde : {% if planif.derniere_sauvegarde_date %}<strong>{{ planif.derniere_sauvegarde_date|date:"d/m/Y H:i" }}</strong>
+        {% if planif.sauvegarde_ok %}<span class="text-success">réussie</span>{% else %}<span class="text-danger">{{ planif.sauvegarde_resultat }}</span>{% endif %}{% else %}aucune encore{% endif %}</div>
+      <div class="col-md-4">Prochaine : {% if planif.prochaine %}<strong>{{ planif.prochaine|date:"d/m/Y H:i" }}</strong>{% else %}<span class="text-danger">aucune (désactivées)</span>{% endif %}</div>
+      <div class="col-md-4">Dernière vérification : {% if planif.derniere_verification_date %}{{ planif.derniere_verification_date|date:"d/m/Y H:i" }}
+        {% if planif.verification_ok %}<span class="text-success">aucune erreur</span>{% else %}<span class="text-danger">ERREURS : {{ planif.verification_details|join:" ; " }}</span>{% endif %}{% else %}pas encore faite{% endif %}</div>
+    </div>
+    <form method="post" class="row g-2 align-items-end">{% csrf_token %}
+      <div class="col-md-3"><label class="form-label small mb-0" for="p-mode">Sauvegardes</label>
+        <select id="p-mode" name="mode" class="form-select form-select-sm">{% for code, libelle in modes.items %}<option value="{{ code }}" {% if reglages.mode == code %}selected{% endif %}>{{ libelle }}</option>{% endfor %}</select></div>
+      <div class="col-md-1"><label class="form-label small mb-0" for="p-heures">Heures</label>
+        <input id="p-heures" name="heures" class="form-control form-control-sm" value="{{ reglages.heures|floatformat:'-1' }}"></div>
+      <div class="col-md-2"><label class="form-label small mb-0" for="p-heure">Chaque jour à</label>
+        <input id="p-heure" name="heure" type="time" class="form-control form-control-sm" value="{{ reglages.heure }}"></div>
+      <div class="col-md-2"><label class="form-label small mb-0" for="p-garder">Nombre gardé</label>
+        <input id="p-garder" name="garder" class="form-control form-control-sm" value="{{ reglages.garder }}"{% if info.moteur == "mssql" %} title="SQLite seulement : les .bak se gèrent sur le serveur SQL"{% endif %}></div>
+      <div class="col-md-4"><label class="form-label small mb-0" for="p-verif">Vérification de l'intégrité</label>
+        <select id="p-verif" name="verification" class="form-select form-select-sm"><option value="hebdomadaire">Chaque semaine (recommandé)</option>
+          <option value="desactive" {% if reglages.verification == "desactive" %}selected{% endif %}>Désactivée</option></select></div>
+      <div class="col-md-6"><label class="form-label small mb-0" for="p-copie">Seconde copie (clé USB, disque réseau…)</label>
+        <input id="p-copie" name="copie" class="form-control form-control-sm" value="{{ reglages.copie }}" placeholder="ex. E:\Sauvegardes-ERP ou \\NAS\ERP"></div>
+      {% if info.moteur == "mssql" %}<div class="col-md-6"><label class="form-label small mb-0" for="p-dossql">Dossier des .bak sur le serveur SQL</label>
+        <input id="p-dossql" name="dossier_sql" class="form-control form-control-sm" value="{{ reglages.dossier_sql }}" placeholder="vide : dossier de sauvegarde de l'instance"></div>{% endif %}
+      <div class="col-12"><button class="btn btn-sm btn-primary" name="action" value="planifier">Enregistrer la programmation</button>
+        <span class="form-text ms-2">Appliquée tout de suite, sans redémarrer.</span></div>
+    </form>
+  </div></div>
+
+  <div class="col-12"><div class="card card-body">
     <h2 class="h6">Changer de base de données</h2>
     <p class="small text-muted">Toutes les données sont recopiées dans la nouvelle base puis contrôlées table par table ; la base actuelle
       n'est pas modifiée. Le logiciel travaille sur la nouvelle base après « Redémarrer le logiciel ». Une base qui contient les tables

@@ -3,6 +3,12 @@ ERP OHADA - PROGRAMME COMPILÉ (.exe)
 
 1. DÉMARRER
 -----------
+Installé avec l'installateur (ERP-OHADA-<Édition>-Installation.exe), le serveur tourne
+en arrière-plan comme SERVICE WINDOWS (choix recommandé) : il démarre avec l'ordinateur,
+même sans session ouverte, se relance tout seul s'il s'arrête, et aucune fenêtre ne peut
+être fermée par erreur. L'icône « ERP OHADA <Édition> » ouvre simplement le navigateur.
+Service : « ERP OHADA <Édition> » (services.msc) ; journaux dans le dossier des données,
+sous-dossier journaux-service. Sans service (programme lancé à la main) :
 Double-cliquez sur ERP-OHADA-<Édition>.exe. Tout démarre dans la même fenêtre :
   - le serveur du logiciel, ouvert aux autres postes du réseau local
     (ils ouvrent l'adresse affichée dans leur navigateur, rien à installer) ;

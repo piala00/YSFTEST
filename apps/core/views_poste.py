@@ -117,7 +117,9 @@ def installation(request):
     return render(request, "core/installation.html", {
         "etape": etape, "form": form, "local": site_local(), "edition": societe.activite,
         "role_prevu": prevue.get("role", ""), "fichier_prevu": prevue.get("fichier_agence"),
-        "changement": bd.ETAT_CHANGEMENT})
+        "changement": bd.ETAT_CHANGEMENT,
+        "base_actuelle": bd.info() if etape == "base" else None,
+        "erreur_base": poste.appeler("erreur_base") if "erreur_base" in poste.ACTIONS else ""})
 
 
 def _terminer(request):
@@ -274,6 +276,11 @@ def base_donnees(request):
                         "MIROIR_DB_PYTHON_DRIVER": "mssql_python",
                         "MIROIR_INTERVALLE_MINUTES": request.POST.get("intervalle") or "60"})
                     messages.success(request, f"{message} Copie miroir réglée : elle démarre au redémarrage du logiciel.")
+            elif action == "planifier":
+                from . import planification
+
+                poste.appeler("configurer", planification.valider(request.POST))
+                messages.success(request, "Programmation des sauvegardes enregistrée (appliquée tout de suite).")
             elif action == "redemarrer":
                 poste.appeler("redemarrer")
                 return render(request, "core/redemarrage.html", {"titre": "Redémarrage"})
@@ -293,7 +300,11 @@ def base_donnees(request):
     from django.conf import settings
 
     miroir = settings.DATABASES.get("miroir")
+    from . import planification
+
+    planif = poste.appeler("planification") if "planification" in poste.ACTIONS else {}
     return render(request, "core/base_donnees.html", {
+        "planif": planif, "reglages": planif.get("config") or planification.reglages(), "modes": planification.MODES,
         "titre": "Base de données", "info": info, "resultat": resultat, "sauvegardes": sauvegardes, "compile": compile_,
         "changement": bd.ETAT_CHANGEMENT,
         "restauration": (poste.appeler("restauration_sqlserver_prevue") or poste.appeler("etat")["restauration_prevue"])

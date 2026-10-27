@@ -18,11 +18,13 @@
       <tr><th>Édition</th><td>{{ etat.edition|capfirst }} · port {{ etat.port|stringformat:"d" }}</td></tr>
       <tr><th>Dossier des données</th><td><code>{{ etat.donnees }}</code></td></tr>
       <tr><th>Base</th><td>{{ etat.base }} · {{ etat.taille_base|filesizeformat }}</td></tr>
-      <tr><th>Démarrage avec Windows</th><td>{% if etat.demarrage_installateur %}<span class="text-success">oui, pour tous les utilisateurs</span>
+      <tr><th>Fonctionnement</th><td>{% if etat.service %}<span class="text-success">service Windows</span> : tourne en arrière-plan, démarre avec l'ordinateur et se relance tout seul
+        {% else %}fenêtre du programme (la fermer arrête le logiciel){% endif %}</td></tr>
+      {% if not etat.service %}<tr><th>Démarrage avec Windows</th><td>{% if etat.demarrage_installateur %}<span class="text-success">oui, pour tous les utilisateurs</span>
         <div class="form-text">Réglé à l'installation : pour le retirer, relancez l'installateur sans cette option.</div>
-        {% elif etat.demarrage_auto %}<span class="text-success">oui</span>{% else %}non{% endif %}</td></tr>
+        {% elif etat.demarrage_auto %}<span class="text-success">oui</span>{% else %}non{% endif %}</td></tr>{% endif %}
     </tbody></table>
-    {% if etat.windows and not etat.demarrage_installateur %}<form method="post">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" name="action" value="demarrage_auto">
+    {% if etat.windows and not etat.demarrage_installateur and not etat.service %}<form method="post">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" name="action" value="demarrage_auto">
       {% if etat.demarrage_auto %}Ne plus démarrer avec Windows{% else %}Démarrer le logiciel à l'ouverture de session Windows{% endif %}</button></form>{% endif %}
     <div class="form-text">Le programme peut être remplacé par une nouvelle version : les données ne sont pas dans son dossier.</div>
   </div></div>

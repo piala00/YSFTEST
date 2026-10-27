@@ -112,8 +112,10 @@ def reparer():
 # ---------------------------------------------------------------- SQL Server : sauvegarde et restauration natives
 def dossier_sauvegarde_sqlserver(alias="default"):
     """Dossier des sauvegardes SUR LE SERVEUR SQL (ERP_SAUVEGARDE_SQL_DOSSIER, sinon celui de l'instance)."""
-    if getattr(settings, "ERP_SAUVEGARDE_SQL_DOSSIER", ""):
-        return settings.ERP_SAUVEGARDE_SQL_DOSSIER
+    import os
+
+    if os.environ.get("ERP_SAUVEGARDE_SQL_DOSSIER"):                # réglé à l'écran (sans redémarrage)
+        return os.environ["ERP_SAUVEGARDE_SQL_DOSSIER"].rstrip("\\/")
     with connections[alias].cursor() as cur:
         cur.execute("SELECT CAST(SERVERPROPERTY('InstanceDefaultBackupPath') AS nvarchar(400))")
         return (cur.fetchone()[0] or "").rstrip("\\/")
