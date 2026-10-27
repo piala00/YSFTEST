@@ -21,5 +21,7 @@
     </div>
   {% endfor %}
   </div>
+  {% if user.is_superuser %}<div class="text-center my-4"><a class="btn btn-outline-secondary btn-sm" href="{% url 'core:poste' %}">
+    <i class="bi bi-pc-display"></i> Administration du poste : sauvegardes, simulation, démarrage avec Windows</a></div>{% endif %}
 </div>
 {% endblock %}

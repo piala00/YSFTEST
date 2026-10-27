@@ -29,7 +29,7 @@ class SiteRelais(models.Model):
 
     def nouveau_jeton(self):
         """Crée (ou remplace) le jeton du site ; il n'est montré qu'une fois."""
-        jeton = secrets.token_urlsafe(32)
+        jeton = secrets.token_hex(32)               # lettres et chiffres : jamais pris pour une option (« -… »)
         self.empreinte_jeton = empreinte(jeton)
         return jeton
 

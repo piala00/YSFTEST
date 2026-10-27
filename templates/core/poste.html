@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Administration du poste{% endblock %}
+{% block head %}{% if simulation.etat == "preparation" %}<meta http-equiv="refresh" content="20">{% endif %}{% endblock %}
+{% block content %}
+<div class="page-title"><h1><i class="bi bi-pc-display" style="color:var(--module)"></i> Administration du poste</h1></div>
+{% if indisponible %}
+<div class="alert alert-info">Ces opérations (sauvegardes de la base, simulation, démarrage avec Windows) se font dans le programme
+  compilé <strong>ERP-OHADA-&lt;Édition&gt;.exe</strong>. Le logiciel n'a pas été lancé par lui sur ce serveur.</div>
+{% else %}
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6"><i class="bi bi-folder2-open"></i> Ce serveur</h2>
+    <table class="table table-sm small mb-2"><tbody>
+      <tr><th>Édition</th><td>{{ etat.edition|capfirst }} · port {{ etat.port|stringformat:"d" }}</td></tr>
+      <tr><th>Dossier des données</th><td><code>{{ etat.donnees }}</code></td></tr>
+      <tr><th>Base</th><td>{{ etat.base }} · {{ etat.taille_base|filesizeformat }}</td></tr>
+      <tr><th>Démarrage avec Windows</th><td>{% if etat.demarrage_auto %}<span class="text-success">oui</span>{% else %}non{% endif %}</td></tr>
+    </tbody></table>
+    {% if etat.windows %}<form method="post">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" name="action" value="demarrage_auto">
+      {% if etat.demarrage_auto %}Ne plus démarrer avec Windows{% else %}Démarrer le logiciel à l'ouverture de session Windows{% endif %}</button></form>{% endif %}
+    <div class="form-text">Le programme peut être remplacé par une nouvelle version : les données ne sont pas dans son dossier.</div>
+  </div></div>
+
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6"><i class="bi bi-hdd"></i> Sauvegardes de la base</h2>
+    <p class="small text-muted mb-2">Automatiques toutes les {{ etat.sauvegarde_heures }} h, {{ etat.sauvegarde_garder }} gardées, dans
+      <code>{{ etat.donnees }}\sauvegardes</code>{% if etat.sauvegarde_copie %} et <code>{{ etat.sauvegarde_copie }}</code>{% endif %}.</p>
+    <form method="post" class="mb-2">{% csrf_token %}<button class="btn btn-sm btn-primary" name="action" value="sauvegarder">
+      <i class="bi bi-hdd"></i> Sauvegarder maintenant</button></form>
+    {% if etat.restauration_prevue %}
+    <div class="alert alert-warning small py-2 mb-2">Restauration prévue au prochain démarrage : <strong>{{ etat.restauration_prevue }}</strong>.
+      Fermez la fenêtre noire du logiciel puis relancez-le.
+      <form method="post" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-link p-0" name="action" value="annuler_restauration">Annuler</button></form></div>
+    {% elif etat.sauvegardes %}
+    <form method="post" class="border-top pt-2">{% csrf_token %}
+      <label class="form-label small mb-0" for="p-sauv">Restaurer une sauvegarde (la base actuelle est mise de côté, pas effacée)</label>
+      <select id="p-sauv" name="fichier" class="form-select form-select-sm mb-1">{% for s in etat.sauvegardes %}
+        <option value="{{ s.nom }}">{{ s.date|date:"d/m/Y H:i" }} — {{ s.taille|filesizeformat }}</option>{% endfor %}</select>
+      <div class="d-flex gap-2"><input name="confirmation" class="form-control form-control-sm" placeholder="Tapez RESTAURER" autocomplete="off" required>
+        <button class="btn btn-sm btn-outline-danger text-nowrap" name="action" value="restaurer">Restaurer</button></div>
+      <div class="form-text">Prend effet au prochain démarrage du logiciel.</div>
+    </form>
+    {% else %}<div class="small text-muted">Aucune sauvegarde pour l'instant.</div>{% endif %}
+  </div></div>
+
+  {% if etat.edition == "transport" %}
+  <div class="col-12"><div class="card card-body">
+    <h2 class="h6"><i class="bi bi-play-circle"></i> Simulation (données fictives, dossier séparé)</h2>
+    <p class="small text-muted mb-2">Une société de transport fictive (agences, cars, billets, colis, garage, paie, comptabilité) pour essayer
+      le logiciel sans toucher à vos données. Elle s'ouvre à une autre adresse, avec les mêmes identifiants administrateur.</p>
+    {% if simulation.etat == "prete" %}
+      <div class="alert alert-success small py-2">Simulation prête : <a href="{{ simulation.url }}" target="_blank" rel="noopener"><strong>{{ simulation.url }}</strong></a></div>
+    {% elif simulation.etat == "preparation" %}
+      <div class="alert alert-info small py-2"><span class="spinner-border spinner-border-sm"></span> Simulation en préparation
+        (environ une heure par mois simulé ; cette page s'actualise toute seule). Vous pouvez fermer cette page.</div>
+    {% elif simulation.etat == "arretee" %}
+      <div class="alert alert-warning small py-2">La simulation existe mais son serveur ne répond pas (relancez le logiciel, ou supprimez-la pour en refaire une).</div>
+    {% endif %}
+    {% if simulation.journal %}<pre class="small bg-light border rounded p-2 mb-2" style="max-height:14rem;overflow:auto">{{ simulation.journal }}</pre>{% endif %}
+    {% if simulation.etat == "absente" %}
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-end">{% csrf_token %}
+      <div><label class="form-label small mb-0" for="p-debut">Mois de départ</label>
+        <input id="p-debut" name="debut" type="month" class="form-control form-control-sm" value="{{ etat.mois_courant }}" required></div>
+      <div><label class="form-label small mb-0" for="p-duree">Durée</label>
+        <select id="p-duree" name="duree" class="form-select form-select-sm">
+          <option value="aujourdhui">jusqu'à aujourd'hui</option>{% for n in "123456" %}<option value="{{ n }}">{{ n }} mois</option>{% endfor %}
+          <option value="12">12 mois</option></select></div>
+      <button class="btn btn-sm btn-primary" name="action" value="simulation_creer"><i class="bi bi-play"></i> Créer la simulation</button>
+    </form>
+    <div class="form-text">Comptez environ une heure de calcul par mois simulé ; le logiciel reste utilisable pendant ce temps.</div>
+    {% else %}
+    <form method="post" class="d-flex gap-2 align-items-end border-top pt-2 mt-1">{% csrf_token %}
+      <div><label class="form-label small mb-0" for="p-sup">Supprimer la simulation (vos vraies données ne sont pas touchées)</label>
+        <input id="p-sup" name="confirmation" class="form-control form-control-sm" placeholder="Tapez SUPPRIMER" autocomplete="off" required></div>
+      <button class="btn btn-sm btn-outline-danger" name="action" value="simulation_supprimer">Supprimer</button></form>
+    {% endif %}
+  </div></div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

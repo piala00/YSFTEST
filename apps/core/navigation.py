@@ -157,7 +157,7 @@ def menu_fichier_comptabilite():
         E("fichier.impression_differee", "Impression différée", preuve=I),
         SEP(),
         E("fichier.outils", "Outils", icone="bi-tools", preuve=D, enfants=[
-            E("fichier.outils.maintenance", "Maintenance", preuve=D),
+            E("fichier.outils.maintenance", "Maintenance", "core:poste", preuve=D),
             E("fichier.outils.sauvegarde", "Sauvegarder ma société", "comptabilite:sauvegarde", preuve=D),
             E("fichier.outils.restauration", "Restaurer ma société", "comptabilite:sauvegarde", preuve=D, vue="restaurer"),
             E("fichier.outils.historique", "Historique des modifications et des suppressions", preuve=D),
@@ -177,6 +177,7 @@ def menu_fichier(module, societe_url, fermer=True):
         E("fichier.autorisations", "Autorisations d'accès", f"{module}:autorisations", icone="bi-shield-lock"),
         E("fichier.journal_evenements", "Journal des événements", f"{module}:journal_evenements", icone="bi-clock-history", preuve="AJOUT-ERP"),
         E("fichier.sauvegarde", "Sauvegarde et restauration", f"{module}:sauvegarde", icone="bi-hdd", preuve="AJOUT-ERP"),
+        E("fichier.poste", "Administration du poste", "core:poste", icone="bi-pc-display", preuve="AJOUT-ERP"),
         *([E("fichier.echanges", "Échanges entre agences", f"{module}:echanges", icone="bi-arrow-left-right",
              preuve="AJOUT-ERP")] if module in ("commercial", "transport") else []),
         *([E("fichier.reprise", "Reprise d'un dossier existant", f"{module}:reprise_dossier", icone="bi-database-down",

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Première configuration{% endblock %}
+{% block content %}
+<div class="container" style="max-width:820px">
+  <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-rocket-takeoff"></i> Première configuration</h1>
+    <div class="text-muted">{% if etape == "role" %}Étape 3 sur 3 : le rôle de ce serveur{% else %}Étape 2 sur 3 : la société{% endif %}</div></div>
+  {% if etape == "role" %}
+  {% if local %}<div class="alert alert-info small">Ce serveur est déjà installé : <strong>{{ local.code }} — {{ local.get_role_display }}</strong>.
+    Choisissez le même rôle pour terminer.</div>{% endif %}
+  <div class="row g-3">
+    <div class="col-md-4"><form method="post" class="card card-body h-100">{% csrf_token %}<input type="hidden" name="role" value="seul">
+      <h2 class="h6"><i class="bi bi-house"></i> Un seul site</h2>
+      <p class="small text-muted flex-grow-1">La société travaille en un seul lieu (les postes du réseau local se connectent à ce serveur).
+        Vous pourrez déclarer une direction et des agences plus tard (Fichier › Échanges entre agences).</p>
+      <button class="btn btn-primary">Terminer</button></form></div>
+    <div class="col-md-4"><form method="post" class="card card-body h-100">{% csrf_token %}<input type="hidden" name="role" value="siege">
+      <h2 class="h6"><i class="bi bi-building"></i> Direction (siège)</h2>
+      <p class="small text-muted">Ce serveur reçoit les données des agences et consolide la comptabilité.</p>
+      <label class="form-label small mb-0" for="r-code">Code du siège</label>
+      <input id="r-code" name="code" class="form-control form-control-sm mb-1" value="SIEGE" required maxlength="10">
+      <label class="form-label small mb-0" for="r-nom">Nom</label>
+      <input id="r-nom" name="nom" class="form-control form-control-sm mb-2" value="Direction générale" required>
+      <div class="form-text mb-2 flex-grow-1">Ensuite : déclarez chaque agence et remettez-lui son fichier d'installation.</div>
+      <button class="btn btn-primary">Terminer</button></form></div>
+    <div class="col-md-4"><form method="post" enctype="multipart/form-data" class="card card-body h-100">{% csrf_token %}<input type="hidden" name="role" value="agence">
+      <h2 class="h6"><i class="bi bi-shop"></i> Agence</h2>
+      <p class="small text-muted">Choisissez le fichier d'installation remis par la direction (ERP-INSTALLATION-….erpx).</p>
+      <input type="file" name="fichier" accept=".erpx" class="form-control form-control-sm mb-2 flex-grow-0" required aria-label="Fichier d'installation">
+      <div class="flex-grow-1"></div>
+      <button class="btn btn-primary">Installer l'agence</button></form></div>
+  </div>
+  <div class="mt-3"><a href="?etape=identite" class="small">← Revenir à la société</a></div>
+  {% else %}
+  <div class="card card-body">
+    <form method="post">{% csrf_token %}
+      <div class="row g-3">{% for field in form %}
+        <div class="col-md-6"><label class="form-label small" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+          {{ field }}{% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>{% endfor %}</div>
+      <div class="form-text mt-2">Le reste (TVA, factures, dépôts…) se règle plus tard dans Fichier › Paramètres société.</div>
+      <button class="btn btn-primary mt-3">Continuer</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

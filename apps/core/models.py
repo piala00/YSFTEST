@@ -61,6 +61,9 @@ class Societe(models.Model):
     SYNCHRO_BASCULE = "BASCULE"
     MODES_SYNCHRO = [(SYNCHRO_AUCUNE, "Aucune"), (SYNCHRO_MIROIR, "Copie synchronisée (saisie dans l'ancien logiciel)"),
                      (SYNCHRO_BASCULE, "Bascule effectuée (saisie dans l'ERP)")]
+    assistant_termine = models.BooleanField(
+        "Première configuration terminée", default=True,
+        help_text="Faux à la création d'un dossier par le programme compilé : l'assistant s'ouvre au premier passage.")
     source_mode = models.CharField("Synchronisation", max_length=10, choices=MODES_SYNCHRO, blank=True, default=SYNCHRO_AUCUNE)
     source_dossier = models.CharField("Dossier d'origine synchronisé", max_length=200, blank=True)
     source_debut_exercice = models.DateField("Début d'exercice du dossier d'origine", null=True, blank=True)

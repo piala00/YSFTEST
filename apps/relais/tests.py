@@ -61,3 +61,8 @@ class RelaisTests(TestCase):
 
     def test_jeton_jamais_stocke_en_clair(self):
         self.assertFalse(SiteRelais.objects.filter(empreinte_jeton=self.jetons["DLA"]).exists())
+
+    def test_jeton_utilisable_en_ligne_de_commande(self):
+        for _ in range(200):
+            jeton = SiteRelais(code="X").nouveau_jeton()
+            self.assertRegex(jeton, r"^[0-9a-f]{64}$")

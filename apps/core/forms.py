@@ -31,7 +31,7 @@ class SocieteForm(BootstrapMixin, forms.ModelForm):
 
     class Meta:
         model = Societe
-        fields = "__all__"
+        exclude = ["assistant_termine"]
         widgets = {"pied_facture": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, **kwargs):
@@ -77,3 +77,11 @@ class ExerciceForm(BootstrapMixin, forms.ModelForm):
         model = Exercice
         fields = ("code", "date_debut", "date_fin")  # la clôture passe par Traitement > Fin d'exercice
         widgets = {"date_debut": DateInput(), "date_fin": DateInput()}
+
+
+class IdentiteSocieteForm(BootstrapMixin, forms.ModelForm):
+    """Assistant de première configuration : l'essentiel de l'identité (le reste dans Paramètres société)."""
+
+    class Meta:
+        model = Societe
+        fields = ["raison_sociale", "sigle", "forme_juridique", "niu", "rccm", "adresse", "ville", "pays", "telephone", "email"]

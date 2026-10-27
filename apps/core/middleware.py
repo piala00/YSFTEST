@@ -59,3 +59,37 @@ class AutorisationsMiddleware:
             "chemin": " › ".join(chemin_titres(onglets, code)), "operation": operation,
             "niveau": d.LIBELLES[droits.niveau(code)], "profil": droits.profil,
         }, status=403)
+
+
+class PremiereConfigurationMiddleware:
+    """Programme compilé seulement (ERP_ASSISTANT) : tant qu'il n'y a pas d'administrateur, toute page mène à sa
+    création ; ensuite l'administrateur passe par l'assistant (société, rôle du serveur) jusqu'à ce qu'il soit terminé."""
+    LIBRES = ("/static/", "/installation/", "/deconnexion/", "/relais/", "/api/")
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.termine = False
+
+    def __call__(self, request):
+        from django.conf import settings
+
+        if settings.ERP_ASSISTANT and not self.termine and not request.path.startswith(self.LIBRES):
+            reponse = self.controler(request)
+            if reponse is not None:
+                return reponse
+        return self.get_response(request)
+
+    def controler(self, request):
+        from django.contrib.auth import get_user_model
+        from django.shortcuts import redirect
+
+        from .models import Societe
+
+        if not get_user_model().objects.filter(is_superuser=True).exists():
+            return redirect("core:installation_compte")
+        if Societe.get().assistant_termine:
+            self.termine = True                                   # plus aucune requête à la base ensuite
+            return None
+        if request.user.is_authenticated and request.user.is_superuser:
+            return redirect("core:installation")
+        return None

@@ -17,8 +17,15 @@ Gardez la fenêtre ouverte ; la fermer arrête tout.
 Un second double-clic ne lance pas un second serveur : il ouvre le navigateur.
 
 Premier démarrage : la base SQLite est créée automatiquement, avec le plan
-comptable à 7 chiffres, les journaux et l'exercice ; le programme demande
-ensuite l'identifiant et le mot de passe de l'administrateur.
+comptable à 7 chiffres, les journaux et l'exercice. Le navigateur s'ouvre sur
+l'assistant de première configuration : 1. compte administrateur (à créer sur
+le serveur lui-même), 2. identité de la société, 3. rôle de ce serveur
+(un seul site, Direction (siège) ou Agence avec le fichier remis par la direction).
+
+Ensuite, tout se fait à l'écran : Fichier > Administration du poste (ou le
+bouton en bas du portail) pour sauvegarder, restaurer une sauvegarde, créer ou
+supprimer la simulation, démarrer le logiciel avec Windows. Les commandes du
+paragraphe 6 restent possibles mais ne sont plus nécessaires.
 
 2. OÙ SONT LES DONNÉES
 ----------------------

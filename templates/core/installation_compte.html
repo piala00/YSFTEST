@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Premier démarrage{% endblock %}
+{% block public %}
+<div class="container" style="max-width:560px">
+  <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-rocket-takeoff"></i> Premier démarrage</h1>
+    <div class="text-muted">Étape 1 sur 3 : le compte administrateur</div></div>
+  {% if distant %}
+  <div class="alert alert-warning">L'installation n'est pas terminée. Créez le compte administrateur <strong>sur le serveur
+    lui-même</strong> (l'ordinateur où le logiciel est lancé), puis revenez sur ce poste.</div>
+  {% else %}
+  <div class="card card-body">
+    <p class="small text-muted">L'administrateur règle la société, les utilisateurs et leurs droits. Choisissez un mot de passe
+      solide et notez-le en lieu sûr : il n'est enregistré nulle part en clair.</p>
+    {% for e in erreurs %}<div class="alert alert-danger py-1 small">{{ e }}</div>{% endfor %}
+    <form method="post">{% csrf_token %}
+      <label class="form-label small" for="i-id">Identifiant</label>
+      <input id="i-id" name="identifiant" class="form-control mb-2" value="{{ identifiant }}" required autocomplete="username">
+      <label class="form-label small" for="i-mdp">Mot de passe (8 caractères ou plus)</label>
+      <input id="i-mdp" name="mot_de_passe" type="password" class="form-control mb-2" required minlength="8" autocomplete="new-password">
+      <label class="form-label small" for="i-conf">Confirmez le mot de passe</label>
+      <input id="i-conf" name="confirmation" type="password" class="form-control mb-3" required minlength="8" autocomplete="new-password">
+      <button class="btn btn-primary w-100">Créer le compte et continuer</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

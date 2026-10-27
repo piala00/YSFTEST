@@ -82,6 +82,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "apps.core.middleware.PremiereConfigurationMiddleware",  # premier démarrage du programme compilé
     "apps.core.middleware.AutorisationsMiddleware",      # Fichier › Autorisations d'accès
     "apps.core.journal.RequeteCouranteMiddleware",       # utilisateur du journal des événements
     "apps.core.selection.SelectionMiddleware",           # fenêtre de sélection avant les états
@@ -184,6 +185,8 @@ elif _miroir == "sqlite":
     DATABASES["miroir"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / env("MIROIR_SQLITE_FICHIER", "miroir.sqlite3")}
 
 # Relais Internet des échanges entre sites (à activer seulement sur le serveur en ligne qui sert de boîte aux lettres)
+# Programme compilé : assistant de premier démarrage (compte administrateur créé depuis le navigateur)
+ERP_ASSISTANT = env_bool("ERP_ASSISTANT", False)
 RELAIS_ACTIF = env_bool("RELAIS_ACTIF", False)
 RELAIS_DOSSIER = Path(env("RELAIS_DOSSIER", str(BASE_DIR / "relais-stockage")))
 

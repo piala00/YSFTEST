@@ -24,6 +24,7 @@ Les données ne sont PAS dans le dossier du programme (on peut le remplacer ou l
     ERP-OHADA-Transport.exe manage <commande>   commande d'administration (miroir, longueur_comptes, echanges…)
 """
 import datetime
+import json
 import os
 import secrets
 import shutil
@@ -56,7 +57,7 @@ if not getattr(sys, "frozen", False):
 for _flux in (sys.stdout, sys.stderr):
     if _flux is not None and hasattr(_flux, "reconfigure"):
         try:
-            _flux.reconfigure(encoding="utf-8", errors="replace")
+            _flux.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)   # progression lisible
         except (ValueError, OSError):
             pass
 
@@ -204,6 +205,22 @@ def restaurer(donnees, fichier=None):
     return 0
 
 
+def restauration_prevue(donnees):
+    marqueur = donnees / "restaurer-au-demarrage.txt"
+    return marqueur.read_text(encoding="utf-8").strip() if marqueur.exists() else ""
+
+
+def prevoir_restauration(donnees, nom):
+    """Écran Administration du poste : la base ne se remplace pas pendant qu'elle sert ; on le fait au redémarrage."""
+    marqueur = donnees / "restaurer-au-demarrage.txt"
+    if nom is None:
+        marqueur.unlink(missing_ok=True)
+        return
+    if nom not in {f.name for f in sauvegardes(donnees)}:
+        raise ValueError("sauvegarde inconnue")
+    marqueur.write_text(nom, encoding="utf-8")
+
+
 def controler_base(donnees):
     """La base a été créée mais elle a disparu : ne jamais repartir d'une base vide sans le dire."""
     base, temoin = base_sqlite(), donnees / "base-creee.txt"
@@ -293,19 +310,71 @@ def demarrer_taches(donnees):
     return taches
 
 
-def demarrer_simulation(donnees, port):
-    """Serveur de simulation (dossier séparé), dans un second processus qui s'arrête avec le programme."""
-    if not (donnees / "simulation.sqlite3").exists():
+SIMULATION = {"processus": None}
+FICHIERS_SIMULATION = ("simulation.sqlite3", "simulation.sqlite3-wal", "simulation.sqlite3-shm", "BILAN-SIMULATION.md",
+                       "simulation-journal.txt")
+
+
+def demarrer_simulation(donnees, port, arguments=None):
+    """Serveur de simulation (dossier séparé), dans un second processus qui s'arrête avec le programme.
+    arguments (mois de départ, durée) : la simulation est d'abord fabriquée (comptez une heure par mois)."""
+    if arguments is None and not (donnees / "simulation.sqlite3").exists():
         return None
+    from django.contrib.auth import get_user_model
+
     env = {k: v for k, v in os.environ.items()
-           if k != "SQLITE_FICHIER" and not k.startswith(("MIROIR_", "ECHANGES_"))}
-    env.update(ERP_SANS_NAVIGATEUR="1", ERP_SOUS_PROCESSUS="1")
+           if k not in ("SQLITE_FICHIER", "ERP_ASSISTANT") and not k.startswith(("MIROIR_", "ECHANGES_"))}
+    env.update(ERP_SANS_NAVIGATEUR="1", ERP_SOUS_PROCESSUS="1", PYTHONUNBUFFERED="1",
+               ERP_ADMIN_COMPTES=json.dumps(list(get_user_model().objects.filter(is_superuser=True, is_active=True)
+                                                 .values_list("username", "password"))))
     programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
-    processus = subprocess.Popen(programme + ["simulation"], env=env)
+    sortie = open(donnees / "simulation-journal.txt", "a", encoding="utf-8")
+    processus = subprocess.Popen(programme + ["simulation", *(arguments or [])], env=env, stdout=sortie,
+                                 stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+    sortie.close()
+    SIMULATION["processus"] = processus
     import atexit
 
     atexit.register(processus.terminate)
     return f"simulation : http://127.0.0.1:{port + 1}"
+
+
+def etat_simulation(donnees, port):
+    p = SIMULATION["processus"]
+    vivant = p is not None and p.poll() is None
+    if deja_demarre(port + 1):
+        etat = "prete"
+    elif vivant:
+        etat = "preparation"
+    elif (donnees / "simulation.sqlite3").exists():
+        etat = "arretee"
+    else:
+        etat = "absente"
+    journal_ = donnees / "simulation-journal.txt"
+    lignes = journal_.read_text(encoding="utf-8", errors="replace").splitlines()[-15:] if journal_.exists() else []
+    return {"etat": etat, "port": port + 1, "journal": "\n".join(lignes) if etat != "prete" else ""}
+
+
+def creer_simulation(donnees, port, debut, duree):
+    if etat_simulation(donnees, port)["etat"] != "absente":
+        raise RuntimeError("une simulation existe déjà : supprimez-la d'abord")
+    journal(f"Simulation demandée : à partir de {debut}, " + ("jusqu'à aujourd'hui" if duree == "aujourdhui" else f"{duree} mois"))
+    demarrer_simulation(donnees, port, [debut] + ([] if duree == "aujourdhui" else [str(int(duree))]))
+
+
+def supprimer_simulation(donnees):
+    p = SIMULATION["processus"]
+    if p is not None and p.poll() is None:
+        p.terminate()
+        try:
+            p.wait(30)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait(10)
+    SIMULATION["processus"] = None
+    for nom in FICHIERS_SIMULATION:
+        (donnees / nom).unlink(missing_ok=True)
+    journal("Simulation supprimée")
 
 
 def deja_demarre(port):
@@ -336,36 +405,37 @@ def adresses_reseau():
 
 # ---------------------------------------------------------------- Démarrage
 def initialiser(edition_, donnees, demander_compte=True):
-    """Base, référentiels et compte administrateur au premier démarrage (rien n'est effacé ensuite)."""
+    """Base, référentiels et comptes au premier démarrage (rien n'est effacé ensuite). Le compte administrateur se crée
+    dans le navigateur (assistant de premier démarrage) ; ERP_ADMIN / ERP_ADMIN_MDP le créent sans question."""
     from django.contrib.auth import get_user_model
     from django.core.management import call_command
 
     from apps.comptabilite.models import Compte
+    from apps.core.models import Societe
 
     call_command("migrate", interactive=False, verbosity=0)
     if not Compte.objects.exists():
         print("Premier démarrage : création de la base, plan comptable, journaux et exercice…")
         call_command("init_erp", "--activite", edition_, verbosity=0)
+        if demander_compte:
+            Societe.objects.filter(pk=Societe.get().pk).update(assistant_termine=False)
     if base_sqlite() is not None and not os.environ.get("ERP_SOUS_PROCESSUS"):
         (donnees / "base-creee.txt").write_text(f"{base_sqlite()}\n", encoding="utf-8")
     U = get_user_model()
-    if U.objects.filter(is_superuser=True).exists() or not demander_compte:
+    if U.objects.filter(is_superuser=True).exists():
         return
-    identifiant = os.environ.get("ERP_ADMIN") or input("Identifiant de l'administrateur [admin] : ").strip() or "admin"
-    mot_de_passe = os.environ.get("ERP_ADMIN_MDP")
-    while not mot_de_passe:
-        import getpass
-
-        saisi = getpass.getpass("Mot de passe (invisible, 8 caractères ou plus) : ")
-        if len(saisi) >= 8 and saisi == getpass.getpass("Confirmez le mot de passe : "):
-            mot_de_passe = saisi
-        else:
-            print("Mots de passe différents ou trop courts, recommencez.")
-    u = U.objects.filter(username=identifiant).first() or U(username=identifiant)
-    u.is_superuser = u.is_staff = u.is_active = True
-    u.set_password(mot_de_passe)
-    u.save()
-    print(f"Compte administrateur prêt : {identifiant}")
+    if os.environ.get("ERP_ADMIN_COMPTES"):                       # simulation : mêmes identifiants que la vraie base
+        for identifiant, empreinte in json.loads(os.environ["ERP_ADMIN_COMPTES"]):
+            U.objects.create(username=identifiant, password=empreinte, is_superuser=True, is_staff=True, is_active=True)
+        return
+    if os.environ.get("ERP_ADMIN") and os.environ.get("ERP_ADMIN_MDP"):
+        u = U(username=os.environ["ERP_ADMIN"], is_superuser=True, is_staff=True, is_active=True)
+        u.set_password(os.environ["ERP_ADMIN_MDP"])
+        u.save()
+        print(f"Compte administrateur prêt : {u.username}")
+    elif demander_compte:
+        print("  Premier démarrage : le navigateur va s'ouvrir pour créer le compte administrateur,")
+        print("  puis renseigner la société et le rôle de ce serveur (direction, agence ou site unique).")
 
 
 def servir(port, reseau=False, ouvrir=True, resume=()):
@@ -388,19 +458,56 @@ def servir(port, reseau=False, ouvrir=True, resume=()):
     serve(application, host=hote, port=port, threads=16 if reseau else 8)
 
 
+def lien_demarrage():
+    dossier = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    return dossier / f"ERP OHADA {edition().capitalize()}.bat"
+
+
 def demarrage_automatique():
     """Lien dans le dossier Démarrage de Windows : le programme démarre à l'ouverture de session (sans navigateur)."""
     if os.name != "nt":
-        print("Le démarrage automatique se règle sous Windows.")
-        return
-    dossier = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
-    lien = dossier / f"ERP OHADA {edition().capitalize()}.bat"
+        return "Le démarrage automatique se règle sous Windows."
+    lien = lien_demarrage()
     if lien.exists():
         lien.unlink()
-        print("Démarrage automatique RETIRÉ.")
-        return
+        return "Démarrage automatique retiré."
+    lien.parent.mkdir(parents=True, exist_ok=True)
     lien.write_text(f'@echo off\r\nset ERP_SANS_NAVIGATEUR=1\r\nstart "ERP OHADA" /min "{sys.executable}"\r\n', encoding="utf-8")
-    print("Le logiciel démarrera à chaque ouverture de session Windows sur ce poste (relancez pour retirer).")
+    return "Le logiciel démarrera à chaque ouverture de session Windows sur ce poste."
+
+
+def enregistrer_actions(donnees, port):
+    """Écran Fichier › Administration du poste (apps.core.poste) : ce que le programme sait faire sur ce serveur."""
+    from apps.core import poste
+
+    def etat():
+        base = base_sqlite()
+        return {
+            "edition": edition(), "port": port, "donnees": str(donnees), "base": str(base or "SQL Server"),
+            "taille_base": base.stat().st_size if base and base.exists() else 0,
+            "windows": os.name == "nt", "demarrage_auto": os.name == "nt" and lien_demarrage().exists(),
+            "sauvegarde_heures": os.environ.get("ERP_SAUVEGARDE_HEURES") or "4",
+            "sauvegarde_garder": os.environ.get("ERP_SAUVEGARDE_GARDER") or "60",
+            "sauvegarde_copie": os.environ.get("ERP_SAUVEGARDE_COPIE", ""),
+            "sauvegardes": [{"nom": f.name, "taille": f.stat().st_size,
+                             "date": datetime.datetime.fromtimestamp(f.stat().st_mtime)} for f in reversed(sauvegardes(donnees))][:30],
+            "restauration_prevue": restauration_prevue(donnees),
+            "simulation": etat_simulation(donnees, port), "mois_courant": f"{datetime.date.today():%Y}-01"}
+
+    def sauvegarder_maintenant():
+        base = base_sqlite()
+        if base is None:
+            raise RuntimeError("la base n'est pas SQLite : sauvegardez-la avec les outils de SQL Server")
+        fichier = sauvegarder(base, donnees)
+        journal(f"Sauvegarde (à l'écran) : {fichier.name}")
+        return fichier.name
+
+    poste.ACTIONS.update(
+        etat=etat, sauvegarder=sauvegarder_maintenant,
+        restaurer_au_demarrage=lambda nom: prevoir_restauration(donnees, nom),
+        simulation_creer=lambda debut, duree: creer_simulation(donnees, port, debut, duree),
+        simulation_supprimer=lambda: supprimer_simulation(donnees),
+        demarrage_auto_basculer=demarrage_automatique)
 
 
 def main(argv):
@@ -411,7 +518,7 @@ def main(argv):
         print(dossier_donnees())
         return 0
     if action == "demarrage-auto":
-        demarrage_automatique()
+        print(demarrage_automatique())
         return 0
     if action == "manage":
         preparer_environnement()
@@ -442,7 +549,9 @@ def main(argv):
                   "données fictives) : comptez environ une heure par mois.")
             call_command("simulation", "--mois", debut or "2026-09", *periode,
                          "--rapport", str(donnees / "BILAN-SIMULATION.md"))
-        initialiser(edition_, donnees, demander_compte=not os.environ.get("ERP_SOUS_PROCESSUS"))
+        initialiser(edition_, donnees, demander_compte=False)
+        if not os.environ.get("ERP_SOUS_PROCESSUS"):
+            os.environ["ERP_ASSISTANT"] = "1"                     # lancée seule : compte créé dans le navigateur
         servir(port + 1, reseau=os.environ.get("ERP_RESEAU", "1") != "0")
         return 0
     donnees = preparer_environnement()
@@ -463,12 +572,18 @@ def main(argv):
         if not os.environ.get("ERP_SANS_NAVIGATEUR"):
             webbrowser.open(f"http://127.0.0.1:{port}")
         return 0
+    prevue = restauration_prevue(donnees)
+    if prevue:                                                    # demandée à l'écran Administration du poste
+        (donnees / "restaurer-au-demarrage.txt").unlink()
+        restaurer(donnees, str(donnees / "sauvegardes" / prevue))
     if not controler_base(donnees):
         return 1
+    os.environ.setdefault("ERP_ASSISTANT", "1")                   # premier démarrage : assistant dans le navigateur
     import django
 
     django.setup()
     initialiser(edition_, donnees)
+    enregistrer_actions(donnees, port)
     reseau = action != "local" and os.environ.get("ERP_RESEAU", "1") != "0"
     resume = [f"Données : {donnees}"] + demarrer_taches(donnees)
     simulation = demarrer_simulation(donnees, port)
