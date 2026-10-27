@@ -58,6 +58,23 @@ journal propre à l'agence (CA-DLA, VT-DLA…), avec la section analytique de la
 Seule l'agence qui a créé un départ, un billet ou un colis peut le modifier ; l'agence d'arrivée peut seulement
 constater l'arrivée et remettre l'envoi.
 
+## Erreur constatée par la direction dans la comptabilité d'une agence
+
+La direction **ne corrige jamais elle-même** les comptes d'une agence : elle lui **signale l'erreur** et suit la correction.
+
+1. **Direction** : ouvrir l'écriture reçue de l'agence, puis « Signaler une erreur à l'agence ». Indiquer l'erreur constatée,
+   la correction attendue et la date limite (7 jours par défaut). La demande (DC00001…) part avec le prochain fichier.
+2. **Agence** : à l'import, la demande apparaît dans *Fichier › Demandes de correction* et sur l'accueil de la comptabilité.
+   L'agence accuse réception automatiquement : la direction voit « Reçue par l'agence ».
+3. **Agence** : passer l'extourne de la pièce fausse, puis la bonne écriture, et les valider ; dans la demande, cocher ces
+   écritures puis « Correction faite ». Ou « Contester », avec une réponse obligatoire, si l'écriture est juste.
+4. **Direction** : au fichier suivant, les écritures de correction entrent dans la consolidation et la demande passe à
+   « Corrigée par l'agence ». Elle n'est close qu'une fois ces écritures reçues. Une contestation est visible avec sa réponse.
+   La direction peut annuler une demande, et l'agence en est informée.
+
+Suivi : *Fichier › Demandes de correction (direction / agences)*. Il affiche les demandes en attente de l'agence, celles qui
+sont en retard (date limite dépassée) et celles qui sont contestées. Sur chaque écriture concernée, un rappel mène à sa demande.
+
 ## Sécurité
 
 - Chaque agence a sa **clé** (connue d'elle et du siège) ; chaque fichier est signé (HMAC-SHA256 sur le manifeste,

@@ -145,6 +145,8 @@ def menu_fichier_comptabilite():
         E("fichier.autorisations", "Autorisations d'accès", "comptabilite:autorisations", icone="bi-shield-lock", preuve=D),
         E("fichier.journal_evenements", "Journal des événements", "comptabilite:journal_evenements", icone="bi-clock-history", preuve="AJOUT-ERP"),
         E("fichier.echanges", "Échanges entre agences", "comptabilite:echanges", icone="bi-arrow-left-right", preuve="AJOUT-ERP"),
+        E("fichier.corrections", "Demandes de correction (direction / agences)", "comptabilite:corrections", icone="bi-flag",
+          preuve="AJOUT-ERP"),
         SEP(),
         E("fichier.importer", "Importer", icone="bi-box-arrow-in-down", preuve=D),
         E("fichier.exporter", "Exporter", icone="bi-box-arrow-up", preuve=D),

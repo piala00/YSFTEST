@@ -7,6 +7,11 @@
     <form method="post" action="{% url 'comptabilite:ecriture_valider' object.pk %}">{% csrf_token %}<button class="btn btn-success btn-sm"><i class="bi bi-check2-circle"></i> Valider</button></form>
     <form method="post" action="{% url 'comptabilite:ecriture_supprimer' object.pk %}" onsubmit="return confirm('Supprimer ?')">{% csrf_token %}<button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button></form>
   </div>{% endif %}</div>
+{% if object.site_origine %}<div class="alert alert-light border small d-flex flex-wrap gap-2 align-items-center">
+  <span>Écriture reçue de l'agence <strong>{{ object.site_origine }}</strong> : elle ne se corrige pas ici.</span>
+  <a class="btn btn-sm btn-outline-primary d-print-none" href="{% url 'comptabilite:correction_demander' object.pk %}"><i class="bi bi-flag"></i> Signaler une erreur à l'agence</a></div>{% endif %}
+{% for d in demandes_correction %}<div class="alert {% if d.ouverte %}alert-warning{% else %}alert-light border{% endif %} small">
+  <i class="bi bi-flag"></i> <a href="{% url 'comptabilite:correction_detail' d.pk %}">Demande de correction {{ d.numero }}</a> — {{ d.get_statut_display }}{% if d.en_retard %} · <strong class="text-danger">en retard</strong>{% endif %} : {{ d.motif|truncatechars:120 }}</div>{% endfor %}
 {% include "core/_auteurs.html" with objet=object %}
 <div class="card p-3 mb-3 small">
   Journal : <strong>{{ object.journal }}</strong> · Date : <strong>{{ object.date|date:"d/m/Y" }}</strong> · Exercice : {{ object.exercice }}<br>

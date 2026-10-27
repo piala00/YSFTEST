@@ -74,3 +74,96 @@ def _dernier_envoye():
     from django.db.models import Max
 
     return LotEmis.objects.aggregate(m=Max("sequence_a"))["m"] or 0
+
+
+# ---------------------------------------------------------------- Demandes de correction (direction → agence)
+@login_required
+def corrections(request):
+    """Direction : toutes les demandes envoyées aux agences. Agence : les demandes reçues de la direction."""
+    from .models import DemandeCorrection
+
+    local = site_local()
+    demandes = DemandeCorrection.objects.all()
+    statut, agence = request.GET.get("statut", "ouvertes"), request.GET.get("agence", "")
+    if statut == "ouvertes":
+        demandes = demandes.filter(statut__in=DemandeCorrection.OUVERTS)
+    elif statut:
+        demandes = demandes.filter(statut=statut)
+    if agence:
+        demandes = demandes.filter(agence=agence)
+    toutes = DemandeCorrection.objects.all()
+    return render(request, "echanges/corrections.html", {
+        "local": local, "demandes": demandes, "statut": statut, "agence": agence, "statuts": DemandeCorrection.STATUTS,
+        "agences": sorted(set(toutes.values_list("agence", flat=True))),
+        "compteurs": {"ouvertes": toutes.filter(statut__in=DemandeCorrection.OUVERTS).count(),
+                      "en_retard": sum(1 for d in toutes.filter(statut__in=DemandeCorrection.OUVERTS) if d.en_retard),
+                      "contestees": toutes.filter(statut=DemandeCorrection.CONTESTEE).count()}})
+
+
+@login_required
+def correction_demander(request, pk):
+    """Direction : signaler une erreur sur une écriture reçue d'une agence."""
+    import datetime
+
+    from django.core.exceptions import ValidationError
+    from django.shortcuts import get_object_or_404
+
+    from apps.comptabilite.models import Ecriture
+
+    from . import corrections as service
+
+    ecriture = get_object_or_404(Ecriture, pk=pk)
+    echeance = datetime.date.today() + datetime.timedelta(days=7)
+    if request.method == "POST":
+        try:
+            saisie = request.POST.get("echeance") or ""
+            d = service.demander(ecriture, request.POST.get("motif", ""), request.POST.get("correction_attendue", ""),
+                                 request.user.get_username(), datetime.date.fromisoformat(saisie) if saisie else None)
+            messages.success(request, f"Demande {d.numero} enregistrée : elle part à l'agence {d.agence} avec le prochain "
+                                      "fichier d'échange.")
+            return redirect("comptabilite:correction_detail", pk=d.pk)
+        except (ValidationError, ValueError) as exc:
+            for m in getattr(exc, "messages", [str(exc)]):
+                messages.error(request, m)
+    return render(request, "echanges/correction_demander.html", {"ecriture": ecriture, "echeance": echeance,
+                                                                  "local": site_local()})
+
+
+@login_required
+def correction_detail(request, pk):
+    """Suivi d'une demande ; à l'agence : corriger (écritures de correction) ou contester ; à la direction : annuler."""
+    import datetime
+
+    from django.core.exceptions import ValidationError
+    from django.shortcuts import get_object_or_404
+
+    from apps.comptabilite.models import Ecriture
+
+    from . import corrections as service
+    from .models import DemandeCorrection
+
+    d = get_object_or_404(DemandeCorrection, pk=pk)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        try:
+            if action == "annuler":
+                service.annuler(d, request.user.get_username(), request.POST.get("motif", ""))
+                messages.success(request, "Demande annulée ; l'agence en sera informée par le prochain fichier.")
+            elif action in ("corriger", "contester"):
+                choisies = Ecriture.objects.filter(pk__in=request.POST.getlist("ecritures"))
+                service.repondre(d, DemandeCorrection.CORRIGEE if action == "corriger" else DemandeCorrection.CONTESTEE,
+                                 request.POST.get("reponse", ""), request.user.get_username(), choisies)
+                messages.success(request, "Réponse enregistrée ; elle part à la direction avec le prochain fichier.")
+            return redirect("comptabilite:correction_detail", pk=d.pk)
+        except ValidationError as exc:
+            for m in exc.messages:
+                messages.error(request, m)
+    origine = Ecriture.objects.filter(uid=d.ecriture_uid).first()
+    candidates = []
+    if d.site_origine and d.ouverte:                    # à l'agence : ses écritures validées depuis la demande
+        depuis = (d.demandee_le.date() if d.demandee_le else datetime.date.today()) - datetime.timedelta(days=3)
+        candidates = (Ecriture.objects.filter(site_origine="", statut=Ecriture.STATUT_VALIDEE, cree_le__date__gte=depuis)
+                      .exclude(uid=d.ecriture_uid).select_related("journal").order_by("-date", "-id")[:100])
+    return render(request, "echanges/correction_detail.html", {
+        "d": d, "origine": origine, "candidates": candidates, "local": site_local(),
+        "correctives": Ecriture.objects.filter(uid__in=d.ecritures_correction).select_related("journal")})

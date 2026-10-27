@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Demandes de correction{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Demandes de correction {% if local.role == "SIEGE" %}envoyées aux agences{% else %}reçues de la direction{% endif %}</h1></div>
+<p class="small text-muted">{% if local.role == "SIEGE" %}La direction signale une erreur ; l'agence corrige elle-même (extourne puis bonne écriture) ou conteste.
+  La demande passe à « corrigée » quand les écritures de correction de l'agence sont arrivées ici.
+  Pour signaler une erreur : ouvrez l'écriture reçue de l'agence, puis « Signaler une erreur à l'agence ».{% else %}Corrigez chaque erreur
+  signalée par la direction (extourne puis bonne écriture), puis rattachez vos écritures à la demande ; ou contestez avec une réponse.{% endif %}</p>
+<div class="row g-2 mb-3">
+  <div class="col-4 col-lg-2"><div class="card kpi p-2"><div class="label">En attente de l'agence</div><div class="value">{{ compteurs.ouvertes }}</div></div></div>
+  <div class="col-4 col-lg-2"><div class="card kpi p-2"><div class="label">En retard</div><div class="value {% if compteurs.en_retard %}text-danger{% endif %}">{{ compteurs.en_retard }}</div></div></div>
+  <div class="col-4 col-lg-2"><div class="card kpi p-2"><div class="label">Contestées</div><div class="value {% if compteurs.contestees %}text-warning{% endif %}">{{ compteurs.contestees }}</div></div></div>
+</div>
+<form class="d-flex flex-wrap gap-2 align-items-end mb-2 d-print-none" method="get">
+  <div><label class="form-label small mb-0" for="statut">Statut</label><select id="statut" name="statut" class="form-select form-select-sm" onchange="this.form.submit()">
+    <option value="ouvertes" {% if statut == "ouvertes" %}selected{% endif %}>En attente de l'agence</option>
+    <option value="" {% if not statut %}selected{% endif %}>Toutes</option>
+    {% for code, titre in statuts %}<option value="{{ code }}" {% if statut == code %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
+  {% if agences|length > 1 %}<div><label class="form-label small mb-0" for="agence">Agence</label><select id="agence" name="agence" class="form-select form-select-sm" onchange="this.form.submit()">
+    <option value="">Toutes</option>{% for a in agences %}<option {% if a == agence %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>{% endif %}
+</form>
+<div class="card"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>N°</th><th>Agence</th><th>Pièce en cause</th><th>Erreur constatée</th><th>Demandée le</th><th>À corriger avant le</th><th>Statut</th></tr></thead>
+  <tbody>{% for d in demandes %}<tr>
+    <td><a href="{% url 'comptabilite:correction_detail' d.pk %}">{{ d.numero }}</a></td><td>{{ d.agence }}</td>
+    <td>{{ d.ecriture_numero }} du {{ d.ecriture_date|date:"d/m/Y" }}</td><td>{{ d.motif|truncatechars:80 }}</td>
+    <td>{{ d.demandee_le|date:"d/m/Y" }}</td><td class="{% if d.en_retard %}text-danger fw-semibold{% endif %}">{{ d.echeance|date:"d/m/Y" }}{% if d.en_retard %} (en retard){% endif %}</td>
+    <td>{{ d.get_statut_display }}</td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted text-center p-3">Aucune demande.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

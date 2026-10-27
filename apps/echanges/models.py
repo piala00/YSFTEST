@@ -107,3 +107,56 @@ class Relais(models.Model):
 
     class Meta:
         unique_together = [("evenement", "destination")]
+
+
+class DemandeCorrection(models.Model):
+    """La direction signale une erreur dans la comptabilité d'une agence et lui demande de la corriger.
+
+    La direction n'écrit jamais dans les comptes de l'agence : l'agence corrige elle-même (extourne puis bonne écriture,
+    ou conteste) ; ses écritures de correction remontent par le lot suivant et la demande se clôt chez les deux.
+    Au siège : la demande d'origine (site_origine vide). À l'agence : la copie reçue (site_origine = code du siège).
+    """
+
+    DEMANDEE, RECUE, CORRIGEE, CONTESTEE, ANNULEE = "DEMANDEE", "RECUE", "CORRIGEE", "CONTESTEE", "ANNULEE"
+    STATUTS = [(DEMANDEE, "Envoyée à l'agence"), (RECUE, "Reçue par l'agence"), (CORRIGEE, "Corrigée par l'agence"),
+               (CONTESTEE, "Contestée par l'agence"), (ANNULEE, "Annulée par la direction")]
+    ORDRE = {DEMANDEE: 0, RECUE: 1, CORRIGEE: 2, CONTESTEE: 2, ANNULEE: 3}
+    OUVERTS = (DEMANDEE, RECUE)
+
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False)
+    numero = models.CharField("N°", max_length=20)
+    agence = models.CharField("Agence concernée", max_length=10)
+    ecriture_uid = models.UUIDField("Écriture en cause")
+    ecriture_numero = models.CharField("N° de pièce", max_length=30, blank=True)
+    ecriture_date = models.DateField("Date de la pièce", null=True, blank=True)
+    ecriture_libelle = models.CharField("Libellé de la pièce", max_length=200, blank=True)
+    motif = models.TextField("Erreur constatée")
+    correction_attendue = models.TextField("Correction attendue", blank=True)
+    demandee_par = models.CharField("Demandée par", max_length=150, blank=True)
+    demandee_le = models.DateTimeField("Demandée le", null=True, blank=True)
+    echeance = models.DateField("À corriger avant le", null=True, blank=True)
+    statut = models.CharField(max_length=10, choices=STATUTS, default=DEMANDEE)
+    reponse = models.TextField("Réponse de l'agence", blank=True)
+    repondu_par = models.CharField("Répondu par", max_length=150, blank=True)
+    repondu_le = models.DateTimeField("Répondu le", null=True, blank=True)
+    ecritures_correction = models.JSONField("Écritures de correction (uid)", default=list, blank=True)
+    annulee_motif = models.CharField("Motif de l'annulation", max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["-demandee_le", "-id"]
+        verbose_name = "demande de correction"
+        verbose_name_plural = "demandes de correction"
+
+    def __str__(self):
+        return f"{self.numero} — {self.agence} — {self.get_statut_display()}"
+
+    @property
+    def ouverte(self):
+        return self.statut in self.OUVERTS
+
+    @property
+    def en_retard(self):
+        import datetime
+
+        return self.ouverte and self.echeance is not None and self.echeance < datetime.date.today()

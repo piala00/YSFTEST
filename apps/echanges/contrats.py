@@ -562,17 +562,70 @@ def _depense_payee(p, origine, local):
     regulariser_depense_recue(p, p.get("payeur") or origine.code)
 
 
+def _correction_demande(p, origine, local):
+    """Dans l'agence concernée : demande de correction de la direction (ou son annulation)."""
+    from .corrections import accuser_reception
+    from .models import DemandeCorrection
+
+    if p["pour_agence"] != local.code:
+        raise SansObjet("demande adressée à une autre agence")
+    d = DemandeCorrection.objects.filter(uid=p["uid"]).first()
+    if d is not None and not d.site_origine:
+        raise SansObjet("demande créée dans ce dossier")
+    if d is None:
+        d = DemandeCorrection(uid=p["uid"], site_origine=origine.code)
+    if p["statut"] == DemandeCorrection.ANNULEE:
+        d.statut, d.annulee_motif = DemandeCorrection.ANNULEE, p.get("annulee_motif", "")
+    elif d.pk is None:
+        d.statut = DemandeCorrection.DEMANDEE
+    d.numero, d.agence, d.ecriture_uid = p["numero"], p["pour_agence"], p["ecriture"]
+    d.ecriture_numero, d.ecriture_libelle = p.get("ecriture_numero", ""), p.get("ecriture_libelle", "")
+    d.ecriture_date = datetime.date.fromisoformat(p["ecriture_date"]) if p.get("ecriture_date") else None
+    d.motif, d.correction_attendue = p["motif"], p.get("correction_attendue", "")
+    d.demandee_par = p.get("demandee_par", "")
+    d.demandee_le = parse_datetime(p["demandee_le"]) if p.get("demandee_le") else None
+    d.echeance = datetime.date.fromisoformat(p["echeance"]) if p.get("echeance") else None
+    d.save()
+    accuser_reception(d)
+
+
+def _correction_suivi(p, origine, local):
+    """À la direction : réception, correction ou contestation par l'agence (jamais d'état antérieur qui écrase)."""
+    from apps.comptabilite.models import Ecriture
+
+    from .models import DemandeCorrection
+
+    if local.role != local.SIEGE:
+        raise SansObjet("suivi des demandes de correction : direction seulement")
+    d = DemandeCorrection.objects.filter(uid=p["demande"], site_origine="").first()
+    if d is None:
+        raise SansObjet("demande inconnue ici")
+    if d.statut == DemandeCorrection.ANNULEE or DemandeCorrection.ORDRE[p["statut"]] < DemandeCorrection.ORDRE[d.statut]:
+        return
+    ecritures = p.get("ecritures") or []
+    if p["statut"] == DemandeCorrection.CORRIGEE:
+        recues = Ecriture.objects.filter(uid__in=ecritures, site_origine=origine.code).count()
+        if recues < len(ecritures):
+            raise Attente(f"écritures de correction de {origine.code} pas encore reçues ({recues}/{len(ecritures)})")
+    d.statut, d.reponse, d.repondu_par = p["statut"], p.get("reponse", ""), p.get("repondu_par", "")
+    d.repondu_le = parse_datetime(p["repondu_le"]) if p.get("repondu_le") else d.repondu_le
+    d.ecritures_correction = ecritures
+    d.save()
+
+
 INTEGRATIONS = {"agence": _agence, "gare": _gare, "ligne": _ligne, "vehicule": _vehicule, "chauffeur": _chauffeur,
                 "depart": _depart, "billet": _billet, "colis": _colis, "colis_livraison": _colis_livraison,
                 "depart_arrivee": _depart_arrivee, "depense": _depense, "ecriture": _ecriture,
                 "troncon_affecte": _troncon_affecte, "troncon_effectue": _troncon_effectue,
                 "plein": _plein, "reparation": _reparation, "depense_demande": _depense_demande,
-                "depense_decision": _depense_decision, "depense_payee": _depense_payee}
+                "depense_decision": _depense_decision, "depense_payee": _depense_payee,
+                "correction_demande": _correction_demande, "correction_suivi": _correction_suivi}
 
 # Ordre d'intégration d'un même lot : les référentiels avant les faits qui les utilisent
 PRIORITE = {"agence": 0, "gare": 1, "vehicule": 1, "chauffeur": 1, "ligne": 2, "depart": 3, "billet": 4, "colis": 4,
             "depense": 4, "plein": 4, "reparation": 4, "colis_livraison": 5, "depart_arrivee": 5, "troncon_affecte": 5, "troncon_effectue": 5,
-            "ecriture": 6, "depense_demande": 4, "depense_decision": 5, "depense_payee": 5}
+            "ecriture": 6, "depense_demande": 4, "depense_decision": 5, "depense_payee": 5,
+            "correction_demande": 7, "correction_suivi": 7}
 
 # Faits qu'une agence doit connaître quand ils viennent d'une autre agence (relais par le siège)
 RELAYES = {"agence", "gare", "ligne", "vehicule", "chauffeur", "depart", "colis", "colis_livraison", "depart_arrivee",

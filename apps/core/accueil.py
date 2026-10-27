@@ -83,6 +83,10 @@ def comptabilite():
     fin_effective = min(fin, today) if debut <= today else fin
     soldes = compta.soldes_par_compte(fin_effective)
     brouillard = Ecriture.objects.filter(statut=Ecriture.STATUT_BROUILLARD).count()
+    from apps.echanges.corrections import ouvertes
+
+    corrections = list(ouvertes())
+    retard = sum(1 for d in corrections if d.en_retard)
     tva = compta.declaration_tva(debut, fin_effective)
     return {
         "raccourcis": [
@@ -120,6 +124,9 @@ def comptabilite():
             _indicateur("TVA à reverser" if tva["solde"] >= 0 else "Crédit de TVA", abs(tva["solde"]), reverse("comptabilite:tva")),
             _indicateur("Écritures au brouillard", brouillard, reverse("comptabilite:ecritures") + "?statut=BROUILLARD",
                         genre="nombre", alerte=bool(brouillard), detail="à valider avant la clôture" if brouillard else ""),
+            *([_indicateur("Corrections demandées (direction / agences)", len(corrections), reverse("comptabilite:corrections"),
+                           genre="nombre", alerte=True,
+                           detail=f"dont {retard} en retard" if retard else "en attente de l'agence")] if corrections else []),
         ],
         "dernieres": [
             {"date": e.date, "piece": e.numero, "libelle": f"{e.journal.code} · {e.libelle}", "montant": e.total or ZERO,

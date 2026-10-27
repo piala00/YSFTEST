@@ -156,6 +156,13 @@ class EcritureDetailView(LoginRequiredMixin, DetailView):
     model = Ecriture
     template_name = "comptabilite/ecriture_detail.html"
 
+    def get_context_data(self, **kwargs):
+        from apps.echanges.models import DemandeCorrection
+
+        ctx = super().get_context_data(**kwargs)
+        ctx["demandes_correction"] = DemandeCorrection.objects.filter(ecriture_uid=self.object.uid)
+        return ctx
+
 
 def _ecriture_form(request, ecriture):
     if request.method == "POST":
