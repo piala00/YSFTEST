@@ -463,6 +463,19 @@ def lien_demarrage():
     return dossier / f"ERP OHADA {edition().capitalize()}.bat"
 
 
+def lien_installateur():
+    """Raccourci « Démarrage » pour tous les utilisateurs, posé par l'installateur (option cochée)."""
+    dossier = Path(os.environ.get("ProgramData", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "StartUp"
+    return dossier / f"ERP OHADA {edition().capitalize()}.lnk"
+
+
+def installation_prevue(donnees):
+    """Rôle choisi dans l'installateur (et fichier de l'agence), proposé par l'assistant du premier démarrage."""
+    role, fichier = donnees / "role-installation.txt", donnees / "installation-agence.erpx"
+    return {"role": role.read_text(encoding="utf-8").strip() if role.exists() else "",
+            "fichier_agence": fichier if fichier.exists() else None}
+
+
 def demarrage_automatique():
     """Lien dans le dossier Démarrage de Windows : le programme démarre à l'ouverture de session (sans navigateur)."""
     if os.name != "nt":
@@ -486,6 +499,7 @@ def enregistrer_actions(donnees, port):
             "edition": edition(), "port": port, "donnees": str(donnees), "base": str(base or "SQL Server"),
             "taille_base": base.stat().st_size if base and base.exists() else 0,
             "windows": os.name == "nt", "demarrage_auto": os.name == "nt" and lien_demarrage().exists(),
+            "demarrage_installateur": os.name == "nt" and lien_installateur().exists(),
             "sauvegarde_heures": os.environ.get("ERP_SAUVEGARDE_HEURES") or "4",
             "sauvegarde_garder": os.environ.get("ERP_SAUVEGARDE_GARDER") or "60",
             "sauvegarde_copie": os.environ.get("ERP_SAUVEGARDE_COPIE", ""),
@@ -507,13 +521,17 @@ def enregistrer_actions(donnees, port):
         restaurer_au_demarrage=lambda nom: prevoir_restauration(donnees, nom),
         simulation_creer=lambda debut, duree: creer_simulation(donnees, port, debut, duree),
         simulation_supprimer=lambda: supprimer_simulation(donnees),
-        demarrage_auto_basculer=demarrage_automatique)
+        demarrage_auto_basculer=demarrage_automatique,
+        installation_prevue=lambda: installation_prevue(donnees))
 
 
 def main(argv):
     edition_ = edition()
     port = int(os.environ.get("ERP_PORT") or PORTS.get(edition_, 8000))
     action = argv[0] if argv else ""
+    if action == "sans-navigateur":                               # raccourci « Démarrage » posé par l'installateur
+        os.environ["ERP_SANS_NAVIGATEUR"] = "1"
+        action, argv = "", argv[1:]
     if action == "dossier":
         print(dossier_donnees())
         return 0

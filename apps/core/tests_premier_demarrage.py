@@ -64,6 +64,21 @@ class AssistantTests(TestCase):
         self.assertTrue(Societe.get().assistant_termine)
         self.assertEqual(self.client.get("/").status_code, 200)
 
+    def test_role_choisi_dans_l_installateur(self):
+        get_user_model().objects.create_superuser("chef", "", "Chef-2026-ok")
+        self.client.login(username="chef", password="Chef-2026-ok")
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier, "installation-agence.erpx")
+            fichier.write_bytes(b"pas un vrai fichier")
+            with mock.patch.dict(poste.ACTIONS, {"installation_prevue": lambda: {"role": "agence", "fichier_agence": fichier}}):
+                page = self.client.get(reverse("core:installation") + "?etape=role")
+                self.assertContains(page, "Choisi à l'installation : <strong>Agence</strong>")
+                self.assertContains(page, "installation-agence.erpx")
+                page = self.client.post(reverse("core:installation") + "?etape=role", {"role": "agence", "fichier_prevu": "1"},
+                                        follow=True)
+                self.assertContains(page, "Impossible")                  # le fichier préparé a bien été lu (et refusé)
+        self.assertFalse(Societe.get().assistant_termine)
+
     @override_settings(ERP_ASSISTANT=False)
     def test_hors_programme_compile_rien_ne_change(self):
         self.assertRedirects(self.client.get("/"), "/connexion/?next=/", fetch_redirect_response=False)

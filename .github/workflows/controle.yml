@@ -115,3 +115,52 @@ jobs:
           name: ERP-OHADA-${{ matrix.nom }}-Windows-exe
           path: dist/ERP-OHADA-${{ matrix.nom }}
           retention-days: 7
+      - name: Fabriquer l'installateur (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
+          & $iscc /Q "/DEdition=${{ matrix.nom }}" "/DPort=${{ matrix.port }}" "/DVersion=1.0.${{ github.run_number }}" deploy\installateur\erp_ohada.iss
+          if ($LASTEXITCODE -ne 0) { throw "Compilation de l'installateur en échec" }
+      - name: Installer sans question, démarrer, désinstaller
+        shell: pwsh
+        run: |
+          $setup = "dist\ERP-OHADA-${{ matrix.nom }}-Installation.exe"
+          $dossier = "$env:RUNNER_TEMP\programme"
+          $journal = "$env:RUNNER_TEMP\installation.log"
+          $i = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/TASKS=parefeu", "/DIR=`"$dossier`"", "/LOG=`"$journal`"" -Wait -PassThru
+          if ($i.ExitCode -ne 0) { Get-Content $journal -Tail 40; throw "Installation en échec ($($i.ExitCode))" }
+          $exe = "$dossier\ERP-OHADA-${{ matrix.nom }}.exe"
+          if (-not (Test-Path $exe)) { throw "Programme absent après installation" }
+          $donnees = "$env:ProgramData\ERP-OHADA\${{ matrix.nom }}"
+          if ((Get-Content "$donnees\role-installation.txt") -ne "siege") { throw "Rôle choisi non transmis à l'assistant" }
+          netsh advfirewall firewall show rule name="ERP OHADA (port ${{ matrix.port }})" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Règle du pare-feu absente" }
+
+          $env:ERP_ADMIN = "essai"; $env:ERP_ADMIN_MDP = "Essai-Windows-2026"; $env:ERP_RESEAU = "0"
+          $p = Start-Process -FilePath $exe -ArgumentList "sans-navigateur" -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\sortie2.txt" -RedirectStandardError "$env:RUNNER_TEMP\erreurs2.txt"
+          $ok = $false
+          for ($n = 0; $n -lt 90; $n++) {
+            Start-Sleep -Seconds 2
+            try { if ((Invoke-WebRequest "http://127.0.0.1:${{ matrix.port }}/connexion/" -UseBasicParsing -TimeoutSec 5).StatusCode -eq 200) { $ok = $true; break } } catch {}
+            if ($p.HasExited) { break }
+          }
+          Get-Content "$env:RUNNER_TEMP\sortie2.txt" -ErrorAction SilentlyContinue
+          Get-Content "$env:RUNNER_TEMP\erreurs2.txt" -ErrorAction SilentlyContinue | Select-Object -Last 40
+          if (-not $ok) { throw "Le programme installé n'a pas servi la page de connexion" }
+          if (-not (Test-Path "$donnees\erp.sqlite3")) { throw "Base non créée dans ProgramData" }
+
+          # Désinstallation (le programme en marche est arrêté) : les données restent
+          Start-Process "$dossier\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          for ($n = 0; $n -lt 60 -and (Test-Path $exe); $n++) { Start-Sleep -Seconds 2 }
+          if (Test-Path $exe) { throw "Programme toujours présent après désinstallation" }
+          if (-not (Test-Path "$donnees\erp.sqlite3")) { throw "La désinstallation a effacé les données" }
+          netsh advfirewall firewall show rule name="ERP OHADA (port ${{ matrix.port }})" | Out-Null
+          if ($LASTEXITCODE -eq 0) { throw "Règle du pare-feu restée après désinstallation" }
+          $global:LASTEXITCODE = 0
+          Write-Output "Installateur ${{ matrix.nom }} : fabriqué, installé sans question (siège), démarré, désinstallé, données conservées."
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ERP-OHADA-${{ matrix.nom }}-Installation
+          path: dist/ERP-OHADA-${{ matrix.nom }}-Installation.exe
+          retention-days: 7

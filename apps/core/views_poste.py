@@ -50,6 +50,7 @@ def installation(request):
 
     societe = Societe.get()
     etape = request.GET.get("etape") or "identite"
+    prevue = poste.appeler("installation_prevue") if "installation_prevue" in poste.ACTIONS else {}
     form = IdentiteSocieteForm(instance=societe)
     if request.method == "POST" and etape == "identite":
         form = IdentiteSocieteForm(request.POST, instance=societe)
@@ -66,9 +67,13 @@ def installation(request):
                 lots.configurer_siege(code, request.POST.get("nom", "").strip() or "Direction")
             elif role == "agence":
                 fichier = request.FILES.get("fichier")
-                if fichier is None:
+                if fichier is not None:
+                    lots.installer_agence(fichier.read(), fichier.name, request.user)
+                elif request.POST.get("fichier_prevu") and prevue.get("fichier_agence"):
+                    chemin = prevue["fichier_agence"]
+                    lots.installer_agence(chemin.read_bytes(), chemin.name, request.user)
+                else:
                     raise lots.LotInvalide("choisissez le fichier d'installation remis par la direction")
-                lots.installer_agence(fichier.read(), fichier.name, request.user)
             elif role != "seul":
                 raise lots.LotInvalide("choisissez le rôle de ce serveur")
         except lots.LotInvalide as exc:
@@ -82,7 +87,8 @@ def installation(request):
                          + " Pour des données d'essai : Fichier › Administration du poste › Simulation.")
         return redirect("core:portail")
     return render(request, "core/installation.html", {
-        "etape": etape, "form": form, "local": site_local(), "edition": societe.activite})
+        "etape": etape, "form": form, "local": site_local(), "edition": societe.activite,
+        "role_prevu": prevue.get("role", ""), "fichier_prevu": prevue.get("fichier_agence")})
 
 
 @login_required

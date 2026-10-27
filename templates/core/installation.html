@@ -7,13 +7,14 @@
   {% if etape == "role" %}
   {% if local %}<div class="alert alert-info small">Ce serveur est déjà installé : <strong>{{ local.code }} — {{ local.get_role_display }}</strong>.
     Choisissez le même rôle pour terminer.</div>{% endif %}
+  {% if role_prevu %}<div class="alert alert-info small">Choisi à l'installation : <strong>{% if role_prevu == "siege" %}Direction (siège){% elif role_prevu == "agence" %}Agence{% else %}Un seul site{% endif %}</strong>{% if fichier_prevu %}, avec le fichier d'installation de l'agence{% endif %}.</div>{% endif %}
   <div class="row g-3">
-    <div class="col-md-4"><form method="post" class="card card-body h-100">{% csrf_token %}<input type="hidden" name="role" value="seul">
+    <div class="col-md-4"><form method="post" class="card card-body h-100{% if role_prevu == 'seul' %} border-primary border-2{% endif %}">{% csrf_token %}<input type="hidden" name="role" value="seul">
       <h2 class="h6"><i class="bi bi-house"></i> Un seul site</h2>
       <p class="small text-muted flex-grow-1">La société travaille en un seul lieu (les postes du réseau local se connectent à ce serveur).
         Vous pourrez déclarer une direction et des agences plus tard (Fichier › Échanges entre agences).</p>
       <button class="btn btn-primary">Terminer</button></form></div>
-    <div class="col-md-4"><form method="post" class="card card-body h-100">{% csrf_token %}<input type="hidden" name="role" value="siege">
+    <div class="col-md-4"><form method="post" class="card card-body h-100{% if role_prevu == 'siege' %} border-primary border-2{% endif %}">{% csrf_token %}<input type="hidden" name="role" value="siege">
       <h2 class="h6"><i class="bi bi-building"></i> Direction (siège)</h2>
       <p class="small text-muted">Ce serveur reçoit les données des agences et consolide la comptabilité.</p>
       <label class="form-label small mb-0" for="r-code">Code du siège</label>
@@ -22,10 +23,12 @@
       <input id="r-nom" name="nom" class="form-control form-control-sm mb-2" value="Direction générale" required>
       <div class="form-text mb-2 flex-grow-1">Ensuite : déclarez chaque agence et remettez-lui son fichier d'installation.</div>
       <button class="btn btn-primary">Terminer</button></form></div>
-    <div class="col-md-4"><form method="post" enctype="multipart/form-data" class="card card-body h-100">{% csrf_token %}<input type="hidden" name="role" value="agence">
+    <div class="col-md-4"><form method="post" enctype="multipart/form-data" class="card card-body h-100{% if role_prevu == 'agence' %} border-primary border-2{% endif %}">{% csrf_token %}<input type="hidden" name="role" value="agence">
       <h2 class="h6"><i class="bi bi-shop"></i> Agence</h2>
-      <p class="small text-muted">Choisissez le fichier d'installation remis par la direction (ERP-INSTALLATION-….erpx).</p>
-      <input type="file" name="fichier" accept=".erpx" class="form-control form-control-sm mb-2 flex-grow-0" required aria-label="Fichier d'installation">
+      {% if fichier_prevu %}<input type="hidden" name="fichier_prevu" value="1">
+      <p class="small text-muted">Le fichier d'installation remis par la direction a été donné à l'installateur : <code>{{ fichier_prevu.name }}</code>.</p>
+      {% else %}<p class="small text-muted">Choisissez le fichier d'installation remis par la direction (ERP-INSTALLATION-….erpx).</p>
+      <input type="file" name="fichier" accept=".erpx" class="form-control form-control-sm mb-2 flex-grow-0" required aria-label="Fichier d'installation">{% endif %}
       <div class="flex-grow-1"></div>
       <button class="btn btn-primary">Installer l'agence</button></form></div>
   </div>
