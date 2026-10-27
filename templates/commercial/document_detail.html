@@ -8,7 +8,7 @@
       <button type="button" class="dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-gear"></i> Fonctions</button>
       <ul class="dropdown-menu">
         {% if object.modifiable %}
-        <li><a class="dropdown-item" href="{% url 'commercial:document_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier la pièce</a></li>
+        <li><a class="dropdown-item" data-erp-action="modifier" href="{% url 'commercial:document_update' object.pk %}"><i class="bi bi-pencil"></i> Modifier la pièce</a></li>
         <li><form method="post" action="{% url 'commercial:document_valider' object.pk %}" onsubmit="return confirm('Valider ce document ?')">{% csrf_token %}
           <button class="dropdown-item"><i class="bi bi-check2-circle"></i> Valider la pièce</button></form></li>
         {% endif %}
@@ -28,7 +28,7 @@
     <span class="inactif"><i class="bi bi-bar-chart-steps"></i> Barèmes</span>
     <button type="button" id="piece-informations"><i class="bi bi-card-list"></i> Informations</button>
     <span class="inactif"><i class="bi bi-file-earmark"></i> Pied</span>
-    <a target="_blank" href="{% url 'commercial:document_print' object.pk %}"><i class="bi bi-printer"></i> Imprimer</a>
+    <a target="_blank" data-erp-action="imprimer" href="{% url 'commercial:document_print' object.pk %}"><i class="bi bi-printer"></i> Imprimer</a>
     {% if object.ecriture %}<a data-nouvelle-fenetre href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}" title="Écriture {{ object.ecriture.numero }}"><i class="bi bi-journal-check"></i> Comptabiliser</a>
     {% else %}<span class="inactif" title="{% if object.est_facturation %}Comptabilisée à la validation{% else %}Pièce non comptable{% endif %}"><i class="bi bi-journal-check"></i> Comptabiliser</span>{% endif %}
     {% with transfos=object.transformations_possibles %}
