@@ -26,7 +26,8 @@ async function scenario(pressePapier, modificationPendantAttente = false) {
   };
   const window = {};
   const contexte = { document, window, navigator: { clipboard: pressePapier },
-    localStorage: { getItem: () => null }, setTimeout: () => {}, location: {}, console, URL };
+    localStorage: { getItem: () => null }, setTimeout: () => {}, location: {}, console, URL,
+    Event: class { constructor(nom) { this.type = nom; } } };
   vm.runInNewContext(code, contexte);
   evenements.focusin({ target: champ });
 
