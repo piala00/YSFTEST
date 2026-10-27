@@ -124,6 +124,24 @@ class LicencesTests(TestCase):
                                   "--code", "pas-un-code"], env=self.env, capture_output=True, text=True)
         self.assertNotEqual(mauvais.returncode, 0)
 
+    def test_outil_enregistrer_sous_et_societes_connues(self):
+        import importlib.util
+
+        choisi = self.donnees / "Clients" / "Transports du Centre" / "licence serveur"     # dossier et nom choisis
+        sortie = subprocess.run([sys.executable, str(OUTIL), "emettre", "--cle", str(Path(self.dossier.name, "cle-privee.pem")),
+                                 "--client", "Transports du Centre", "--niu", "M999", "--edition", "transport", "--role", "agence",
+                                 "--site", "BTA", "--postes", "4", "--code", l.code_activation(), "--fichier", str(choisi)],
+                                env=self.env, capture_output=True, text=True)
+        self.assertEqual(sortie.returncode, 0, sortie.stderr)
+        fichier = choisi.with_name("licence serveur.erplic")
+        self.assertTrue(fichier.exists())
+        spec = importlib.util.spec_from_file_location("outil_licences", OUTIL)
+        outil = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(outil)
+        connus = outil.clients_connus(self.dossier.name)
+        self.assertEqual(connus["Transports du Centre"]["niu"], "M999")
+        self.assertEqual(connus["Transports du Centre"]["fichier"], str(fichier))
+
     # ------------------------------------------------------------ essai
     def test_essai_trente_jours_puis_lecture_seule(self):
         e = l.etat(J)

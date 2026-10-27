@@ -14,7 +14,7 @@ Code : `apps/licences/` (contrôle), `deploy/licences/licences.py` (outil du pro
    Sauvegarder le dossier `ERP-OHADA-Licences` (clé privée + registre) sur une clé USB gardée au coffre.
 3. Envoyer à Claude le contenu de **cle-publique.txt** (une ligne, sans danger) : il est ajouté dans
    `apps/licences/cle_publique.txt` et les programmes suivants savent vérifier vos licences.
-4. Pour chaque client : il vous envoie le **code d'activation** (écran *Licence*) → double-clic sur l'outil →
+4. Pour chaque client : il vous envoie le **code d'activation** (écran *Licence*) → double-clic sur l'outil : choisissez la **société** (liste des clients déjà servis, ou nouvelle), réglez la licence, puis **Générer la licence…** ouvre « Enregistrer sous » : vous choisissez le dossier et le nom du fichier `.erplic`, que vous envoyez au client.
    **2. Émettre une licence** → envoyez-lui le fichier `.erplic` produit.
 
 Les sections suivantes gardent la proposition d'origine ; les **[À DÉCIDER]** sont tranchés comme ci-dessus.
