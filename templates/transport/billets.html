@@ -2,7 +2,7 @@
 {% block title %}Billets vendus{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Billets {% if q %}— recherche « {{ q }} »{% else %}vendus le {{ jour|date:"d/m/Y" }}{% endif %}</h1>
-  <a class="btn btn-primary btn-sm" href="{% url 'transport:billet_vente' %}"><i class="bi bi-ticket-perforated"></i> Vendre un billet</a></div>
+  <a class="btn btn-primary btn-sm" data-erp-action="ajouter" href="{% url 'transport:billet_vente' %}"><i class="bi bi-ticket-perforated"></i> Vendre un billet</a></div>
 <form class="d-flex gap-2 align-items-end mb-3"><div><label class="form-label small mb-0" for="b-date">Date de vente</label>
   <input type="date" id="b-date" name="date" value="{{ jour|date:'Y-m-d' }}" class="form-control form-control-sm" onchange="this.form.submit()"></div>
   <div><label class="form-label small mb-0" for="b-q">N°, voyageur ou téléphone</label><input id="b-q" name="q" value="{{ q }}" class="form-control form-control-sm"></div>
