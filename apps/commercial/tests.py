@@ -318,3 +318,11 @@ class StocksTests(BaseCommerciale):
         self.assertEqual(soldes["6031000"], Decimal("-80000"))
         with self.assertRaises(ValidationError):
             constater_variation_stock(timezone.localdate())
+
+
+class RecetteBoutonsDocumentsTests(TestCase):
+    def test_refuse_une_base_qui_n_est_pas_de_recette(self):
+        from django.core.management.base import CommandError
+
+        with self.assertRaisesMessage(CommandError, "Base de recette seulement"):
+            call_command("recette_boutons_documents", sortie="/tmp/inutile")
