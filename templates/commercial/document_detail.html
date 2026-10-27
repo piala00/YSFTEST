@@ -29,11 +29,11 @@
     <button type="button" id="piece-informations"><i class="bi bi-card-list"></i> Informations</button>
     <span class="inactif"><i class="bi bi-file-earmark"></i> Pied</span>
     <a target="_blank" data-erp-action="imprimer" href="{% url 'commercial:document_print' object.pk %}"><i class="bi bi-printer"></i> Imprimer</a>
-    {% if object.ecriture %}<a data-nouvelle-fenetre href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}" title="Écriture {{ object.ecriture.numero }}"><i class="bi bi-journal-check"></i> Comptabiliser</a>
-    {% else %}<span class="inactif" title="{% if object.est_facturation %}Comptabilisée à la validation{% else %}Pièce non comptable{% endif %}"><i class="bi bi-journal-check"></i> Comptabiliser</span>{% endif %}
+    {% if object.ecriture %}<a data-nouvelle-fenetre href="{% url 'comptabilite:ecriture_detail' object.ecriture.pk %}" title="Consulter l'écriture {{ object.ecriture.numero }} déjà créée à la validation"><i class="bi bi-journal-check"></i> Voir l'écriture comptable</a>
+    {% else %}<span class="inactif" title="{% if object.est_facturation %}Écriture créée automatiquement à la validation si les conditions sont réunies ; aucune écriture disponible actuellement{% else %}Pièce non comptable{% endif %}"><i class="bi bi-journal-check"></i> Écriture comptable indisponible</span>{% endif %}
     {% with transfos=object.transformations_possibles %}
     <div class="dropdown">
-      <button type="button" class="dropdown-toggle" data-bs-toggle="dropdown" {% if not transfos %}disabled{% endif %}><i class="bi bi-arrow-repeat"></i> Transformer</button>
+      <button type="button" id="piece-transformer" class="dropdown-toggle" data-bs-toggle="dropdown" {% if not transfos %}disabled{% endif %}><i class="bi bi-arrow-repeat"></i> Transformer</button>
       <ul class="dropdown-menu">{% for code, lib in transfos %}<li><form method="post" action="{% url 'commercial:document_transformer' object.pk %}">{% csrf_token %}
         <input type="hidden" name="type_cible" value="{{ code }}"><button class="dropdown-item">{{ lib }}</button></form></li>{% endfor %}</ul>
     </div>
