@@ -332,6 +332,68 @@ def liste_articles(debut, fin, **_):
 
 
 # code : (titre, période requise, fonction)
+# ---------------------------------------------------------------------------
+# Stocks et retours (compléments au découpage Sage : audit du reporting)
+# ---------------------------------------------------------------------------
+def rotation_stocks(debut, fin, **_):
+    """Par article suivi en stock : stock au début et à la fin, entrées, sorties, rotation (sorties / stock moyen),
+    couverture (jours de sorties que le stock final permet) et alerte de rupture. Sans dépôt choisi, les transferts
+    entre dépôts ne comptent ni en entrée ni en sortie."""
+    from django.db.models import Q, Sum
+
+    from apps.commercial.models import MouvementStock
+
+    c = _criteres.get()
+    mouvements = MouvementStock.objects.filter(date__lte=fin, article__suivi_stock=True)
+    if c.get("depot"):
+        mouvements = mouvements.filter(depot_id=c["depot"])
+    else:
+        mouvements = mouvements.exclude(document__type_document=Document.STOCK_VIREMENT)
+    mouvements = _filtrer_articles(mouvements, sur_lignes=True)
+    periode = Q(date__gte=debut)
+    totaux = {r["article"]: r for r in mouvements.values("article").annotate(
+        avant=Sum("quantite", filter=Q(date__lt=debut)),
+        entrees=Sum("quantite", filter=periode & Q(quantite__gt=0)),
+        sorties=Sum("quantite", filter=periode & Q(quantite__lt=0)))}
+    jours = (fin - debut).days + 1
+    lignes = []
+    for article in Article.objects.filter(pk__in=totaux).order_by("reference"):
+        t = totaux[article.pk]
+        avant, entrees, sorties = t["avant"] or ZERO, t["entrees"] or ZERO, -(t["sorties"] or ZERO)
+        apres = avant + entrees - sorties
+        moyen = (avant + apres) / 2
+        rotation = sorties / moyen if moyen > 0 else None
+        couverture = int(apres / (sorties / jours)) if sorties > 0 and apres > 0 else None
+        alerte = "Rupture" if apres <= 0 else ("Sous le stock d'alerte" if article.stock_minimum and apres <= article.stock_minimum
+                                              else ("Sans sortie" if not sorties else ""))
+        lignes.append({"reference": article.reference, "designation": article.designation, "debut": avant,
+                       "entrees": entrees, "sorties": sorties, "fin_stock": apres,
+                       "rotation": f"{rotation:.1f}".replace(".", ",") if rotation is not None else "—",
+                       "couverture": couverture, "alerte": alerte, "lien": f"/commercial/articles/{article.pk}/"})
+    lignes.sort(key=lambda l: ({"Rupture": 0, "Sous le stock d'alerte": 1}.get(l["alerte"], 2), l["reference"]))
+    colonnes = [("reference", "Référence", "texte"), ("designation", "Désignation", "texte"),
+                ("debut", "Stock début", "quantite"), ("entrees", "Entrées", "quantite"), ("sorties", "Sorties", "quantite"),
+                ("fin_stock", "Stock fin", "quantite"), ("rotation", "Rotation", "texte"),
+                ("couverture", "Couverture (jours)", "entier"), ("alerte", "Alerte", "texte")]
+    return colonnes, lignes
+
+
+def avoirs_retours(debut, fin, **_):
+    """Factures de retour et d'avoir clients de la période, rapprochées de la pièce d'origine et du chiffre d'affaires."""
+    docs = _filtrer_documents(Document.objects.filter(type_document__in=VENTES_MOINS, statut__in=VALIDES,
+                                                      date__gte=debut, date__lte=fin)
+                              .select_related("tiers", "origine").order_by("date", "numero"))
+    ca = sum((l.montant_ht * signe for l, signe in _lignes(debut, fin, VENTES_PLUS, ())), ZERO)
+    lignes = [{"date": d.date, "numero": d.numero_affiche, "type": d.get_type_document_display(),
+               "tiers": d.tiers.nom if d.tiers_id else "", "origine": d.origine.numero if d.origine_id else "",
+               "ht": d.total_ht, "ttc": d.total_ttc, "part": _pourcent(d.total_ht, ca),
+               "lien": f"/commercial/document/{d.pk}/"} for d in docs]
+    colonnes = [("date", "Date", "date"), ("numero", "N° pièce", "texte"), ("type", "Type", "texte"), ("tiers", "Client", "texte"),
+                ("origine", "Pièce d'origine", "texte"), ("ht", "Montant HT", "montant"), ("ttc", "Montant TTC", "montant"),
+                ("part", "Part du CA facturé", "pourcent")]
+    return colonnes, lignes
+
+
 ETATS = {
     "activite_clients": ("Activité clients", True, activite_clients),
     "rentabilite_clients": ("Rentabilité clients", True, rentabilite_clients),
@@ -355,6 +417,8 @@ ETATS = {
     "liste_clients": ("Liste des clients", False, liste_clients),
     "liste_fournisseurs": ("Liste des fournisseurs", False, liste_fournisseurs),
     "liste_articles": ("Liste des articles", False, liste_articles),
+    "rotation_stocks": ("Rotation des stocks et ruptures", True, rotation_stocks),
+    "avoirs_retours": ("Avoirs et retours clients", True, avoirs_retours),
 }
 
 

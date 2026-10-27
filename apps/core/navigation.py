@@ -490,6 +490,8 @@ GESTION_COMMERCIALE = Module(
                 E("etats.clients.activite", "Activité clients", "commercial:statistique", "activite_clients"),
                 E("etats.clients.rentabilite", "Rentabilité clients", "commercial:statistique", "rentabilite_clients"),
                 E("etats.clients.risque", "Risque clients", "commercial:statistique", "risque_clients"),
+                E("etats.clients.avoirs", "Avoirs et retours clients", "commercial:statistique", "avoirs_retours",
+                  preuve="AJOUT-ERP"),
             ]),
             E("etats.cadencier_clients", "Cadencier clients"),
             E("etats.statistiques_clients", "Statistiques clients", icone="bi-graph-up", enfants=[
@@ -514,6 +516,8 @@ GESTION_COMMERCIALE = Module(
                 E("etats.articles.articles", "Statistiques articles", "commercial:statistique", "articles"),
                 E("etats.articles.familles", "Statistiques familles", "commercial:statistique", "familles"),
                 E("etats.articles.palmares", "Palmarès des ventes", "commercial:statistique", "palmares_ventes"),
+                E("etats.articles.rotation", "Rotation des stocks et ruptures", "commercial:statistique", "rotation_stocks",
+                  preuve="AJOUT-ERP"),
             ]),
             E("etats.mouvements", "Mouvements de stock", "commercial:mouvements", icone="bi-arrow-left-right", vue="etat"),
             E("etats.inventaire", "Inventaire", icone="bi-clipboard-data", enfants=[

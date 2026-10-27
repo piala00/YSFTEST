@@ -131,6 +131,33 @@ class PagesEtApiTests(TestCase):
                 self.assertEqual(self.client.get(reverse("commercial:statistique", args=[code]) + "?export=csv").status_code, 200)
         self.assertEqual(self.client.get(reverse("commercial:statistique", args=["inexistant"])).status_code, 404)
 
+    def test_rotation_des_stocks_et_avoirs(self):
+        import datetime
+
+        from django.db.models import Sum
+
+        from apps.commercial.models import MouvementStock
+        from apps.reporting import statistiques
+
+        debut, fin = datetime.date(2026, 1, 1), datetime.date(2026, 12, 31)
+        rotation = statistiques.calculer("rotation_stocks", debut, fin)
+        self.assertTrue(rotation["lignes"])
+        for l in rotation["lignes"]:
+            self.assertEqual(l["fin_stock"], l["debut"] + l["entrees"] - l["sorties"])
+            reel = (MouvementStock.objects.filter(article__reference=l["reference"], date__lte=fin)
+                    .exclude(document__type_document=Document.STOCK_VIREMENT).aggregate(q=Sum("quantite"))["q"])
+            self.assertEqual(l["fin_stock"], reel, l["reference"])
+            if l["fin_stock"] <= 0:
+                self.assertEqual(l["alerte"], "Rupture")
+
+        facture = Document.objects.filter(type_document=Document.FACTURE, statut=Document.VALIDE, date__gte=debut).first()
+        avoir = facture.transformer(Document.AVOIR, self.user)
+        avoir.valider()
+        etat = statistiques.calculer("avoirs_retours", debut, fin)
+        ligne = next(l for l in etat["lignes"] if l["numero"] == avoir.numero_affiche)
+        self.assertEqual((ligne["origine"], ligne["ht"]), (facture.numero, avoir.total_ht))
+        self.assertGreater(ligne["part"], 0)
+
     def test_saisie_facture_par_formulaire(self):
         tiers = Tiers.objects.filter(type_tiers=Tiers.CLIENT).first()
         article = Article.objects.first()
