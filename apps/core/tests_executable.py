@@ -20,7 +20,7 @@ class ProgrammeCompileTests(SimpleTestCase):
     def setUp(self):
         temporaire = tempfile.TemporaryDirectory()
         self.addCleanup(temporaire.cleanup)
-        self.addCleanup(lambda: [os.chmod(f, stat.S_IREAD | stat.S_IWRITE) for f in Path(temporaire.name).rglob("*")])
+        self.addCleanup(lambda: [os.chmod(f, stat.S_IREAD | stat.S_IWRITE) for f in Path(temporaire.name).rglob("*") if f.is_file()])
         self.donnees = Path(temporaire.name)
         self.base = self.donnees / "erp.sqlite3"
         with sqlite3.connect(self.base) as c:

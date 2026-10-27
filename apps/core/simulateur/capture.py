@@ -163,8 +163,7 @@ def ecrans_bureau():
             if isinstance(instruction.value, ast.List):
                 listes[nom] = [e.value for e in instruction.value.elts if isinstance(e, ast.Constant)]
             elif nom.startswith("ECRANS_") and isinstance(instruction.value, ast.Dict):
-                module = {"ECRANS_COMMERCIAL": "commercial", "ECRANS_COMPTABILITE": "comptabilite",
-                          "ECRANS_REPORTING": "reporting"}[nom]
+                module = nom.removeprefix("ECRANS_").lower()          # ECRANS_ANALYTIQUE → analytique, etc.
                 ecrans[module] = {}
                 for cle, fonction in zip(instruction.value.keys, instruction.value.values):
                     appel = fonction.body

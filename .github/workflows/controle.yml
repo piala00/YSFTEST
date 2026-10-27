@@ -1,0 +1,117 @@
+# Contrôle de chaque envoi et de chaque pull request (Claude, GPT/Codex) : rien n'est fusionné si un de ces travaux échoue.
+#   tests-linux       toute la suite de tests (SQLite)
+#   tests-sqlserver   toute la suite sur un vrai SQL Server 2022 (conteneur jetable)
+#   windows           compilation du programme Windows (.exe) pour chaque édition, puis démarrage réel :
+#                     base créée, page de connexion servie, sauvegarde faite ; le programme compilé est conservé 7 jours
+name: Contrôle
+
+on:
+  push:
+    branches: [ccr-5592a371-fusjt2, main, "gpt/**", "codex/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: controle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Tests (SQLite)
+        run: python manage.py test --noinput --parallel 4 -v1
+
+  tests-sqlserver:
+    runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Essai-ERP-2026!"      # conteneur jetable du contrôle, aucune donnée
+        ports: ["1433:1433"]
+    env:
+      DB_ENGINE: mssql
+      DB_HOST: 127.0.0.1
+      DB_USER: sa
+      DB_PASSWORD: "Essai-ERP-2026!"
+      DB_NAME: ERP_ESSAI
+      DB_PYTHON_DRIVER: mssql_python
+      DB_EXTRA_PARAMS: TrustServerCertificate=yes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: |
+          sudo apt-get install -y libltdl7 > /dev/null || true
+          pip install -r requirements.txt "mssql-django>=2.0" mssql-python
+      - name: Attendre SQL Server
+        run: for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/1433) 2>/dev/null && exit 0; sleep 2; done; exit 1
+      - name: Tests (SQL Server 2022)
+        run: python manage.py test --noinput -v1
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - edition: transport
+            nom: Transport
+            port: 8100
+          - edition: commerce
+            nom: Commerce
+            port: 8000
+    env:
+      ERP_EDITION: ${{ matrix.edition }}
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"                     # même version que le paquet Windows
+          cache: pip
+      - run: pip install -r deploy/windows/outils/composants.txt -r deploy/windows/outils/compilation.txt
+      - run: python manage.py collectstatic --noinput -v0
+      - name: Compiler le programme
+        run: python -m PyInstaller deploy/executable/erp_ohada.spec --noconfirm --workpath build --distpath dist
+      - name: Démarrer le programme compilé et l'interroger
+        shell: pwsh
+        run: |
+          $exe = "dist\ERP-OHADA-${{ matrix.nom }}\ERP-OHADA-${{ matrix.nom }}.exe"
+          $env:ERP_DONNEES = "$env:RUNNER_TEMP\donnees"
+          $env:ERP_ADMIN = "essai"; $env:ERP_ADMIN_MDP = "Essai-Windows-2026"
+          $env:ERP_SANS_NAVIGATEUR = "1"; $env:ERP_RESEAU = "0"
+          $p = Start-Process -FilePath $exe -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\sortie.txt" -RedirectStandardError "$env:RUNNER_TEMP\erreurs.txt"
+          $ok = $false
+          for ($i = 0; $i -lt 90; $i++) {
+            Start-Sleep -Seconds 2
+            try { if ((Invoke-WebRequest "http://127.0.0.1:${{ matrix.port }}/connexion/" -UseBasicParsing -TimeoutSec 5).StatusCode -eq 200) { $ok = $true; break } } catch {}
+            if ($p.HasExited) { break }
+          }
+          Get-Content "$env:RUNNER_TEMP\sortie.txt" -ErrorAction SilentlyContinue
+          Get-Content "$env:RUNNER_TEMP\erreurs.txt" -ErrorAction SilentlyContinue | Select-Object -Last 40
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          if (-not $ok) { throw "Le programme n'a pas servi la page de connexion" }
+          if (-not (Test-Path "$env:ERP_DONNEES\erp.sqlite3")) { throw "Base non créée" }
+          if (-not (Get-ChildItem "$env:ERP_DONNEES\sauvegardes\erp-*.sqlite3")) { throw "Pas de sauvegarde au démarrage" }
+          & $exe sauvegarder
+          if ($LASTEXITCODE -ne 0) { throw "Sauvegarde à la demande en échec" }
+          Write-Output "Programme Windows ${{ matrix.nom }} : compilé, démarré, page de connexion servie, sauvegardes faites."
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ERP-OHADA-${{ matrix.nom }}-Windows-exe
+          path: dist/ERP-OHADA-${{ matrix.nom }}
+          retention-days: 7
