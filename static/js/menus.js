@@ -57,8 +57,24 @@
     annuler: () => { if (dernierChamp) { dernierChamp.focus(); document.execCommand('undo'); } },
     couper: () => {
       if (!dernierChamp) return signaler('Sélectionnez du texte dans un champ.');
-      const c = dernierChamp, texte = c.value.slice(c.selectionStart, c.selectionEnd);
-      navigator.clipboard?.writeText(texte); remplacerSelection(c, ''); c.focus();
+      const c = dernierChamp;
+      if (c.readOnly || c.disabled || !Number.isInteger(c.selectionStart) || !Number.isInteger(c.selectionEnd)) {
+        return signaler('Ce champ ne permet pas de couper le texte.');
+      }
+      const debut = c.selectionStart, fin = c.selectionEnd, valeurInitiale = c.value;
+      const texte = valeurInitiale.slice(debut, fin);
+      if (!texte) return signaler('Sélectionnez le texte à couper.');
+      // Ne jamais supprimer localement si la copie échoue ou est refusée par le navigateur.
+      if (typeof navigator.clipboard?.writeText !== 'function') {
+        return signaler('Utilisez Ctrl+X : accès au presse-papiers indisponible.');
+      }
+      navigator.clipboard.writeText(texte).then(() => {
+        // Une écriture asynchrone ne doit pas écraser une saisie effectuée entre-temps.
+        if (c.value !== valeurInitiale) return signaler('Le champ a changé : coupe annulée.');
+        c.focus();
+        c.setSelectionRange(debut, fin);
+        remplacerSelection(c, '');
+      }).catch(() => signaler('Coupe annulée : accès au presse-papiers refusé.'));
     },
     copier: () => {
       const texte = dernierChamp && dernierChamp.selectionStart !== dernierChamp.selectionEnd
