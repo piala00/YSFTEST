@@ -113,6 +113,7 @@ import json
 from apps.core import base_donnees as bd
 f = bd.sauvegarder_sqlserver()
 assert f in [s["nom"] for s in bd.sauvegardes_sqlserver()]
+assert bd.sauvegarder_sqlserver() != f                     # même seconde : jamais le même fichier (régression)
 from django.contrib.auth.models import User
 User.objects.create_user("apres", "", "Apres-2026-ok")
 print(json.dumps(f))""")

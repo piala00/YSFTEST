@@ -121,13 +121,18 @@ def dossier_sauvegarde_sqlserver(alias="default"):
         return (cur.fetchone()[0] or "").rstrip("\\/")
 
 
-def sauvegarder_sqlserver(alias="default", base=None):
+def sauvegarder_sqlserver(alias="default", base=None, motif=""):
     """BACKUP DATABASE … WITH CHECKSUM, COPY_ONLY (n'interfère pas avec les sauvegardes du service informatique),
     puis RESTORE VERIFYONLY. Renvoie le chemin du fichier .bak sur le serveur SQL."""
     base = base or _nom(alias)
     dossier = dossier_sauvegarde_sqlserver(alias)
     separateur = "\\" if "\\" in dossier or ":" in dossier[:3] else "/"
-    fichier = f"{dossier}{separateur}ERP-{base}-{datetime.datetime.now():%Y%m%d-%H%M%S}.bak"
+    # Nom toujours unique : deux sauvegardes dans la même seconde (ex. celle faite juste avant une restauration)
+    # ne doivent jamais s'écraser — WITH INIT remplacerait la sauvegarde que l'on veut restaurer
+    import uuid
+
+    fichier = (f"{dossier}{separateur}ERP-{base}-{datetime.datetime.now():%Y%m%d-%H%M%S}"
+               f"{'-' + motif if motif else ''}-{uuid.uuid4().hex[:6]}.bak")
     with connections[alias].cursor() as cur:
         cur.execute(f"BACKUP DATABASE [{base}] TO DISK = N'{fichier}' WITH INIT, CHECKSUM, COPY_ONLY")
         while cur.nextset():                                       # messages de progression de BACKUP
@@ -157,7 +162,9 @@ def restaurer_sqlserver(reglage, fichier):
     from apps.core.management.commands.miroir import connexion_temporaire
 
     with connexion_temporaire("_maitre", {**reglage, "NAME": "master"}) as maitre:
-        avant = sauvegarder_sqlserver("_maitre", base)
+        avant = sauvegarder_sqlserver("_maitre", base, motif="avant-restauration")
+        if avant == fichier:                                      # impossible avec un nom unique, mais jamais d'écrasement
+            raise RuntimeError("la sauvegarde de sécurité porterait le nom de la sauvegarde à restaurer")
         with maitre.cursor() as cur:
             cur.execute(f"ALTER DATABASE [{base}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE")
             try:
