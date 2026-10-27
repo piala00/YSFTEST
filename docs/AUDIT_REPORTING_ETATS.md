@@ -112,7 +112,7 @@ voyages, contrats, et les plans de sections créés par l'utilisateur.
 | Top / bottom des éléments analytiques | Existe | `reporting:classement` | oui |
 | Comparatif multisites | Existe | `reporting:comparaison` sur le plan agences ou villes | oui |
 | Plusieurs mois, N et N-1 | Existe | `reporting:matrice`, `reporting:comparaison` (N-1) | oui |
-| Trésorerie projetée | Absent | pas de prévision | — |
+| Trésorerie projetée | Existe | `comptabilite:tresorerie_projetee` : trésorerie réelle de départ, factures à échéance, prévisions uniques ou mensuelles, budget validé en option | oui |
 | Écart scénario / réel | Absent | pas de scénario enregistré | — |
 | Simulation par mois et cumulée | Existe | commande `simulation --nombre-mois N` (BILAN-SIMULATION.md, tableau mois par mois) ; tous les états sur le dossier de simulation | oui |
 | Hypothèses et sensibilités | Absent | — | — |
@@ -128,14 +128,14 @@ voyages, contrats, et les plans de sections créés par l'utilisateur.
 | Analytique | 16 | 14 | 2 | 0 | 0 |
 | Commerce | 10 | 5 | 4 | 1 | 0 |
 | Transport | 17 | 16 | 1 | 0 | 0 |
-| Direction et scénarios | 11 | 5 | 3 | 3 | 0 |
-| **Total** | **73** | **54** | **13** | **4** | **2** |
+| Direction et scénarios | 11 | 6 | 3 | 2 | 0 |
+| **Total** | **73** | **55** | **13** | **3** | **2** |
 
 Ces totaux portent sur les lignes de ce document. Les deux balances âgées et les deux échéanciers du catalogue sont regroupés en une ligne chacun.
 
 **Priorités proposées** (rien n'est commencé sans accord) :
 1. ~~Budget, avec un état budget / réel par plan~~ — fait le 27/10/2026.
-2. Trésorerie projetée.
+2. ~~Trésorerie projetée~~ — fait le 27/10/2026.
 3. Vendeur sur les documents de vente, avec un état des ventes par commercial.
 4. Canal de vente (guichet, Mobile Money, en ligne) comme plan analytique.
 5. Liste unique des contrôles de clôture et des anomalies.

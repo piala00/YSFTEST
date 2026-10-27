@@ -671,6 +671,8 @@ COMPTABILITE = Module(
               icone="bi-diagram-3", preuve="AJOUT-ERP"),
             SEP(),
             E("etats.budgetaires", "Etats budgétaires", icone="bi-bullseye", preuve="INDICATIF"),
+            E("etats.tresorerie_projetee", "Trésorerie projetée", "comptabilite:tresorerie_projetee", icone="bi-graph-up-arrow",
+              preuve="AJOUT-ERP"),
             SEP(),
             E("etats.financiers", "Bilan / Compte de résultat", icone="bi-bank", preuve="ERG-CLASSIQUE", enfants=[
                 E("etats.financiers.bilan", "Bilan", "comptabilite:bilan", preuve="ERG-CLASSIQUE"),
