@@ -9,6 +9,10 @@
     <span class="inactif" title="Non disponible"><i class="bi bi-star-fill"></i> Mes filtres <i class="bi bi-caret-down-fill"></i></span>
     <form class="liste-recherche" method="get">
       {% if filtre %}<input type="hidden" name="filtre" value="{{ filtre }}">{% endif %}
+      {% if request.GET.statut %}<input type="hidden" name="statut" value="{{ request.GET.statut }}">{% endif %}
+      {% if request.GET.depot %}<input type="hidden" name="depot" value="{{ request.GET.depot }}">{% endif %}
+      {% if request.GET.tri %}<input type="hidden" name="tri" value="{{ request.GET.tri }}">{% endif %}
+      {% if request.GET.sens %}<input type="hidden" name="sens" value="{{ request.GET.sens }}">{% endif %}
       <input name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="N° pièce, tiers, référence…" aria-label="Rechercher">
       <button class="btn btn-sm" title="Rechercher"><i class="bi bi-search"></i></button>
     </form>
@@ -18,6 +22,9 @@
       {% for code, libelle in filtres %}<a href="?{% if base_filtre %}{{ base_filtre }}&amp;{% endif %}filtre={{ code }}" class="{% if code == filtre %}actif{% endif %}">{{ libelle }}</a>{% endfor %}
       <form method="get" class="liste-criteres" id="liste-criteres" hidden>
         <input type="hidden" name="filtre" value="{{ filtre }}">
+        {% if request.GET.q %}<input type="hidden" name="q" value="{{ request.GET.q }}">{% endif %}
+        {% if request.GET.tri %}<input type="hidden" name="tri" value="{{ request.GET.tri }}">{% endif %}
+        {% if request.GET.sens %}<input type="hidden" name="sens" value="{{ request.GET.sens }}">{% endif %}
         <label class="small mb-0" for="crit-statut">Statut</label>
         <select id="crit-statut" name="statut" class="form-select form-select-sm mb-1" onchange="this.form.submit()"><option value="">Tous</option>
           {% for code, lib in statuts %}<option value="{{ code }}" {% if code == request.GET.statut %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select>
