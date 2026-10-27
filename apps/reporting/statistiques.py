@@ -394,6 +394,25 @@ def avoirs_retours(debut, fin, **_):
     return colonnes, lignes
 
 
+def reglements_modes(debut, fin, **_):
+    """Encaissements (clients) et décaissements (fournisseurs) de la période par mode de paiement."""
+    from apps.commercial.models import Reglement
+
+    qs = _filtrer_documents(Reglement.objects.filter(date__gte=debut, date__lte=fin).select_related("tiers"))
+    par_mode = {code: {"mode": libelle, "nb": 0, "encaisse": ZERO, "decaisse": ZERO} for code, libelle in Reglement.MODES}
+    for r in qs:
+        ligne = par_mode.setdefault(r.mode, {"mode": r.get_mode_display(), "nb": 0, "encaisse": ZERO, "decaisse": ZERO})
+        ligne["nb"] += 1
+        ligne["encaisse" if r.est_encaissement else "decaisse"] += r.montant
+    total = sum((l["encaisse"] for l in par_mode.values()), ZERO)
+    lignes = [{**l, "net": l["encaisse"] - l["decaisse"], "part": _pourcent(l["encaisse"], total)}
+              for l in par_mode.values() if l["nb"]]
+    colonnes = [("mode", "Mode de paiement", "texte"), ("nb", "Nombre", "entier"), ("encaisse", "Encaissé (clients)", "montant"),
+                ("decaisse", "Décaissé (fournisseurs)", "montant"), ("net", "Net", "montant"),
+                ("part", "Part des encaissements", "pourcent")]
+    return colonnes, sorted(lignes, key=lambda l: -l["encaisse"])
+
+
 ETATS = {
     "activite_clients": ("Activité clients", True, activite_clients),
     "rentabilite_clients": ("Rentabilité clients", True, rentabilite_clients),
@@ -419,6 +438,7 @@ ETATS = {
     "liste_articles": ("Liste des articles", False, liste_articles),
     "rotation_stocks": ("Rotation des stocks et ruptures", True, rotation_stocks),
     "avoirs_retours": ("Avoirs et retours clients", True, avoirs_retours),
+    "reglements_modes": ("Règlements par mode de paiement", True, reglements_modes),
 }
 
 

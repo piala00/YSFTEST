@@ -78,7 +78,7 @@ voyages, contrats, et les plans de sections créés par l'utilisateur.
 | Recouvrement et retards, créances échues | Existe | risque clients, balance âgée, échéances | oui |
 | État du stock valorisé | Existe | `commercial:etat_inventaire`, `commercial:stock` | — |
 | Rotation et ruptures | Existe | état « Rotation des stocks et ruptures » (`commercial:statistique` rotation_stocks) : stock début / fin, entrées, sorties, rotation, couverture en jours, alertes | — |
-| Règlements et modes de paiement | Partiel | `commercial:reglements`, rapport commercial journalier | — |
+| Règlements et modes de paiement | Existe | état « Règlements par mode de paiement » (`commercial:statistique` reglements_modes), `commercial:reglements`, rapport commercial journalier | — |
 | Performance agences et magasins | Partiel | rapport commercial par agence, échanges entre agences ; pas de comparatif multi-magasins | — |
 | Avoirs et retours | Existe | état « Avoirs et retours clients » (`commercial:statistique` avoirs_retours) : pièce d'origine, montants, part du CA | — |
 
@@ -126,10 +126,10 @@ voyages, contrats, et les plans de sections créés par l'utilisateur.
 |---|---:|---:|---:|---:|---:|
 | Comptabilité générale | 19 | 15 | 2 | 0 | 2 |
 | Analytique | 16 | 14 | 2 | 0 | 0 |
-| Commerce | 10 | 7 | 2 | 1 | 0 |
+| Commerce | 10 | 8 | 1 | 1 | 0 |
 | Transport | 17 | 16 | 1 | 0 | 0 |
 | Direction et scénarios | 11 | 6 | 3 | 2 | 0 |
-| **Total** | **73** | **58** | **10** | **3** | **2** |
+| **Total** | **73** | **59** | **9** | **3** | **2** |
 
 Ces totaux portent sur les lignes de ce document. Les deux balances âgées et les deux échéanciers du catalogue sont regroupés en une ligne chacun.
 

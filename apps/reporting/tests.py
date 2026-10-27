@@ -150,6 +150,13 @@ class PagesEtApiTests(TestCase):
             if l["fin_stock"] <= 0:
                 self.assertEqual(l["alerte"], "Rupture")
 
+        from apps.commercial.models import Reglement
+
+        modes = statistiques.calculer("reglements_modes", debut, fin)
+        encaisse = sum(r.montant for r in Reglement.objects.filter(date__gte=debut, date__lte=fin) if r.est_encaissement)
+        self.assertEqual(modes["totaux"]["encaisse"], encaisse)
+        self.assertEqual(sum(l["nb"] for l in modes["lignes"]), Reglement.objects.filter(date__gte=debut, date__lte=fin).count())
+
         facture = Document.objects.filter(type_document=Document.FACTURE, statut=Document.VALIDE, date__gte=debut).first()
         avoir = facture.transformer(Document.AVOIR, self.user)
         avoir.valider()

@@ -484,6 +484,8 @@ GESTION_COMMERCIALE = Module(
             E("etats.personnalises", "Etats personnalisés"),
             E("etats.rapport_commercial", "Rapport commercial journalier", "commercial:rapport_commercial",
               icone="bi-cash-stack", preuve="AJOUT-ERP"),
+            E("etats.reglements_modes", "Règlements par mode de paiement", "commercial:statistique", "reglements_modes",
+              icone="bi-wallet2", preuve="AJOUT-ERP"),
             E("etats.fiche_stock", "Fiche de stock d'un article", "commercial:fiche_article", icone="bi-card-list", preuve="AJOUT-ERP"),
             SEP(),
             E("etats.analyse_clients", "Analyse clients", icone="bi-person-check", enfants=[
