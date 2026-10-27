@@ -151,5 +151,23 @@ const attendre = () => new Promise(resolve => setImmediate(resolve));
       assert.match(detail, /data-erp-action="imprimer"/);
     });
   }
+  {
+    const ecrans = [
+      ['commercial/article_list.html', 'ajouter'],
+      ['commercial/article_detail.html', 'modifier'],
+      ['commercial/tiers_list.html', 'ajouter'],
+      ['commercial/tiers_detail.html', 'modifier'],
+      ['comptabilite/ecriture_list.html', 'ajouter'],
+      ['comptabilite/journal_list.html', 'ajouter'],
+      ['transport/billets.html', 'ajouter'],
+      ['transport/departs.html', 'ajouter'],
+    ];
+    controler('huit fenêtres commerciales, comptables et transport ont leur action explicite', () => {
+      for (const [fichier, action] of ecrans) {
+        const template = fs.readFileSync(path.resolve(__dirname, '../templates', fichier), 'utf8');
+        assert.ok(template.includes('data-erp-action="' + action + '"'), fichier + ' : ' + action);
+      }
+    });
+  }
   console.log(total + ' contrôles OK');
 })().catch(e => { console.error(e); process.exitCode = 1; });
