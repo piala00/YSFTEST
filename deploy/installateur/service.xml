@@ -14,7 +14,7 @@
   <onfailure action="restart" delay="60 sec"/>
   <resetfailure>1 hour</resetfailure>
   <stoptimeout>30 sec</stoptimeout>
-  <logpath>%ProgramData%\ERP-OHADA\@EDITION@\journaux-service</logpath>
+  <logpath>%BASE%\journaux-service</logpath>
   <log mode="roll-by-size">
     <sizeThreshold>10240</sizeThreshold>
     <keepFiles>5</keepFiles>

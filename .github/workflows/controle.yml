@@ -146,14 +146,28 @@ jobs:
             }
             return $false
           }
+          function Diagnostic {
+            Get-Service $service -ErrorAction SilentlyContinue | Format-List Name, Status, StartType | Out-String | Write-Output
+            sc.exe qc $service | Write-Output
+            Get-ChildItem "$dossier\journaux-service" -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "== $($_.Name)"; Get-Content $_.FullName -Tail 40 }
+            Get-Content "$donnees\journal.txt" -Tail 30 -ErrorAction SilentlyContinue
+            Get-WinEvent -LogName System -MaxEvents 15 -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -eq "Service Control Manager" } | Format-List TimeCreated, Message | Out-String | Write-Output
+          }
+          function Attendre-Service {
+            for ($n = 0; $n -lt 30; $n++) {
+              if ((Get-Service $service -ErrorAction SilentlyContinue).Status -eq "Running") { return $true }
+              Start-Sleep -Seconds 2
+            }
+            return $false
+          }
           function Installer($journal) {
             $i = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/BASE=sqlite", "/TASKS=parefeu,service", "/DIR=`"$dossier`"", "/LOG=`"$journal`"" -Wait -PassThru
             if ($i.ExitCode -ne 0) { Get-Content $journal -Tail 40; throw "Installation en échec ($($i.ExitCode))" }
           }
           Installer "$env:RUNNER_TEMP\installation.log"
-          if ((Get-Service $service).Status -ne "Running") { throw "Service non démarré" }
+          if (-not (Attendre-Service)) { Diagnostic; Get-Content "$env:RUNNER_TEMP\installation.log" -Tail 30; throw "Service non démarré" }
           if ((Get-Service $service).StartType -notin @("Automatic", "AutomaticDelayedStart")) { throw "Service pas en démarrage automatique" }
-          if (-not (Attendre-Serveur)) { Get-ChildItem "$donnees\journaux-service" -ErrorAction SilentlyContinue | Get-Content -Tail 40; throw "Le service ne sert pas la page de connexion" }
+          if (-not (Attendre-Serveur)) { Diagnostic; throw "Le service ne sert pas la page de connexion" }
           if ((Get-Content "$donnees\role-installation.txt") -ne "siege") { throw "Rôle choisi non transmis à l'assistant" }
           if (-not (Test-Path "$donnees\erp.sqlite3")) { throw "Base SQLite non créée par le service" }
           netsh advfirewall firewall show rule name="ERP OHADA (port ${{ matrix.port }})" | Out-Null
@@ -161,12 +175,12 @@ jobs:
 
           # Le service se relance tout seul si le programme s'arrête
           Stop-Process -Name "ERP-OHADA-${{ matrix.nom }}" -Force
-          if (-not (Attendre-Serveur)) { throw "Le service ne s'est pas relancé après l'arrêt du programme" }
+          if (-not (Attendre-Serveur)) { Diagnostic; throw "Le service ne s'est pas relancé après l'arrêt du programme" }
 
           # Mise à jour par-dessus : service remplacé, données et configuration gardées
           $config = Get-Content "$donnees\configuration.env" -Raw
           Installer "$env:RUNNER_TEMP\mise-a-jour.log"
-          if ((Get-Service $service).Status -ne "Running") { throw "Service non redémarré après la mise à jour" }
+          if (-not (Attendre-Service)) { Diagnostic; throw "Service non redémarré après la mise à jour" }
           if (-not (Attendre-Serveur)) { throw "Serveur muet après la mise à jour" }
           if ((Get-Content "$donnees\configuration.env" -Raw) -ne $config) { throw "La mise à jour a modifié la configuration" }
 
