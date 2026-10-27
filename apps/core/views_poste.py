@@ -42,7 +42,8 @@ def installation_compte(request):
 
 @login_required
 def installation(request):
-    """Assistant : 1. identité de la société, 2. rôle de ce serveur (un seul site, direction ou agence)."""
+    """Assistant : 1. identité de la société, 2. rôle de ce serveur (un seul site, direction ou agence),
+    3. base de données (SQLite, SQL Server, ou SQLite avec copie miroir vers SQL Server ; programme compilé)."""
     if not request.user.is_superuser:
         return redirect("core:portail")
     from apps.echanges import lots
@@ -79,16 +80,54 @@ def installation(request):
         except lots.LotInvalide as exc:
             messages.error(request, f"Impossible : {exc}")
             return redirect(f"{request.path}?etape=role")
-        societe.refresh_from_db()
-        societe.assistant_termine = True
-        societe.save(update_fields=["assistant_termine"])
-        local = site_local()
-        messages.success(request, "Configuration terminée." + (f" Ce serveur : {local.code} — {local.get_role_display()}." if local else "")
-                         + " Pour des données d'essai : Fichier › Administration du poste › Simulation.")
-        return redirect("core:portail")
+        if "configurer" in poste.ACTIONS:                          # programme compilé : choix de la base ensuite
+            return redirect(f"{request.path}?etape=base")
+        return _terminer(request)
+    elif request.method == "POST" and etape == "base":
+        from . import base_donnees as bd
+
+        action = request.POST.get("action")
+        try:
+            if action == "sqlite":
+                return _terminer(request)
+            if action == "tester":
+                messages.info(request, bd.tester_sqlserver(_reglage_formulaire(request.POST)))
+            elif action in ("sqlserver", "miroir"):
+                cible = _reglage_formulaire(request.POST)
+                messages.info(request, bd.tester_sqlserver(cible))
+                Societe.objects.filter(pk=societe.pk).update(assistant_termine=True)   # copié avec le reste
+                if action == "miroir":
+                    poste.appeler("configurer", {
+                        "MIROIR_DB_ENGINE": "mssql", "MIROIR_DB_HOST": cible["HOST"], "MIROIR_DB_NAME": cible["NAME"],
+                        "MIROIR_DB_USER": cible["USER"] or None, "MIROIR_DB_PASSWORD": cible["PASSWORD"] or None,
+                        "MIROIR_DB_PYTHON_DRIVER": "mssql_python"})
+                    poste.appeler("redemarrer")
+                    return render(request, "core/redemarrage.html", {"titre": "Redémarrage"})
+                bd.lancer_changement(cible, apres=lambda: poste.appeler("configurer", _configuration_sqlserver(cible)))
+            elif action == "redemarrer":
+                poste.appeler("redemarrer")
+                return render(request, "core/redemarrage.html", {"titre": "Redémarrage"})
+        except (ValueError, RuntimeError) as exc:
+            messages.error(request, f"Impossible : {exc}")
+        except Exception as exc:
+            messages.error(request, f"Le serveur SQL a répondu : {str(exc)[:300]}")
+        return redirect(f"{request.path}?etape=base")
+    from . import base_donnees as bd
+
     return render(request, "core/installation.html", {
         "etape": etape, "form": form, "local": site_local(), "edition": societe.activite,
-        "role_prevu": prevue.get("role", ""), "fichier_prevu": prevue.get("fichier_agence")})
+        "role_prevu": prevue.get("role", ""), "fichier_prevu": prevue.get("fichier_agence"),
+        "changement": bd.ETAT_CHANGEMENT})
+
+
+def _terminer(request):
+    from apps.echanges.publication import site_local
+
+    Societe.objects.filter(pk=Societe.get().pk).update(assistant_termine=True)
+    local = site_local()
+    messages.success(request, "Configuration terminée." + (f" Ce serveur : {local.code} — {local.get_role_display()}." if local else "")
+                     + " Pour des données d'essai : Fichier › Administration du poste › Simulation.")
+    return redirect("core:portail")
 
 
 @login_required
@@ -145,3 +184,118 @@ def administration_poste(request):
 
     return render(request, "core/poste.html", {"titre": "Administration du poste", "etat": etat, "simulation": simulation,
                                                "licence_etat": etat_licence()})
+
+
+def _reglage_formulaire(post):
+    """Réglage SQL Server saisi à l'écran (compte Windows si l'utilisateur est vide)."""
+    from . import base_donnees as bd
+
+    hote, base = post.get("hote", "").strip(), post.get("base", "").strip() or "ERP"
+    if not hote:
+        raise ValueError("indiquez le serveur SQL (ex. SERVEUR\\SQLEXPRESS ou 192.168.1.10)")
+    return bd.reglage_sqlserver(hote, base, post.get("utilisateur", "").strip(), post.get("mot_de_passe", ""),
+                                post.get("port", "").strip())
+
+
+def _configuration_sqlserver(reglage):
+    return {"DB_ENGINE": "mssql", "DB_HOST": reglage["HOST"], "DB_NAME": reglage["NAME"], "DB_USER": reglage["USER"] or None,
+            "DB_PASSWORD": reglage["PASSWORD"] or None, "DB_PORT": reglage["PORT"] or None, "DB_PYTHON_DRIVER": "mssql_python",
+            "DB_EXTRA_PARAMS": "TrustServerCertificate=yes"}
+
+
+@login_required
+def base_donnees(request):
+    """Fichier › Administration du poste › Base de données : état, vérifier, réparer, optimiser, sauvegarder,
+    restaurer, changer de moteur (SQLite ↔ SQL Server), copie miroir, redémarrer."""
+    from . import base_donnees as bd
+    from . import droits as d
+
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {
+            "chemin": "Fichier › Administration du poste › Base de données", "operation": "administrer la base",
+            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    compile_ = poste.disponible()
+    resultat = None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        try:
+            if action == "verifier":
+                intacte, details = bd.verifier()
+                resultat = {"ok": intacte, "titre": "Vérification de l'intégrité", "details": details}
+            elif action == "reparer":
+                ok, message = bd.reparer()
+                resultat = {"ok": ok, "titre": "Réparation", "details": [message]}
+            elif action == "optimiser":
+                resultat = {"ok": True, "titre": "Optimisation", "details": [bd.optimiser()]}
+            elif action == "sauvegarder":
+                fichier = bd.sauvegarder_sqlserver() if bd.moteur() == "mssql" else poste.appeler("sauvegarder")
+                messages.success(request, f"Sauvegarde faite : {fichier}")
+            elif action == "restaurer":
+                if request.POST.get("confirmation") != "RESTAURER":
+                    raise ValueError("tapez RESTAURER pour confirmer")
+                fichier = request.POST.get("fichier", "")
+                if bd.moteur() == "mssql":
+                    if fichier not in {s["nom"] for s in bd.sauvegardes_sqlserver()}:
+                        raise ValueError("sauvegarde inconnue")
+                    poste.appeler("restaurer_sqlserver_au_demarrage", fichier)
+                else:
+                    poste.appeler("restaurer_au_demarrage", fichier)
+                messages.warning(request, "Restauration prévue au redémarrage (la base actuelle est sauvegardée d'abord). "
+                                          "Cliquez sur « Redémarrer le logiciel » quand personne ne saisit.")
+            elif action == "annuler_restauration":
+                poste.appeler("restaurer_sqlserver_au_demarrage", None)
+                poste.appeler("restaurer_au_demarrage", None)
+                messages.success(request, "Restauration annulée.")
+            elif action == "tester":
+                resultat = {"ok": True, "titre": "Test de connexion", "details": [bd.tester_sqlserver(_reglage_formulaire(request.POST))]}
+            elif action in ("vers_sqlserver", "vers_sqlite"):
+                if request.POST.get("confirmation") != "CHANGER":
+                    raise ValueError("tapez CHANGER pour confirmer")
+                if action == "vers_sqlserver":
+                    cible = _reglage_formulaire(request.POST)
+                    bd.tester_sqlserver(cible)
+                    configuration = _configuration_sqlserver(cible)
+                else:
+                    fichier = poste.appeler("nouveau_fichier_sqlite")
+                    cible = bd.reglage_sqlite(fichier)
+                    configuration = {"DB_ENGINE": "sqlite", "SQLITE_FICHIER": str(fichier)}
+                bd.lancer_changement(cible, apres=lambda: poste.appeler("configurer", configuration))
+                messages.info(request, "Copie lancée : cette page suit son avancement.")
+            elif action == "miroir":
+                if request.POST.get("desactiver"):
+                    poste.appeler("configurer", {"MIROIR_DB_ENGINE": None})
+                    messages.success(request, "Copie miroir désactivée au prochain démarrage.")
+                else:
+                    reglage = _reglage_formulaire(request.POST)
+                    message = bd.tester_sqlserver(reglage)
+                    poste.appeler("configurer", {
+                        "MIROIR_DB_ENGINE": "mssql", "MIROIR_DB_HOST": reglage["HOST"], "MIROIR_DB_NAME": reglage["NAME"],
+                        "MIROIR_DB_USER": reglage["USER"] or None, "MIROIR_DB_PASSWORD": reglage["PASSWORD"] or None,
+                        "MIROIR_DB_PYTHON_DRIVER": "mssql_python",
+                        "MIROIR_INTERVALLE_MINUTES": request.POST.get("intervalle") or "60"})
+                    messages.success(request, f"{message} Copie miroir réglée : elle démarre au redémarrage du logiciel.")
+            elif action == "redemarrer":
+                poste.appeler("redemarrer")
+                return render(request, "core/redemarrage.html", {"titre": "Redémarrage"})
+        except (ValueError, RuntimeError, OSError) as exc:
+            messages.error(request, f"Impossible : {exc}")
+        except Exception as exc:                                  # erreur du serveur SQL : message lisible
+            messages.error(request, f"Le serveur de base de données a répondu : {str(exc)[:400]}")
+        if resultat is None:
+            return redirect(request.get_full_path())
+    info = bd.info()
+    sauvegardes = []
+    try:
+        sauvegardes = (bd.sauvegardes_sqlserver() if info["moteur"] == "mssql"
+                       else poste.appeler("etat")["sauvegardes"] if compile_ else [])
+    except Exception as exc:
+        messages.warning(request, f"Liste des sauvegardes indisponible : {str(exc)[:200]}")
+    from django.conf import settings
+
+    miroir = settings.DATABASES.get("miroir")
+    return render(request, "core/base_donnees.html", {
+        "titre": "Base de données", "info": info, "resultat": resultat, "sauvegardes": sauvegardes, "compile": compile_,
+        "changement": bd.ETAT_CHANGEMENT,
+        "restauration": (poste.appeler("restauration_sqlserver_prevue") or poste.appeler("etat")["restauration_prevue"])
+        if compile_ else "",
+        "miroir": f"{miroir.get('HOST', '')} · {miroir['NAME']}" if miroir else ""})

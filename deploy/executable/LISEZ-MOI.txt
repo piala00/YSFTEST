@@ -54,7 +54,26 @@ Autre emplacement : variable d'environnement ERP_DONNEES (ex. D:\ERP-DONNEES).
   La base remplacée est mise de côté (erp-avant-restauration-<date>.sqlite3).
 - Sauvegarde immédiate :  ERP-OHADA-<Édition>.exe sauvegarder
 
-4. SQLITE + COPIE MIROIR SQL SERVER
+4. BASE DE DONNÉES : SQLITE OU SQL SERVER (À L'ÉCRAN)
+------------------------------------------------------
+Au premier démarrage, l'assistant propose : SQLite (recommandé, rien à
+installer), SQL Server (serveur\instance, base, compte Windows ou compte SQL,
+avec « Tester la connexion » ; la base est créée si besoin), ou SQLite avec
+copie miroir automatique vers SQL Server.
+Ensuite : Fichier > Administration du poste > Base de données :
+  - état (moteur, emplacement, version, taille, tables) ;
+  - Vérifier l'intégrité (SQLite : integrity_check ; SQL Server : DBCC CHECKDB) ;
+  - Optimiser (index, statistiques ; SQLite : compactage) ; Réparer ;
+  - Sauvegarder maintenant et Restaurer (SQL Server : .bak natif sur le serveur
+    SQL, vérifié ; la restauration se fait au redémarrage, la base actuelle est
+    sauvegardée avant) ; sauvegardes automatiques toutes les 4 h ;
+  - Changer de base (SQLite <-> SQL Server) : copie complète contrôlée table
+    par table, la base actuelle n'est pas modifiée ;
+  - Redémarrer le logiciel (sans aller dans la fenêtre noire).
+Une base qui contient les tables d'un autre logiciel (ex. Sage) est toujours
+refusée : l'ERP n'écrit jamais dans une base Sage.
+
+Réglages équivalents dans configuration.env (pour mémoire) :
 -----------------------------------
 La société travaille sur SQLite (rapide, hors ligne). Une copie complète est
 reportée automatiquement dans une base SQL Server, à chaque intervalle.

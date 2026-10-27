@@ -40,6 +40,7 @@ import webbrowser
 from pathlib import Path
 
 PORTS = {"commerce": 8000, "transport": 8100}
+ENVIRONNEMENT_INITIAL = dict(os.environ)          # avant configuration.env : un redémarrage relit la configuration
 MODELE_SAUVEGARDE = "erp-????????-??????*.sqlite3"
 
 
@@ -125,6 +126,23 @@ def preparer_environnement(base="erp.sqlite3"):
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "erp.settings")
     os.environ.setdefault("ERP_DOSSIER_DONNEES", str(donnees))    # mémoire de l'essai hors de la base
     return donnees
+
+
+def modifier_configuration(donnees, valeurs):
+    """Écran Base de données : met à jour configuration.env (clé=valeur ; None met la ligne en commentaire).
+    L'ancien fichier est gardé (configuration-AAAAMMJJ-HHMMSS.env) ; le changement prend effet au redémarrage."""
+    config = donnees / "configuration.env"
+    lignes = config.read_text(encoding="utf-8").splitlines() if config.exists() else []
+    if config.exists():
+        shutil.copy2(config, donnees / f"configuration-{datetime.datetime.now():%Y%m%d-%H%M%S}.env")
+    restantes = dict(valeurs)
+    for i, ligne in enumerate(lignes):
+        cle = ligne.lstrip("# ").split("=", 1)[0].strip()
+        if "=" in ligne and cle in restantes:
+            valeur = restantes.pop(cle)
+            lignes[i] = f"# {cle}=" if valeur is None else f"{cle}={valeur}"
+    lignes += [f"{cle}={valeur}" for cle, valeur in restantes.items() if valeur is not None]
+    config.write_text("\n".join(lignes) + "\n", encoding="utf-8")
 
 
 def base_sqlite():
@@ -280,6 +298,13 @@ def demarrer_taches(donnees):
         tache_periodique("Sauvegarde", heures * 3600, lambda: journal(f"Sauvegarde : {sauvegarder(base, donnees).name}"))
         taches.append(f"sauvegardes toutes les {heures:g} h → {donnees / 'sauvegardes'}"
                       + (f" et {os.environ['ERP_SAUVEGARDE_COPIE']}" if os.environ.get("ERP_SAUVEGARDE_COPIE") else ""))
+    elif settings.DATABASES["default"]["ENGINE"] == "mssql":
+        from apps.core.base_donnees import sauvegarder_sqlserver
+
+        heures = float(os.environ.get("ERP_SAUVEGARDE_HEURES") or 4)
+        tache_periodique("Sauvegarde SQL Server", heures * 3600, lambda: journal(f"Sauvegarde SQL Server : {sauvegarder_sqlserver()}"),
+                         attendre_d_abord=True)
+        taches.append(f"sauvegardes SQL Server (.bak) toutes les {heures:g} h, sur le serveur SQL")
     if "miroir" in settings.DATABASES:
         minutes = settings.MIROIR_INTERVALLE_MINUTES
         cible = settings.DATABASES["miroir"]
@@ -376,6 +401,20 @@ def supprimer_simulation(donnees):
     for nom in FICHIERS_SIMULATION:
         (donnees / nom).unlink(missing_ok=True)
     journal("Simulation supprimée")
+
+
+def redemarrer(port):
+    """Relance le programme (nouvelle fenêtre) puis arrête celui-ci : le nouveau attend que le port se libère."""
+    p = SIMULATION["processus"]
+    if p is not None and p.poll() is None:
+        p.terminate()
+    programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
+    env = {**ENVIRONNEMENT_INITIAL, "ERP_SANS_NAVIGATEUR": "1"}
+    options = {"creationflags": subprocess.CREATE_NEW_CONSOLE} if os.name == "nt" else {"start_new_session": True}
+    subprocess.Popen(programme + ["redemarrage"], env=env, stdin=subprocess.DEVNULL, **options)
+    journal("Redémarrage demandé à l'écran")
+    threading.Timer(1.5, os._exit, [0]).start()
+    return f"Redémarrage en cours (port {port})"
 
 
 def deja_demarre(port):
@@ -512,7 +551,9 @@ def enregistrer_actions(donnees, port):
     def sauvegarder_maintenant():
         base = base_sqlite()
         if base is None:
-            raise RuntimeError("la base n'est pas SQLite : sauvegardez-la avec les outils de SQL Server")
+            from apps.core.base_donnees import sauvegarder_sqlserver
+
+            return sauvegarder_sqlserver()
         fichier = sauvegarder(base, donnees)
         journal(f"Sauvegarde (à l'écran) : {fichier.name}")
         return fichier.name
@@ -523,6 +564,15 @@ def enregistrer_actions(donnees, port):
         simulation_creer=lambda debut, duree: creer_simulation(donnees, port, debut, duree),
         simulation_supprimer=lambda: supprimer_simulation(donnees),
         demarrage_auto_basculer=demarrage_automatique,
+        configurer=lambda valeurs: modifier_configuration(donnees, valeurs),
+        redemarrer=lambda: redemarrer(port),
+        nouveau_fichier_sqlite=lambda: donnees / ("erp.sqlite3" if not (donnees / "erp.sqlite3").exists()
+                                                  else f"erp-{datetime.datetime.now():%Y%m%d-%H%M%S}.sqlite3"),
+        restaurer_sqlserver_au_demarrage=lambda fichier: (
+            (donnees / "restaurer-sqlserver.txt").write_text(fichier, encoding="utf-8") if fichier
+            else (donnees / "restaurer-sqlserver.txt").unlink(missing_ok=True)),
+        restauration_sqlserver_prevue=lambda: ((donnees / "restaurer-sqlserver.txt").read_text(encoding="utf-8").strip()
+                                               if (donnees / "restaurer-sqlserver.txt").exists() else ""),
         installation_prevue=lambda: installation_prevue(donnees))
 
 
@@ -586,6 +636,12 @@ def main(argv):
             print("Arrêtez d'abord le logiciel (fermez sa fenêtre), puis relancez la restauration.")
             return 1
         return restaurer(donnees, argv[1] if len(argv) > 1 else None)
+    if action == "redemarrage":                                   # demandé à l'écran : attendre l'arrêt de l'ancien
+        for _ in range(120):
+            if not deja_demarre(port):
+                break
+            time.sleep(0.5)
+        action = ""
     if deja_demarre(port):
         print(f"Le logiciel est déjà démarré sur ce poste : http://127.0.0.1:{port}")
         if not os.environ.get("ERP_SANS_NAVIGATEUR"):
@@ -602,6 +658,16 @@ def main(argv):
     import django
 
     django.setup()
+    marqueur = donnees / "restaurer-sqlserver.txt"
+    if marqueur.exists():                                         # demandée à l'écran Base de données
+        from django.conf import settings
+
+        from apps.core.base_donnees import restaurer_sqlserver
+
+        fichier = marqueur.read_text(encoding="utf-8").strip()
+        marqueur.unlink()
+        journal(f"Restauration SQL Server depuis {fichier} (base actuelle sauvegardée dans "
+                f"{restaurer_sqlserver(settings.DATABASES['default'], fichier)})")
     initialiser(edition_, donnees)
     enregistrer_actions(donnees, port)
     reseau = action != "local" and os.environ.get("ERP_RESEAU", "1") != "0"

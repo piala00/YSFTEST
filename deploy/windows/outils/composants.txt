@@ -4,4 +4,6 @@ whitenoise>=6.6
 waitress>=3.0
 tzdata
 mssql-django>=2.0
+# Pilote SQL Server fourni avec le programme (aucun pilote ODBC à installer)
+mssql-python>=0.13
 cryptography>=42

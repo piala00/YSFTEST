@@ -179,6 +179,9 @@ class ProgrammeLanceTests(SimpleTestCase):
                 self.assertTrue(adresse.endswith("/installation/"))
                 nav.post("/installation/", {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"})
                 adresse, page = nav.post("/installation/?etape=role", {"role": "seul"})
+                self.assertTrue(adresse.endswith("/installation/?etape=base"), adresse)
+                self.assertIn("SQL Server", page)
+                adresse, page = nav.post("/installation/?etape=base", {"action": "sqlite"})
                 self.assertTrue(adresse.endswith(f":{port}/"), adresse)
                 self.assertIn("Configuration terminée", page)
 
@@ -203,6 +206,31 @@ class ProgrammeLanceTests(SimpleTestCase):
                 self.assertIn("Simulation supprimée", page)
                 self.assertFalse(Path(donnees, "simulation.sqlite3").exists())
                 self.assertIn("Créer la simulation", page)
+
+                # Base de données : état, vérification, sauvegarde, puis redémarrage depuis l'écran
+                _, page = nav.get("/poste/base/?seul=1")
+                self.assertIn("SQLite", page)
+                _, page = nav.post("/poste/base/?seul=1", {"action": "verifier"})
+                self.assertIn("Vérification de l", page)
+                self.assertIn("aucune erreur", page)
+                _, page = nav.post("/poste/base/?seul=1", {"action": "sauvegarder"})
+                self.assertIn("Sauvegarde faite", page)
+                _, page = nav.post("/poste/base/?seul=1", {"action": "redemarrer"})
+                self.assertIn("Redémarrage du logiciel", page)
+                serveur.wait(30)                                          # l'ancien programme s'arrête…
+                for _ in range(240):                                      # … et le nouveau répond sur le même port
+                    try:
+                        _, page = nav.get("/poste/base/?seul=1")
+                        break
+                    except (urllib.error.URLError, OSError):
+                        time.sleep(0.5)
+                self.assertIn("Base de données", page)
             finally:
+                for environ in Path("/proc").glob("[0-9]*/environ"):     # le programme relancé (même dossier de données)
+                    try:
+                        if f"ERP_DONNEES={donnees}\0".encode() in environ.read_bytes():
+                            os.kill(int(environ.parent.name), 15)
+                    except (OSError, ValueError):
+                        pass
                 serveur.terminate()
                 serveur.wait(30)

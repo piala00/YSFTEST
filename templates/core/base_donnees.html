@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Base de données{% endblock %}
+{% block head %}{% if changement.etat == "en_cours" %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block content %}
+<div class="page-title d-flex align-items-center"><h1><i class="bi bi-database-gear" style="color:var(--module)"></i> Base de données</h1>
+  <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'core:poste' %}">Administration du poste</a></div>
+
+{% if resultat %}<div class="alert alert-{% if resultat.ok %}success{% else %}danger{% endif %}"><strong>{{ resultat.titre }}</strong>
+  <ul class="mb-0 small">{% for d in resultat.details %}<li>{{ d }}</li>{% endfor %}</ul></div>{% endif %}
+{% if changement.etat %}<div class="alert alert-{% if changement.etat == 'erreur' %}danger{% elif changement.etat == 'termine' %}success{% else %}info{% endif %} d-flex align-items-center gap-2">
+  {% if changement.etat == "en_cours" %}<span class="spinner-border spinner-border-sm"></span>{% endif %}<span>{{ changement.message }}</span>
+  {% if changement.etat == "termine" and compile %}<form method="post" class="ms-auto">{% csrf_token %}<button class="btn btn-sm btn-primary" name="action" value="redemarrer">Redémarrer le logiciel</button></form>{% endif %}</div>{% endif %}
+{% if restauration %}<div class="alert alert-warning small">Restauration prévue au redémarrage : <strong>{{ restauration }}</strong>.
+  <form method="post" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-link p-0" name="action" value="annuler_restauration">Annuler</button></form></div>{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6">Base actuelle</h2>
+    <table class="table table-sm small mb-2"><tbody>
+      <tr><th>Moteur</th><td>{{ info.libelle }}</td></tr>
+      <tr><th>Emplacement</th><td><code>{{ info.emplacement }}</code></td></tr>
+      <tr><th>Version</th><td>{{ info.version }}</td></tr>
+      <tr><th>Taille</th><td>{{ info.taille|filesizeformat }} · {{ info.tables }} tables</td></tr>
+      {% if info.recuperation %}<tr><th>Mode de récupération</th><td>{{ info.recuperation }}</td></tr>{% endif %}
+      {% if info.compte %}<tr><th>Connexion</th><td>{{ info.compte }}</td></tr>{% endif %}
+      <tr><th>Copie miroir</th><td>{% if miroir %}vers {{ miroir }}{% else %}aucune{% endif %}</td></tr>
+    </tbody></table>
+    <form method="post" class="d-flex flex-wrap gap-2">{% csrf_token %}
+      <button class="btn btn-sm btn-outline-primary" name="action" value="verifier" title="{% if info.moteur == 'mssql' %}DBCC CHECKDB{% else %}PRAGMA integrity_check{% endif %}"><i class="bi bi-clipboard-check"></i> Vérifier l'intégrité</button>
+      <button class="btn btn-sm btn-outline-primary" name="action" value="optimiser"><i class="bi bi-speedometer"></i> Optimiser{% if info.moteur == "sqlite" %} et compacter{% else %} (index, statistiques){% endif %}</button>
+      <button class="btn btn-sm btn-outline-warning" name="action" value="reparer"><i class="bi bi-wrench"></i> Réparer</button>
+      {% if compile %}<button class="btn btn-sm btn-outline-secondary ms-auto" name="action" value="redemarrer"><i class="bi bi-arrow-clockwise"></i> Redémarrer le logiciel</button>{% endif %}
+    </form>
+    <div class="form-text">Réparer reconstruit les index puis revérifie. Une base encore abîmée se répare en restaurant la dernière
+      sauvegarde saine : jamais de réparation qui accepterait de perdre des données.</div>
+  </div></div>
+
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6">Sauvegardes{% if info.moteur == "mssql" %} SQL Server (.bak, sur le serveur SQL){% endif %}</h2>
+    {% if info.moteur == "mssql" or compile %}
+    <form method="post" class="mb-2">{% csrf_token %}<button class="btn btn-sm btn-primary" name="action" value="sauvegarder"><i class="bi bi-hdd"></i> Sauvegarder maintenant</button>
+      <span class="form-text ms-2">Automatique toutes les 4 h (réglage ERP_SAUVEGARDE_HEURES).</span></form>
+    {% if sauvegardes %}
+    <form method="post" class="border-top pt-2">{% csrf_token %}
+      <label class="form-label small mb-0" for="b-sauv">Restaurer (au redémarrage ; la base actuelle est sauvegardée avant)</label>
+      <select id="b-sauv" name="fichier" class="form-select form-select-sm mb-1">{% for s in sauvegardes %}
+        <option value="{{ s.nom }}">{{ s.date|date:"d/m/Y H:i" }} — {{ s.taille|filesizeformat }} — {{ s.nom|truncatechars:70 }}</option>{% endfor %}</select>
+      <div class="d-flex gap-2"><input name="confirmation" class="form-control form-control-sm" placeholder="Tapez RESTAURER" autocomplete="off" required>
+        <button class="btn btn-sm btn-outline-danger text-nowrap" name="action" value="restaurer">Restaurer</button></div>
+    </form>{% else %}<div class="small text-muted">Aucune sauvegarde pour l'instant.</div>{% endif %}
+    {% else %}<div class="small text-muted">Sauvegardes de fichiers : dans le programme compilé (ERP-OHADA-&lt;Édition&gt;.exe).</div>{% endif %}
+  </div></div>
+
+  {% if compile %}
+  <div class="col-12"><div class="card card-body">
+    <h2 class="h6">Changer de base de données</h2>
+    <p class="small text-muted">Toutes les données sont recopiées dans la nouvelle base puis contrôlées table par table ; la base actuelle
+      n'est pas modifiée. Le logiciel travaille sur la nouvelle base après « Redémarrer le logiciel ». Une base qui contient les tables
+      d'un autre logiciel (ex. Sage) est toujours refusée.</p>
+    {% if info.moteur == "sqlite" %}
+    <form method="post" class="row g-2 align-items-end">{% csrf_token %}
+      <div class="col-md-4"><label class="form-label small mb-0" for="s-hote">Serveur SQL (\instance)</label>
+        <input id="s-hote" name="hote" class="form-control form-control-sm" placeholder="SERVEUR\SQLEXPRESS" required></div>
+      <div class="col-md-2"><label class="form-label small mb-0" for="s-base">Nom de la base</label>
+        <input id="s-base" name="base" class="form-control form-control-sm" value="ERP_{{ societe.sigle|default:'SOCIETE'|upper|cut:' ' }}" required></div>
+      <div class="col-md-2"><label class="form-label small mb-0" for="s-util">Utilisateur SQL</label>
+        <input id="s-util" name="utilisateur" class="form-control form-control-sm" placeholder="vide : compte Windows" autocomplete="off"></div>
+      <div class="col-md-2"><label class="form-label small mb-0" for="s-mdp">Mot de passe</label>
+        <input id="s-mdp" name="mot_de_passe" type="password" class="form-control form-control-sm" autocomplete="new-password"></div>
+      <div class="col-md-2"><label class="form-label small mb-0" for="s-port">Port (option)</label>
+        <input id="s-port" name="port" class="form-control form-control-sm" placeholder="1433"></div>
+      <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+        <button class="btn btn-sm btn-outline-primary" name="action" value="tester" formnovalidate>Tester la connexion</button>
+        <input name="confirmation" class="form-control form-control-sm" style="max-width:12rem" placeholder="Tapez CHANGER" autocomplete="off">
+        <button class="btn btn-sm btn-primary" name="action" value="vers_sqlserver">Passer sur SQL Server</button>
+        <button class="btn btn-sm btn-outline-secondary" name="action" value="miroir" title="Garder SQLite et recopier automatiquement dans SQL Server">Garder SQLite + copie miroir vers ce SQL Server</button>
+      </div>
+    </form>
+    {% if miroir %}<form method="post" class="mt-2">{% csrf_token %}<input type="hidden" name="desactiver" value="1">
+      <button class="btn btn-sm btn-link p-0" name="action" value="miroir">Désactiver la copie miroir</button></form>{% endif %}
+    {% else %}
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-center">{% csrf_token %}
+      <span class="small">Revenir à SQLite (fichier dans le dossier des données) :</span>
+      <input name="confirmation" class="form-control form-control-sm" style="max-width:12rem" placeholder="Tapez CHANGER" autocomplete="off" required>
+      <button class="btn btn-sm btn-primary" name="action" value="vers_sqlite">Passer sur SQLite</button></form>
+    {% endif %}
+  </div></div>
+  {% endif %}
+</div>
+{% endblock %}
