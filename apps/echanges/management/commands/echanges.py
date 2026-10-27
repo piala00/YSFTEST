@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
@@ -33,6 +34,10 @@ class Command(BaseCommand):
         p = sous.add_parser("importer", help="Intégrer un ou plusieurs lots reçus")
         p.add_argument("fichiers", nargs="+")
         sous.add_parser("etat", help="Identité du site, sites connus, lots en retard")
+        p = sous.add_parser("synchroniser", help="Envoyer et recevoir par la boîte aux lettres (dossier partagé ou relais)")
+        p.add_argument("--dossier-partage", default="", help="Dossier commun (sinon ECHANGES_DOSSIER_PARTAGE)")
+        p.add_argument("--relais-url", default="", help="Relais Internet (sinon ECHANGES_RELAIS_URL)")
+        p.add_argument("--relais-jeton", default="", help="Jeton de ce site sur le relais (sinon ECHANGES_RELAIS_JETON)")
 
     def handle(self, *args, **o):
         try:
@@ -83,6 +88,23 @@ class Command(BaseCommand):
         for f in o["fichiers"]:
             chemin = Path(f)
             self.stdout.write(f"{chemin.name} : {lots.importer(chemin.read_bytes(), chemin.name).texte()}")
+
+    def _synchroniser(self, o):
+        from ... import synchro
+
+        if o["relais_url"]:
+            boite = synchro.RelaisHTTP(o["relais_url"], o["relais_jeton"] or os.environ.get("ECHANGES_RELAIS_JETON", ""))
+        elif o["dossier_partage"]:
+            boite = synchro.DossierPartage(o["dossier_partage"])
+        else:
+            boite = synchro.boite_configuree()
+        if boite is None:
+            raise CommandError("Aucune boîte aux lettres : --dossier-partage, --relais-url, ou ECHANGES_DOSSIER_PARTAGE / "
+                               "ECHANGES_RELAIS_URL dans la configuration.")
+        bilan = synchro.synchroniser(boite)
+        self.stdout.write(f"{boite} : {bilan.texte()}")
+        for ligne in bilan.recus:
+            self.stdout.write(f"  {ligne}")
 
     def _etat(self, o):
         from ...models import Evenement, EvenementRecu

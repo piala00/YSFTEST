@@ -4,3 +4,4 @@ whitenoise>=6.6
 waitress>=3.0
 tzdata
 mssql-django>=2.0
+cryptography>=42

@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "apps.personnel",
     "apps.partenaires",
     "apps.api",
+    "apps.relais",
 ]
 
 MIDDLEWARE = [
@@ -181,6 +182,10 @@ elif _miroir == "postgresql":
     }
 elif _miroir == "sqlite":
     DATABASES["miroir"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / env("MIROIR_SQLITE_FICHIER", "miroir.sqlite3")}
+
+# Relais Internet des échanges entre sites (à activer seulement sur le serveur en ligne qui sert de boîte aux lettres)
+RELAIS_ACTIF = env_bool("RELAIS_ACTIF", False)
+RELAIS_DOSSIER = Path(env("RELAIS_DOSSIER", str(BASE_DIR / "relais-stockage")))
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

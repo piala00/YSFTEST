@@ -6,6 +6,7 @@ anciens fichiers .bat lançaient un par un :
   - les sauvegardes automatiques de la base (au démarrage puis toutes les ERP_SAUVEGARDE_HEURES heures) ;
   - la copie miroir vers SQL Server, si elle est configurée (toutes les MIROIR_INTERVALLE_MINUTES minutes) ;
   - la synchronisation du dossier d'origine pendant la transition (toutes les heures, si elle est commencée) ;
+  - les échanges direction ↔ agences par la boîte aux lettres, si elle est configurée (toutes les 5 minutes) ;
   - le serveur de simulation (port suivant), si un dossier de simulation existe.
 
 Les données ne sont PAS dans le dossier du programme (on peut le remplacer ou l'effacer sans rien perdre) :
@@ -109,7 +110,12 @@ def preparer_environnement(base="erp.sqlite3"):
             "# Copie miroir automatique dans SQL Server (la société continue de travailler sur SQLite)",
             "# MIROIR_DB_ENGINE=mssql", "# MIROIR_DB_HOST=SERVEUR\\INSTANCE", "# MIROIR_DB_NAME=ERP_MIROIR",
             "# MIROIR_DB_USER=            (vide : compte Windows)", "# MIROIR_DB_PASSWORD=",
-            "# MIROIR_DB_PYTHON_DRIVER=mssql_python", "# MIROIR_INTERVALLE_MINUTES=60", ""]), encoding="utf-8")
+            "# MIROIR_DB_PYTHON_DRIVER=mssql_python", "# MIROIR_INTERVALLE_MINUTES=60",
+            "# Direction et agences : échanges automatiques par une boîte aux lettres (lots chiffrés)",
+            "#   relais Internet (adresse et jeton donnés par la direction) :",
+            "# ECHANGES_RELAIS_URL=https://relais.exemple.com", "# ECHANGES_RELAIS_JETON=",
+            "#   ou dossier partagé (réseau, disque synchronisé) :",
+            "# ECHANGES_DOSSIER_PARTAGE=\\\\SERVEUR\\Echanges-ERP", "# ECHANGES_INTERVALLE_MINUTES=5", ""]), encoding="utf-8")
     for ligne in config.read_text(encoding="utf-8").splitlines():
         if "=" in ligne and not ligne.lstrip().startswith("#"):
             cle, valeur = ligne.split("=", 1)
@@ -270,6 +276,20 @@ def demarrer_taches(donnees):
 
     tache_periodique("Synchronisation", 3600, synchroniser, attendre_d_abord=True)
     taches.append("synchronisation du dossier d'origine toutes les heures (si elle a été commencée à l'écran)")
+
+    from apps.echanges import synchro
+
+    boite = synchro.boite_configuree()
+    if boite is not None:
+        minutes = float(os.environ.get("ECHANGES_INTERVALLE_MINUTES") or 5)
+
+        def echanger():
+            bilan = synchro.synchroniser(boite)
+            if bilan.envoyes or bilan.recus or bilan.erreurs:      # le journal ne se remplit pas de passages vides
+                journal(f"Échanges ({boite}) : {bilan.texte()}")
+
+        tache_periodique("Échanges", minutes * 60, echanger)
+        taches.append(f"échanges direction / agences toutes les {minutes:g} min → {boite}")
     return taches
 
 
@@ -277,7 +297,8 @@ def demarrer_simulation(donnees, port):
     """Serveur de simulation (dossier séparé), dans un second processus qui s'arrête avec le programme."""
     if not (donnees / "simulation.sqlite3").exists():
         return None
-    env = {k: v for k, v in os.environ.items() if k != "SQLITE_FICHIER" and not k.startswith("MIROIR_")}
+    env = {k: v for k, v in os.environ.items()
+           if k != "SQLITE_FICHIER" and not k.startswith(("MIROIR_", "ECHANGES_"))}
     env.update(ERP_SANS_NAVIGATEUR="1", ERP_SOUS_PROCESSUS="1")
     programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
     processus = subprocess.Popen(programme + ["simulation"], env=env)
@@ -401,6 +422,8 @@ def main(argv):
     if action == "simulation":
         os.environ["CONTROLE_HEURE_DEPART"] = "0"
         os.environ["MIROIR_DB_ENGINE"] = ""                     # jamais de copie miroir d'un dossier fictif
+        for cle in ("ECHANGES_RELAIS_URL", "ECHANGES_DOSSIER_PARTAGE"):
+            os.environ[cle] = ""                                # ni d'échange avec les vraies agences
         donnees = preparer_environnement(base="simulation.sqlite3")
         import django
 

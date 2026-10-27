@@ -34,7 +34,7 @@ donnees = [(src, dst) for src, dst in donnees
            if "locale" not in Path(dst).parts or {"fr", "en"} & set(Path(dst).parts)]
 
 a = Analysis([str(RACINE / "deploy" / "executable" / "erp_ohada.py")], pathex=[str(RACINE)], hiddenimports=modules,
-             datas=donnees, excludes=["tkinter", "django.contrib.gis", "numpy", "PIL", "cryptography", "yaml", "pandas", "matplotlib",
+             datas=donnees, excludes=["tkinter", "django.contrib.gis", "numpy", "PIL", "yaml", "pandas", "matplotlib",
                        "IPython", "pytest", "playwright"], noarchive=False)
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=NOM, console=True, upx=False)

@@ -23,7 +23,10 @@
 {% else %}
 <div class="row g-3 mb-3">
   <div class="col-md-4"><div class="card card-body h-100"><div class="text-muted small">Ce poste</div>
-    <div class="fs-5 fw-semibold">{{ local.code }} — {{ local.nom }}</div><div class="small">{{ local.get_role_display }} · {{ a_envoyer }} fait(s) pas encore envoyé(s)</div></div></div>
+    <div class="fs-5 fw-semibold">{{ local.code }} — {{ local.nom }}</div><div class="small">{{ local.get_role_display }} · {{ a_envoyer }} fait(s) pas encore envoyé(s)</div>
+    {% if boite %}<form method="post" class="mt-2">{% csrf_token %}<div class="small text-muted"><i class="bi bi-arrow-repeat"></i> Échanges automatiques : {{ boite }}</div>
+      <button class="btn btn-sm btn-outline-primary mt-1" name="action" value="synchroniser">Synchroniser maintenant</button></form>
+    {% else %}<div class="small text-muted mt-2">Échanges automatiques non configurés : fichiers à envoyer et importer ci-contre.</div>{% endif %}</div></div>
   <div class="col-md-4"><form method="post" class="card card-body h-100">{% csrf_token %}<h6 class="mb-1"><i class="bi bi-send"></i> Préparer le fichier à envoyer</h6>
     <select name="destination" class="form-select form-select-sm" aria-label="Destinataire">{% for s in sites %}{% if local.role == "SIEGE" or s.agence.role == "SIEGE" %}<option value="{{ s.agence.pk }}">{{ s.agence.code }} — {{ s.agence.nom }}</option>{% endif %}{% endfor %}</select>
     <button class="btn btn-sm btn-primary mt-2" name="action" value="exporter">Télécharger le fichier</button>

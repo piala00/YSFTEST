@@ -79,8 +79,42 @@ sont en retard (date limite dépassée) et celles qui sont contestées. Sur chaq
 
 - Chaque agence a sa **clé** (connue d'elle et du siège) ; chaque fichier est signé (HMAC-SHA256 sur le manifeste,
   empreintes SHA-256 des données). Un fichier signé n'est **pas chiffré** : il circule par des canaux de la société.
+- Par la boîte aux lettres, les lots sont **en plus chiffrés** (voir ci-dessous).
 - Contenu limité à trois fichiers (manifest.json, events.jsonl, auth.json) ; tout autre contenu, chemin ou taille
   anormale est refusé. Aucun code, SQL ou sauvegarde n'est jamais importé par ce moyen.
+
+## Échanges automatiques par boîte aux lettres
+
+Dès qu'il y a Internet, chaque serveur (direction et agences) **dépose** les lots destinés aux autres dans une boîte aux
+lettres et **retire** les siens, toutes les 5 minutes. Ce sont exactement les mêmes lots que par fichiers (signés,
+intégrés une seule fois, dans n'importe quel ordre) : les fichiers restent le **secours** si la boîte est inaccessible.
+
+- **Chiffrés avant de partir** : AES-256-GCM, clé tirée de la clé de l'agence (que seuls l'agence et la direction
+  connaissent). La boîte ne peut pas lire les lots ; un lot déplacé d'une boîte à l'autre ou abîmé est refusé et laissé
+  en place (il apparaît dans le bilan).
+- **Ordre d'un passage** : recevoir et intégrer, puis envoyer ; l'accusé de réception d'une demande de correction part
+  donc dans le même passage. Rien de nouveau : aucun lot n'est déposé.
+- **Deux boîtes possibles** (dans `configuration.env` du dossier des données) :
+  - relais Internet : `ECHANGES_RELAIS_URL=https://…` et `ECHANGES_RELAIS_JETON=…` (un jeton par site) ;
+  - dossier partagé (dossier réseau, disque synchronisé) : `ECHANGES_DOSSIER_PARTAGE=\\SERVEUR\Echanges-ERP`.
+  - `ECHANGES_INTERVALLE_MINUTES=5` règle la fréquence ; le journal (`journal.txt`) ne note que les passages utiles.
+- Écran **Échanges** : bouton « Synchroniser maintenant ». Le dossier de simulation n'échange jamais avec les vraies agences.
+
+### Le relais Internet (petit serveur en ligne)
+
+C'est le même logiciel avec `RELAIS_ACTIF=1` (désactivé partout ailleurs : l'adresse `/relais/` répond 404). Il ne
+fait que garder des lots chiffrés le temps que le destinataire les retire : il ne connaît aucune clé d'agence.
+
+```
+RELAIS_ACTIF=1  RELAIS_DOSSIER=/srv/relais-stockage
+python manage.py relais_site --code SIEGE --nom "Direction"     (affiche le jeton UNE fois : à reporter au siège)
+python manage.py relais_site --code DLA --nom "Agence de Douala"
+python manage.py relais_site --liste
+python manage.py relais_site --code DLA --desactiver             (jeton perdu ou volé : on désactive puis on recrée)
+```
+
+Règles du relais : un jeton par site (seule son empreinte SHA-256 est gardée), un site ne lit et ne retire que sa propre
+boîte, il ne peut déposer que sous son propre nom d'expéditeur, 60 Mo au plus par lot, HTTPS obligatoire en production.
 
 ## Commande (automatisation, Claude Code sur le poste)
 
@@ -92,6 +126,9 @@ python manage.py echanges installer D:\ECHANGES\ERP-INSTALLATION-SIEGE-vers-DLA-
 python manage.py echanges exporter --dossier D:\ECHANGES            (au siège : un fichier par agence)
 python manage.py echanges importer D:\ECHANGES\*.erpx
 python manage.py echanges etat
+python manage.py echanges synchroniser                            (boîte de configuration.env)
+python manage.py echanges synchroniser --dossier-partage \\SERVEUR\Echanges-ERP
+python manage.py echanges synchroniser --relais-url https://relais.exemple.com --relais-jeton …
 ```
 
 ## Essai
@@ -104,7 +141,7 @@ véhicule reçoit sa part ; avances et liaisons soldées au siège). Le scénari
 
 ## Reste à faire
 
-- **Envoi automatique** quand Internet est disponible (robot Telegram ou dépôt HTTPS) ; aujourd'hui, l'envoi est manuel.
+- **Mise en ligne du relais** sur un petit serveur (VPS) avec HTTPS ; **VPN** en option plus tard.
 - **Transmission directe d'agence à agence** (sans attendre le siège) pour les colis, si le car arrive avant le fichier ;
   en attendant, l'agence d'arrivée attend le fichier du siège pour remettre l'envoi.
 - **Gestion commerciale** (factures, règlements, stocks entre agences) : les écritures remontent déjà ; les pièces et

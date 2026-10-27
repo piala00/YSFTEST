@@ -6,3 +6,5 @@ gunicorn>=22.0
 psycopg[binary]>=3.1
 # SQL Server (DB_ENGINE=mssql) — nécessite le pilote "ODBC Driver 18 for SQL Server"
 # mssql-django>=1.5
+# Chiffrement des lots de la boîte aux lettres (synchronisation des agences)
+cryptography>=42

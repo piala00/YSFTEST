@@ -105,3 +105,23 @@ class EcranEchangesTests(TestCase):
         self.assertContains(page, "refusé")
         for module in ("commercial", "comptabilite"):
             self.assertEqual(self.client.get(reverse(f"{module}:echanges")).status_code, 200)
+
+    def test_synchroniser_maintenant(self):
+        import tempfile
+        from unittest import mock
+
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        url = reverse("transport:echanges") + "?seul=1"
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "", "x"))
+        self.client.post(url, {"action": "siege", "code": "SIEGE", "nom": "Siège"})
+        self.client.post(url, {"action": "agence", "code": "DLA", "nom": "Agence de Douala"})
+        with mock.patch.dict("os.environ", {"ECHANGES_RELAIS_URL": "", "ECHANGES_DOSSIER_PARTAGE": ""}):
+            self.assertContains(self.client.get(url), "non configurés")
+            self.assertContains(self.client.post(url, {"action": "synchroniser"}, follow=True), "aucune boîte")
+        with tempfile.TemporaryDirectory() as boite, mock.patch.dict("os.environ", {"ECHANGES_DOSSIER_PARTAGE": boite}):
+            self.assertContains(self.client.get(url), "Synchroniser maintenant")
+            page = self.client.post(url, {"action": "synchroniser"}, follow=True)
+            self.assertContains(page, "1 lot(s) envoyé(s)")
+            self.assertEqual(len(list(__import__("pathlib").Path(boite, "DLA").glob("*.erpx.chiffre"))), 1)

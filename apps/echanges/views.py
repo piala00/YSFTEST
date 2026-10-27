@@ -43,6 +43,14 @@ def echanges(request, module):
             elif action == "exporter":
                 return _fichier(*lots.exporter(Agence.objects.get(pk=request.POST["destination"]), request.user,
                                                depuis=int(request.POST["depuis"]) if request.POST.get("depuis") else None))
+            elif action == "synchroniser":
+                from . import synchro
+
+                boite = synchro.boite_configuree()
+                if boite is None:
+                    raise ValueError("aucune boîte aux lettres n'est configurée sur ce serveur")
+                bilan = synchro.synchroniser(boite, request.user)
+                (messages.warning if bilan.erreurs else messages.success)(request, f"{boite} : {bilan.texte()}")
             elif action == "importer":
                 for f in request.FILES.getlist("fichiers"):
                     try:
@@ -62,8 +70,11 @@ def echanges(request, module):
                           "attente": EvenementRecu.objects.filter(site_origine=a, statut=EvenementRecu.ATTENTE).count(),
                           "conflits": EvenementRecu.objects.filter(site_origine=a, statut__in=[EvenementRecu.CONFLIT,
                                                                                                 EvenementRecu.REJET]).count()})
+    from .synchro import boite_configuree
+
+    boite = boite_configuree()
     return render(request, "echanges/echanges.html", {
-        "titre": "Échanges entre agences", "local": local, "sites": sites,
+        "titre": "Échanges entre agences", "local": local, "sites": sites, "boite": str(boite) if boite else "",
         "a_envoyer": Evenement.objects.filter(sequence__gt=_dernier_envoye()).count() if local else 0,
         "lots_recus": LotRecu.objects.select_related("source")[:15], "lots_emis": LotEmis.objects.select_related("destination")[:15],
         "problemes": EvenementRecu.objects.exclude(statut__in=[EvenementRecu.INTEGRE, EvenementRecu.IGNORE])

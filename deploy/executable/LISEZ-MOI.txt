@@ -10,6 +10,8 @@ Double-cliquez sur ERP-OHADA-<Édition>.exe. Tout démarre dans la même fenêtr
   - la copie miroir vers SQL Server, si elle est réglée (paragraphe 4) ;
   - la synchronisation du dossier d'origine pendant la transition, si elle a été
     commencée à l'écran (Fichier > Reprise d'un dossier existant) ;
+  - les échanges direction / agences par la boîte aux lettres, si elle est
+    réglée (paragraphe 5) ;
   - le serveur de simulation (port suivant), si une simulation a été créée.
 Gardez la fenêtre ouverte ; la fermer arrête tout.
 Un second double-clic ne lance pas un second serveur : il ouvre le navigateur.
@@ -68,7 +70,22 @@ Dans configuration.env, retirez le # devant :
 Travailler directement sur SQL Server (sans SQLite) reste possible :
 DB_ENGINE=mssql, DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PYTHON_DRIVER=mssql_python.
 
-5. AUTRES COMMANDES
+5. DIRECTION ET AGENCES : ÉCHANGES AUTOMATIQUES
+-----------------------------------------------
+Dès qu'Internet est là, chaque serveur dépose les lots destinés aux autres sites
+dans une boîte aux lettres et retire les siens (toutes les 5 minutes). Les lots
+sont signés et chiffrés : la boîte ne peut pas les lire. Les fichiers .erpx
+(écran Échanges) restent le secours. Dans configuration.env :
+
+    ECHANGES_RELAIS_URL=https://relais.exemple.com    (relais Internet)
+    ECHANGES_RELAIS_JETON=jeton donné par la direction
+ou
+    ECHANGES_DOSSIER_PARTAGE=\\SERVEUR\Echanges-ERP     (dossier partagé)
+    ECHANGES_INTERVALLE_MINUTES=5
+
+Écran Échanges : « Synchroniser maintenant ». Détails : docs\ECHANGES_AGENCES.md
+
+6. AUTRES COMMANDES
 -------------------
     ERP-OHADA-<Édition>.exe local             ce poste seulement (pas de réseau)
     ERP-OHADA-<Édition>.exe simulation 3      simulation fictive de 3 mois dès 09/2026 (dossier séparé)
