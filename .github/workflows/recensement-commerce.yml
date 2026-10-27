@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   recensement:
@@ -36,3 +36,13 @@ jobs:
             docs/retour/RECENSEMENT_BOUTONS_COMMERCIAL.md
             docs/retour/RECENSEMENT_BOUTONS_COMMERCIAL.csv
           retention-days: 30
+      - name: Publier le recensement CSV et la synthèse dans la branche GPT
+        if: github.event_name == 'push' && github.ref_name == 'gpt/audit-boutons-sage-v12'
+        run: |
+          git config user.name "erp-audit-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/retour/RECENSEMENT_BOUTONS_COMMERCIAL.md docs/retour/RECENSEMENT_BOUTONS_COMMERCIAL.csv
+          if ! git diff --cached --quiet; then
+            git commit -m "Actualiser l'inventaire reproductible des boutons Commercial"
+            git push origin HEAD:gpt/audit-boutons-sage-v12
+          fi
