@@ -671,6 +671,8 @@ COMPTABILITE = Module(
               icone="bi-diagram-3", preuve="AJOUT-ERP"),
             SEP(),
             E("etats.budgetaires", "Etats budgétaires", icone="bi-bullseye", preuve="INDICATIF"),
+            E("etats.tresorerie_projetee", "Trésorerie projetée", "comptabilite:tresorerie_projetee", icone="bi-graph-up-arrow",
+              preuve="AJOUT-ERP"),
             SEP(),
             E("etats.financiers", "Bilan / Compte de résultat", icone="bi-bank", preuve="ERG-CLASSIQUE", enfants=[
                 E("etats.financiers.bilan", "Bilan", "comptabilite:bilan", preuve="ERG-CLASSIQUE"),
@@ -683,6 +685,7 @@ COMPTABILITE = Module(
                 E("etats.dsf", "Déclaration statistique et fiscale (DSF)", preuve="AJOUT-ERP"),
             ]),
             E("etats.controles", "Analyse et contrôles", icone="bi-clipboard-check", preuve="INDICATIF", enfants=[
+                E("etats.controles.cloture", "Contrôles de clôture", "comptabilite:controles_cloture", preuve="AJOUT-ERP"),
                 E("etats.controles.liaison", "Contrôle de la liaison commerciale", "comptabilite:controle_liaison",
                   preuve="AJOUT-ERP"),
             ]),

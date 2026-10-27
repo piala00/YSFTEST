@@ -38,7 +38,7 @@ import webbrowser
 from pathlib import Path
 
 PORTS = {"commerce": 8000, "transport": 8100}
-MODELE_SAUVEGARDE = "erp-????????-??????.sqlite3"
+MODELE_SAUVEGARDE = "erp-????????-??????*.sqlite3"
 
 
 def dossier_programme():
@@ -136,7 +136,11 @@ def sauvegarder(base, donnees):
     dossier.mkdir(parents=True, exist_ok=True)
     for interrompue in dossier.glob("erp-*.partiel"):            # sauvegarde coupée par un arrêt du programme
         interrompue.unlink()
-    fichier = dossier / f"erp-{datetime.datetime.now():%Y%m%d-%H%M%S}.sqlite3"
+    horodatage = f"{datetime.datetime.now():%Y%m%d-%H%M%S}"
+    fichier, n = dossier / f"erp-{horodatage}.sqlite3", 1
+    while fichier.exists():                          # deux sauvegardes dans la même seconde : ne jamais écraser
+        n += 1
+        fichier = dossier / f"erp-{horodatage}-{n}.sqlite3"
     partiel = fichier.with_suffix(".partiel")
     source, copie = sqlite3.connect(base), sqlite3.connect(partiel)
     try:

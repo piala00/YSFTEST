@@ -391,3 +391,38 @@ class LigneBudget(models.Model):
     @property
     def total(self):
         return sum(self.mois, Decimal("0"))
+
+
+class PrevisionTresorerie(models.Model):
+    """Encaissement ou décaissement attendu, connu d'avance (échéance d'emprunt, impôt, loyer, apport…),
+    unique ou répété chaque mois jusqu'à une date. Sert seulement à la trésorerie projetée : aucune écriture."""
+
+    ENCAISSEMENT, DECAISSEMENT = "ENCAISSEMENT", "DECAISSEMENT"
+    SENS = [(ENCAISSEMENT, "Encaissement"), (DECAISSEMENT, "Décaissement")]
+
+    date = models.DateField("Date prévue")
+    libelle = models.CharField("Libellé", max_length=100)
+    sens = models.CharField(max_length=12, choices=SENS, default=DECAISSEMENT)
+    montant = models.DecimalField(max_digits=16, decimal_places=2)
+    mensuelle = models.BooleanField("Chaque mois", default=False)
+    jusqu_au = models.DateField("Jusqu'au", null=True, blank=True)
+    cree_par = models.CharField(max_length=150, blank=True)
+
+    class Meta:
+        ordering = ["date", "libelle"]
+
+    def __str__(self):
+        return f"{self.date:%d/%m/%Y} {self.libelle} {self.montant}"
+
+    def occurrences(self, debut, fin):
+        """Dates de la prévision comprises entre debut et fin."""
+        import calendar
+
+        dates, d, rang = [], self.date, 0
+        while d <= fin and (rang == 0 or self.mensuelle) and (self.jusqu_au is None or d <= self.jusqu_au):
+            if d >= debut:
+                dates.append(d)
+            rang += 1
+            a, m = self.date.year + (self.date.month - 1 + rang) // 12, (self.date.month - 1 + rang) % 12 + 1
+            d = self.date.replace(year=a, month=m, day=min(self.date.day, calendar.monthrange(a, m)[1]))
+        return dates

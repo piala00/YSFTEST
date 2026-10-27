@@ -6,7 +6,7 @@ from apps.partenaires import views as partenaires_views
 from apps.transport import views as transport_views
 from apps.reporting import views as reporting_views
 
-from . import views
+from . import views, views_tresorerie
 
 app_name = "comptabilite"
 
@@ -15,6 +15,8 @@ urlpatterns = [
     path("autorisations/", core_views.autorisations, {"module": "comptabilite"}, name="autorisations"),
     path("echanges/", echanges_views.echanges, {"module": "comptabilite"}, name="echanges"),
     path("corrections/", echanges_views.corrections, name="corrections"),
+    path("tresorerie-projetee/", views_tresorerie.tresorerie_projetee, name="tresorerie_projetee"),
+    path("controles-cloture/", views_tresorerie.controles_cloture, name="controles_cloture"),
     path("corrections/<int:pk>/", echanges_views.correction_detail, name="correction_detail"),
     path("ecritures/<int:pk>/signaler/", echanges_views.correction_demander, name="correction_demander"),
     path("vehicules/balance/", transport_views.balance_vehicules, name="balance_vehicules"),
