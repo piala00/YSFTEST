@@ -173,6 +173,38 @@ def verifier(fichier, publique):
     print("Signature correcte :", json.dumps(donnees, ensure_ascii=False, indent=1))
 
 
+def bureau():
+    """Bureau de Windows (OneDrive compris), sinon le dossier personnel."""
+    profil = Path(os.environ.get("USERPROFILE") or Path.home())
+    for d in (profil / "OneDrive" / "Desktop", profil / "OneDrive" / "Bureau", profil / "Desktop", profil / "Bureau"):
+        if d.is_dir():
+            return d
+    return profil
+
+
+PREFERENCES = Path.home() / ".erp-ohada-licences.json"
+
+
+def preferences():
+    try:
+        return json.loads(PREFERENCES.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def retenir(**valeurs):
+    try:
+        PREFERENCES.write_text(json.dumps({**preferences(), **valeurs}, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def ouvrir_dossier(dossier):
+    Path(dossier).mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        os.startfile(dossier)                                     # l'Explorateur sur le dossier choisi
+
+
 def interface(essai=False):
     """Fenêtre du propriétaire : choisir la société, régler la licence, choisir où l'enregistrer."""
     import tkinter as tk
@@ -182,11 +214,12 @@ def interface(essai=False):
     fen.title("ERP OHADA — Licences (propriétaire)")
     fen.geometry("760x640")
     v = {nom: tk.StringVar(value=val) for nom, val in {
-        "dossier": str(Path.home() / "ERP-OHADA-Licences"), "client": "", "niu": "", "edition": "transport",
+        "dossier": preferences().get("cles", str(Path.home() / "ERP-OHADA-Licences")),
+        "licences": preferences().get("licences", str(bureau() / "Licences ERP")),
+        "client": "", "niu": "", "edition": "transport",
         "role": "seul", "site": "", "postes": "5", "code": "", "duree": "annuelle",
         "jusqu_au": (datetime.date.today() + datetime.timedelta(days=365)).isoformat(),
         "maj": (datetime.date.today() + datetime.timedelta(days=365)).isoformat()}.items()}
-    dernier_dossier = {"chemin": str(Path.home())}
 
     cadre = ttk.Frame(fen, padding=12)
     cadre.pack(fill="both", expand=True)
@@ -224,8 +257,8 @@ def interface(essai=False):
                               ("postes", "Postes", 60), ("fin", "Jusqu'au", 100)):
         registre.heading(col, text=titre)
         registre.column(col, width=large)
-    registre.grid(row=11, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
-    cadre.rowconfigure(11, weight=1)
+    registre.grid(row=13, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
+    cadre.rowconfigure(13, weight=1)
 
     def rafraichir(*_):
         connus = clients_connus(v["dossier"].get())
@@ -252,11 +285,7 @@ def interface(essai=False):
             messagebox.showerror("Licences", "Choisissez ou saisissez la société.")
             return
         numero = prochain_numero(dossier / "registre-licences.csv")
-        fichier = filedialog.asksaveasfilename(
-            title="Enregistrer la licence", initialdir=dernier_dossier["chemin"], defaultextension=".erplic",
-            initialfile=nom_fichier(numero, v["client"].get()), filetypes=[("Licence ERP OHADA", "*.erplic")])
-        if not fichier:
-            return
+        fichier = Path(v["licences"].get()) / nom_fichier(numero, v["client"].get())
         mdp = simpledialog.askstring("Licences", "Mot de passe de la clé privée :", show="*", parent=fen)
         if not mdp:
             return
@@ -270,9 +299,11 @@ def interface(essai=False):
         except (SystemExit, ValueError) as exc:
             messagebox.showerror("Licences", str(exc) or "Valeur incorrecte.")
             return
-        dernier_dossier["chemin"] = str(Path(sortie).parent)
+        retenir(cles=str(dossier), licences=str(Path(sortie).parent))
         rafraichir()
-        messagebox.showinfo("Licences", f"Licence enregistrée :\n{sortie}\n\nEnvoyez ce fichier au client.")
+        if messagebox.askyesno("Licences", f"Licence enregistrée :\n{sortie}\n\nEnvoyez ce fichier au client.\n\n"
+                                           "Ouvrir le dossier maintenant ?"):
+            ouvrir_dossier(Path(sortie).parent)
 
     def creer():
         dossier = Path(v["dossier"].get())
@@ -291,10 +322,18 @@ def interface(essai=False):
         messagebox.showinfo("Licences", f"Clés créées dans {dossier}.\nEnvoyez le contenu de cle-publique.txt à Claude ;\n"
                                         "gardez une copie du dossier sur une clé USB au coffre.")
 
+    zone_licences = ttk.Frame(cadre)
+    ttk.Entry(zone_licences, textvariable=v["licences"]).pack(side="left", fill="x", expand=True)
+    ttk.Button(zone_licences, text="Parcourir…", command=lambda: v["licences"].set(
+        filedialog.askdirectory(initialdir=v["licences"].get(), title="Dossier où enregistrer les licences")
+        or v["licences"].get())).pack(side="left", padx=4)
+    ttk.Button(zone_licences, text="Ouvrir", command=lambda: ouvrir_dossier(v["licences"].get())).pack(side="left")
+    ttk.Label(cadre, text="Dossier où enregistrer les licences").grid(row=10, column=0, sticky="w", pady=(10, 3), padx=(0, 8))
+    zone_licences.grid(row=10, column=1, sticky="ew", pady=(10, 3))
     boutons = ttk.Frame(cadre)
-    boutons.grid(row=10, column=0, columnspan=2, sticky="e", pady=(10, 0))
+    boutons.grid(row=12, column=0, columnspan=2, sticky="e", pady=(10, 0))
     ttk.Button(boutons, text="Créer la paire de clés", command=creer).pack(side="left", padx=4)
-    ttk.Button(boutons, text="Générer la licence…", command=generer).pack(side="left", padx=4)
+    ttk.Button(boutons, text="Générer la licence", command=generer).pack(side="left", padx=4)
     rafraichir()
     if essai:                                                     # contrôle automatique : la fenêtre se construit
         fen.update()
@@ -324,7 +363,8 @@ def menu():
             definitive=duree == "D", jusqu_au=None if duree == "D" else question("Valable jusqu'au (AAAA-MM-JJ)", (
                 datetime.date.today() + datetime.timedelta(days=365)).isoformat()),
             maj_jusqu_au=question("Mises à jour jusqu'au (AAAA-MM-JJ)", (datetime.date.today() + datetime.timedelta(days=365)).isoformat()),
-            sortie=None)
+            sortie=question("Dossier où enregistrer la licence", preferences().get("licences", str(bureau() / "Licences ERP"))))
+        retenir(licences=a.sortie)
         emettre(a)
     input("\nEntrée pour fermer…")
 
