@@ -76,3 +76,15 @@ class ProgrammeCompileTests(SimpleTestCase):
         de_cote = list(self.donnees.glob("erp-avant-restauration-*.sqlite3"))
         self.assertEqual(len(de_cote), 1)
         self.assertEqual(self.valeur(de_cote[0]), 9)
+
+    def test_deux_sauvegardes_dans_la_meme_seconde(self):
+        import datetime as vrai
+
+        instant = vrai.datetime(2026, 10, 27, 7, 51, 5)
+        with mock.patch.object(lanceur.datetime, "datetime") as horloge:
+            horloge.now.return_value = instant
+            premiere = lanceur.sauvegarder(self.base, self.donnees)
+            seconde = lanceur.sauvegarder(self.base, self.donnees)
+        self.assertNotEqual(premiere, seconde)
+        self.assertTrue(premiere.exists() and seconde.exists())
+        self.assertEqual(seconde.name, "erp-20261027-075105-2.sqlite3")
