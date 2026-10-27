@@ -169,5 +169,72 @@ const attendre = () => new Promise(resolve => setImmediate(resolve));
       }
     });
   }
+
+  {
+    const saisie = fs.readFileSync(path.resolve(__dirname, '../templates/commercial/document_form.html'), 'utf8');
+    const debut = '<script>\n(function commandesSaisieDocument() {';
+    const d = saisie.indexOf(debut), f = saisie.indexOf('</script>', d);
+    const script = saisie.slice(d + '<script>\n'.length, f);
+    controler('nouvelle saisie : actions Fn, Informations et Pied réellement actives', () => {
+      assert.ok(d >= 0 && f > d, 'Script des commandes de saisie');
+      for (const id of ['doc-form-fonctions','doc-form-informations','doc-form-pied',
+                        'doc-form-panneau-infos','piece-pied']) assert.ok(saisie.includes('id="' + id + '"'), id);
+      assert.match(saisie, /data-doc-form-action="brouillon"/);
+      assert.match(saisie, /data-doc-form-action="valider"/);
+      assert.match(saisie, /data-doc-form-action="ajouter"/);
+    });
+    const ecouteurs = {};
+    const element = id => ({
+      id, hidden: id === 'doc-form-panneau-infos',
+      attrs: {}, clicks: 0,
+      addEventListener(evt, cb) { this[evt] = cb; },
+      setAttribute(k, v) { this.attrs[k] = v; },
+      click() { this.clicks++; },
+      focus() { this.focuses = (this.focuses || 0) + 1; },
+      scrollIntoView() { this.scrolls = (this.scrolls || 0) + 1; },
+    });
+    for (const id of ['doc-form-fonctions','doc-form-informations','doc-form-pied',
+                      'doc-form-panneau-infos','piece-pied','ajout-ligne'])
+      ecouteurs[id] = element(id);
+    const enregistrer = element('enregistrer'), valider = element('valider');
+    const actions = ['brouillon','valider','ajouter'].map(n => {
+      const el = element(n); el.dataset = { docFormAction: n }; return el;
+    });
+    const formulaire = { querySelector(q) {
+      return q === 'button[name="brouillon"]' ? enregistrer :
+        q === 'button[name="valider"]' ? valider : null;
+    } };
+    ecouteurs['doc-form'] = formulaire;
+    vm.runInNewContext(script, { document: {
+      getElementById: id => ecouteurs[id],
+      querySelectorAll: q => q === '[data-doc-form-action]' ? actions : [],
+    }, console }, { filename: 'document_form.actions.js' });
+    const info = ecouteurs['doc-form-informations'], panneau = ecouteurs['doc-form-panneau-infos'];
+    info.click = info['click'];
+    info.click();
+    controler('Informations ouvre le panneau et met à jour aria-expanded', () => {
+      assert.equal(panneau.hidden, false);
+      assert.equal(info.attrs['aria-expanded'], 'true');
+    });
+    info.click();
+    controler('Informations referme le panneau', () => {
+      assert.equal(panneau.hidden, true);
+      assert.equal(info.attrs['aria-expanded'], 'false');
+    });
+    ecouteurs['doc-form-pied'].click();
+    controler('Pied déplace le focus sur les totaux', () => {
+      assert.equal(ecouteurs['piece-pied'].focuses, 1);
+      assert.equal(ecouteurs['piece-pied'].scrolls, 1);
+    });
+    actions[0]['click']();
+    controler('Fonctions Enregistrer réutilise le bouton brouillon existant', () => assert.equal(enregistrer.clicks, 1));
+    actions[1]['click']();
+    controler('Fonctions Valider délègue au bouton à confirmation existant', () => assert.equal(valider.clicks, 1));
+    actions[2]['click']();
+    controler('Fonctions Ajouter délègue à ajout-ligne existant', () => assert.equal(ecouteurs['ajout-ligne'].clicks, 1));
+    valider.disabled = true;
+    actions[1]['click']();
+    controler('Fonctions n’active pas les boutons désactivés', () => assert.equal(valider.clicks, 1));
+  }
   console.log(total + ' contrôles OK');
 })().catch(e => { console.error(e); process.exitCode = 1; });

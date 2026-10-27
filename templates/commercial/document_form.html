@@ -4,12 +4,28 @@
 {# Saisie d'une pièce façon Sage 100 V12 : en-tête en trois colonnes, grille des lignes, pied (totaux), OK / Annuler #}
 <form method="post" id="doc-form" class="piece-fenetre">{% csrf_token %}
   <div class="piece-barre">
-    <span class="inactif"><i class="bi bi-gear"></i> Fonctions</span><span class="inactif"><i class="bi bi-bar-chart-steps"></i> Barèmes</span>
-    <span class="inactif"><i class="bi bi-card-list"></i> Informations</span><span class="inactif"><i class="bi bi-file-earmark"></i> Pied</span>
+    <div class="dropdown">
+      <button type="button" id="doc-form-fonctions" class="dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear"></i> Fonctions</button>
+      <ul class="dropdown-menu">
+        <li><button type="button" class="dropdown-item" data-doc-form-action="brouillon">Enregistrer le brouillon</button></li>
+        <li><button type="button" class="dropdown-item" data-doc-form-action="valider">Valider la pièce…</button></li>
+        <li><button type="button" class="dropdown-item" data-doc-form-action="ajouter">Ajouter une ligne</button></li>
+      </ul>
+    </div>
+    <span class="inactif" title="Fonction non développée"><i class="bi bi-bar-chart-steps"></i> Barèmes</span>
+    <button type="button" id="doc-form-informations" aria-controls="doc-form-panneau-infos" aria-expanded="false"><i class="bi bi-card-list"></i> Informations</button>
+    <button type="button" id="doc-form-pied" aria-controls="piece-pied"><i class="bi bi-file-earmark"></i> Pied</button>
     <span class="inactif"><i class="bi bi-printer"></i> Imprimer</span><span class="inactif"><i class="bi bi-journal-check"></i> Comptabiliser</span>
     <span class="inactif"><i class="bi bi-arrow-repeat"></i> Transformer</span>
     <span class="ms-auto small text-muted">{{ titre }}{% if document.pk %} · {{ document.numero_affiche }}{% endif %}</span>
   </div>
+  <section id="doc-form-panneau-infos" class="border rounded m-2 p-2 small" hidden aria-label="Informations sur la pièce">
+    <strong>Informations sur le document</strong>
+    <div>Type : {{ titre }}{% if document.pk %} — N° {{ document.numero_affiche }}{% else %} — Nouvelle pièce non enregistrée{% endif %}</div>
+    <div>État : {{ document.get_statut_display|default:"Brouillon" }}</div>
+    {% if document.origine_id %}<div>Document d'origine : {{ document.origine.numero_affiche }}</div>{% endif %}
+    <div class="text-muted">Les lignes et montants définitifs sont contrôlés à l'enregistrement.</div>
+  </section>
   {% if form.non_field_errors %}<div class="alert alert-danger m-2 py-1">{{ form.non_field_errors }}</div>{% endif %}
   <div class="piece-entete">
     {% for colonne in colonnes_entete %}<div class="piece-champs">
@@ -39,7 +55,7 @@
   </tbody></table>
   </div>
 
-  <div class="piece-pied">
+  <div class="piece-pied" id="piece-pied" tabindex="-1" aria-label="Totaux de la pièce">
     <div class="piece-pied-bloc"><span>Saisie</span><span class="num small text-muted">montants recalculés à l'enregistrement</span></div>
     <div class="piece-pied-bloc">
       <span>{% if domaine == "stocks" %}Valeur du mouvement{% else %}Total HT{% endif %}</span><span class="num" id="total-ht">0</span>
@@ -57,6 +73,39 @@
 {{ tiers_json|json_script:"tiers-data" }}
 {% endblock %}
 {% block scripts %}
+<script>
+(function commandesSaisieDocument() {
+  const formulaire = document.getElementById('doc-form');
+  const panneau = document.getElementById('doc-form-panneau-infos');
+  const info = document.getElementById('doc-form-informations');
+  const pied = document.getElementById('doc-form-pied');
+  const totaux = document.getElementById('piece-pied');
+
+  info.addEventListener('click', () => {
+    panneau.hidden = !panneau.hidden;
+    info.setAttribute('aria-expanded', String(!panneau.hidden));
+  });
+  pied.addEventListener('click', () => {
+    if (typeof totaux.scrollIntoView === 'function')
+      totaux.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    totaux.focus({ preventScroll: true });
+  });
+
+  // Ne pas dupliquer la validation ni contourner sa confirmation : on
+  // déclenche les commandes existantes et leurs contrôles métier.
+  const commandes = {
+    brouillon: formulaire.querySelector('button[name="brouillon"]'),
+    valider: formulaire.querySelector('button[name="valider"]'),
+    ajouter: document.getElementById('ajout-ligne'),
+  };
+  document.querySelectorAll('[data-doc-form-action]').forEach(bouton => {
+    bouton.addEventListener('click', () => {
+      const cible = commandes[bouton.dataset.docFormAction];
+      if (cible && !cible.disabled) cible.click();
+    });
+  });
+})();
+</script>
 <script>
 const ARTICLES = JSON.parse(document.getElementById('articles-data').textContent);
 const EST_VENTE = {{ est_vente|yesno:"true,false" }};
