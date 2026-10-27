@@ -459,11 +459,18 @@ def controle_liaison(date_debut, date_fin):
     total = sum((r.montant for r in reglements), ZERO)
     flux.append({"flux": "Règlements", "nombre": len(reglements), "conformes": len(passes), "ht": None, "tva": None, "ttc": total})
 
-    # Écritures orphelines : pièce commerciale citée mais introuvable (ou rattachée à une autre écriture)
+    # Écritures orphelines : pièce commerciale citée mais introuvable (ou rattachée à une autre écriture).
+    # Seules les écritures qui citent un numéro de pièce commerciale (FA2026-00001, RC2026-00001…) sont concernées :
+    # les autres modules écrivent aussi dans VT / AC (achats du magasin ACM…, billets et colis en compte, pleins).
+    import re
+
+    numero_commercial = re.compile(r"^(?:%s)\d{4}-\d+$" % "|".join(sorted(set(Document.PREFIXES.values()) | {"RC", "RF"})))
     rattachees = set(Document.objects.exclude(ecriture=None).values_list("ecriture_id", flat=True)) | \
         set(Reglement.objects.exclude(ecriture=None).values_list("ecriture_id", flat=True))
     for ecriture in (Ecriture.objects.filter(date__range=(date_debut, date_fin), journal__code__in=("VT", "AC"))
                      .exclude(origine="").exclude(pk__in=rattachees)):
+        if not numero_commercial.match(ecriture.origine):
+            continue
         anomalies.append({"url": "", "libelle": f"Écriture {ecriture.journal.code} {ecriture.numero} ({ecriture.origine})",
                           "probleme": "Pièce commerciale introuvable : écriture passée en double ou pièce supprimée"})
     return {"flux": flux, "anomalies": anomalies}

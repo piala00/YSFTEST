@@ -106,6 +106,7 @@ def comptabilite():
                 _raccourci("Déclaration de TVA", "bi-percent", "comptabilite:tva"),
                 _raccourci("Bilan", "bi-bank", "comptabilite:bilan"),
                 _raccourci("Compte de résultat", "bi-graph-up", "comptabilite:compte_resultat"),
+                _raccourci("Contrôles de clôture", "bi-clipboard-check", "comptabilite:controles_cloture"),
                 _raccourci("Clôture de l'exercice", "bi-calendar-check", "comptabilite:cloture_exercice"),
             ]},
             {"groupe": "Structure", "liens": [

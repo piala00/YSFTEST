@@ -685,6 +685,7 @@ COMPTABILITE = Module(
                 E("etats.dsf", "Déclaration statistique et fiscale (DSF)", preuve="AJOUT-ERP"),
             ]),
             E("etats.controles", "Analyse et contrôles", icone="bi-clipboard-check", preuve="INDICATIF", enfants=[
+                E("etats.controles.cloture", "Contrôles de clôture", "comptabilite:controles_cloture", preuve="AJOUT-ERP"),
                 E("etats.controles.liaison", "Contrôle de la liaison commerciale", "comptabilite:controle_liaison",
                   preuve="AJOUT-ERP"),
             ]),

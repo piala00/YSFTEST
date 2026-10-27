@@ -47,3 +47,17 @@ def tresorerie_projetee(request):
     return render(request, "comptabilite/tresorerie_projetee.html", {
         **projection(nombre_mois=nombre, budget=budget), "nombre_mois": nombre, "budgets": budgets,
         "previsions": PrevisionTresorerie.objects.all(), "sens": PrevisionTresorerie.SENS})
+
+
+@login_required
+def controles_cloture(request):
+    """Etat › Analyse et contrôles › Contrôles de clôture : toutes les vérifications avant de clôturer."""
+    from .controles import executer
+    from .views_analytique import _contexte_periode
+
+    if not request.GET.get("du") and not request.GET.get("periode") and not request.GET.get("mois"):
+        params = request.GET.copy()
+        params["periode"] = "exercice"
+        request.GET = params
+    p = _contexte_periode(request)
+    return render(request, "comptabilite/controles_cloture.html", {**p, **executer(p["du"], p["au"])})
