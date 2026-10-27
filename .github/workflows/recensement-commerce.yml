@@ -1,0 +1,38 @@
+name: Recensement boutons Commercial
+on:
+  push:
+    branches: [gpt/audit-boutons-sage-v12]
+    paths:
+      - 'apps/core/management/commands/recenser_boutons_commercial.py'
+      - '.github/workflows/recensement-commerce.yml'
+      - 'templates/commercial/**'
+      - 'templates/base.html'
+      - 'apps/core/navigation.py'
+      - 'apps/commercial/models.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recensement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+      - name: Recenser menus, sous-menus, fenêtres et types de documents
+        run: python manage.py recenser_boutons_commercial --sortie docs/retour/RECENSEMENT_BOUTONS_COMMERCIAL
+      - name: Afficher la synthèse
+        run: sed -n '1,52p' docs/retour/RECENSEMENT_BOUTONS_COMMERCIAL.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recensement-boutons-commercial
+          path: |
+            docs/retour/RECENSEMENT_BOUTONS_COMMERCIAL.md
+            docs/retour/RECENSEMENT_BOUTONS_COMMERCIAL.csv
+          retention-days: 30
