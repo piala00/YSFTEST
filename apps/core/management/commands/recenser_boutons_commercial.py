@@ -366,6 +366,91 @@ class Command(BaseCommand):
             "Aucune écriture SQL de production ni aucun taux fiscal inventé.\n"
         )
         chemin_md.write_text(texte, encoding="utf-8")
+        # Matrice d'actions par type de pièce × statut : 21 × 4 = 84 cas statiques.
+        # Le statut réel, les montants et l'origine de la pièce conditionnent les commandes.
+        fichier_actions = prefixe.parent / "MATRICE_ACTIONS_DOCUMENTS_COMMERCIAL.csv"
+        champs_actions = (
+            "famille", "code_document", "libelle", "statut",
+            "fonctions_affichees_ou_declenchees",
+            "fonctions_conditionnelles",
+            "fonctions_inactives",
+            "cibles_transformation_si_valide",
+            "impact_potentiel_stock_si_valide",
+            "comptabilisation_a_validation",
+            "verification_sage_v12", "verification_execution_erp",
+        )
+        with fichier_actions.open("w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(f, fieldnames=champs_actions, delimiter=";")
+            writer.writeheader()
+            for code, libelle, famille in bilan["documents"]:
+                est_facturation = code in Document.TYPES_FACTURATION
+                est_avoir = code in Document.TYPES_AVOIR
+                transforme = Document.TRANSFORMATIONS.get(code, ())
+                est_stock = (
+                    code in Document.TYPES_STOCK
+                    or code in Document.TYPES_LIVRAISON
+                    or code in Document.TYPES_RETOUR
+                )
+                stock_conditionnel = code in (
+                    Document.FACTURE, Document.ACHAT_FACTURE,
+                    Document.FACTURE_RETOUR, Document.ACHAT_FACTURE_RETOUR
+                )
+                effet_stock = (
+                    "oui_si_article_suivi_stock" if est_stock
+                    else "selon_chaine_origine_et_stock" if stock_conditionnel
+                    else "non"
+                )
+                for statut in (
+                    Document.BROUILLON, Document.VALIDE,
+                    Document.TRANSFORME, Document.ANNULE,
+                ):
+                    commandes = ["Informations", "Imprimer", "Fonctions (menu)"]
+                    conditionnelles = ["Fiche du tiers (si tiers lié)"]
+                    inactives = ["Barèmes", "Pied"]
+                    if statut == Document.BROUILLON:
+                        commandes += ["Modifier", "Valider (POST)", "Annuler (POST)"]
+                        conditionnelles.append("OK / Valider la pièce en mode saisie")
+                    elif statut == Document.VALIDE:
+                        if transforme:
+                            conditionnelles.append(
+                                "Transformer (POST ; reliquat obligatoire ; type cible autorisé)"
+                            )
+                        if est_facturation and not est_avoir:
+                            conditionnelles.append(
+                                "Saisir un règlement (si reste à payer > 0)"
+                            )
+                        if code in (Document.COMMANDE, Document.ACHAT_COMMANDE):
+                            conditionnelles.append("Saisir un acompte")
+                        if not est_facturation:
+                            conditionnelles.append(
+                                "Annuler (POST ; si pièces filles/stock le permettent)"
+                            )
+                        if est_facturation:
+                            conditionnelles.append(
+                                "Comptabiliser = consultation de l'écriture existante,"
+                                " non lancement d'une comptabilisation"
+                            )
+                    if not transforme or statut != Document.VALIDE:
+                        inactives.append("Transformer")
+                    writer.writerow({
+                        "famille": famille, "code_document": code,
+                        "libelle": libelle, "statut": statut,
+                        "fonctions_affichees_ou_declenchees": " ; ".join(commandes),
+                        "fonctions_conditionnelles": " ; ".join(conditionnelles),
+                        "fonctions_inactives": " ; ".join(inactives),
+                        "cibles_transformation_si_valide": ",".join(transforme),
+                        "impact_potentiel_stock_si_valide": effet_stock,
+                        "comptabilisation_a_validation": (
+                            "oui" if est_facturation else "non"
+                        ),
+                        "verification_sage_v12": "A_VERIFIER_PAR_CAPTURE_ET_DOC_OFFICIELLE",
+                        "verification_execution_erp": "NON_TESTE_EN_NAVIGATEUR",
+                    })
+        self.stdout.write(
+            "MATRICE PIECES : 84 scénarios (21 types × 4 statuts), "
+            "conditions, transformations et impacts stock/comptabilité à vérifier."
+        )
+        self.stdout.write(str(fichier_actions))
         self.stdout.write(
             "RECENSEMENT COMMERCIAL : %d commandes menus ; %d sous-menus ; "
             "%d occurrences HTML dans %d templates ; %d types de pièces (V=%d A=%d S=%d)."
