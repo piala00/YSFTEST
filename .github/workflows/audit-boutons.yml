@@ -24,7 +24,10 @@ jobs:
           node --check static/js/menus.js
           node --check tests_js/test_menus_couper.js
           node --check tests_js/test_menus_actions.js
+          node --check tests_js/test_document_actions.js
       - name: Tester la commande Couper
         run: node tests_js/test_menus_couper.js
       - name: Tester les commandes contextuelles
         run: node tests_js/test_menus_actions.js
+      - name: Tester les actions des documents de vente, achat et stock
+        run: node tests_js/test_document_actions.js
