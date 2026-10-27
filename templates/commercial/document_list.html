@@ -31,7 +31,7 @@
       <table class="table table-sm mb-0" id="grille">
         <thead><tr>{% for cle, libelle in colonnes %}<th class="{% if libelle == 'Hors taxe' or libelle == 'Solde dû' or libelle == 'Valeur' %}num{% endif %}">{% if cle %}<a href="?{% if base_tri %}{{ base_tri }}&amp;{% endif %}tri={{ cle }}&amp;sens={% if tri == cle and sens == 'asc' %}desc{% else %}asc{% endif %}">{{ libelle }}{% if tri == cle %} <i class="bi bi-caret-{% if sens == 'asc' %}up{% else %}down{% endif %}-fill"></i>{% endif %}</a>{% else %}{{ libelle }}{% endif %}</th>{% endfor %}</tr></thead>
         <tbody>
-        {% for d in object_list %}<tr data-url="{% url 'commercial:document_detail' d.pk %}" data-modifiable="{% if d.statut == 'BROUILLON' %}1{% endif %}" data-annuler="{% url 'commercial:document_annuler' d.pk %}" data-imprimer="{% url 'commercial:document_print' d.pk %}" tabindex="0">
+        {% for d in object_list %}<tr data-url="{% url 'commercial:document_detail' d.pk %}" data-modifiable="{% if d.statut == 'BROUILLON' %}1{% else %}0{% endif %}" data-annuler="{% url 'commercial:document_annuler' d.pk %}" data-imprimer="{% url 'commercial:document_print' d.pk %}" tabindex="0">
           <td><span class="type-piece type-{{ d.type_document|lower }}" title="{{ d.get_type_document_display }}">{{ prefixes|valeur:d.type_document }}</span></td>
           {% if domaine == "stocks" %}
           <td>{{ d.date|date:"dmy" }}</td><td><a href="{% url 'commercial:document_detail' d.pk %}" data-nouvelle-fenetre>{{ d.numero_affiche }}</a></td><td>{{ d.reference_externe }}</td>
@@ -53,15 +53,15 @@
     <div class="dropdown">
       <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Actions</button>
       <ul class="dropdown-menu">
-        <li><button type="button" class="dropdown-item" data-liste="imprimer">Imprimer la pièce sélectionnée</button></li>
+        <li><button type="button" class="dropdown-item" data-liste="imprimer" data-erp-action="imprimer" disabled>Imprimer la pièce sélectionnée</button></li>
         <li><a class="dropdown-item" href="?{{ request.GET.urlencode }}">Actualiser la liste</a></li>
       </ul>
     </div>
     {% include "pagination.html" %}
     <div class="ms-auto d-flex gap-1">
-      <button type="button" class="btn btn-sm btn-ok" data-liste="ouvrir" disabled>Ouvrir</button>
+      <button type="button" class="btn btn-sm btn-ok" data-liste="ouvrir" data-erp-action="modifier" disabled>Ouvrir</button>
       <div class="dropup">
-        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Nouveau</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-erp-action="ajouter" data-bs-toggle="dropdown" title="Choisir le type du nouveau document">Nouveau</button>
         <ul class="dropdown-menu dropdown-menu-end">{% for code, lib in types %}<li><a class="dropdown-item" data-nouvelle-fenetre href="{% url 'commercial:document_create' code %}">{{ lib }}</a></li>{% endfor %}</ul>
       </div>
       <button type="button" class="btn btn-sm btn-outline-secondary" data-liste="supprimer" disabled>Supprimer</button>
@@ -79,21 +79,29 @@
   let ligne = null;
   const ouvrirUrl = url => (window.parent !== window && window.parent.erpFenetres) ? window.parent.erpFenetres.ouvrir(url) : (location.href = url);
   const selectionner = tr => {
-    grille.querySelectorAll('tr.selection').forEach(t => t.classList.remove('selection'));
+    grille.querySelectorAll('tr.selection').forEach(t => {
+      t.classList.remove('selection');
+      t.setAttribute('aria-selected', 'false');
+    });
     ligne = tr; tr.classList.add('selection');
+    tr.setAttribute('aria-selected', 'true');
     boutons('ouvrir').disabled = false;
-    boutons('supprimer').disabled = !tr.dataset.modifiable;
+    boutons('imprimer').disabled = false;
+    boutons('supprimer').disabled = tr.dataset.modifiable !== '1';
     etat.textContent = `1 élément sélectionné sur ${total} éléments de la liste`;
   };
   grille.querySelectorAll('tbody tr[data-url]').forEach(tr => {
     tr.addEventListener('click', () => selectionner(tr));
     tr.addEventListener('dblclick', () => ouvrirUrl(tr.dataset.url));
-    tr.addEventListener('keydown', e => { if (e.key === 'Enter') ouvrirUrl(tr.dataset.url); });
+    tr.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); selectionner(tr); ouvrirUrl(tr.dataset.url); }
+      else if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); selectionner(tr); }
+    });
   });
   boutons('ouvrir').addEventListener('click', () => ligne && ouvrirUrl(ligne.dataset.url));
   boutons('imprimer').addEventListener('click', () => ligne && window.open(ligne.dataset.imprimer, '_blank'));
   boutons('supprimer').addEventListener('click', () => {
-    if (!ligne || !confirm('Supprimer (annuler) ce document en brouillon ?')) return;
+    if (!ligne || ligne.dataset.modifiable !== '1' || !confirm('Annuler ce document en brouillon ?')) return;
     const f = document.getElementById('form-supprimer'); f.action = ligne.dataset.annuler; f.submit();
   });
   boutons('fermer').addEventListener('click', () => {
@@ -103,6 +111,10 @@
   document.getElementById('plus-criteres').addEventListener('click', () => {
     const c = document.getElementById('liste-criteres'); c.hidden = !c.hidden;
   });
-  document.getElementById('liste-filtrer').addEventListener('click', () => document.querySelector('.liste-recherche input[name=q]').focus());
+  document.getElementById('liste-filtrer').addEventListener('click', () => {
+    const criteres = document.getElementById('liste-criteres');
+    criteres.hidden = false;
+    criteres.querySelector('select')?.focus();
+  });
 })();
 </script>{% endblock %}
