@@ -12,19 +12,23 @@ les codes de l'expéditeur et du destinataire sont authentifiés avec le contenu
 import json
 import os
 import re
+import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from django.db import transaction
 from django.db.models import Max
 
 from . import lots
 from .publication import site_local
 
 ENTETE = b"ERP-OHADA-CHIFFRE-V1\x00"
-MODELE_NOM = re.compile(r"^ERP-LOT-(?P<source>[A-Z0-9_-]+?)-vers-(?P<destination>[A-Z0-9_-]+?)-\d{8}-\d{4}-\d+-\d+\.erpx\.chiffre$")
+MODELE_NOM = re.compile(r"^(?P<lot>ERP-LOT-(?P<source>[A-Z0-9_-]+?)-vers-(?P<destination>[A-Z0-9_-]+?)-\d{8}-\d{4}-\d+-\d+)"
+                        r"(?:-[0-9a-f]{8})?\.erpx\.chiffre$")
+LOCAUX = {"localhost", "127.0.0.1", "::1"}
 
 
 # ---------------------------------------------------------------- Chiffrement
@@ -66,9 +70,15 @@ class DossierPartage:
     def deposer(self, destination, nom, octets):
         dossier = self.racine / destination
         dossier.mkdir(parents=True, exist_ok=True)
-        provisoire = dossier / f".{nom}.part"
+        final = dossier / nom
+        if final.exists():
+            raise FileExistsError(f"{nom} existe déjà dans la boîte : jamais écrasé")
+        provisoire = dossier / f".{nom}.{secrets.token_hex(4)}.part"
         provisoire.write_bytes(octets)
-        provisoire.replace(dossier / nom)
+        try:
+            os.link(provisoire, final)                            # échoue si le nom a été pris entre-temps
+        finally:
+            provisoire.unlink(missing_ok=True)
 
     def lister(self, code):
         dossier = self.racine / code
@@ -84,20 +94,29 @@ class DossierPartage:
         return f"dossier partagé {self.racine}"
 
 
+class _SansRedirection(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None                                               # le jeton ne suit jamais une redirection
+
+
 class RelaisHTTP:
-    """Client du relais Internet : POST pour déposer, GET pour lister et lire, DELETE pour retirer."""
+    """Client du relais Internet : POST pour déposer, GET pour lister et lire, DELETE pour retirer.
+    HTTPS obligatoire (certificat vérifié), sauf sur ce poste même (essais) ; jamais de redirection."""
 
     def __init__(self, url, jeton, delai=60):
         self.url, self.jeton, self.delai = url.rstrip("/"), jeton, delai
 
     def _appel(self, methode, chemin, octets=None, entetes=None):
+        adresse = urllib.parse.urlsplit(self.url)
+        if adresse.scheme != "https" and not (adresse.scheme == "http" and adresse.hostname in LOCAUX):
+            raise ConnectionError("relais refusé : adresse en https:// obligatoire (le jeton ne part jamais en clair)")
         requete = urllib.request.Request(f"{self.url}/relais/v1/{chemin}", data=octets, method=methode,
                                          headers={"Authorization": f"Bearer {self.jeton}", **(entetes or {})})
         try:
-            with urllib.request.urlopen(requete, timeout=self.delai) as r:
+            with urllib.request.build_opener(_SansRedirection).open(requete, timeout=self.delai) as r:
                 return r.read()
         except urllib.error.HTTPError as exc:
-            raise ConnectionError(f"relais : {exc.code} {exc.read()[:200].decode('utf-8', 'replace')}")
+            raise ConnectionError(f"relais : {exc.code} {(exc.read() or b'')[:200].decode('utf-8', 'replace')}")
         except (urllib.error.URLError, OSError) as exc:
             raise ConnectionError(f"relais injoignable : {exc}")
 
@@ -176,7 +195,7 @@ def _recevoir(boite, local, bilan, utilisateur):
         try:
             cle, _ = lots.cle_du_lien(local, source)
             octets = dechiffrer(boite.lire(local.code, nom), cle, source.code, local.code)
-            rapport = lots.importer(octets, nom.removesuffix(".chiffre"), utilisateur)
+            rapport = lots.importer(octets, f"{m['lot']}.erpx", utilisateur)
             bilan.recus.append(f"{nom} : {rapport.texte()}")
             boite.retirer(local.code, nom)
         except (ConnectionError, OSError) as exc:
@@ -186,13 +205,18 @@ def _recevoir(boite, local, bilan, utilisateur):
 
 
 def _envoyer(boite, local, bilan, utilisateur):
+    """Le lot n'est noté « émis » que si le dépôt a réussi : un échec annule tout, le passage suivant le refait.
+    Si le dépôt a réussi mais que la réponse s'est perdue, le lot refait porte les mêmes faits : le destinataire
+    ne les intègre qu'une fois. Le nom reçoit un suffixe aléatoire : deux lots ne portent jamais le même nom."""
     for destination in destinataires(local):
         try:
             if not a_envoyer(local, destination):
                 continue
-            nom, octets = lots.exporter(destination, utilisateur=utilisateur)
-            cle, _ = lots.cle_du_lien(local, destination)
-            boite.deposer(destination.code, f"{nom}.chiffre", chiffrer(octets, cle, local.code, destination.code))
+            with transaction.atomic():
+                nom, octets = lots.exporter(destination, utilisateur=utilisateur)
+                cle, _ = lots.cle_du_lien(local, destination)
+                nom_boite = f"{nom.removesuffix('.erpx')}-{secrets.token_hex(4)}.erpx.chiffre"
+                boite.deposer(destination.code, nom_boite, chiffrer(octets, cle, local.code, destination.code))
             bilan.envoyes.append(nom)
         except (ConnectionError, OSError, lots.LotInvalide) as exc:
             bilan.erreurs.append(f"envoi vers {destination.code} : {exc}")

@@ -1,9 +1,8 @@
 """Contrats de sécurité supplémentaires du client relais.
 
-Ces tests sont volontairement des échecs attendus tant que la politique HTTPS
-n'est pas imposée par le client. Aucun appel réseau réel n'est effectué.
+HTTPS imposé par le client (sauf sur le poste même, pour les essais). Aucun appel réseau réel n'est effectué.
 """
-from unittest import expectedFailure, mock
+from unittest import mock
 
 from django.test import SimpleTestCase
 
@@ -11,7 +10,6 @@ from apps.echanges.synchro import RelaisHTTP
 
 
 class PolitiqueTransportRelaisTests(SimpleTestCase):
-    @expectedFailure
     def test_refuser_http_avec_jeton(self):
         """Un jeton de site ne doit jamais partir vers un relais HTTP non chiffré."""
         relais = RelaisHTTP("http://exemple.invalid", "jeton-de-test")
@@ -23,3 +21,9 @@ class PolitiqueTransportRelaisTests(SimpleTestCase):
     def test_url_https_conservee(self):
         relais = RelaisHTTP("https://relais.example.invalid/", "jeton-de-test")
         self.assertEqual(relais.url, "https://relais.example.invalid")
+
+    def test_http_local_permis_pour_les_essais(self):
+        relais = RelaisHTTP("http://127.0.0.1:1", "jeton-de-test", delai=1)
+        with self.assertRaises(ConnectionError) as e:
+            relais.lister("DLA")
+        self.assertIn("injoignable", str(e.exception))
