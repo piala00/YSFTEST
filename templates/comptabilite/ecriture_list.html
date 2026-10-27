@@ -2,7 +2,7 @@
 {% block title %}Écritures{% endblock %}
 {% block content %}
 <div class="page-title"><h1>{{ element_actif.titre|default:"Écritures comptables" }}</h1>
-  <a class="btn btn-primary btn-sm" href="{% url 'comptabilite:ecriture_create' %}"><i class="bi bi-plus"></i> Saisie d'écriture</a></div>
+  <a class="btn btn-primary btn-sm" data-erp-action="ajouter" href="{% url 'comptabilite:ecriture_create' %}"><i class="bi bi-plus"></i> Saisie d'écriture</a></div>
 <form class="row g-2 mb-3">
   <div class="col-md-2"><select name="journal" class="form-select form-select-sm"><option value="">Tous journaux</option>
     {% for j in journaux %}<option value="{{ j.code }}" {% if request.GET.journal == j.code %}selected{% endif %}>{{ j.code }} - {{ j.intitule }}</option>{% endfor %}</select></div>
