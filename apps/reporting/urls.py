@@ -26,6 +26,7 @@ urlpatterns = [
     path("transport/", views_analyses.transport_tableau_de_bord, name="transport_tableau_de_bord"),
     path("transport/billetterie/", views_analyses.transport_billetterie, name="transport_billetterie"),
     path("transport/colis/", views_analyses.transport_colis, name="transport_colis"),
+    path("transport/colis-non-livres/", views_analyses.transport_colis_non_livres, name="transport_colis_non_livres"),
     path("bilan/", compta_views.bilan_view, name="bilan"),
     path("compte-de-resultat/", compta_views.compte_resultat_view, name="compte_resultat"),
 ]

@@ -174,6 +174,36 @@ def activite_colis(debut, fin, axe="depart"):
     return {"lignes": lignes, "total": total}
 
 
+def colis_non_livres(fin, seuil_jours=7):
+    """Colis arrivés ou en route mais pas encore livrés (ni annulés) à la date « fin » : suivi des colis en souffrance.
+
+    Âge = nombre de jours entre l'enregistrement et « fin » ; au-delà du seuil, le colis est signalé « en retard »."""
+    import datetime
+
+    from .models import Colis
+
+    seuil = max(1, int(seuil_jours or 7))
+    attente = (Colis.ENREGISTRE, Colis.CHARGE, Colis.EN_ROUTE, Colis.ARRIVE)
+    lignes = []
+    for c in (Colis.objects.filter(statut__in=attente, date__lte=fin)
+              .select_related("gare_depart", "gare_arrivee").order_by("date")):
+        age = (fin - c.date).days
+        lignes.append({"numero": c.numero, "date": c.date, "jours": age,
+                       "depart": c.gare_depart.nom, "arrivee": c.gare_arrivee.nom,
+                       "destinataire": c.destinataire, "tel": c.tel_destinataire,
+                       "statut": c.get_statut_display(), "pieces": c.nombre,
+                       "en_retard": age >= seuil, "lien": f"/transport/colis/{c.pk}/"})
+    lignes.sort(key=lambda l: -l["jours"])
+    en_retard = [l for l in lignes if l["en_retard"]]
+    par_gare = {}
+    for l in lignes:
+        g = par_gare.setdefault(l["arrivee"], {"gare": l["arrivee"], "colis": 0, "en_retard": 0})
+        g["colis"] += 1
+        g["en_retard"] += 1 if l["en_retard"] else 0
+    return {"lignes": lignes, "seuil": seuil, "total": len(lignes), "nb_en_retard": len(en_retard),
+            "par_gare": sorted(par_gare.values(), key=lambda g: -g["en_retard"])}
+
+
 def tableau_de_bord(debut, fin):
     """Indicateurs du transport sur la période, comparés à la période précédente de même durée."""
     import datetime

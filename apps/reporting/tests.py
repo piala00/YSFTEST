@@ -324,6 +324,29 @@ class MenusDuTransportTests(TestCase):
                     total += 1
         self.assertGreater(total, 150)
 
+    def test_colis_non_livres(self):
+        import datetime
+
+        from apps.transport import reporting as tr
+        from apps.transport.models import Colis, Gare
+
+        g = Gare.objects.order_by("pk")[:2]
+        depart, arrivee = g[0], g[1] if len(g) > 1 else g[0]
+        aujourdhui = datetime.date.today()
+        Colis.objects.create(numero="TST-A", nature=Colis.COLIS, date=aujourdhui - datetime.timedelta(days=10), gare_depart=depart,
+                             gare_arrivee=arrivee, expediteur="X", destinataire="Y", nombre=1, statut=Colis.ARRIVE)
+        Colis.objects.create(numero="TST-B", nature=Colis.COLIS, date=aujourdhui - datetime.timedelta(days=2), gare_depart=depart,
+                             gare_arrivee=arrivee, expediteur="X", destinataire="Z", nombre=1, statut=Colis.EN_ROUTE)
+        Colis.objects.create(numero="TST-C", nature=Colis.COLIS, date=aujourdhui - datetime.timedelta(days=20), gare_depart=depart,
+                             gare_arrivee=arrivee, expediteur="X", destinataire="Livré", nombre=1, statut=Colis.LIVRE)
+        r = tr.colis_non_livres(aujourdhui, seuil_jours=7)
+        self.assertEqual(r["total"], 2)                              # le colis livré est exclu
+        self.assertEqual(r["nb_en_retard"], 1)                       # seul celui de 10 jours dépasse le seuil
+        self.assertEqual(r["lignes"][0]["jours"], 10)                # trié par ancienneté décroissante
+        self.assertTrue(r["lignes"][0]["en_retard"])
+        self.assertEqual(self.client.get(reverse("reporting:transport_colis_non_livres") + "?seuil=7").status_code, 200)
+        self.assertEqual(self.client.get(reverse("reporting:transport_colis_non_livres") + "?export=csv").status_code, 200)
+
     def test_etats_du_transport_coherents(self):
         import datetime
 

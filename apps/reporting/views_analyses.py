@@ -144,6 +144,26 @@ def transport_billetterie(request):
 
 
 @login_required
+def transport_colis_non_livres(request):
+    """Colis arrivés ou en route, pas encore livrés (ni annulés) : suivi des colis en souffrance, triés par ancienneté."""
+    from apps.transport import reporting as tr
+
+    p = _contexte(request)
+    try:
+        seuil = int(request.GET.get("seuil") or 7)
+    except ValueError:
+        seuil = 7
+    r = tr.colis_non_livres(p["au"], seuil)
+    if request.GET.get("export") == "csv":
+        return _csv(f"colis-non-livres-{p['au']}",
+                    ["N° colis", "Enregistré le", "Jours", "Départ", "Arrivée", "Destinataire", "Téléphone", "Statut",
+                     "Pièces", "En retard"],
+                    [[l["numero"], l["date"], l["jours"], l["depart"], l["arrivee"], l["destinataire"], l["tel"],
+                      l["statut"], l["pieces"], "oui" if l["en_retard"] else ""] for l in r["lignes"]])
+    return render(request, "reporting/transport_colis_non_livres.html", {**p, **r})
+
+
+@login_required
 def transport_colis(request):
     from apps.transport import reporting as tr
 

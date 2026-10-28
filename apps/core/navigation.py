@@ -827,6 +827,7 @@ REPORTING = Module(
                 E("transport.recettes.billetterie", "Billetterie par point de vente", "reporting:transport_billetterie",
                   preuve="AJOUT-ERP"),
                 E("transport.recettes.colis", "Colis, courrier et fret", "reporting:transport_colis", preuve="AJOUT-ERP"),
+                E("transport.recettes.colis_non_livres", "Colis arrivés non livrés", "reporting:transport_colis_non_livres", preuve="AJOUT-ERP"),
                 E("transport.recettes.sessions", "Sessions de caisse", "transport:sessions_caisse", preuve="AJOUT-ERP"),
                 E("transport.recettes.transferts", "Transferts entre caisses", "transport:transferts", preuve="AJOUT-ERP"),
             ]),
