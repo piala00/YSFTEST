@@ -360,7 +360,7 @@ def colis_form(request):
             return redirect("transport:colis_detail", colis.pk)
         except ValidationError as exc:
             _erreur(request, exc)
-    return render(request, "core/form.html", {"form": form, "titre": "Enregistrer un colis, un courrier ou du fret"})
+    return render(request, "transport/colis_form.html", {"form": form, "titre": "Enregistrer un colis, un courrier ou du fret"})
 
 
 @login_required

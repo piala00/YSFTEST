@@ -315,6 +315,13 @@ class EcransTransportTests(TestCase):
         self.assertContains(recette, "11 500")                               # port dû 1 500 + contre-remboursement 10 000
         self.assertContains(self.client.get(reverse("transport:rentabilite") + "?axe=depart"), depart.numero)
 
+    def test_saisie_rapide_portrait_billet_et_colis(self):
+        from django.urls import reverse
+
+        # Les écrans de saisie billet et colis sont en portrait « saisie rapide » (Entrée passe au champ suivant).
+        for url in (reverse("transport:billet_vente"), reverse("transport:colis_create")):
+            self.assertContains(self.client.get(url), "data-saisie-rapide")
+
 
 class ComptesVehiculesTests(TestCase):
     @classmethod
