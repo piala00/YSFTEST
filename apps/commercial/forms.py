@@ -243,3 +243,12 @@ class LigneInventaireForm(forms.ModelForm):
 
 
 LigneInventaireFormSet = forms.modelformset_factory(LigneInventaire, form=LigneInventaireForm, extra=0)
+
+
+class BaremeForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        from .models import Bareme
+        model = Bareme
+        fields = ("type_bareme", "sens", "libelle", "categorie", "tiers", "famille", "article",
+                  "quantite_min", "debut", "fin", "taux", "representant", "actif")
+        widgets = {"debut": forms.DateInput(attrs={"type": "date"}), "fin": forms.DateInput(attrs={"type": "date"})}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ titre }}{% endblock %}
+{% block content %}
+<div class="page-title d-flex align-items-center"><h1>{{ titre }}</h1>
+  <a class="btn btn-primary btn-sm ms-auto" href="{% url 'commercial:bareme_create' %}{% if type_bareme %}?type={{ type_bareme }}{% if sens %}&amp;sens={{ sens }}{% endif %}{% endif %}">
+    <i class="bi bi-plus"></i> Nouveau barème</a></div>
+<p class="small text-muted">Le barème le plus précis (article &gt; famille ; tiers &gt; catégorie) remplit la remise de la ligne ;
+  une remise saisie à la main reste prioritaire. Aucun cumul : un seul barème s'applique.</p>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+<thead class="table-light"><tr><th>Libellé</th><th>Type</th><th>Pour</th><th>Catégorie</th><th>Tiers</th><th>Famille</th>
+  <th>Article</th><th class="num">Qté mini</th><th>Période</th><th class="num">Taux</th><th>Actif</th></tr></thead><tbody>
+{% for b in object_list %}<tr>
+  <td><a href="{% url 'commercial:bareme_update' b.pk %}">{{ b.libelle }}</a></td>
+  <td>{{ b.get_type_bareme_display }}</td><td>{{ b.get_sens_display }}</td>
+  <td>{{ b.categorie|default:"—" }}</td><td>{{ b.tiers|default:"—" }}</td>
+  <td>{{ b.famille|default:"—" }}</td><td>{{ b.article|default:"—" }}</td>
+  <td class="num">{% if b.quantite_min %}{{ b.quantite_min|floatformat:"-3" }}{% else %}—{% endif %}</td>
+  <td>{% if b.debut %}{{ b.debut|date:"d/m/Y" }} → {{ b.fin|date:"d/m/Y" }}{% else %}permanent{% endif %}</td>
+  <td class="num">{% if b.type_bareme == 'COMMISSION' %}{{ b.taux }} %{% else %}{{ b.taux }} %{% endif %}</td>
+  <td>{% if b.actif %}<span class="text-success">oui</span>{% else %}<span class="text-muted">non</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="11" class="text-muted text-center p-3">Aucun barème. Créez-en un avec « Nouveau barème ».</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% if type_bareme == 'COMMISSION' %}<div class="form-text mt-2">Les commissions n'agissent pas sur les prix : elles serviront à un état des commissions par représentant (à venir).</div>{% endif %}
+{% endblock %}

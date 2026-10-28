@@ -326,3 +326,65 @@ class RecetteBoutonsDocumentsTests(TestCase):
 
         with self.assertRaisesMessage(CommandError, "Base de recette seulement"):
             call_command("recette_boutons_documents", sortie="/tmp/inutile")
+
+
+class BaremesRemisesTests(BaseCommerciale):
+    """Barèmes (façon Sage) : remise automatique la plus précise, promotion datée, remise manuelle prioritaire."""
+
+    def ligne_remise(self, quantite=10, remise=0):
+        doc = Document.objects.create(type_document=Document.FACTURE, tiers=self.client_)
+        l = LigneDocument.objects.create(document=doc, article=self.article, quantite=quantite,
+                                         prix_unitaire=1000, remise=remise)
+        l.refresh_from_db()
+        return l
+
+    def test_remise_automatique_la_plus_precise(self):
+        from .models import Bareme
+
+        Bareme.objects.create(type_bareme="REMISE", sens="CLIENT", libelle="Tous clients", taux=5)
+        l = self.ligne_remise()
+        self.assertEqual(l.remise, 5)                                  # barème général appliqué
+        self.assertEqual(l.montant_ht, 10 * 1000 * Decimal("0.95"))
+        self.assertIsNotNone(l.remise_bareme_id)
+        # un barème plus précis (cet article) l'emporte
+        Bareme.objects.create(type_bareme="REMISE", sens="CLIENT", libelle="Cet article", article=self.article, taux=8)
+        self.assertEqual(self.ligne_remise().remise, 8)
+
+    def test_escalier_quantite(self):
+        from .models import Bareme
+
+        Bareme.objects.create(type_bareme="REMISE", sens="CLIENT", libelle="Gros volume", quantite_min=50, taux=12)
+        self.assertEqual(self.ligne_remise(quantite=10).remise, 0)     # sous le seuil : pas de remise
+        self.assertEqual(self.ligne_remise(quantite=60).remise, 12)    # au-dessus : remise accordée
+
+    def test_remise_manuelle_prioritaire(self):
+        from .models import Bareme
+
+        Bareme.objects.create(type_bareme="REMISE", sens="CLIENT", libelle="Général", taux=5)
+        l = self.ligne_remise(remise=15)
+        self.assertEqual(l.remise, 15)                                 # remise saisie conservée
+        self.assertIsNone(l.remise_bareme_id)
+
+    def test_promotion_datee(self):
+        import datetime
+
+        from .models import Bareme
+
+        Bareme.objects.create(type_bareme="PROMOTION", sens="CLIENT", libelle="Soldes janvier", taux=20,
+                              debut=datetime.date(2000, 1, 1), fin=datetime.date(2000, 1, 31))
+        self.assertEqual(self.ligne_remise().remise, 0)                # hors période : pas de promotion
+        doc = Document.objects.create(type_document=Document.FACTURE, tiers=self.client_, date=datetime.date(2000, 1, 15))
+        l = LigneDocument.objects.create(document=doc, article=self.article, quantite=10, prix_unitaire=1000)
+        self.assertEqual(l.remise, 20)                                 # dans la période : promotion appliquée
+
+    def test_ecran_baremes(self):
+        from django.contrib.auth import get_user_model
+
+        self.client.force_login(get_user_model().objects.create_superuser("chef", "", "Chef-ok-2026"))
+        self.assertEqual(self.client.get(reverse("commercial:baremes") + "?type=REMISE&sens=CLIENT").status_code, 200)
+        reponse = self.client.post(reverse("commercial:bareme_create"),
+                                   {"type_bareme": "REMISE", "sens": "CLIENT", "libelle": "T", "quantite_min": "0",
+                                    "taux": "5", "actif": "on"})
+        self.assertEqual(reponse.status_code, 302)
+        from .models import Bareme
+        self.assertTrue(Bareme.objects.filter(libelle="T").exists())

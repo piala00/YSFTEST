@@ -14,10 +14,10 @@ from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.comptabilite.models import Journal
 
-from .forms import (AgenceForm, ArticleForm, DepotForm, DocumentForm, FamilleArticleForm, InventaireForm, LigneDocumentFormSet,
+from .forms import (AgenceForm, ArticleForm, BaremeForm, DepotForm, DocumentForm, FamilleArticleForm, InventaireForm, LigneDocumentFormSet,
                     OperationCaisseForm,
                     LigneInventaireFormSet, ReglementForm, TiersForm)
-from .models import (Article, CategorieTarifaire, Depot, Document, FamilleArticle, Inventaire, MouvementStock, OperationCaisse,
+from .models import (Article, Bareme, CategorieTarifaire, Depot, Document, FamilleArticle, Inventaire, MouvementStock, OperationCaisse,
                      Reglement,
                      StockDepot, TarifCategorie, Tiers, ZERO)
 
@@ -255,6 +255,49 @@ class FamilleUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "core/form.html"
     success_url = reverse_lazy("commercial:familles")
     extra_context = {"titre": "Modifier la famille"}
+
+
+class BaremeListView(LoginRequiredMixin, ListView):
+    """Structure › Barèmes : remises/ristournes, soldes/promotions et commissions (filtrés par type et sens)."""
+    model = Bareme
+    template_name = "commercial/bareme_list.html"
+
+    def get_queryset(self):
+        qs = Bareme.objects.select_related("categorie", "tiers", "famille", "article")
+        self.type_bareme = self.request.GET.get("type") or ""
+        self.sens = self.request.GET.get("sens") or ""
+        if self.type_bareme in dict(Bareme.TYPES):
+            qs = qs.filter(type_bareme=self.type_bareme)
+        if self.sens in dict(Bareme.SENS):
+            qs = qs.filter(sens=self.sens)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        titres = {"REMISE": "Rabais, remises et ristournes", "PROMOTION": "Soldes et promotions",
+                  "COMMISSION": "Commissions représentants"}
+        ctx["titre"] = titres.get(self.type_bareme, "Barèmes")
+        ctx["type_bareme"], ctx["sens"] = self.type_bareme, self.sens
+        return ctx
+
+
+class BaremeCreateView(LoginRequiredMixin, CreateView):
+    model = Bareme
+    form_class = BaremeForm
+    template_name = "core/form.html"
+    success_url = reverse_lazy("commercial:baremes")
+    extra_context = {"titre": "Nouveau barème"}
+
+    def get_initial(self):
+        return {"type_bareme": self.request.GET.get("type") or "REMISE", "sens": self.request.GET.get("sens") or "CLIENT"}
+
+
+class BaremeUpdateView(LoginRequiredMixin, UpdateView):
+    model = Bareme
+    form_class = BaremeForm
+    template_name = "core/form.html"
+    success_url = reverse_lazy("commercial:baremes")
+    extra_context = {"titre": "Modifier le barème"}
 
 
 class StockListView(LoginRequiredMixin, ListView):

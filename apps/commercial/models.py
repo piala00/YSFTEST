@@ -916,6 +916,8 @@ class LigneDocument(models.Model):
     montant_ht = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     montant_tva = models.DecimalField(max_digits=18, decimal_places=2, default=ZERO)
     ligne_origine = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="lignes_generees")
+    remise_bareme = models.ForeignKey("Bareme", null=True, blank=True, on_delete=models.SET_NULL, related_name="lignes",
+                                      verbose_name="Remise appliquée par un barème")
 
     class Meta:
         ordering = ["id"]
@@ -973,8 +975,90 @@ class LigneDocument(models.Model):
                 self.taux_tva = ZERO        # société non assujettie : elle ne facture pas de TVA
             elif doc.tiers_id and not doc.tiers.assujetti_tva:
                 self.taux_tva = ZERO        # client exonéré ou fournisseur non assujetti
+        if self.remise == ZERO and self.article_id and self.document_id and not self.document.est_stock:
+            taux, bareme = Bareme.remise_applicable(self.document, self.article, self.quantite)
+            if taux:                                   # remise automatique (barème) ; une remise saisie reste prioritaire
+                self.remise = taux
+                self.remise_bareme = bareme
         self.calculer()
         super().save(*args, **kwargs)
+
+
+class Bareme(models.Model):
+    """Structure › Barèmes (à la manière de Sage) : remises automatiques, soldes/promotions et commissions.
+
+    Le barème le PLUS PRÉCIS qui correspond à une ligne (catégorie/client × famille/article × quantité × période)
+    remplit la remise de la ligne ; une remise saisie à la main reste prioritaire. Aucun cumul (un seul barème).
+    Aucun taux par défaut n'est livré : les barèmes sont créés par la société.
+    """
+    REMISE, PROMOTION, COMMISSION = "REMISE", "PROMOTION", "COMMISSION"
+    TYPES = [(REMISE, "Remise / ristourne (RRR)"), (PROMOTION, "Solde / promotion (daté)"),
+             (COMMISSION, "Commission représentant")]
+    CLIENT, FOURNISSEUR = "CLIENT", "FOURNISSEUR"
+    SENS = [(CLIENT, "Clients"), (FOURNISSEUR, "Fournisseurs")]
+
+    type_bareme = models.CharField("Type", max_length=12, choices=TYPES, default=REMISE)
+    sens = models.CharField("Clients ou fournisseurs", max_length=12, choices=SENS, default=CLIENT)
+    libelle = models.CharField("Libellé", max_length=120)
+    categorie = models.ForeignKey(CategorieTarifaire, null=True, blank=True, on_delete=models.CASCADE,
+                                  related_name="baremes", verbose_name="Catégorie tarifaire (vide : toutes)")
+    tiers = models.ForeignKey(Tiers, null=True, blank=True, on_delete=models.CASCADE, related_name="baremes",
+                              verbose_name="Tiers précis (vide : tous)")
+    famille = models.ForeignKey("FamilleArticle", null=True, blank=True, on_delete=models.CASCADE,
+                                related_name="baremes", verbose_name="Famille d'articles (vide : toutes)")
+    article = models.ForeignKey(Article, null=True, blank=True, on_delete=models.CASCADE, related_name="baremes",
+                                verbose_name="Article précis (vide : tous)")
+    quantite_min = models.DecimalField("Quantité minimale (escalier)", max_digits=18, decimal_places=3, default=ZERO)
+    debut = models.DateField("Début (promotion)", null=True, blank=True)
+    fin = models.DateField("Fin (promotion)", null=True, blank=True)
+    taux = models.DecimalField("Taux %", max_digits=5, decimal_places=2, default=ZERO)
+    representant = models.CharField("Représentant (commission)", max_length=120, blank=True)
+    actif = models.BooleanField("Actif", default=True)
+
+    class Meta:
+        ordering = ["type_bareme", "sens", "libelle"]
+        verbose_name = "barème"
+
+    def __str__(self):
+        return f"{self.get_type_bareme_display()} — {self.libelle} ({self.taux} %)"
+
+    def clean(self):
+        if self.type_bareme == self.PROMOTION and not (self.debut and self.fin):
+            raise ValidationError("Une promotion doit avoir une date de début et de fin.")
+        if self.debut and self.fin and self.fin < self.debut:
+            raise ValidationError("La date de fin est avant la date de début.")
+        if not (0 <= self.taux <= 100):
+            raise ValidationError({"taux": "Le taux va de 0 à 100 %."})
+
+    @classmethod
+    def remise_applicable(cls, document, article, quantite):
+        """Barème de remise/promotion le plus précis qui s'applique à cette ligne → (taux, barème) ou (None, None)."""
+        if not getattr(document, "tiers_id", None):
+            return None, None
+        sens = cls.CLIENT if document.est_vente else cls.FOURNISSEUR
+        jour = document.date
+        candidats = cls.objects.filter(actif=True, sens=sens, type_bareme__in=(cls.REMISE, cls.PROMOTION),
+                                       quantite_min__lte=quantite or ZERO)
+        meilleur, note = None, None
+        for b in candidats.select_related("categorie", "tiers", "famille", "article"):
+            if b.categorie_id and b.categorie_id != document.tiers.categorie_tarifaire_id:
+                continue
+            if b.tiers_id and b.tiers_id != document.tiers_id:
+                continue
+            if b.famille_id and b.famille_id != article.famille_id:
+                continue
+            if b.article_id and b.article_id != article.pk:
+                continue
+            if b.debut and jour < b.debut:
+                continue
+            if b.fin and jour > b.fin:
+                continue
+            # précision : article > famille ; tiers > catégorie ; puis seuil de quantité le plus élevé, puis taux
+            precision = (bool(b.article_id), bool(b.famille_id), bool(b.tiers_id), bool(b.categorie_id),
+                         b.quantite_min, b.taux)
+            if note is None or precision > note:
+                meilleur, note = b, precision
+        return (meilleur.taux, meilleur) if meilleur else (None, None)
 
 
 class Reglement(models.Model):

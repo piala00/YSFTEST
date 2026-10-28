@@ -49,6 +49,9 @@ urlpatterns = [
     path("familles/", views.FamilleListView.as_view(), name="familles"),
     path("familles/nouvelle/", views.FamilleCreateView.as_view(), name="famille_create"),
     path("familles/<int:pk>/", views.FamilleUpdateView.as_view(), name="famille_update"),
+    path("baremes/", views.BaremeListView.as_view(), name="baremes"),
+    path("baremes/nouveau/", views.BaremeCreateView.as_view(), name="bareme_create"),
+    path("baremes/<int:pk>/", views.BaremeUpdateView.as_view(), name="bareme_update"),
     path("stock/", views.StockListView.as_view(), name="stock"),
     path("stock/comptabiliser/", views.stock_comptabiliser, name="stock_comptabiliser"),
 
