@@ -2,6 +2,7 @@
 ;   ISCC /DEdition=Transport /DPort=8100 /DVersion=1.0.0 /DSource=..\..\dist\ERP-OHADA-Transport erp_ohada.iss
 ; Installation silencieuse (déploiement sur plusieurs postes) :
 ;   ERP-OHADA-Transport-Installation.exe /VERYSILENT /ROLE=seul|siege|agence|poste [/FICHIER=agence.erpx] [/SERVEUR=http://SERVEUR:8100]
+;       [/CLE=clé d'installation remise par l'éditeur]
 ;       [/BASE=sqlite|sqlserver|les-deux /SQL_SERVEUR=SRV\SQLEXPRESS /SQL_BASE=ERP /SQL_UTILISATEUR=… /SQL_MDP=…]
 ;       [/TASKS="service,parefeu"]   (service Windows : serveur en arrière-plan, recommandé)
 ; Les données (C:\ProgramData\ERP-OHADA\<Édition>) ne sont jamais effacées, ni à la mise à jour ni à la désinstallation.
@@ -81,10 +82,11 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM ""{#Programme}"""; Flags:
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""ERP OHADA (port {#Port})"""; Flags: runhidden; RunOnceId: "PareFeu"
 
 [Messages]
-fr.FinishedLabel=L'installation est terminée.%n%nLe serveur tourne en arrière-plan (service Windows « {#Nom} ») si vous l'avez choisi. Au premier démarrage, le navigateur ouvre l'assistant : compte administrateur, société, rôle du serveur, base de données. Les données sont dans C:\ProgramData\ERP-OHADA ; elles sont conservées si vous désinstallez le logiciel.
+fr.FinishedLabel=L'installation est terminée.%n%nLe serveur tourne en arrière-plan (service Windows « {#Nom} ») si vous l'avez choisi. Au premier démarrage, le navigateur ouvre l'assistant : compte administrateur, clé d'installation, société, rôle du serveur, base de données. Les données sont dans C:\ProgramData\ERP-OHADA ; elles sont conservées si vous désinstallez le logiciel.
 
 [Code]
 var
+  PageCle: TInputQueryWizardPage;
   PageBase: TInputOptionWizardPage;
   PageSQL: TInputQueryWizardPage;
   PageRole: TInputOptionWizardPage;
@@ -166,9 +168,22 @@ begin
     Result := 'http://' + Result;
 end;
 
+function CleInstallation(): String;
+begin
+  Result := Trim(ExpandConstant('{param:CLE|}'));
+  if Result = '' then
+    Result := Trim(PageCle.Values[0]);
+end;
+
 procedure InitializeWizard();
 begin
-  PageRole := CreateInputOptionPage(wpWelcome, 'Rôle de cet ordinateur',
+  PageCle := CreateInputQueryPage(wpWelcome, 'Clé d''installation',
+    'Saisissez la clé d''installation remise par l''éditeur',
+    'Elle indique votre société et l''édition achetée ; collez-la telle quelle (groupes de 5 caractères). ' +
+    'Sans clé, l''assistant du premier démarrage la demandera.');
+  PageCle.Add('Clé d''installation :', False);
+
+  PageRole := CreateInputOptionPage(PageCle.ID, 'Rôle de cet ordinateur',
     'Comment cet ordinateur sera-t-il utilisé ?',
     'Le serveur garde les données ; les autres postes du réseau l''ouvrent simplement dans leur navigateur.',
     True, False);
@@ -213,6 +228,8 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
+  if PageID = PageCle.ID then
+    Result := (Role() = 'poste') or DejaConfigure() or (ExpandConstant('{param:CLE|}') <> '');
   if PageID = PageAgence.ID then
     Result := Role() <> 'agence';
   if PageID = PageServeur.ID then
@@ -265,6 +282,8 @@ begin
     { L'assistant du premier démarrage proposera ce rôle (et installera l'agence avec ce fichier) }
     ForceDirectories(Donnees());
     SaveStringToFile(Donnees() + '\role-installation.txt', Role(), False);
+    if CleInstallation() <> '' then
+      SaveStringToFile(Donnees() + '\cle-installation.txt', CleInstallation(), False);
     if (Role() = 'agence') and (FichierAgence() <> '') and FileExists(FichierAgence()) then
       FileCopy(FichierAgence(), Donnees() + '\installation-agence.erpx', False);
   end;

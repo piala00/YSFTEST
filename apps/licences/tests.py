@@ -63,8 +63,102 @@ class LicencesTests(TestCase):
         return next(self.donnees.glob("LIC-*.erplic")).read_text(), sortie
 
     def tearDown(self):
-        for f in self.donnees.glob("LIC-*.erplic"):
+        for f in self.donnees.glob("LIC-*"):
             f.unlink()
+
+    def outil(self, *arguments):
+        sortie = subprocess.run([sys.executable, str(OUTIL), *arguments], env=self.env, capture_output=True, text=True)
+        self.assertEqual(sortie.returncode, 0, sortie.stderr + sortie.stdout)
+        return sortie
+
+    def cle_installation(self, client="Transports Essai SA", edition="transport"):
+        sortie = self.outil("installation", "--cle", str(Path(self.dossier.name, "cle-privee.pem")), "--client", client,
+                            "--edition", edition, "--sortie", str(self.donnees))
+        return sortie.stdout.strip().splitlines()[-1]
+
+    # ------------------------------------------------------------ clé d'installation, demande, clé d'activation
+    def test_cle_installation(self):
+        from apps.core.models import Societe
+
+        cle = self.cle_installation("Société Générale de Voyages")
+        d = l.enregistrer_cle_installation(cle.lower().replace("-", " "))          # recopiée sans soin : acceptée
+        self.assertEqual((d["societe"], d["edition"]), ("Société Générale de Voyages", "transport"))
+        self.assertTrue(d["numero"].startswith("INS-"))
+        self.assertEqual(Societe.get().raison_sociale, "Société Générale de Voyages")
+        self.assertEqual(l.cle_installation()["numero"], d["numero"])
+        self.assertIn(d["numero"], Path(self.dossier.name, "registre-installations.csv").read_text())
+        with self.assertRaisesRegex(l.LicenceInvalide, "édition"):
+            l.enregistrer_cle_installation(self.cle_installation(edition="commerce"))
+        brut = bytearray(l.fc.depuis_texte(cle))
+        brut[12] ^= 1                                                                # une lettre du nom changée
+        with self.assertRaisesRegex(l.LicenceInvalide, "signature"):
+            l.enregistrer_cle_installation(l.fc.en_texte(bytes(brut)))
+        for faux in ("", "ABCDE-FGHIJ", "n'importe quoi"):
+            with self.assertRaises(l.LicenceInvalide):
+                l.enregistrer_cle_installation(faux)
+
+    @override_settings(ERP_LICENCE=True)
+    def test_demande_puis_fichier_et_cle_activation(self):
+        U = get_user_model()
+        self.client.force_login(U.objects.create_superuser("chef", "", "Chef-2030-ok"))
+        self.client.post(reverse("licence"), {"action": "installation", "cle": self.cle_installation()})
+        reponse = self.client.get(reverse("licence") + "?demande=1")
+        self.assertIn("DEMANDE-LICENCE-", reponse["Content-Disposition"])
+        demande = l.fc.demande_lire(reponse.content)
+        self.assertEqual(demande["societe"], "Transports Essai SA")
+        self.assertEqual(demande["materiel"], l.empreinte_machine())
+        self.assertEqual(demande["machine_nom"], l.nom_machine())
+        self.assertTrue(demande["installation"].startswith("INS-"))
+        fichier_demande = self.donnees / "LIC-demande.erpdem"
+        fichier_demande.write_bytes(reponse.content)
+        sortie = self.outil("emettre", "--cle", str(Path(self.dossier.name, "cle-privee.pem")), "--demande",
+                            str(fichier_demande), "--postes", "12", "--jusqu-au", "2099-12-31", "--sortie", str(self.donnees))
+        cle = sortie.stdout.strip().splitlines()[-1]
+        licence = next(self.donnees.glob("LIC-2*.erplic"))
+        self.assertTrue(licence.with_name(licence.stem + "-CLE-ACTIVATION.txt").read_text().strip().endswith(cle))
+        registre = Path(self.dossier.name, "registre-licences.csv").read_text()
+        self.assertIn(demande["machine_nom"], registre)
+
+        # La clé d'activation ne vaut que pour ce serveur, cette société et cette clé d'installation
+        with mock.patch.dict(os.environ, {"ERP_MACHINE_ID": "autre-serveur"}):
+            with self.assertRaisesRegex(l.LicenceInvalide, "autre serveur"):
+                l.activer(cle)
+        page = self.client.post(reverse("licence"), {"action": "activation", "cle": cle}, follow=True)
+        self.assertContains(page, "activée pour Transports Essai SA")
+        e = l.etat()
+        self.assertEqual((e.mode, e.postes, e.licence["machine_nom"]), ("licence", 12, l.nom_machine()))
+        # le fichier .erplic donne la même licence
+        LicenceDeposee.objects.all().delete()
+        l.oublier()
+        l.deposer(licence.read_text())
+        self.assertEqual(l.etat().licence["numero"], e.licence["numero"])
+
+        # Demande dont la clé d'installation n'a pas été émise par le propriétaire : l'outil refuse
+        autre = tempfile.TemporaryDirectory()
+        self.addCleanup(autre.cleanup)
+        subprocess.run([sys.executable, str(OUTIL), "cles", "--dossier", autre.name], env=self.env, check=True,
+                       capture_output=True)
+        pirate = subprocess.run([sys.executable, str(OUTIL), "installation", "--cle", str(Path(autre.name, "cle-privee.pem")),
+                                 "--client", "Pirate", "--edition", "transport", "--sortie", autre.name],
+                                env=self.env, capture_output=True, text=True).stdout.strip().splitlines()[-1]
+        faux = {**demande, "cle_installation": pirate}
+        fichier_demande.write_text(l.fc.demande_ecrire(faux), encoding="utf-8")
+        refus = subprocess.run([sys.executable, str(OUTIL), "emettre", "--cle", str(Path(self.dossier.name, "cle-privee.pem")),
+                                "--demande", str(fichier_demande), "--postes", "2", "--sortie", str(self.donnees)],
+                               env=self.env, capture_output=True, text=True)
+        self.assertNotEqual(refus.returncode, 0)
+        self.assertIn("pas été émise par vous", refus.stdout + refus.stderr)
+
+    @override_settings(ERP_LICENCE=True)
+    def test_premier_demarrage_demande_la_cle(self):
+        U = get_user_model()
+        self.client.force_login(U.objects.create_superuser("chef", "", "Chef-2030-ok"))
+        self.assertContains(self.client.get(reverse("core:installation") + "?etape=role"), "clé d'installation")
+        page = self.client.post(reverse("core:installation"), {"cle": "FAUSSE-CLE22"}, follow=True)
+        self.assertContains(page, "refusée : clé incomplète")
+        reponse = self.client.post(reverse("core:installation"), {"cle": self.cle_installation("Voyages du Nord")})
+        self.assertRedirects(reponse, reverse("core:installation") + "?etape=identite", fetch_redirect_response=False)
+        self.assertContains(self.client.get(reverse("core:installation")), "Voyages du Nord")
 
     # ------------------------------------------------------------ fichier et signature
     def test_licence_valide_puis_rappel_grace_lecture_seule(self):
@@ -143,11 +237,39 @@ class LicencesTests(TestCase):
         self.assertEqual(connus["Transports du Centre"]["fichier"], str(fichier))
 
     # ------------------------------------------------------------ essai
-    def test_essai_trente_jours_puis_lecture_seule(self):
+    def test_essai_quinze_jours_au_plus(self):
         e = l.etat(J)
-        self.assertEqual((e.mode, e.statut, e.jours, e.postes), ("essai", "valide", 30, 3))
+        self.assertEqual((e.mode, e.statut, e.jours, e.postes, e.ouvertures_restantes), ("essai", "valide", 15, 3, 30))
         l.oublier()
-        self.assertEqual(l.etat(J + datetime.timedelta(days=31)).statut, "expiree")
+        self.assertEqual(l.etat(J + datetime.timedelta(days=16)).statut, "expiree")
+
+    def test_essai_trente_ouvertures(self):
+        l.etat(J)
+        for _ in range(30):
+            l.memoire(J, ouvrir=True)
+        l.oublier()
+        e = l.etat(J)
+        self.assertEqual((e.statut, e.ouvertures_restantes), ("valide", 0))     # la 30e ouverture reste utilisable
+        l.memoire(J, ouvrir=True)
+        l.oublier()
+        self.assertEqual(l.etat(J).statut, "expiree")
+        EtatLicence.objects.all().delete()                     # base neuve : le compteur hors base reste
+        l.oublier()
+        self.assertEqual(l.etat(J).statut, "expiree")
+        EtatLicence.objects.update(ouvertures=0)               # compteur remis à zéro à la main : refusé
+        (self.donnees / ".erp-essai").unlink()
+        l.oublier()
+        self.assertEqual(l.etat(J).statut, "expiree")
+
+    @override_settings(ERP_LICENCE=True)
+    def test_chaque_connexion_compte(self):
+        U = get_user_model()
+        u = U.objects.create_user("caisse", "", "Essai-2030-ok")
+        avant = l.etat().ouvertures
+        self.assertTrue(self.client.login(username="caisse", password="Essai-2030-ok"))
+        self.client.logout()
+        self.client.force_login(u)
+        self.assertEqual(l.etat().ouvertures, avant + 2)
 
     def test_essai_non_relance(self):
         l.etat(J)
@@ -161,11 +283,11 @@ class LicencesTests(TestCase):
     def test_horloge_reculee(self):
         l.etat(J)
         l.oublier()
-        l.etat(J + datetime.timedelta(days=20))
+        l.etat(J + datetime.timedelta(days=10))
         l.oublier()
-        e = l.etat(J)                                          # on remet l'horloge 20 jours en arrière
+        e = l.etat(J)                                          # on remet l'horloge 10 jours en arrière
         self.assertTrue(e.horloge_reculee)
-        self.assertEqual(e.jours, 10)                          # l'essai ne s'allonge pas
+        self.assertEqual(e.jours, 5)                           # l'essai ne s'allonge pas
 
     # ------------------------------------------------------------ dans le logiciel
     @override_settings(ERP_LICENCE=True)
@@ -173,6 +295,11 @@ class LicencesTests(TestCase):
         U = get_user_model()
         admin = U.objects.create_superuser("chef", "", "Chef-2030-ok")
         self.client.force_login(admin)
+        self.assertTrue(l.etat().sans_cle)                     # clé d'installation exigée : lecture seule sans elle
+        self.assertTrue(l.etat().lecture_seule)
+        page = self.client.post(reverse("licence"), {"action": "installation", "cle": self.cle_installation()}, follow=True)
+        self.assertContains(page, "enregistrée pour Transports Essai SA")
+        self.assertFalse(l.etat().lecture_seule)
         autorisations = reverse("comptabilite:autorisations")
         for nom in ("a1", "a2", "a3"):
             self.client.post(autorisations, {"action": "utilisateur", "nom_utilisateur": nom, "mot_de_passe": "Essai-2030-ok"})
@@ -192,8 +319,9 @@ class LicencesTests(TestCase):
         self.assertEqual(self.client.get("/").status_code, 200)
 
         # Essai fini : lecture seule (les pages s'ouvrent, les saisies sont refusées, la sauvegarde reste permise)
-        EtatLicence.objects.update(debut_essai=datetime.date(2000, 1, 1))
-        EtatLicence.objects.update(sceau=l._sceau("2000-01-01", EtatLicence.objects.get().derniere_date_vue.isoformat()))
+        etat = EtatLicence.objects.get()
+        EtatLicence.objects.update(debut_essai=datetime.date(2000, 1, 1), sceau=l._sceau(
+            "2000-01-01", etat.derniere_date_vue.isoformat(), etat.ouvertures))
         l.oublier()
         self.assertContains(self.client.get(reverse("comptabilite:accueil")), "lecture seule")
         reponse = self.client.post(reverse("comptabilite:tresorerie_projetee"), {"action": "ajouter", "date": "2030-02-01",
@@ -204,13 +332,13 @@ class LicencesTests(TestCase):
         # Dépôt de la licence à l'écran : tout se rétablit
         contenu, _ = self.emettre("--jusqu-au", "2099-12-31")
         page = self.client.get(reverse("licence"))
-        self.assertContains(page, l.code_activation())
+        self.assertContains(page, l.empreinte_machine())
         page = self.client.post(reverse("licence"), {"fichier": SimpleUploadedFile("lic.erplic", contenu.encode())}, follow=True)
         self.assertContains(page, "installée pour Transports Essai SA")
         self.assertFalse(l.etat().lecture_seule)
         self.assertEqual(l.etat().postes, 10)
         page = self.client.post(reverse("licence"), {"fichier": SimpleUploadedFile("x.erplic", b"faux")}, follow=True)
-        self.assertContains(page, "Licence refusée")
+        self.assertContains(page, "Refusé")
 
     @override_settings(ERP_LICENCE=False)
     def test_hors_programme_compile_aucune_limite(self):

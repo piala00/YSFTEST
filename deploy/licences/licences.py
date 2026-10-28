@@ -1,10 +1,16 @@
 """Outil du PROPRIÉTAIRE pour émettre les licences de l'ERP OHADA (jamais livré aux clients).
 
-    ERP-OHADA-Licences.exe                       fenêtre (double-clic) : société, licence, « Enregistrer sous »
+Parcours : 1. clé d'installation remise à la société (avant l'installation) ; 2. la société envoie la DEMANDE de
+licence produite par son serveur (nom de la machine, société, identifiant matériel, clé d'installation) ;
+3. l'outil produit le fichier de licence .erplic ET la clé d'activation (le client utilise l'un ou l'autre).
+
+    ERP-OHADA-Licences.exe                       fenêtre (double-clic)
     ERP-OHADA-Licences.exe cles --dossier D      crée la paire de clés (une seule fois, sur VOTRE ordinateur)
-    ERP-OHADA-Licences.exe emettre --cle D\\cle-privee.pem --client "…" --edition transport --role siege
-                          --postes 10 --code T-ABCD-EFGH-IJKL-MNOP [--site SIEGE] [--niu …]
+    ERP-OHADA-Licences.exe installation --cle D\\cle-privee.pem --client "…" --edition transport [--sortie D]
+    ERP-OHADA-Licences.exe emettre --cle D\\cle-privee.pem --demande DEMANDE-….erpdem --postes 10 [--role siege]
                           [--jusqu-au 2027-10-31 | --definitive] [--maj-jusqu-au 2027-10-31] [--sortie D | --fichier F]
+        (sans demande : --client "…" --edition transport --role siege --code T-ABCD-EFGH-IJKL-MNOP [--site …] [--niu …],
+         fichier .erplic seulement)
     ERP-OHADA-Licences.exe verifier fichier.erplic --publique D\\cle-publique.txt
 
 La clé privée est chiffrée par un mot de passe ; gardez-en une copie hors ligne (clé USB au coffre). Elle ne doit
@@ -22,14 +28,15 @@ import re
 import sys
 from pathlib import Path
 
-ENTETE = "ERP-OHADA-LICENCE-V1"
-EDITIONS = ("transport", "commerce", "toutes")
-ROLES = ("seul", "siege", "agence")
+if not getattr(sys, "frozen", False):                            # depuis le dépôt : format commun avec le logiciel
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from apps.licences import format_cles as fc  # noqa: E402
+
+ENTETE = fc.ENTETE_LICENCE
+EDITIONS = fc.EDITIONS
+ROLES = fc.ROLES
 CODE = re.compile(r"^[TCM]-([A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4})$")
-
-
-def canonique(donnees):
-    return json.dumps(donnees, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+canonique = fc.canonique
 
 
 def mot_de_passe(confirmer=False):
@@ -84,39 +91,105 @@ def date_ou_rien(texte):
         raise SystemExit(f"Date attendue au format AAAA-MM-JJ : {texte}")
 
 
-def prochain_numero(registre):
+def prochain_numero(registre, prefixe="LIC"):
     annee = datetime.date.today().year
     n = 0
     if registre.exists():
         with open(registre, encoding="utf-8", newline="") as f:
             for ligne in csv.DictReader(f, delimiter=";"):
-                m = re.match(rf"LIC-{annee}-(\d+)$", ligne.get("numero", ""))
+                m = re.match(rf"{prefixe}-{annee}-(\d+)$", ligne.get("numero", ""))
                 n = max(n, int(m[1])) if m else n
-    return f"LIC-{annee}-{n + 1:04d}"
+    return f"{prefixe}-{annee}-{n + 1:04d}"
+
+
+def ajouter_registre(registre, ligne):
+    """Ajoute une ligne au registre CSV ; un registre plus ancien reçoit les colonnes nouvelles (rien n'est perdu)."""
+    lignes, colonnes = [], list(ligne)
+    if registre.exists():
+        with open(registre, encoding="utf-8", newline="") as f:
+            lecteur = csv.DictReader(f, delimiter=";")
+            lignes = list(lecteur)
+            colonnes = list(lecteur.fieldnames or []) + [c for c in ligne if c not in (lecteur.fieldnames or [])]
+    with open(registre, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=colonnes, delimiter=";", restval="")
+        w.writeheader()
+        w.writerows(lignes + [{k: "" if v is None else v for k, v in ligne.items()}])
+
+
+def nom_propre(texte, longueur=40):
+    return re.sub(r"[^A-Za-z0-9]+", "-", texte).strip("-")[:longueur]
+
+
+def emettre_installation(a, mdp=None):
+    """Clé d'installation pour une société (avant l'installation du logiciel)."""
+    if a.edition not in EDITIONS:
+        raise SystemExit(f"Édition : {', '.join(EDITIONS)}.")
+    if not a.client.strip():
+        raise SystemExit("Nom de la société absent.")
+    cle_chemin = Path(a.cle)
+    registre = cle_chemin.with_name("registre-installations.csv")
+    numero = prochain_numero(registre, "INS")
+    texte = fc.installation_creer(charger_cle(cle_chemin, mdp), numero, a.client.strip(), a.edition)
+    sortie = Path(a.sortie or cle_chemin.parent) / f"CLE-INSTALLATION-{numero}-{nom_propre(a.client)}.txt"
+    sortie.parent.mkdir(parents=True, exist_ok=True)
+    sortie.write_text(f"Clé d'installation {numero} — {a.client.strip()} — édition {a.edition}\r\n\r\n{texte}\r\n",
+                      encoding="utf-8")
+    ajouter_registre(registre, {"numero": numero, "client": a.client.strip(), "edition": a.edition,
+                                "emise_le": datetime.date.today().isoformat(), "cle": texte, "fichier": str(sortie)})
+    print(f"Clé d'installation {numero} : {sortie}\n{texte}")
+    return numero, texte, sortie
+
+
+def lire_demande(chemin, cle_privee=None):
+    """Demande de licence du client ; sa clé d'installation est vérifiée avec la clé de l'éditeur si elle est fournie."""
+    try:
+        demande = fc.demande_lire(Path(chemin).read_bytes())
+    except (OSError, fc.CleInvalide) as exc:
+        raise SystemExit(f"Demande illisible : {exc}")
+    if cle_privee is not None and demande.get("cle_installation"):
+        from cryptography.exceptions import InvalidSignature
+
+        try:
+            _, signe, signature = fc.installation_lire(demande["cle_installation"])
+            cle_privee.public_key().verify(signature, signe)
+        except (fc.CleInvalide, InvalidSignature):
+            raise SystemExit("La clé d'installation de cette demande n'a pas été émise par vous : demande refusée.")
+    return demande
 
 
 def emettre(a, mdp=None):
-    """Émet la licence. a.fichier : chemin exact choisi par le propriétaire (« Enregistrer sous ») ;
-    sinon a.sortie (dossier) ou, à défaut, le dossier de la clé privée."""
-    m = CODE.match(a.code.strip().upper())
-    if not m:
-        raise SystemExit("Code d'activation attendu comme T-ABCD-EFGH-IJKL-MNOP (affiché dans l'écran Licence du client).")
-    if a.edition not in EDITIONS or a.role not in ROLES:
-        raise SystemExit(f"Édition : {', '.join(EDITIONS)} ; rôle : {', '.join(ROLES)}.")
-    if a.role == "agence" and not a.site:
-        raise SystemExit("Une licence d'agence indique le code du site (--site DLA).")
-    if a.postes < 1:
-        raise SystemExit("Au moins 1 poste.")
-    jusqu_au = None if a.definitive else date_ou_rien(a.jusqu_au) or (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
-    maj = date_ou_rien(a.maj_jusqu_au) or jusqu_au or (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
+    """Émet la licence : fichier .erplic, et la clé d'activation quand la licence part d'une demande.
+    a.fichier : chemin exact du fichier ; sinon a.sortie (dossier) ou, à défaut, le dossier de la clé privée."""
     cle_chemin = Path(a.cle)
+    cle_privee = charger_cle(cle_chemin, mdp)
+    if getattr(a, "demande", None):
+        demande = lire_demande(a.demande, cle_privee)
+        edition = a.edition or demande.get("edition") or "transport"
+        role = a.role or demande.get("role") or "seul"
+    else:
+        m = CODE.match((a.code or "").strip().upper())
+        if not m:
+            raise SystemExit("Donnez la demande de licence du client (--demande), ou son code d'activation "
+                             "(T-ABCD-EFGH-IJKL-MNOP, écran Licence).")
+        demande = {"societe": (a.client or "").strip(), "niu": (a.niu or "").strip(), "materiel": m[1],
+                   "site": (a.site or "").strip().upper(), "machine_nom": "", "installation": ""}
+        edition, role = a.edition, a.role
+        if not demande["societe"]:
+            raise SystemExit("Nom du client absent.")
+    if edition not in EDITIONS or role not in ROLES:
+        raise SystemExit(f"Édition : {', '.join(EDITIONS)} ; rôle : {', '.join(ROLES)}.")
+    if role == "agence" and not demande.get("site"):
+        raise SystemExit("Une licence d'agence indique le code du site (--site DLA).")
+    if a.postes < 1 or a.postes > 65000:
+        raise SystemExit("Nombre de postes : de 1 à 65000.")
+    un_an = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
+    jusqu_au = None if a.definitive else date_ou_rien(a.jusqu_au) or un_an
+    maj = date_ou_rien(a.maj_jusqu_au) or jusqu_au or un_an
     registre = cle_chemin.with_name("registre-licences.csv")
-    donnees = {"version": 1, "numero": prochain_numero(registre), "client": a.client.strip(), "niu": (a.niu or "").strip(),
-               "edition": a.edition, "role": a.role, "site": (a.site or "").strip().upper(), "postes": a.postes,
-               "machine": m[1], "emise_le": datetime.date.today().isoformat(), "valable_jusqu_au": jusqu_au,
-               "maj_jusqu_au": maj}
-    signature = charger_cle(cle_chemin, mdp).sign(canonique(donnees))
-    texte = "\n".join([ENTETE, base64.b64encode(canonique(donnees)).decode(), base64.b64encode(signature).decode(), ""])
+    conditions = {"numero": prochain_numero(registre), "edition": edition, "role": role, "postes": a.postes,
+                  "emise_le": datetime.date.today().isoformat(), "valable_jusqu_au": jusqu_au, "maj_jusqu_au": maj}
+    donnees = fc.licence_donnees(demande, conditions)
+    signature = cle_privee.sign(canonique(donnees))
     if getattr(a, "fichier", None):
         sortie = Path(a.fichier)
         if sortie.suffix.lower() != ".erplic":
@@ -124,23 +197,27 @@ def emettre(a, mdp=None):
     else:
         sortie = Path(a.sortie or cle_chemin.parent) / nom_fichier(donnees["numero"], donnees["client"])
     sortie.parent.mkdir(parents=True, exist_ok=True)
-    sortie.write_text(texte, encoding="utf-8")
-    nouveau = not registre.exists()
-    with open(registre, "a", encoding="utf-8", newline="") as f:
-        w = csv.writer(f, delimiter=";")
-        if nouveau:
-            w.writerow(["numero", "client", "niu", "edition", "role", "site", "postes", "machine", "emise_le",
-                        "valable_jusqu_au", "maj_jusqu_au", "fichier"])
-        w.writerow([donnees[k] or "" for k in ("numero", "client", "niu", "edition", "role", "site", "postes", "machine",
-                                               "emise_le", "valable_jusqu_au", "maj_jusqu_au")] + [str(sortie)])
+    sortie.write_text(fc.licence_texte(donnees, signature), encoding="utf-8")
+    activation = fc.activation_creer(conditions, signature) if getattr(a, "demande", None) else ""
+    if activation:
+        sortie.with_name(sortie.stem + "-CLE-ACTIVATION.txt").write_text(
+            f"Clé d'activation de la licence {donnees['numero']} — {donnees['client']}\r\n"
+            f"Serveur : {donnees['machine_nom']} ({donnees['machine']})\r\n\r\n{activation}\r\n", encoding="utf-8")
+    ajouter_registre(registre, {**{k: donnees[k] for k in ("numero", "client", "niu", "edition", "role", "site", "postes",
+                                                         "machine", "emise_le", "valable_jusqu_au", "maj_jusqu_au")},
+                                "fichier": str(sortie), "machine_nom": donnees["machine_nom"],
+                                "installation": donnees["installation"], "cle_activation": activation})
     print(f"Licence {donnees['numero']} : {sortie}")
-    print(f"  {donnees['client']} · {donnees['edition']} · {donnees['role']}{' ' + donnees['site'] if donnees['site'] else ''}"
-          f" · {donnees['postes']} postes · {'définitive' if jusqu_au is None else 'jusqu au ' + jusqu_au}")
+    print(f"  {donnees['client']} · {edition} · {role}{' ' + donnees['site'] if donnees['site'] else ''}"
+          f" · {a.postes} postes · {'définitive' if jusqu_au is None else 'jusqu au ' + jusqu_au}")
+    if activation:
+        print(f"Clé d'activation :\n{activation}")
+    a.activation = activation
     return sortie
 
 
 def nom_fichier(numero, client):
-    return f"{numero}-{re.sub(r'[^A-Za-z0-9]+', '-', client).strip('-')[:40]}.erplic"
+    return f"{numero}-{nom_propre(client)}.erplic"
 
 
 def registre_lignes(dossier):
@@ -212,12 +289,12 @@ def interface(essai=False):
 
     fen = tk.Tk()
     fen.title("ERP OHADA — Licences (propriétaire)")
-    fen.geometry("760x640")
+    fen.geometry("820x720")
     v = {nom: tk.StringVar(value=val) for nom, val in {
         "dossier": preferences().get("cles", str(Path.home() / "ERP-OHADA-Licences")),
         "licences": preferences().get("licences", str(bureau() / "Licences ERP")),
         "client": "", "niu": "", "edition": "transport",
-        "role": "seul", "site": "", "postes": "5", "code": "", "duree": "annuelle",
+        "role": "seul", "site": "", "postes": "5", "code": "", "demande": "", "duree": "annuelle",
         "jusqu_au": (datetime.date.today() + datetime.timedelta(days=365)).isoformat(),
         "maj": (datetime.date.today() + datetime.timedelta(days=365)).isoformat()}.items()}
 
@@ -244,7 +321,13 @@ def interface(essai=False):
     ligne(4, "Rôle du serveur", ttk.Combobox(cadre, textvariable=v["role"], values=ROLES, state="readonly"))
     ligne(5, "Code du site (agence)", ttk.Entry(cadre, textvariable=v["site"]))
     ligne(6, "Postes", ttk.Spinbox(cadre, from_=1, to=500, textvariable=v["postes"]))
-    ligne(7, "Code d'activation du client", ttk.Entry(cadre, textvariable=v["code"]))
+    zone_demande = ttk.Frame(cadre)
+    ttk.Entry(zone_demande, textvariable=v["demande"]).pack(side="left", fill="x", expand=True)
+    ttk.Button(zone_demande, text="Ouvrir une demande…", command=lambda: ouvrir_demande()).pack(side="left", padx=4)
+    ligne(7, "Demande de licence (.erpdem)", zone_demande)
+    serveur = ttk.Label(cadre, text="", foreground="#555")
+    serveur.grid(row=12, column=1, sticky="w")
+    ligne(11, "Sans demande : code d'activation", ttk.Entry(cadre, textvariable=v["code"]))
     duree = ttk.Frame(cadre)
     ttk.Radiobutton(duree, text="Abonnement jusqu'au", value="annuelle", variable=v["duree"]).pack(side="left")
     ttk.Entry(duree, textvariable=v["jusqu_au"], width=12).pack(side="left", padx=4)
@@ -276,6 +359,58 @@ def interface(essai=False):
 
     choix_client.bind("<<ComboboxSelected>>", client_choisi)
 
+    def ouvrir_demande():
+        chemin = filedialog.askopenfilename(title="Demande de licence du client",
+                                            filetypes=[("Demande de licence", "*.erpdem"), ("Tous les fichiers", "*.*")])
+        if not chemin:
+            return
+        try:
+            d = lire_demande(chemin)
+        except SystemExit as exc:
+            messagebox.showerror("Licences", str(exc))
+            return
+        v["demande"].set(chemin)
+        v["client"].set(d["societe"])
+        v["niu"].set(d.get("niu", ""))
+        v["edition"].set(d.get("edition") or v["edition"].get())
+        v["role"].set(d.get("role") or v["role"].get())
+        v["site"].set(d.get("site", ""))
+        v["code"].set(d.get("code", ""))
+        serveur.configure(text=f"Serveur « {d.get('machine_nom', '?')} » · identifiant matériel {d['materiel']} · "
+                               f"clé d'installation {d.get('installation') or 'aucune'}")
+
+    def montrer_cle(titre, texte):
+        fen.clipboard_clear()
+        fen.clipboard_append(texte)
+        boite = tk.Toplevel(fen)
+        boite.title(titre)
+        ttk.Label(boite, text=f"{titre} (déjà copiée : collez-la dans votre e-mail ou WhatsApp) :").pack(padx=10, pady=(10, 4))
+        zone = tk.Text(boite, height=6, width=70, font=("Consolas", 10), wrap="word")
+        zone.insert("1.0", texte)
+        zone.pack(padx=10)
+        ttk.Button(boite, text="Fermer", command=boite.destroy).pack(pady=8)
+
+    def installation():
+        dossier = Path(v["dossier"].get())
+        if not (dossier / "cle-privee.pem").exists():
+            messagebox.showerror("Licences", "Aucune clé privée dans ce dossier : créez d'abord la paire de clés.")
+            return
+        if not v["client"].get().strip():
+            messagebox.showerror("Licences", "Saisissez la société (client).")
+            return
+        mdp = simpledialog.askstring("Licences", "Mot de passe de la clé privée :", show="*", parent=fen)
+        if not mdp:
+            return
+        a = argparse.Namespace(cle=str(dossier / "cle-privee.pem"), client=v["client"].get(), edition=v["edition"].get(),
+                               sortie=v["licences"].get())
+        try:
+            numero, texte, _ = emettre_installation(a, mdp.encode())
+        except SystemExit as exc:
+            messagebox.showerror("Licences", str(exc))
+            return
+        retenir(cles=str(dossier), licences=v["licences"].get())
+        montrer_cle(f"Clé d'installation {numero}", texte)
+
     def generer():
         dossier = Path(v["dossier"].get())
         if not (dossier / "cle-privee.pem").exists():
@@ -292,7 +427,8 @@ def interface(essai=False):
         a = argparse.Namespace(
             cle=str(dossier / "cle-privee.pem"), client=v["client"].get(), niu=v["niu"].get(), edition=v["edition"].get(),
             role=v["role"].get(), site=v["site"].get(), code=v["code"].get(), definitive=v["duree"].get() == "definitive",
-            jusqu_au=v["jusqu_au"].get(), maj_jusqu_au=v["maj"].get(), sortie=None, fichier=fichier)
+            jusqu_au=v["jusqu_au"].get(), maj_jusqu_au=v["maj"].get(), sortie=None, fichier=fichier,
+            demande=v["demande"].get() or None)
         try:
             a.postes = int(v["postes"].get())
             sortie = emettre(a, mdp.encode())
@@ -301,6 +437,8 @@ def interface(essai=False):
             return
         retenir(cles=str(dossier), licences=str(Path(sortie).parent))
         rafraichir()
+        if a.activation:
+            montrer_cle("Clé d'activation", a.activation)
         if messagebox.askyesno("Licences", f"Licence enregistrée :\n{sortie}\n\nEnvoyez ce fichier au client.\n\n"
                                            "Ouvrir le dossier maintenant ?"):
             ouvrir_dossier(Path(sortie).parent)
@@ -331,9 +469,10 @@ def interface(essai=False):
     ttk.Label(cadre, text="Dossier où enregistrer les licences").grid(row=10, column=0, sticky="w", pady=(10, 3), padx=(0, 8))
     zone_licences.grid(row=10, column=1, sticky="ew", pady=(10, 3))
     boutons = ttk.Frame(cadre)
-    boutons.grid(row=12, column=0, columnspan=2, sticky="e", pady=(10, 0))
+    boutons.grid(row=14, column=0, columnspan=2, sticky="e", pady=(10, 0))
     ttk.Button(boutons, text="Créer la paire de clés", command=creer).pack(side="left", padx=4)
-    ttk.Button(boutons, text="Générer la licence", command=generer).pack(side="left", padx=4)
+    ttk.Button(boutons, text="Clé d'installation", command=installation).pack(side="left", padx=4)
+    ttk.Button(boutons, text="Générer la licence et la clé d'activation", command=generer).pack(side="left", padx=4)
     rafraichir()
     if essai:                                                     # contrôle automatique : la fenêtre se construit
         fen.update()
@@ -348,23 +487,27 @@ def question(texte, defaut=""):
 
 
 def menu():
-    print("ERP OHADA — émission des licences\n  1. Créer la paire de clés (une seule fois)\n  2. Émettre une licence\n  3. Quitter")
-    choix = question("Choix", "2")
+    print("ERP OHADA — émission des licences\n  1. Créer la paire de clés (une seule fois)\n"
+          "  2. Clé d'installation pour une société\n  3. Licence et clé d'activation (depuis la demande du client)\n"
+          "  4. Quitter")
+    choix = question("Choix", "3")
+    dossier = Path(question("Dossier des clés", preferences().get("cles", str(Path.home() / "ERP-OHADA-Licences"))))
+    sortie = question("Dossier où enregistrer", preferences().get("licences", str(bureau() / "Licences ERP")))
+    retenir(cles=str(dossier), licences=sortie)
     if choix == "1":
-        creer_cles(question("Dossier des clés", str(Path.home() / "ERP-OHADA-Licences")))
+        creer_cles(dossier)
     elif choix == "2":
-        dossier = Path(question("Dossier des clés", str(Path.home() / "ERP-OHADA-Licences")))
+        emettre_installation(argparse.Namespace(cle=str(dossier / "cle-privee.pem"), client=question("Société"),
+                                                edition=question("Édition (transport, commerce, toutes)", "transport"),
+                                                sortie=sortie))
+    elif choix == "3":
         duree = question("Durée : A = abonnement annuel, D = définitive", "A").upper()
+        un_an = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
         a = argparse.Namespace(
-            cle=str(dossier / "cle-privee.pem"), client=question("Client (raison sociale)"), niu=question("NIU", ""),
-            edition=question("Édition (transport, commerce, toutes)", "transport"),
-            role=question("Rôle (seul, siege, agence)", "seul"), site=question("Code du site (agence : DLA…)", ""),
-            postes=int(question("Postes", "5")), code=question("Code d'activation du client"),
-            definitive=duree == "D", jusqu_au=None if duree == "D" else question("Valable jusqu'au (AAAA-MM-JJ)", (
-                datetime.date.today() + datetime.timedelta(days=365)).isoformat()),
-            maj_jusqu_au=question("Mises à jour jusqu'au (AAAA-MM-JJ)", (datetime.date.today() + datetime.timedelta(days=365)).isoformat()),
-            sortie=question("Dossier où enregistrer la licence", preferences().get("licences", str(bureau() / "Licences ERP"))))
-        retenir(licences=a.sortie)
+            cle=str(dossier / "cle-privee.pem"), demande=question("Fichier de la demande (.erpdem)"), client=None, niu=None,
+            edition=None, role=None, site=None, code=None, postes=int(question("Postes", "5")), definitive=duree == "D",
+            jusqu_au=None if duree == "D" else question("Valable jusqu'au (AAAA-MM-JJ)", un_an),
+            maj_jusqu_au=question("Mises à jour jusqu'au (AAAA-MM-JJ)", un_an), sortie=sortie, fichier=None)
         emettre(a)
     input("\nEntrée pour fermer…")
 
@@ -380,9 +523,15 @@ def main(argv):
     s = p.add_subparsers(dest="commande", required=True)
     c = s.add_parser("cles")
     c.add_argument("--dossier", required=True)
+    i = s.add_parser("installation")
+    for nom in ("--cle", "--client", "--edition"):
+        i.add_argument(nom, required=True)
+    i.add_argument("--sortie")
     e = s.add_parser("emettre")
-    for nom in ("--cle", "--client", "--edition", "--role", "--code"):
-        e.add_argument(nom, required=True)
+    e.add_argument("--cle", required=True)
+    e.add_argument("--demande", help="demande de licence (.erpdem) envoyée par le client")
+    for nom in ("--client", "--edition", "--role", "--code"):
+        e.add_argument(nom)
     e.add_argument("--postes", type=int, required=True)
     e.add_argument("--site")
     e.add_argument("--niu")
@@ -397,6 +546,8 @@ def main(argv):
     a = p.parse_args(argv)
     if a.commande == "cles":
         creer_cles(a.dossier)
+    elif a.commande == "installation":
+        emettre_installation(a)
     elif a.commande == "emettre":
         emettre(a)
     else:

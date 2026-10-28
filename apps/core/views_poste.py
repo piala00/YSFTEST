@@ -49,10 +49,24 @@ def installation(request):
     from apps.echanges import lots
     from apps.echanges.publication import site_local
 
+    from apps.licences import licence as lic
+
     societe = Societe.get()
     etape = request.GET.get("etape") or "identite"
     prevue = poste.appeler("installation_prevue") if "installation_prevue" in poste.ACTIONS else {}
-    form = IdentiteSocieteForm(instance=societe)
+    if lic.cle_installation_requise() and lic.cle_installation() is None:
+        etape = "cle"                                             # rien d'autre sans la clé remise par l'éditeur
+        texte = request.POST.get("cle", "") if request.method == "POST" else prevue.get("cle_installation", "")
+        if texte:
+            try:
+                d = lic.enregistrer_cle_installation(texte)
+                messages.success(request, f"Clé d'installation {d['numero']} acceptée : {d['societe']}.")
+                return redirect(f"{request.path}?etape=identite")
+            except lic.LicenceInvalide as exc:
+                messages.error(request, f"Clé d'installation refusée : {exc}")
+                if request.method == "POST":
+                    return redirect(request.path)
+    form = IdentiteSocieteForm(instance=Societe.get())
     if request.method == "POST" and etape == "identite":
         form = IdentiteSocieteForm(request.POST, instance=societe)
         if form.is_valid():

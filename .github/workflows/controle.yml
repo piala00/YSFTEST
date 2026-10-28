@@ -198,12 +198,14 @@ jobs:
         if: matrix.edition == 'transport'
         shell: pwsh
         run: |
-          python -m PyInstaller deploy/licences/licences.py --onefile --name ERP-OHADA-Licences --noconfirm --workpath build-licences --distpath dist-licences
+          python -m PyInstaller deploy/licences/licences.py --paths . --onefile --name ERP-OHADA-Licences --noconfirm --workpath build-licences --distpath dist-licences
           $outil = "dist-licences\ERP-OHADA-Licences.exe"
           $env:ERP_LICENCES_MDP = "Essai-CI-uniquement-2026"
           $cles = "$env:RUNNER_TEMP\cles-essai"
           & $outil cles --dossier $cles
           if ($LASTEXITCODE -ne 0) { throw "Création des clés en échec" }
+          & $outil installation --cle "$cles\cle-privee.pem" --client "Société Essai" --edition transport --sortie $cles
+          if (($LASTEXITCODE -ne 0) -or -not (Get-ChildItem "$cles\CLE-INSTALLATION-INS-*.txt")) { throw "Clé d'installation en échec" }
           & $outil emettre --cle "$cles\cle-privee.pem" --client "Société Essai" --edition transport --role siege --postes 5 --code T-AAAA-BBBB-CCCC-DDDD --sortie $cles
           if ($LASTEXITCODE -ne 0) { throw "Émission en échec" }
           $lic = Get-ChildItem "$cles\LIC-*.erplic" | Select-Object -First 1

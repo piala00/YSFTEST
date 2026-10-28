@@ -1,3 +1,5 @@
+import re
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
@@ -15,21 +17,39 @@ def licence(request):
         return render(request, "core/acces_refuse.html", {
             "chemin": "Licence", "operation": "gérer la licence", "niveau": "réservé à l'administrateur",
             "profil": d.profil_de(request.user) or "sans profil"}, status=403)
-    if request.method == "POST":
-        fichier = request.FILES.get("fichier")
-        if fichier is None or fichier.size > 64 * 1024:
-            messages.error(request, "Choisissez le fichier de licence (.erplic) envoyé par l'éditeur.")
-        else:
-            try:
-                _, donnees = l.deposer(fichier.read(), request.user)
-                from apps.core import journal
+    if request.GET.get("demande"):
+        from django.http import HttpResponse
 
+        d = l.demande()
+        reponse = HttpResponse(l.fc.demande_ecrire(d), content_type="text/plain; charset=utf-8")
+        nom = re.sub(r"[^A-Za-z0-9]+", "-", f"{d['societe']}-{d['machine_nom']}").strip("-")[:60]
+        reponse["Content-Disposition"] = f'attachment; filename="DEMANDE-LICENCE-{nom}.erpdem"'
+        return reponse
+    if request.method == "POST":
+        from apps.core import journal
+
+        action = request.POST.get("action", "fichier")
+        try:
+            if action == "installation":
+                d = l.enregistrer_cle_installation(request.POST.get("cle", ""))
+                journal.enregistrer("LICENCE", libelle=f"Clé d'installation {d['numero']} — {d['societe']}")
+                messages.success(request, f"Clé d'installation {d['numero']} enregistrée pour {d['societe']}.")
+            elif action == "activation":
+                _, donnees = l.activer(request.POST.get("cle", ""), request.user)
+                journal.enregistrer("LICENCE", libelle=f"{donnees.get('numero', '')} — {donnees.get('client', '')}")
+                messages.success(request, f"Licence {donnees.get('numero', '')} activée pour {donnees.get('client', '')}.")
+            else:
+                fichier = request.FILES.get("fichier")
+                if fichier is None or fichier.size > 64 * 1024:
+                    raise l.LicenceInvalide("choisissez le fichier de licence (.erplic) envoyé par l'éditeur")
+                _, donnees = l.deposer(fichier.read(), request.user)
                 journal.enregistrer("LICENCE", libelle=f"{donnees.get('numero', '')} — {donnees.get('client', '')}")
                 messages.success(request, f"Licence {donnees.get('numero', '')} installée pour {donnees.get('client', '')}.")
-            except l.LicenceInvalide as exc:
-                messages.error(request, f"Licence refusée : {exc}")
-        return redirect(request.get_full_path())
+        except l.LicenceInvalide as exc:
+            messages.error(request, f"Refusé : {exc}")
+        return redirect(request.path)
     return render(request, "licences/licence.html", {
-        "titre": "Licence", "etat": l.etat(), "code": l.code_activation(), "actifs": l.comptes_actifs(),
-        "roles": l.ROLES, "historique": LicenceDeposee.objects.select_related("deposee_par")[:20],
-        "cles": bool(l.cles_publiques())})
+        "titre": "Licence", "etat": l.etat(), "demande": l.demande(), "installation": l.cle_installation(),
+        "installation_requise": l.cle_installation_requise(), "actifs": l.comptes_actifs(), "roles": l.ROLES,
+        "essai_ouvertures": l.ESSAI_OUVERTURES,
+        "historique": LicenceDeposee.objects.select_related("deposee_par")[:20], "cles": bool(l.cles_publiques())})

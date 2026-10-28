@@ -128,4 +128,17 @@ ou
     ERP-OHADA-<Édition>.exe manage <commande> administration (echanges, longueur_comptes…)
 Accès réseau désactivé : ERP_RESEAU=0 dans configuration.env.
 
+7. LICENCE
+----------
+  1. Clé d'installation : remise par l'éditeur avec le logiciel ; saisie dans
+     l'installateur ou au premier démarrage. Elle porte le nom de votre société.
+  2. Essai : 30 ouvertures (chaque connexion compte pour une), au plus 15 jours,
+     3 postes. Ensuite le logiciel passe en lecture seule (consultation, états,
+     exports et sauvegardes restent possibles).
+  3. Fichier > Administration du poste > Licence : « Télécharger la demande de
+     licence » (nom de la machine, société, identifiant matériel, clé
+     d'installation) et envoyez-la à l'éditeur.
+  4. L'éditeur renvoie un fichier de licence (.erplic) et une clé d'activation :
+     installez le fichier OU collez la clé, sur le même écran.
+
 La documentation du logiciel est dans le dossier « documentation ».

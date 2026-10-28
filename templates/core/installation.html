@@ -3,8 +3,17 @@
 {% block content %}
 <div class="container" style="max-width:820px">
   <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-rocket-takeoff"></i> Première configuration</h1>
-    <div class="text-muted">{% if etape == "base" %}Étape 4 sur 4 : la base de données{% elif etape == "role" %}Étape 3 sur 4 : le rôle de ce serveur{% else %}Étape 2 sur 4 : la société{% endif %}</div></div>
-  {% if etape == "base" %}
+    <div class="text-muted">{% if etape == "cle" %}Clé d'installation{% elif etape == "base" %}Étape 4 sur 4 : la base de données{% elif etape == "role" %}Étape 3 sur 4 : le rôle de ce serveur{% else %}Étape 2 sur 4 : la société{% endif %}</div></div>
+  {% if etape == "cle" %}
+  <div class="card card-body">
+    <p class="small">Saisissez la <strong>clé d'installation</strong> remise par l'éditeur avec le logiciel. Elle indique votre société
+      et l'édition achetée ; le nom de la société est repris de la clé.</p>
+    <form method="post">{% csrf_token %}
+      <textarea name="cle" rows="4" class="form-control font-monospace" required aria-label="Clé d'installation" placeholder="XXXXX-XXXXX-XXXXX-…"></textarea>
+      <button class="btn btn-primary mt-3">Valider la clé</button></form>
+    <div class="form-text mt-2">Vous n'avez pas de clé ? Demandez-la à l'éditeur du logiciel.</div>
+  </div>
+  {% elif etape == "base" %}
   {% if erreur_base %}<div class="alert alert-danger small">{{ erreur_base }}<br>Le logiciel fonctionne sur SQLite en attendant : corrigez les informations ci-dessous.</div>{% endif %}
   {% if base_actuelle %}<div class="alert alert-secondary small d-flex align-items-center gap-2"><i class="bi bi-database"></i>
     <span>Base actuelle : <strong>{{ base_actuelle.libelle }}</strong> — {{ base_actuelle.emplacement }}{% if base_actuelle.miroir %} · copie miroir vers SQL Server active{% endif %}</span>

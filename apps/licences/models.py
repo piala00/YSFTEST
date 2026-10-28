@@ -3,10 +3,12 @@ from django.db import models
 
 
 class EtatLicence(models.Model):
-    """Mémoire de la période d'essai (une seule ligne), scellée avec l'empreinte du serveur."""
+    """Mémoire de la période d'essai (une seule ligne), scellée avec l'empreinte du serveur, et clé d'installation."""
     debut_essai = models.DateField()
     derniere_date_vue = models.DateField()
+    ouvertures = models.PositiveIntegerField("Ouvertures de l'essai", default=0)
     sceau = models.CharField(max_length=64)
+    cle_installation = models.TextField("Clé d'installation", blank=True)
 
     class Meta:
         verbose_name = "état de la licence"

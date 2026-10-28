@@ -574,8 +574,10 @@ def lien_installateur():
 def installation_prevue(donnees):
     """Rôle choisi dans l'installateur (et fichier de l'agence), proposé par l'assistant du premier démarrage."""
     role, fichier = donnees / "role-installation.txt", donnees / "installation-agence.erpx"
+    cle = donnees / "cle-installation.txt"
     return {"role": role.read_text(encoding="utf-8").strip() if role.exists() else "",
-            "fichier_agence": fichier if fichier.exists() else None}
+            "fichier_agence": fichier if fichier.exists() else None,
+            "cle_installation": cle.read_text(encoding="utf-8-sig").strip() if cle.exists() else ""}
 
 
 def demarrage_automatique():

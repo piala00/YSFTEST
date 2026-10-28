@@ -3,8 +3,22 @@
 **Statut : validé par le propriétaire le 27/10/2026 (« choisir les meilleures options et appliquer ») ; implémenté.**
 
 Choix appliqués : postes = **comptes utilisateurs actifs** ; licence **annuelle ou définitive** au choix à
-l'émission (annuelle par défaut) ; **essai 30 jours, 3 postes** ; rappel 30 jours avant, **15 jours de grâce puis
-lecture seule** ; **une licence par serveur** (direction, chaque agence, site unique), regroupées par client.
+l'émission (annuelle par défaut) ; **essai : 30 ouvertures (chaque connexion compte pour une), au plus 15 jours,
+3 postes** (décision du propriétaire, 28/10/2026) ; rappel 30 jours avant, **15 jours de grâce puis lecture seule** ;
+**une licence par serveur** (direction, chaque agence, site unique), regroupées par client.
+
+## Parcours de la licence (décision du propriétaire, 28/10/2026)
+
+1. **Clé d'installation** — émise par le propriétaire pour une société (outil : bouton « Clé d'installation »).
+   Elle porte le nom de la société et l'édition, signée. La société la saisit à l'installation (page de
+   l'installateur, ou `/CLE=` en silencieux) ou au premier démarrage ; sans elle, rien ne s'ouvre en saisie.
+2. **Demande de licence** — écran *Licence* du serveur (celui de la direction, puis chaque agence) : le logiciel
+   rassemble seul le **nom de la machine**, le **nom de la société**, l'**identifiant matériel** (hardware ID) et la
+   **clé d'installation** ; bouton « Télécharger la demande de licence » (fichier `.erpdem`) à envoyer au propriétaire.
+3. **Licence** — l'outil du propriétaire ouvre la demande (il vérifie que la clé d'installation vient bien de lui),
+   on règle postes et durée, puis « Générer la licence et la clé d'activation » produit **les deux** :
+   le fichier `.erplic` et la **clé d'activation** (texte à copier-coller). Le client utilise l'un ou l'autre ;
+   ils ne valent que pour ce serveur, cette société et cette clé d'installation.
 Code : `apps/licences/` (contrôle), `deploy/licences/licences.py` (outil du propriétaire).
 
 ## Mise en route pour le propriétaire (une seule fois)
@@ -14,8 +28,10 @@ Code : `apps/licences/` (contrôle), `deploy/licences/licences.py` (outil du pro
    Sauvegarder le dossier `ERP-OHADA-Licences` (clé privée + registre) sur une clé USB gardée au coffre.
 3. Envoyer à Claude le contenu de **cle-publique.txt** (une ligne, sans danger) : il est ajouté dans
    `apps/licences/cle_publique.txt` et les programmes suivants savent vérifier vos licences.
-4. Pour chaque client : il vous envoie le **code d'activation** (écran *Licence*) → double-clic sur l'outil : choisissez la **société** (liste des clients déjà servis, ou nouvelle), réglez la licence, puis **Générer la licence…** ouvre « Enregistrer sous » : vous choisissez le dossier et le nom du fichier `.erplic`, que vous envoyez au client.
-   **2. Émettre une licence** → envoyez-lui le fichier `.erplic` produit.
+4. Nouveau client : saisissez la société et l'édition → **Clé d'installation** (copiée, et enregistrée en .txt dans
+   le dossier des licences) → envoyez-la avec l'installateur.
+5. Le client vous envoie sa **demande de licence** (`.erpdem`) → **Ouvrir une demande…** → réglez postes et durée →
+   **Générer la licence et la clé d'activation** : envoyez le fichier `.erplic` et/ou la clé d'activation.
 
 Les sections suivantes gardent la proposition d'origine ; les **[À DÉCIDER]** sont tranchés comme ci-dessus.
 

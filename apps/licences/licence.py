@@ -1,8 +1,11 @@
 """Licences de l'ERP OHADA (docs/CONCEPTION_LICENCES.md) : fichier signé Ed25519, vérifié hors ligne.
 
 Choix retenus : postes = comptes utilisateurs actifs ; licence annuelle ou définitive (champ « valable_jusqu_au »
-vide) ; essai de 30 jours et 3 postes ; rappel 30 jours avant l'échéance ; 15 jours de grâce puis lecture seule ;
-une licence par serveur (direction, chaque agence, site unique).
+vide) ; essai de 30 ouvertures (connexions) dans la limite de 15 jours, 3 postes ; rappel 30 jours avant l'échéance ;
+15 jours de grâce puis lecture seule ; une licence par serveur (direction, chaque agence, site unique).
+Parcours : clé d'installation remise par l'éditeur → demande de licence produite ici (nom de la machine, société,
+identifiant matériel, clé d'installation) → l'éditeur renvoie le fichier .erplic et la clé d'activation (l'un ou
+l'autre suffit). Formats : format_cles.py.
 Une licence absente ou expirée ne bloque jamais la lecture, les exports ni les sauvegardes.
 """
 import base64
@@ -15,8 +18,11 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ENTETE = "ERP-OHADA-LICENCE-V1"
-ESSAI_JOURS = 30
+from . import format_cles as fc
+
+ENTETE = fc.ENTETE_LICENCE
+ESSAI_OUVERTURES = 30
+ESSAI_JOURS = 15
 ESSAI_POSTES = 3
 RAPPEL_JOURS = 30
 GRACE_JOURS = 15
@@ -60,18 +66,22 @@ def ecrire(donnees, signature):
 
 
 def verifier_signature(donnees, signature):
+    return verifier_octets(canonique(donnees), signature)
+
+
+def verifier_octets(message, signature, quoi="fichier"):
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
     for cle in cles_publiques():
         try:
-            Ed25519PublicKey.from_public_bytes(base64.b64decode(cle)).verify(signature, canonique(donnees))
+            Ed25519PublicKey.from_public_bytes(base64.b64decode(cle)).verify(signature, message)
             return True
         except (InvalidSignature, ValueError):
             continue
     if not cles_publiques():
         raise LicenceInvalide("aucune clé de vérification n'est installée dans ce logiciel (version d'essai)")
-    raise LicenceInvalide("signature incorrecte : fichier modifié ou non émis par l'éditeur")
+    raise LicenceInvalide(f"signature incorrecte : {quoi} modifié ou non émis par l'éditeur")
 
 
 # ---------------------------------------------------------------- Empreinte du serveur
@@ -103,11 +113,93 @@ def empreinte_machine():
     return "-".join(texte[i:i + 4] for i in range(0, 16, 4))
 
 
+def nom_machine():
+    import platform
+
+    return (os.environ.get("COMPUTERNAME") or platform.node() or "inconnu")[:60]
+
+
+def edition_logiciel():
+    from apps.core.models import Societe
+
+    return {"TRANSPORT": "transport", "COMMERCE": "commerce"}.get(Societe.get().activite, "toutes")
+
+
 def code_activation():
-    """À envoyer à l'éditeur : édition + empreinte du serveur (rien de personnel)."""
+    """Ancien code (édition + identifiant matériel), toujours accepté par l'outil de l'éditeur."""
     from apps.core.models import Societe
 
     return f"{Societe.get().activite[:1]}-{empreinte_machine()}"
+
+
+# ---------------------------------------------------------------- Clé d'installation
+def cle_installation_requise():
+    """Programme compilé contenant la clé publique de l'éditeur : la clé d'installation est exigée."""
+    from django.conf import settings
+
+    return bool(getattr(settings, "ERP_LICENCE", False) and cles_publiques())
+
+
+def lire_cle_installation(texte):
+    """Clé d'installation vérifiée (signature de l'éditeur, édition de ce logiciel) → ses données."""
+    try:
+        donnees, signe, signature = fc.installation_lire(texte)
+    except fc.CleInvalide as exc:
+        raise LicenceInvalide(str(exc))
+    verifier_octets(signe, signature, "clé d'installation")
+    if edition_logiciel() not in ("toutes",) and donnees["edition"] not in (edition_logiciel(), "toutes"):
+        raise LicenceInvalide(f"clé d'installation de l'édition « {donnees['edition']} » : ne convient pas à ce logiciel")
+    return donnees
+
+
+def cle_installation():
+    """Clé d'installation enregistrée sur ce serveur (données vérifiées) ou None."""
+    from .models import EtatLicence
+
+    etat = EtatLicence.objects.first()
+    if etat is None or not etat.cle_installation:
+        return None
+    try:
+        return {**lire_cle_installation(etat.cle_installation), "texte": etat.cle_installation}
+    except LicenceInvalide:
+        return None
+
+
+def enregistrer_cle_installation(texte):
+    """Écran de premier démarrage ou écran Licence : la clé est vérifiée puis gardée ; le nom de la société vient
+    de la clé (il figure ensuite sur la demande de licence)."""
+    from apps.core.models import Societe
+
+    from .models import EtatLicence
+
+    donnees = lire_cle_installation(texte)
+    memoire(datetime.date.today())                                 # crée la mémoire de l'essai si besoin
+    EtatLicence.objects.update(cle_installation=fc.en_texte(fc.depuis_texte(texte)))
+    societe = Societe.get()
+    if fc.nom_simple(societe.raison_sociale) != fc.nom_simple(donnees["societe"]):
+        Societe.objects.filter(pk=societe.pk).update(raison_sociale=donnees["societe"][:150])
+    oublier()
+    return donnees
+
+
+# ---------------------------------------------------------------- Demande de licence
+def demande():
+    """Ce que l'éditeur doit savoir pour produire la licence de CE serveur (rien d'autre)."""
+    from apps.core.models import Societe
+    from apps.echanges.publication import site_local
+
+    societe, local, installation = Societe.get(), site_local(), cle_installation()
+    role = {"SIEGE": "siege", "AGENCE": "agence"}.get(getattr(local, "role", ""), "seul") if local else "seul"
+    return {"societe": societe.raison_sociale, "niu": getattr(societe, "niu", "") or "", "machine_nom": nom_machine(),
+            "materiel": empreinte_machine(), "code": code_activation(), "edition": edition_logiciel(), "role": role,
+            "site": local.code if local and role == "agence" else "",
+            "installation": installation["numero"] if installation else "",
+            "cle_installation": installation["texte"] if installation else "",
+            "date": datetime.date.today().isoformat()}
+
+
+def fichier_demande():
+    return fc.demande_ecrire(demande())
 
 
 # ---------------------------------------------------------------- Contrôle d'une licence pour ce serveur
@@ -155,9 +247,47 @@ def deposer(contenu, utilisateur=None):
     return depot, donnees
 
 
+def licence_depuis_activation(texte):
+    """Clé d'activation → texte du fichier .erplic équivalent, reconstitué avec la demande de CE serveur."""
+    try:
+        conditions, signature = fc.activation_lire(texte)
+    except fc.CleInvalide as exc:
+        raise LicenceInvalide(str(exc))
+    donnees = fc.licence_donnees(demande(), conditions)
+    try:
+        verifier_signature(donnees, signature)
+    except LicenceInvalide as exc:
+        if not cles_publiques():
+            raise
+        raise LicenceInvalide("clé d'activation refusée : elle a été faite pour un autre serveur, une autre société ou "
+                              "une autre clé d'installation (ou elle est mal recopiée)") from exc
+    return fc.licence_texte(donnees, signature)
+
+
+def activer(texte, utilisateur=None):
+    """Clé d'activation collée à l'écran Licence : même effet que le dépôt du fichier .erplic."""
+    from .models import LicenceDeposee
+
+    try:
+        licence_texte = licence_depuis_activation(texte)
+    except LicenceInvalide as exc:
+        LicenceDeposee.objects.create(contenu=texte[:2000], valide=False, motif=str(exc)[:200], deposee_par=utilisateur)
+        raise
+    return deposer(licence_texte, utilisateur)
+
+
 # ---------------------------------------------------------------- Mémoire de l'essai
-def _sceau(debut, derniere):
-    return hmac.new(empreinte_machine().encode(), f"{debut}|{derniere}".encode(), hashlib.sha256).hexdigest()
+# L'essai se compte en OUVERTURES (chaque connexion réussie au logiciel), dans la limite de ESSAI_JOURS jours.
+# Le compteur est gardé à trois endroits (base, dossier des données, registre Windows), scellé avec l'identifiant
+# matériel : le plus grand l'emporte, et réinstaller le logiciel ou repartir d'une base neuve ne le remet pas à zéro.
+def _sceau(*valeurs):
+    return hmac.new(empreinte_machine().encode(), "|".join(map(str, valeurs)).encode(), hashlib.sha256).hexdigest()
+
+
+def _sceau_valide(sceau, debut, derniere, ouvertures):
+    if hmac.compare_digest(sceau, _sceau(debut, derniere, ouvertures)):
+        return True
+    return ouvertures == 0 and hmac.compare_digest(sceau, _sceau(debut, derniere))    # versions précédentes
 
 
 def _fichier_essai():
@@ -189,54 +319,70 @@ def _registre_ecrire(valeur):
         pass
 
 
-def _debut_externe():
-    """Début d'essai gardé hors de la base (dossier des données, registre) : une base neuve ne relance pas l'essai."""
-    dates = []
+def _externes():
+    """Mémoires hors de la base : [(début, ouvertures)] dont le sceau est valide."""
+    trouves = []
     fichier = _fichier_essai()
     for valeur in ((fichier.read_text(encoding="utf-8") if fichier and fichier.exists() else None), _registre_lire()):
+        parties = (valeur or "").strip().split("|")
         try:
-            debut, sceau = (valeur or "").strip().split("|")
-            if hmac.compare_digest(sceau, _sceau(debut, debut)):
-                dates.append(datetime.date.fromisoformat(debut))
+            if len(parties) == 3 and hmac.compare_digest(parties[2], _sceau(parties[0], parties[1])):
+                trouves.append((datetime.date.fromisoformat(parties[0]), int(parties[1])))
+            elif len(parties) == 2 and hmac.compare_digest(parties[1], _sceau(parties[0], parties[0])):
+                trouves.append((datetime.date.fromisoformat(parties[0]), 0))
         except ValueError:
             continue
-    return min(dates) if dates else None
+    return trouves
 
 
-def _memoriser_debut(debut):
-    valeur = f"{debut.isoformat()}|{_sceau(debut.isoformat(), debut.isoformat())}"
+def _memoriser(debut, ouvertures):
+    valeur = f"{debut.isoformat()}|{ouvertures}|{_sceau(debut.isoformat(), ouvertures)}"
     fichier = _fichier_essai()
     if fichier is not None:
         try:
             fichier.write_text(valeur, encoding="utf-8")
         except OSError:
             pass
-    if _registre_lire() is None:
-        _registre_ecrire(valeur)
+    _registre_ecrire(valeur)
 
 
-def memoire(aujourdhui):
-    """(début de l'essai, date retenue pour aujourd'hui, horloge reculée ?) ; une date ne recule jamais."""
+def memoire(aujourdhui, ouvrir=False):
+    """(début de l'essai, date retenue pour aujourd'hui, horloge reculée ?, ouvertures) ; ni la date ni le compteur
+    ne reculent jamais. ouvrir=True : une ouverture de plus (connexion réussie)."""
     from .models import EtatLicence
 
     etat = EtatLicence.objects.first()
-    externe = _debut_externe()
+    externes = _externes()
+    debut_externe = min((d for d, _ in externes), default=None)
+    ouvertures_externes = max((n for _, n in externes), default=0)
     if etat is None:
-        debut = min(filter(None, [externe, aujourdhui]))
-        etat = EtatLicence.objects.create(debut_essai=debut, derniere_date_vue=aujourdhui,
-                                          sceau=_sceau(debut.isoformat(), aujourdhui.isoformat()))
-    elif not hmac.compare_digest(etat.sceau, _sceau(etat.debut_essai.isoformat(), etat.derniere_date_vue.isoformat())):
+        debut = min(filter(None, [debut_externe, aujourdhui]))
+        etat = EtatLicence(debut_essai=debut, derniere_date_vue=aujourdhui, ouvertures=ouvertures_externes)
+    elif not _sceau_valide(etat.sceau, etat.debut_essai.isoformat(), etat.derniere_date_vue.isoformat(), etat.ouvertures):
         etat.debut_essai = datetime.date(2000, 1, 1)               # mémoire modifiée à la main : essai terminé
-    if externe and externe < etat.debut_essai:
-        etat.debut_essai = externe
+        etat.ouvertures = max(etat.ouvertures, ESSAI_OUVERTURES + 1)
+    if debut_externe and debut_externe < etat.debut_essai:
+        etat.debut_essai = debut_externe
+    etat.ouvertures = max(etat.ouvertures, ouvertures_externes) + (1 if ouvrir else 0)
     recul = aujourdhui < etat.derniere_date_vue - datetime.timedelta(days=1)
     jour = max(aujourdhui, etat.derniere_date_vue)
     etat.derniere_date_vue = jour
-    etat.sceau = _sceau(etat.debut_essai.isoformat(), jour.isoformat())
+    etat.sceau = _sceau(etat.debut_essai.isoformat(), jour.isoformat(), etat.ouvertures)
     etat.save()
-    if externe is None or externe > etat.debut_essai:
-        _memoriser_debut(etat.debut_essai)
-    return etat.debut_essai, jour, recul
+    if debut_externe != etat.debut_essai or ouvertures_externes != etat.ouvertures or len(externes) < 2:
+        _memoriser(etat.debut_essai, etat.ouvertures)
+    return etat.debut_essai, jour, recul, etat.ouvertures
+
+
+def compter_ouverture(**_):
+    """Signal user_logged_in (programme compilé) : une ouverture d'essai de plus, tant qu'aucune licence n'est active."""
+    from django.conf import settings
+
+    if not getattr(settings, "ERP_LICENCE", False):
+        return
+    if etat().mode == "essai":
+        memoire(datetime.date.today(), ouvrir=True)
+        oublier()
 
 
 # ---------------------------------------------------------------- État du logiciel
@@ -250,17 +396,27 @@ class Etat:
     probleme: str = ""            # licence déposée mais refusée (ex. autre serveur)
     horloge_reculee: bool = False
     echeance: datetime.date | None = None
+    ouvertures: int = 0           # essai : ouvertures déjà faites
+    sans_cle: bool = False        # essai : clé d'installation exigée mais absente
 
     @property
     def lecture_seule(self):
         return self.statut == "expiree"
 
     @property
+    def ouvertures_restantes(self):
+        return max(0, ESSAI_OUVERTURES - self.ouvertures)
+
+    @property
     def message(self):
         if self.mode == "essai":
+            if self.sans_cle:
+                return ("Clé d'installation absente : saisissez celle remise par l'éditeur (Fichier › Administration "
+                        "du poste › Licence). En attendant, le logiciel est en lecture seule.")
             if self.statut == "expiree":
                 return "Période d'essai terminée : logiciel en lecture seule. Déposez une licence pour continuer à saisir."
-            return f"Version d'essai : encore {self.jours} jour(s), {self.postes} postes."
+            return (f"Version d'essai : encore {self.ouvertures_restantes} ouverture(s) sur {ESSAI_OUVERTURES}, "
+                    f"au plus tard jusqu'au {self.echeance:%d/%m/%Y}, {self.postes} postes.")
         if self.statut == "rappel":
             return f"Licence à renouveler : échéance le {self.echeance:%d/%m/%Y} ({self.jours} jour(s))."
         if self.statut == "grace":
@@ -279,13 +435,13 @@ def oublier():
 
 
 def etat(aujourdhui=None):
-    """État calculé une fois par jour (et après chaque dépôt de licence)."""
+    """État calculé une fois par jour (et après chaque dépôt de licence ou ouverture d'essai)."""
     jour = aujourdhui or datetime.date.today()
     if jour in _CACHE:
         return _CACHE[jour]
     from .models import LicenceDeposee
 
-    debut, jour_retenu, recul = memoire(jour)
+    debut, jour_retenu, recul, ouvertures = memoire(jour)
     resultat, probleme = None, ""
     for depot in LicenceDeposee.objects.filter(valide=True)[:5]:   # la plus récente encore valable ici
         try:
@@ -307,8 +463,10 @@ def etat(aujourdhui=None):
         break
     if resultat is None:
         fin = debut + datetime.timedelta(days=ESSAI_JOURS)
-        resultat = Etat("essai", "valide" if jour_retenu <= fin else "expiree", jours=max(0, (fin - jour_retenu).days),
-                        echeance=fin, probleme=probleme)
+        sans_cle = cle_installation_requise() and cle_installation() is None
+        en_cours = jour_retenu <= fin and ouvertures <= ESSAI_OUVERTURES and not sans_cle
+        resultat = Etat("essai", "valide" if en_cours else "expiree", jours=max(0, (fin - jour_retenu).days),
+                        echeance=fin, probleme=probleme, ouvertures=ouvertures, sans_cle=sans_cle)
     resultat.horloge_reculee = recul
     _CACHE.clear()
     _CACHE[jour] = resultat
