@@ -81,7 +81,7 @@ comptabilité par un **traitement de comptabilisation** paramétrable — **cat�
 4. Confirmez-vous que la recette d'une portion doit rester **rattachée à l'agence qui a fait partir le véhicule**
    (section analytique = agence de départ) ?
 
-Dès vos réponses, je code par étapes testées, en commençant par l'écran de comptabilisation façon Sage et la
+Les réponses sont consignées au §6-7. Je code par étapes testées, en commençant par l'écran de comptabilisation façon Sage et la
 clarification de l'enchaînement multi-agences, sans rien casser de l'existant (comptabilisation au départ,
 rattachement au point de vente, absents).
 
@@ -89,3 +89,38 @@ rattachement au point de vente, absents).
 *Références : code `apps/transport/models.py` (Depart, Troncon, Billet) ; Sage via les compétences
 `sage100-gescom-v5-v12-expert` et `sage100-comptabilite-v5-v12-expert` [DOC-SAGE]. Aucune règle fiscale ou de compte
 inventée ; les comptes et taux restent ceux paramétrés par la société / validés par l'expert-comptable.*
+
+
+## 6. Décisions du propriétaire (28/10/2026) et nouvelles demandes
+
+**Q1 — Hors ligne, une portion = un départ (RETENU).** Chaque agence fonctionne **indépendamment, hors ligne**, et
+produit **son** rapport journalier (format déjà défini). En fin de journée, les agences **envoient leurs données au
+siège** (synchronisation) ; le siège produit un **rapport journalier consolidé** regroupant toutes les agences.
+→ Pas de départ « multi-agences » rouvert ; le regroupement se fait au siège par la synchronisation.
+
+**Q2 — Billets d'absents : distinguer deux cas.**
+- **Absent / raté** (la personne ne s'est pas présentée) : la société n'est **pas responsable** ; pas de
+  remboursement dû.
+- **Présent mais n'a pas pu voyager** (faute de place / décision compagnie) : proposer au voyageur soit le
+  **remboursement**, soit, s'il existe un autre véhicule, le **report** sur le prochain voyage de la **même
+  destination** (s'il accepte).
+- **Option à prévoir** : report **automatique** (la machine détecte la même destination et reprogramme sur le
+  prochain départ) **ou manuel** — réglable dans les Paramètres transport. [À CODER]
+
+**Q3 — Comptabilisation / mise à jour : indicateur de progression.** Garder l'automatique **et** un écran de
+transfert façon Sage, **avec une barre/indicateur de progression** pendant le traitement. [À CODER]
+
+**Q4 — Rattachement de la recette d'un point de vente intermédiaire.** Exemple Bertoua → Ndokayo avec un point de
+vente entre les deux : Bertoua est déjà **bouclée**, Ndokayo encore **ouverte**. Les billets vendus à ce point de
+vente sont rattachés à **l'agence suivante encore ouverte qui encaisse la recette** (ici Ndokayo), pas à Bertoua.
+→ Règle : la recette d'un point de vente va à **l'agence qui réceptionne réellement l'argent** (la prochaine agence
+ouverte sur la route), pas forcément à l'agence de rattachement fixe. [À CODER / à affiner]
+
+## 7. Ergonomie de saisie — nouvelles demandes [À CODER]
+
+- **Saisie d'un billet en portrait, rapide** : champs **empilés verticalement**, **Entrée** passe au champ du
+  dessous, enregistrement rapide d'un voyageur à la chaîne. S'inspirer des logiciels de billetterie les plus rapides.
+- **Même format rapide pour les colis**, mais sur **une seule page visible** (portrait, sans défilement).
+- **Plusieurs départs ouverts côte à côte** : fenêtres de vente **étroites (portrait)**, déplaçables / rangées côte
+  à côte, pour qu'un guichetier travaille sur **plusieurs voitures en chargement à la fois** (plusieurs
+  destinations), sans ouvrir/fermer à chaque fois — si cela ne crée pas de problèmes de cohérence (places, caisse).
