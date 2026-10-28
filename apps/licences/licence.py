@@ -479,6 +479,20 @@ def comptes_actifs():
     return get_user_model().objects.filter(is_active=True).count()
 
 
+def fonctions_pro_disponibles():
+    """Sauvegarde, restauration et gestion de la base : réservées aux versions sous licence.
+    Indisponibles en version d'essai (le propriétaire l'a demandé) ; une licence expirée (lecture seule) les garde,
+    pour que le client ne perde jamais l'accès à ses données."""
+    from django.conf import settings
+
+    if not getattr(settings, "ERP_LICENCE", False):
+        return True, ""
+    if etat().mode == "essai":
+        return False, ("Fonction réservée à la version sous licence : les sauvegardes, la restauration et la gestion "
+                       "de la base de données ne sont pas disponibles en version d'essai. Déposez une licence pour les activer.")
+    return True, ""
+
+
 def peut_activer_un_compte():
     """Un compte de plus dépasserait-il le nombre de postes ? (programme compilé seulement)"""
     from django.conf import settings

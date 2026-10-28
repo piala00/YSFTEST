@@ -5,6 +5,10 @@
 <div class="page-title d-flex align-items-center"><h1><i class="bi bi-database-gear" style="color:var(--module)"></i> Base de données</h1>
   <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'core:poste' %}">Administration du poste</a></div>
 
+{% if essai_bloque %}<div class="alert alert-warning d-flex align-items-center gap-2">
+  <i class="bi bi-lock"></i><span>{{ essai_bloque }}</span>
+  <a class="btn btn-sm btn-primary ms-auto" href="{% url 'licence' %}">Déposer une licence</a></div>
+{% else %}
 {% if resultat %}<div class="alert alert-{% if resultat.ok %}success{% else %}danger{% endif %}"><strong>{{ resultat.titre }}</strong>
   <ul class="mb-0 small">{% for d in resultat.details %}<li>{{ d }}</li>{% endfor %}</ul></div>{% endif %}
 {% if changement.etat %}<div class="alert alert-{% if changement.etat == 'erreur' %}danger{% elif changement.etat == 'termine' %}success{% else %}info{% endif %} d-flex align-items-center gap-2">
@@ -117,4 +121,5 @@
   </div></div>
   {% endif %}
 </div>
+{% endif %}
 {% endblock %}

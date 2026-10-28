@@ -287,6 +287,36 @@ class LicencesTests(TestCase):
         self.assertEqual(l.etat(J).statut, "expiree")
 
     @override_settings(ERP_LICENCE=True)
+    def test_sauvegarde_et_base_bloquees_en_essai(self):
+        U = get_user_model()
+        self.client.force_login(U.objects.create_superuser("chef", "", "Chef-2030-ok"))
+        # Essai (mode == essai) : sauvegarde / restauration et gestion de la base indisponibles
+        self.assertTrue(l.etat().mode == "essai")
+        self.assertFalse(l.fonctions_pro_disponibles()[0])
+        page = self.client.get(reverse("comptabilite:sauvegarde"))
+        self.assertContains(page, "réservée à la version sous licence")
+        self.assertNotContains(page, 'value="sauvegarder"')
+        refus = self.client.post(reverse("comptabilite:sauvegarde"), {"action": "sauvegarder"}, follow=True)
+        self.assertNotIn("application/json", refus["Content-Type"])     # aucun téléchargement
+        self.assertContains(self.client.get(reverse("core:base_donnees")), "ne sont pas disponibles en version")
+        # Avec une licence : de nouveau disponibles
+        contenu, _ = self.emettre("--jusqu-au", "2099-12-31")
+        l.deposer(contenu)
+        self.assertTrue(l.fonctions_pro_disponibles()[0])
+        self.assertContains(self.client.get(reverse("comptabilite:sauvegarde")), 'value="sauvegarder"')
+
+    @override_settings(ERP_LICENCE=True)
+    def test_sauvegarde_reste_possible_licence_expiree(self):
+        U = get_user_model()
+        self.client.force_login(U.objects.create_superuser("chef", "", "Chef-2030-ok"))
+        contenu, _ = self.emettre("--jusqu-au", "2020-01-01")       # déjà expirée → lecture seule, mais sous licence
+        l.deposer(contenu)
+        e = l.etat()
+        self.assertTrue(e.lecture_seule and e.mode == "licence")
+        self.assertTrue(l.fonctions_pro_disponibles()[0])           # données d'un client : jamais bloquées
+        self.assertContains(self.client.get(reverse("comptabilite:sauvegarde")), 'value="sauvegarder"')
+
+    @override_settings(ERP_LICENCE=True)
     def test_chaque_connexion_compte(self):
         U = get_user_model()
         u = U.objects.create_user("caisse", "", "Essai-2030-ok")
@@ -343,7 +373,7 @@ class LicencesTests(TestCase):
         self.assertContains(c.get("/"), "Trop de comptes actifs", status_code=403)
         self.assertEqual(self.client.get("/").status_code, 200)
 
-        # Essai fini : lecture seule (les pages s'ouvrent, les saisies sont refusées, la sauvegarde reste permise)
+        # Essai fini : lecture seule (les pages s'ouvrent, les saisies sont refusées, la sauvegarde reste bloquée en essai)
         etat = EtatLicence.objects.get()
         EtatLicence.objects.update(debut_essai=datetime.date(2000, 1, 1), sceau=l._sceau(
             "2000-01-01", etat.derniere_date_vue.isoformat(), etat.ouvertures))
@@ -352,7 +382,7 @@ class LicencesTests(TestCase):
         reponse = self.client.post(reverse("comptabilite:tresorerie_projetee"), {"action": "ajouter", "date": "2030-02-01",
                                                                                  "montant": "1", "libelle": "x"})
         self.assertContains(reponse, "Rien n'a été enregistré", status_code=403)
-        self.assertEqual(self.client.post(reverse("comptabilite:sauvegarde"), {"action": "sauvegarder"}).status_code, 200)
+        self.assertEqual(self.client.post(reverse("comptabilite:sauvegarde"), {"action": "sauvegarder"}).status_code, 302)
 
         # Dépôt de la licence à l'écran : tout se rétablit
         contenu, _ = self.emettre("--jusqu-au", "2099-12-31")

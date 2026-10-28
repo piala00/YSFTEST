@@ -280,6 +280,12 @@ def sauvegarde(request, module):
         return render(request, "core/acces_refuse.html", {
             "chemin": "Fichier › Sauvegarde et restauration", "operation": "sauvegarder ou restaurer",
             "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    from apps.licences.licence import fonctions_pro_disponibles
+
+    pro_ok, pro_message = fonctions_pro_disponibles()
+    if request.method == "POST" and not pro_ok:
+        messages.error(request, pro_message)
+        return redirect(request.path)
     if request.method == "POST" and request.POST.get("action") == "sauvegarder":
         contenu = s.sauvegarder()
         journal.enregistrer("SAUVEGARDE", libelle=f"{len(contenu) // 1024} Ko")
@@ -302,7 +308,7 @@ def sauvegarde(request, module):
                 messages.success(request, f"Données restaurées ({entete['objets']} enregistrements). "
                                           "Reconnectez-vous si besoin.")
         return redirect(request.path)
-    return render(request, "core/sauvegarde.html")
+    return render(request, "core/sauvegarde.html", {"pro_ok": pro_ok, "pro_message": pro_message})
 
 
 def reprise_dossier(request, module):

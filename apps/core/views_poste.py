@@ -157,8 +157,14 @@ def administration_poste(request):
             "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
     if not poste.disponible():
         return render(request, "core/poste.html", {"indisponible": True, "titre": "Administration du poste"})
+    from apps.licences.licence import fonctions_pro_disponibles
+
+    pro_ok, pro_message = fonctions_pro_disponibles()
     if request.method == "POST":
         action = request.POST.get("action")
+        if not pro_ok and action in ("sauvegarder", "restaurer", "annuler_restauration"):
+            messages.error(request, pro_message)
+            return redirect(request.get_full_path())
         try:
             if action == "sauvegarder":
                 messages.success(request, f"Sauvegarde faite : {poste.appeler('sauvegarder')}")
@@ -199,7 +205,7 @@ def administration_poste(request):
     from apps.licences.licence import etat as etat_licence
 
     return render(request, "core/poste.html", {"titre": "Administration du poste", "etat": etat, "simulation": simulation,
-                                               "licence_etat": etat_licence()})
+                                               "licence_etat": etat_licence(), "pro_ok": pro_ok, "pro_message": pro_message})
 
 
 def _reglage_formulaire(post):
@@ -230,6 +236,14 @@ def base_donnees(request):
         return render(request, "core/acces_refuse.html", {
             "chemin": "Fichier › Administration du poste › Base de données", "operation": "administrer la base",
             "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    from apps.licences.licence import fonctions_pro_disponibles
+
+    pro_ok, pro_message = fonctions_pro_disponibles()
+    if not pro_ok:                                             # gestion de la base indisponible en version d'essai
+        if request.method == "POST":
+            messages.error(request, pro_message)
+            return redirect(request.path)
+        return render(request, "core/base_donnees.html", {"titre": "Base de données", "essai_bloque": pro_message})
     compile_ = poste.disponible()
     resultat = None
     if request.method == "POST":

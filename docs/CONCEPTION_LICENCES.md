@@ -80,6 +80,18 @@ Algorithme : **Ed25519** (bibliothèque `cryptography`, déjà incluse dans l'ex
   l'empreinte de la machine : réinstaller le logiciel ne relance pas l'essai.
 - Recul de l'horloge détecté (date du jour antérieure à la dernière date vue) : avertissement, l'essai ne s'allonge pas.
 
+## Fonctions réservées à la version sous licence (décision du propriétaire, 28/10/2026)
+
+En **version d'essai**, les écrans suivants sont indisponibles (un bandeau invite à déposer une licence) :
+- *Fichier › Sauvegarde et restauration* (sauvegarde et restauration manuelles) ;
+- *Fichier › Administration du poste › Base de données* (vérifier, réparer, optimiser, sauvegarder/restaurer la base,
+  changer de moteur SQLite ↔ SQL Server, copie miroir, planification).
+
+La **simulation** reste disponible en essai (c'est le moyen d'essayer le logiciel). Les **sauvegardes automatiques**
+au démarrage continuent côté serveur (protection des données d'essai). Une **licence expirée** (client qui a payé,
+passé en lecture seule) **garde** la sauvegarde/restauration et la gestion de la base, pour ne jamais perdre l'accès
+aux données comptables.
+
 ## 5. Ce qui se passe à l'expiration
 
 1. **30 jours avant** : rappel à l'administrateur sur l'accueil.

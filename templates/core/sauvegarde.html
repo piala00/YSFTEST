@@ -2,7 +2,11 @@
 {% block title %}Sauvegarde et restauration{% endblock %}
 {% block content %}
 <div class="page-title"><h1><i class="bi bi-hdd" style="color:var(--module)"></i> Sauvegarde et restauration</h1></div>
+{% if not pro_ok %}<div class="alert alert-warning d-flex align-items-center gap-2">
+  <i class="bi bi-lock"></i><span>{{ pro_message }}</span>
+  <a class="btn btn-sm btn-primary ms-auto" href="{% url 'licence' %}">Déposer une licence</a></div>{% endif %}
 <div class="row g-3">
+  {% if pro_ok %}
   <div class="col-lg-6"><div class="card card-body h-100">
     <h2 class="h6"><i class="bi bi-download"></i> Sauvegarder</h2>
     <p class="small text-muted">Télécharge dans un fichier toutes les données : société, exercices, utilisateurs, profils et droits,
@@ -20,5 +24,6 @@
       <input name="confirmation" class="form-control form-control-sm mb-2" placeholder="Tapez RESTAURER pour confirmer" autocomplete="off" required>
       <button class="btn btn-outline-danger"><i class="bi bi-upload"></i> Restaurer</button></form>
   </div></div>
+  {% endif %}
 </div>
 {% endblock %}

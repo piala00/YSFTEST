@@ -198,15 +198,13 @@ class ProgrammeLanceTests(SimpleTestCase):
                 self.assertTrue(adresse.endswith(f":{port}/"), adresse)
                 self.assertIn("Configuration terminée", page)
 
+                # Version d'essai (aucune licence) : sauvegarde / restauration et gestion de la base sont bloquées
+                # à l'écran (les sauvegardes automatiques au démarrage, elles, continuent côté serveur).
                 _, page = nav.post("/poste/?seul=1", {"action": "sauvegarder"})
-                self.assertIn("Sauvegarde faite", page)
-                sauvegarde = next(Path(donnees, "sauvegardes").glob("erp-*.sqlite3")).name
-                self.assertIn("Créer la simulation", page)
-                _, page = nav.post("/poste/?seul=1", {"action": "restaurer", "fichier": sauvegarde, "confirmation": "RESTAURER"})
-                self.assertIn("Restauration prévue", page)
-                self.assertEqual(Path(donnees, "restaurer-au-demarrage.txt").read_text(), sauvegarde)
-                nav.post("/poste/?seul=1", {"action": "annuler_restauration"})
-                self.assertFalse(Path(donnees, "restaurer-au-demarrage.txt").exists())
+                self.assertIn("réservée à la version sous licence", page)
+                self.assertIn("Créer la simulation", page)                 # la simulation, elle, reste disponible
+                _, base = nav.get("/poste/base/")
+                self.assertIn("ne sont pas disponibles en version", base)
 
                 _, page = nav.post("/poste/?seul=1", {"action": "simulation_creer", "debut": "2026-09", "duree": "1"})
                 self.assertIn("en préparation", page)
@@ -219,25 +217,8 @@ class ProgrammeLanceTests(SimpleTestCase):
                 self.assertIn("Simulation supprimée", page)
                 self.assertFalse(Path(donnees, "simulation.sqlite3").exists())
                 self.assertIn("Créer la simulation", page)
-
-                # Base de données : état, vérification, sauvegarde, puis redémarrage depuis l'écran
-                _, page = nav.get("/poste/base/?seul=1")
-                self.assertIn("SQLite", page)
-                _, page = nav.post("/poste/base/?seul=1", {"action": "verifier"})
-                self.assertIn("Vérification de l", page)
-                self.assertIn("aucune erreur", page)
-                _, page = nav.post("/poste/base/?seul=1", {"action": "sauvegarder"})
-                self.assertIn("Sauvegarde faite", page)
-                _, page = nav.post("/poste/base/?seul=1", {"action": "redemarrer"})
-                self.assertIn("Redémarrage du logiciel", page)
-                serveur.wait(30)                                          # l'ancien programme s'arrête…
-                for _ in range(240):                                      # … et le nouveau répond sur le même port
-                    try:
-                        _, page = nav.get("/poste/base/?seul=1")
-                        break
-                    except (urllib.error.URLError, OSError):
-                        time.sleep(0.5)
-                self.assertIn("Base de données", page)
+                # La vérification, la sauvegarde, le changement de moteur et le redémarrage depuis l'écran Base de
+                # données sont couverts, hors blocage d'essai, par apps/core/tests_base_donnees.py.
             finally:
                 arreter_programmes(donnees)                               # le programme relancé (même dossier)
                 serveur.terminate()
