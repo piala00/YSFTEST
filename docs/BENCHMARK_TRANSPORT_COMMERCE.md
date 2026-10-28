@@ -48,9 +48,11 @@ Autrement dit : **le Transport est l'édition la plus mûre.** Ce qui reste à f
 - **P1 — États de reporting encore absents** (confié à Codex, lot 03) : remplissage par départ/heure, retards et
   incidents de voyage, recettes par chauffeur/convoyeur, coût au km par véhicule, colis non livrés depuis N jours.
   Règle : montants uniquement depuis les écritures validées.
-- **P2 — Impression** des billets, manifestes de départ, bordereaux de colis, rapport journalier d'agence (le
-  « Imprimer… » du décor, mais appliqué aux pièces du transport).
 - **P2 — Import/Export CSV** des listes (véhicules, lignes, tarifs, partenaires).
+
+> **Déjà fait (vérifié dans le code)** : l'impression des billets, du manifeste de départ, du bordereau de colis et
+> du rapport journalier d'agence existe (`billet_print.html`, `manifeste.html`, `colis_print.html`,
+> `rapport_journalier_a4.html`). Ne pas la redévelopper.
 
 ## 3. Commerce — vrais manques par rapport à Sage Gescom
 
@@ -58,13 +60,18 @@ Autrement dit : **le Transport est l'édition la plus mûre.** Ce qui reste à f
 gestion commerciale complet. Classés par priorité métier :
 
 ### P1 — utiles à beaucoup de commerces
-- **Barèmes et conditions de vente** : rabais/remises/ristournes (RRR) clients et fournisseurs, soldes et promotions,
-  commissions des représentants. (Structure › Barèmes — aujourd'hui inactif.)
-- **Cadenciers** clients, fournisseurs et de livraison (État) : suivi des commandes récurrentes et des livraisons.
-- **Rapprochement bancaire** et saisie des opérations bancaires (Comptabilité › Traitement).
-- **Reports à-nouveaux** et **clôture de période/exercice** côté Commerce (le Transport a déjà ses contrôles de
-  clôture ; à étendre au commerce).
+- **Barèmes et conditions de vente** : grilles automatiques de rabais/remises/ristournes (RRR) clients et
+  fournisseurs, soldes et promotions, commissions des représentants. (Structure › Barèmes — aujourd'hui inactif.)
+  *À noter : la **remise ligne à ligne** existe déjà sur les documents ; ce qui manque, ce sont les **grilles
+  automatiques** par client / article / quantité.*
 - **Nomenclatures** d'articles (articles composés) si le client vend des ensembles.
+
+> **Déjà fait (vérifié dans le code), donc retirés des manques :**
+> - **Cadenciers** clients, fournisseurs et de livraison → **livrés** (quantités par article et par mois, graphique
+>   et export CSV ; États › Analyse clients / fournisseurs / articles).
+> - **Rapprochement bancaire manuel** : écran actif (`comptabilite:rapprochement`, pointage contre relevé).
+> - **Reports à-nouveaux** et **clôture d'exercice** : la génération des à-nouveaux de l'exercice suivant existe
+>   (`services.py`), pour les deux éditions.
 
 ### P2 — selon le type de client
 - **Fabrication** (préparation, ordre et bon de fabrication, contremarque) : seulement si le client produit.
@@ -93,8 +100,9 @@ Présent partout, faible valeur métier, à traiter d'un bloc (confié à Codex,
 
 1. **Transport (le plus mûr) → finir le reporting** (lot 03, Codex) : ce sont les états que le gérant réclame au
    quotidien. Impact immédiat, faible risque.
-2. **Commerce → combler les P1** (barèmes/RRR, cadenciers, rapprochement bancaire, reports à-nouveaux) : c'est là
-   que le Commerce est le plus en retard sur un vrai logiciel de gestion commerciale.
+2. **Commerce → combler les P1 restants** (grilles de barèmes/RRR automatiques, soldes/promotions, commissions) :
+   c'est là que le Commerce est le plus en retard sur un vrai logiciel de gestion commerciale. (Cadenciers,
+   rapprochement bancaire et reports à-nouveaux : déjà faits.)
 3. **Décor de menu** (lot 05, Codex) : nettoyer les deux éditions pour qu'aucune commande affichée ne soit morte.
 4. **Fiscal (P3)** : seulement après validation d'un expert-comptable, sources officielles à l'appui.
 

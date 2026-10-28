@@ -125,6 +125,16 @@ class PagesEtApiTests(TestCase):
         palmares = statistiques.calculer("palmares_clients", debut, fin)["lignes"]
         self.assertEqual([l["rang"] for l in palmares], list(range(1, len(palmares) + 1)))
         self.assertAlmostEqual(float(palmares[-1]["cumul"]), 100.0)
+        # Cadencier clients : colonnes par mois + total ; sur chaque article, total = somme des mois
+        cad = statistiques.calculer("cadencier_clients", debut, fin)
+        mois = [c[0] for c in cad["colonnes"] if c[0].startswith("m2")]
+        self.assertEqual(len(mois), 12)                           # 12 colonnes mensuelles sur l'année
+        self.assertEqual(cad["colonnes"][-1][0], "total")
+        for ligne in cad["lignes"]:
+            self.assertEqual(ligne["total"], sum(ligne[m] for m in mois))
+        # La quantité totale du cadencier = quantité des ventes par article sur la même période
+        total_articles = sum((l["quantite"] for l in statistiques.calculer("ventes_articles", debut, fin)["lignes"]), 0)
+        self.assertEqual(cad["totaux"]["total"], total_articles)
         for code in statistiques.ETATS:
             with self.subTest(etat=code):
                 self.assertEqual(self.client.get(reverse("commercial:statistique", args=[code])).status_code, 200)

@@ -413,6 +413,51 @@ def reglements_modes(debut, fin, **_):
     return colonnes, sorted(lignes, key=lambda l: -l["encaisse"])
 
 
+def _mois_de(debut, fin):
+    """Liste des (année, mois) de la période, bornée à 36 mois pour garder le tableau lisible."""
+    mois, y, m = [], debut.year, debut.month
+    while (y, m) <= (fin.year, fin.month) and len(mois) < 36:
+        mois.append((y, m))
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return mois
+
+
+def _cadencier(debut, fin, plus, moins):
+    """Quantités par article (lignes) et par mois (colonnes) : rythme des ventes/achats/livraisons."""
+    mois = _mois_de(debut, fin)
+    cols_mois = {f"m{y}_{m}": ZERO for (y, m) in mois}
+    par_article = {}
+    for ligne, signe in _lignes(debut, fin, plus, moins):
+        cle = ligne.article_id or ligne.designation
+        row = par_article.setdefault(cle, {
+            "reference": ligne.article.reference if ligne.article else "",
+            "designation": ligne.designation or (ligne.article.designation if ligne.article else ""),
+            **dict(cols_mois), "total": ZERO})
+        d = ligne.document.date
+        q = signe * ligne.quantite
+        cle_mois = f"m{d.year}_{d.month}"
+        if cle_mois in row:                                       # toujours vrai (document dans la période)
+            row[cle_mois] += q
+        row["total"] += q
+    lignes = sorted(par_article.values(), key=lambda r: -r["total"])
+    colonnes = ([("reference", "Référence", "texte"), ("designation", "Désignation", "texte")]
+                + [(f"m{y}_{m}", f"{m:02d}/{str(y)[2:]}", "quantite") for (y, m) in mois]
+                + [("total", "Total", "quantite")])
+    return colonnes, lignes
+
+
+def cadencier_clients(debut, fin, **_):
+    return _cadencier(debut, fin, VENTES_PLUS, VENTES_MOINS)
+
+
+def cadencier_fournisseurs(debut, fin, **_):
+    return _cadencier(debut, fin, ACHATS_PLUS, ACHATS_MOINS)
+
+
+def cadencier_livraison(debut, fin, **_):
+    return _cadencier(debut, fin, (Document.LIVRAISON,), (Document.RETOUR,))
+
+
 ETATS = {
     "activite_clients": ("Activité clients", True, activite_clients),
     "rentabilite_clients": ("Rentabilité clients", True, rentabilite_clients),
@@ -439,6 +484,9 @@ ETATS = {
     "rotation_stocks": ("Rotation des stocks et ruptures", True, rotation_stocks),
     "avoirs_retours": ("Avoirs et retours clients", True, avoirs_retours),
     "reglements_modes": ("Règlements par mode de paiement", True, reglements_modes),
+    "cadencier_clients": ("Cadencier clients (quantités vendues par mois)", True, cadencier_clients),
+    "cadencier_fournisseurs": ("Cadencier fournisseurs (quantités achetées par mois)", True, cadencier_fournisseurs),
+    "cadencier_livraison": ("Cadencier de livraison (quantités livrées par mois)", True, cadencier_livraison),
 }
 
 

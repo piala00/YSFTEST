@@ -496,7 +496,7 @@ GESTION_COMMERCIALE = Module(
                 E("etats.clients.avoirs", "Avoirs et retours clients", "commercial:statistique", "avoirs_retours",
                   preuve="AJOUT-ERP"),
             ]),
-            E("etats.cadencier_clients", "Cadencier clients"),
+            E("etats.cadencier_clients", "Cadencier clients", "commercial:statistique", "cadencier_clients"),
             E("etats.statistiques_clients", "Statistiques clients", icone="bi-graph-up", enfants=[
                 E("etats.clients.familles", "Statistiques par familles d'articles", "commercial:statistique", "ventes_familles"),
                 E("etats.clients.articles", "Statistiques par articles", "commercial:statistique", "ventes_articles"),
@@ -508,7 +508,7 @@ GESTION_COMMERCIALE = Module(
                 E("etats.fournisseurs.activite", "Activité fournisseurs", "commercial:statistique", "activite_fournisseurs"),
                 E("etats.fournisseurs.ca", "Chiffre d'affaires fournisseurs", "commercial:statistique", "ca_fournisseurs"),
             ]),
-            E("etats.cadencier_fournisseurs", "Cadencier fournisseurs"),
+            E("etats.cadencier_fournisseurs", "Cadencier fournisseurs", "commercial:statistique", "cadencier_fournisseurs"),
             E("etats.statistiques_fournisseurs", "Statistiques fournisseurs", icone="bi-graph-down", enfants=[
                 E("etats.fournisseurs.familles", "Statistiques par familles d'articles", "commercial:statistique", "achats_familles"),
                 E("etats.fournisseurs.articles", "Statistiques par articles", "commercial:statistique", "achats_articles"),
@@ -527,7 +527,7 @@ GESTION_COMMERCIALE = Module(
                 E("etats.inventaire.preparatoire", "Etat préparatoire", "commercial:etat_inventaire", vue="preparatoire"),
                 E("etats.inventaire.livre", "Livre d'inventaire", "commercial:etat_inventaire", vue="livre"),
             ]),
-            E("etats.cadencier_livraison", "Cadencier de livraison"),
+            E("etats.cadencier_livraison", "Cadencier de livraison", "commercial:statistique", "cadencier_livraison"),
             SEP(),
             E("etats.stats_collaborateurs", "Statistiques collaborateurs"),
             E("etats.stats_ressources", "Statistiques ressources"),
