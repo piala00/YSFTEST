@@ -47,9 +47,13 @@ def cles_publiques():
         gravees = []
     if gravees:
         return gravees
-    fichier = Path(__file__).with_name("cle_publique.txt")
-    lignes = fichier.read_text(encoding="utf-8").splitlines() if fichier.exists() else []
-    return [l.strip() for l in lignes if l.strip() and not l.lstrip().startswith("#")]
+    cles, dossier = [], Path(__file__).parent        # les deux orthographes du fichier sont acceptées (tiret ou tiret bas)
+    for nom in ("cle_publique.txt", "cle-publique.txt"):
+        fichier = dossier / nom
+        if fichier.exists():
+            cles += [l.strip() for l in fichier.read_text(encoding="utf-8").splitlines()
+                     if l.strip() and not l.lstrip().startswith("#")]
+    return cles
 
 
 def canonique(donnees):

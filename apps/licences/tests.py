@@ -409,6 +409,20 @@ class CleEditeurTests(TestCase):
         with mock.patch("apps.licences.cle_editeur.CLES", []):
             self.assertNotIn("CleGraveeBase64=", l.cles_publiques())        # repli fichier (vide ici)
 
+    def test_fichier_repli_accepte_tiret_et_tiret_bas(self):
+        from pathlib import Path
+
+        dossier = Path(l.__file__).parent
+        for nom in ("cle-publique.txt", "cle_publique.txt"):               # l'outil crée « cle-publique.txt » (tiret)
+            fichier = dossier / nom
+            if fichier.exists():                                           # le vrai fichier du dépôt : ne pas l'écraser
+                continue
+            self.addCleanup(lambda f=fichier: f.unlink(missing_ok=True))
+            fichier.write_text("CleDeSecoursBase64=\n", encoding="utf-8")
+            with mock.patch("apps.licences.cle_editeur.CLES", []):
+                self.assertIn("CleDeSecoursBase64=", l.cles_publiques())
+            fichier.unlink()
+
     def test_cle_gravee_verifie_une_vraie_licence(self):
         import subprocess
         import sys

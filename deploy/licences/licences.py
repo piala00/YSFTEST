@@ -69,7 +69,7 @@ def creer_cles(dossier):
     brut = cle.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     publique.write_text(base64.b64encode(brut).decode() + "\n", encoding="utf-8")
     print(f"Clé privée : {privee}  (secrète ; copie de secours hors ligne)")
-    print(f"Clé publique : {publique}  -> à copier dans apps/licences/cle_publique.txt du logiciel :")
+    print(f"Clé publique : {publique}  -> envoyez cette ligne à l'éditeur (gravée dans apps/licences/cle_editeur.py) :")
     print("  " + publique.read_text().strip())
 
 
