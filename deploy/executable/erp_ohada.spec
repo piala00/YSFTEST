@@ -23,7 +23,8 @@ try:                                                   # pilote SQL Server : inc
 except ImportError:
     pilote_sql = []
 modules = pilote_sql + (collect_submodules("apps") + collect_submodules("erp") + collect_submodules("django")
-           + collect_submodules("rest_framework") + collect_submodules("whitenoise") + collect_submodules("waitress"))
+           + collect_submodules("rest_framework") + collect_submodules("whitenoise") + collect_submodules("waitress")
+           + collect_submodules("cryptography"))     # importée en différé : invisible après compilation native
 donnees = (collect_data_files("apps", include_py_files=False) + collect_data_files("django")
            + collect_data_files("rest_framework") + collect_data_files("tzdata")
            + [(str(RACINE / "templates"), "templates"), (str(RACINE / "staticfiles"), "staticfiles"),

@@ -487,6 +487,7 @@ def peut_activer_un_compte():
         return True, ""
     e = etat()
     if comptes_actifs() >= e.postes:
-        return False, (f"{e.postes} poste(s) prévus par la {"version d'essai" if e.mode == "essai" else "licence"} "
+        source = "version d'essai" if e.mode == "essai" else "licence"
+        return False, (f"{e.postes} poste(s) prévus par la {source} "
                        f"et {comptes_actifs()} compte(s) actif(s) : désactivez un compte ou étendez la licence.")
     return True, ""

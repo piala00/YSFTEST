@@ -85,6 +85,15 @@ jobs:
           cache: pip
       - run: pip install -r deploy/windows/outils/composants.txt -r deploy/windows/outils/compilation.txt
       - run: python manage.py collectstatic --noinput -v0
+      - name: Compiler le code de l'ERP en natif (protection contre le décorticage)
+        run: python deploy/executable/compiler_natif.py . --supprimer-sources
+      - name: Vérifier qu'il ne reste aucun code source de l'ERP
+        shell: pwsh
+        run: |
+          $sources = Get-ChildItem -Recurse apps, erp -Filter *.py |
+            Where-Object { $_.Name -ne '__init__.py' -and $_.FullName -notmatch 'migrations' -and $_.FullName -notmatch 'tests' }
+          if ($sources) { $sources | ForEach-Object { Write-Output $_.FullName }; throw "Du code source de l'ERP subsiste" }
+          Write-Output "Code de l'ERP entièrement compilé en natif (.pyd)."
       - name: Compiler le programme
         run: python -m PyInstaller deploy/executable/erp_ohada.spec --noconfirm --workpath build --distpath dist
       - name: Démarrer le programme compilé et l'interroger

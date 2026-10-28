@@ -1,0 +1,39 @@
+CONTRAT DE LICENCE UTILISATEUR FINAL (CLUF) - ERP OHADA
+
+En installant ce logiciel, vous acceptez les conditions suivantes. Si vous ne
+les acceptez pas, n'installez pas le logiciel.
+
+1. PROPRIETE
+Le logiciel ERP OHADA, son code et sa documentation restent la propriete de
+l'editeur. L'installation ne vous en transfere pas la propriete : elle vous
+accorde seulement un droit d'usage.
+
+2. DROIT D'USAGE
+Vous recevez un droit d'usage pour votre societe, selon la licence acquise
+(edition, nombre de postes, duree). Une licence vaut pour un seul serveur
+(direction, agence ou site unique).
+
+3. INTERDICTIONS
+Vous vous engagez a ne pas :
+  - copier, revendre, louer ou preter le logiciel a un tiers ;
+  - decompiler, desassembler, retro-concevoir ou tenter d'extraire le code ;
+  - contourner ou neutraliser le controle de licence ;
+  - diffuser une cle d'installation ou une licence hors de votre societe.
+
+4. DONNEES
+Vos donnees comptables et d'exploitation vous appartiennent. Le logiciel les
+garde sur votre serveur. Une licence absente ou expiree ne bloque jamais la
+consultation, les etats, les exports ni les sauvegardes de vos donnees.
+
+5. ESSAI
+A defaut de licence, le logiciel fonctionne en essai limite, puis passe en
+lecture seule. L'essai ne confere aucun droit d'usage definitif.
+
+6. GARANTIE ET RESPONSABILITE
+Le logiciel est fourni en l'etat. L'editeur ne peut etre tenu responsable des
+pertes resultant d'un usage non conforme ou d'un defaut de sauvegarde par
+l'utilisateur. Vous restez responsable de vos declarations legales et fiscales.
+
+7. RESILIATION
+Tout manquement aux presentes conditions met fin au droit d'usage, sans
+remboursement, les obligations de non-copie et de non-decompilation demeurant.

@@ -43,6 +43,7 @@ CloseApplications=force
 UninstallDisplayName={#Nom}
 UninstallDisplayIcon={app}\{#Programme}
 SetupLogging=yes
+LicenseFile=CLUF.txt
 
 [Languages]
 Name: "fr"; MessagesFile: "compiler:Languages\French.isl"
