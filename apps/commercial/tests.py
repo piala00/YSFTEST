@@ -388,3 +388,23 @@ class BaremesRemisesTests(BaseCommerciale):
         self.assertEqual(reponse.status_code, 302)
         from .models import Bareme
         self.assertTrue(Bareme.objects.filter(libelle="T").exists())
+
+
+class EtatRemisesAccordeesTests(BaseCommerciale):
+    def test_etat_liste_les_remises(self):
+        from apps.reporting import statistiques
+
+        from .models import Bareme
+
+        Bareme.objects.create(type_bareme="REMISE", sens="CLIENT", libelle="Fidélité", taux=10)
+        doc = Document.objects.create(type_document=Document.FACTURE, tiers=self.client_)
+        LigneDocument.objects.create(document=doc, article=self.article, quantite=10, prix_unitaire=1000)
+        doc.recalculer()
+        doc.valider()
+        import datetime
+
+        cols, lignes = statistiques.remises_accordees(datetime.date(2000, 1, 1), datetime.date(2100, 1, 1))
+        self.assertEqual(len(lignes), 1)
+        self.assertEqual(lignes[0]["remise"], 10)
+        self.assertEqual(lignes[0]["montant_remise"], Decimal("1000"))      # 10 % de 10 000
+        self.assertEqual(lignes[0]["bareme"], "Fidélité")

@@ -394,6 +394,29 @@ def avoirs_retours(debut, fin, **_):
     return colonnes, lignes
 
 
+def remises_accordees(debut, fin, **_):
+    """Remises et promotions accordées sur les factures de vente de la période (ligne par ligne), avec le barème."""
+    lignes = []
+    for ligne, signe in _lignes(debut, fin, VENTES_PLUS, ()):
+        if not ligne.remise:
+            continue
+        brut = ligne.quantite * ligne.prix_unitaire
+        remise_montant = brut - ligne.montant_ht
+        lignes.append({
+            "date": ligne.document.date, "numero": ligne.document.numero_affiche,
+            "tiers": ligne.document.tiers.nom if ligne.document.tiers_id else "",
+            "article": ligne.designation, "quantite": ligne.quantite, "brut": brut,
+            "remise": ligne.remise, "montant_remise": remise_montant, "net": ligne.montant_ht,
+            "bareme": ligne.remise_bareme.libelle if ligne.remise_bareme_id else "Remise saisie",
+            "lien": f"/commercial/document/{ligne.document.pk}/"})
+    lignes.sort(key=lambda l: -l["montant_remise"])
+    colonnes = [("date", "Date", "date"), ("numero", "N° pièce", "texte"), ("tiers", "Client", "texte"),
+                ("article", "Article", "texte"), ("quantite", "Quantité", "quantite"), ("brut", "Brut HT", "montant"),
+                ("remise", "Remise %", "pourcent"), ("montant_remise", "Remise accordée", "montant"),
+                ("net", "Net HT", "montant"), ("bareme", "Barème", "texte")]
+    return colonnes, lignes
+
+
 def reglements_modes(debut, fin, **_):
     """Encaissements (clients) et décaissements (fournisseurs) de la période par mode de paiement."""
     from apps.commercial.models import Reglement
@@ -484,6 +507,7 @@ ETATS = {
     "rotation_stocks": ("Rotation des stocks et ruptures", True, rotation_stocks),
     "avoirs_retours": ("Avoirs et retours clients", True, avoirs_retours),
     "reglements_modes": ("Règlements par mode de paiement", True, reglements_modes),
+    "remises_accordees": ("Remises et promotions accordées", True, remises_accordees),
     "cadencier_clients": ("Cadencier clients (quantités vendues par mois)", True, cadencier_clients),
     "cadencier_fournisseurs": ("Cadencier fournisseurs (quantités achetées par mois)", True, cadencier_fournisseurs),
     "cadencier_livraison": ("Cadencier de livraison (quantités livrées par mois)", True, cadencier_livraison),

@@ -497,6 +497,7 @@ GESTION_COMMERCIALE = Module(
                   preuve="AJOUT-ERP"),
             ]),
             E("etats.cadencier_clients", "Cadencier clients", "commercial:statistique", "cadencier_clients"),
+            E("etats.remises_accordees", "Remises et promotions accordées", "commercial:statistique", "remises_accordees", preuve="AJOUT-ERP"),
             E("etats.statistiques_clients", "Statistiques clients", icone="bi-graph-up", enfants=[
                 E("etats.clients.familles", "Statistiques par familles d'articles", "commercial:statistique", "ventes_familles"),
                 E("etats.clients.articles", "Statistiques par articles", "commercial:statistique", "ventes_articles"),
