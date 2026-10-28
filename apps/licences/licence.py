@@ -36,6 +36,17 @@ class LicenceInvalide(Exception):
 
 # ---------------------------------------------------------------- Clés et format
 def cles_publiques():
+    """Clés de vérification. Autorité : celles gravées dans le module compilé cle_editeur (non remplaçables).
+    À défaut (développement, version d'essai sans clé gravée), le fichier texte cle_publique.txt sert de secours ;
+    comme il est remplaçable, il n'est JAMAIS utilisé quand une clé est gravée."""
+    try:
+        from . import cle_editeur
+
+        gravees = [c.strip() for c in getattr(cle_editeur, "CLES", []) if isinstance(c, str) and c.strip()]
+    except Exception:
+        gravees = []
+    if gravees:
+        return gravees
     fichier = Path(__file__).with_name("cle_publique.txt")
     lignes = fichier.read_text(encoding="utf-8").splitlines() if fichier.exists() else []
     return [l.strip() for l in lignes if l.strip() and not l.lstrip().startswith("#")]

@@ -126,6 +126,8 @@ def preparer_environnement(base="erp.sqlite3"):
     for ligne in config.read_text(encoding="utf-8").splitlines():
         if "=" in ligne and not ligne.lstrip().startswith("#"):
             cle, valeur = ligne.split("=", 1)
+            if cle.strip() in ("ERP_LICENCE", "ERP_ASSISTANT"):   # jamais pilotés par le fichier (contournement)
+                continue
             os.environ.setdefault(cle.strip(), valeur.strip())
     os.environ.setdefault("SQLITE_FICHIER", str(donnees / base))   # chemin absolu, dans le dossier des données
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "erp.settings")
@@ -728,7 +730,8 @@ def main(argv):
     if not controler_base(donnees):
         return 1
     os.environ.setdefault("ERP_ASSISTANT", "1")                   # premier démarrage : assistant dans le navigateur
-    os.environ.setdefault("ERP_LICENCE", "1")                     # essai, échéance, lecture seule, postes
+    os.environ["ERP_LICENCE"] = "1"                               # toujours actif dans le programme compilé :
+    #   ni configuration.env ni une variable d'environnement ne peuvent désactiver le contrôle de licence.
     import django
 
     django.setup()

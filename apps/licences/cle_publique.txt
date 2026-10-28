@@ -1,4 +1,7 @@
 # Clé(s) publique(s) Ed25519 du propriétaire, en base64, une par ligne.
 # Elles permettent seulement de VÉRIFIER une licence : sans danger dans le dépôt.
 # La clé privée (qui fabrique les licences) reste sur l'ordinateur du propriétaire, jamais ici.
-# Tant qu'aucune clé n'est inscrite, le logiciel fonctionne en période d'essai seulement.
+#
+# IMPORTANT : en PRODUCTION, la clé de l'éditeur se place dans apps/licences/cle_editeur.py (module COMPILÉ en
+# code machine, non remplaçable). Ce fichier texte-ci n'est qu'un SECOURS de développement : dès qu'une clé est
+# gravée dans cle_editeur, ce fichier est ignoré. Tant que ni l'un ni l'autre n'a de clé, le logiciel reste en essai.

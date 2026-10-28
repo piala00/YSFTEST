@@ -26,14 +26,23 @@ Code : `apps/licences/` (contrôle), `deploy/licences/licences.py` (outil du pro
 1. Télécharger **ERP-OHADA-Licences.exe** (artefact « ERP-OHADA-Licences-PROPRIETAIRE » de la CI) sur VOTRE ordinateur.
 2. Double-clic → **1. Créer la paire de clés** → choisir un mot de passe solide (10 caractères ou plus).
    Sauvegarder le dossier `ERP-OHADA-Licences` (clé privée + registre) sur une clé USB gardée au coffre.
-3. Envoyer à Claude le contenu de **cle-publique.txt** (une ligne, sans danger) : il est ajouté dans
-   `apps/licences/cle_publique.txt` et les programmes suivants savent vérifier vos licences.
+3. Envoyer à Claude le contenu de **cle-publique.txt** (une ligne, sans danger) : il est gravé dans le module
+   **compilé** `apps/licences/cle_editeur.py` (code machine, non remplaçable) et les programmes suivants savent
+   vérifier vos licences. Le fichier texte `cle_publique.txt` ne sert plus qu'au développement.
 4. Nouveau client : saisissez la société et l'édition → **Clé d'installation** (copiée, et enregistrée en .txt dans
    le dossier des licences) → envoyez-la avec l'installateur.
 5. Le client vous envoie sa **demande de licence** (`.erpdem`) → **Ouvrir une demande…** → réglez postes et durée →
    **Générer la licence et la clé d'activation** : envoyez le fichier `.erplic` et/ou la clé d'activation.
 
 Les sections suivantes gardent la proposition d'origine ; les **[À DÉCIDER]** sont tranchés comme ci-dessus.
+
+## Durcissement (28/10/2026)
+
+- **Clé de l'éditeur gravée dans le code compilé** (`cle_editeur.py` → `.pyd`) : un pirate ne peut plus remplacer un
+  simple fichier texte par sa propre clé pour fabriquer de fausses licences.
+- **Contrôle de licence non désactivable** dans le programme compilé : `configuration.env` et les variables
+  d'environnement ne peuvent pas éteindre `ERP_LICENCE`.
+- **Code compilé en natif** (voir la protection anti-décorticage) : pas de source lisible dans le dossier installé.
 
 ## 1. Principes
 

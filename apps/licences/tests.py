@@ -398,3 +398,29 @@ class LicencesTests(TestCase):
     @override_settings(ERP_LICENCE=False)
     def test_hors_programme_compile_aucune_limite(self):
         self.assertEqual(l.peut_activer_un_compte(), (True, ""))
+
+
+class CleEditeurTests(TestCase):
+    """La clé de l'éditeur gravée dans le module compilé fait autorité ; le fichier texte (remplaçable) est ignoré."""
+
+    def test_cle_gravee_prioritaire_sur_le_fichier(self):
+        with mock.patch("apps.licences.cle_editeur.CLES", ["CleGraveeBase64="]):
+            self.assertEqual(l.cles_publiques(), ["CleGraveeBase64="])      # fichier texte ignoré
+        with mock.patch("apps.licences.cle_editeur.CLES", []):
+            self.assertNotIn("CleGraveeBase64=", l.cles_publiques())        # repli fichier (vide ici)
+
+    def test_cle_gravee_verifie_une_vraie_licence(self):
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+
+        dossier = tempfile.TemporaryDirectory()
+        self.addCleanup(dossier.cleanup)
+        env = {**os.environ, "ERP_LICENCES_MDP": "Mot-de-passe-essai-2030"}
+        subprocess.run([sys.executable, str(OUTIL), "cles", "--dossier", dossier.name], env=env, check=True,
+                       capture_output=True)
+        publique = Path(dossier.name, "cle-publique.txt").read_text().strip()
+        with mock.patch("apps.licences.cle_editeur.CLES", [publique]):
+            self.assertEqual(l.cles_publiques(), [publique])
+            self.assertTrue(l.cles_publiques())                            # clé disponible → plus en essai « sans clé »
