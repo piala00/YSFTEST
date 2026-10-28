@@ -325,6 +325,15 @@ class MenusDuTransportTests(TestCase):
         self.assertEqual(c["total"]["envois"], c["total"]["livres"] + c["total"]["attente"])
         tdb = tr.tableau_de_bord(debut, fin)
         self.assertEqual(len(tdb["indicateurs"]), 9)
+        # La recette colis/fret vient des écritures validées (comptes dédiés), jamais de la somme des prix de colis
+        from apps.comptabilite import plan_analytique as pa
+        from apps.transport.models import ParametresTransport
+
+        p = ParametresTransport.get()
+        comptes = {p.compte_colis.numero, p.compte_fret.numero}
+        attendu = sum((f["montant"] for f in pa.faits(debut, fin) if f["produit"] and f["compte"] in comptes), 0)
+        recette = next(i["valeur"] for i in tdb["indicateurs"] if i["cle"] == "colis_recette")
+        self.assertEqual(recette, attendu)
         for url in ("reporting:transport_billetterie", "reporting:transport_colis", "reporting:transport_tableau_de_bord"):
             self.assertEqual(self.client.get(reverse(url) + "?seul=1&export=csv" if url != "reporting:transport_tableau_de_bord"
                                              else reverse(url) + "?seul=1").status_code, 200)

@@ -178,7 +178,12 @@ def tableau_de_bord(debut, fin):
     """Indicateurs du transport sur la période, comparés à la période précédente de même durée."""
     import datetime
 
-    from .models import Billet, Colis
+    from apps.comptabilite import plan_analytique as pa
+
+    from .models import Billet, Colis, ParametresTransport
+
+    p = ParametresTransport.get()
+    comptes_colis = {p.compte_colis.numero, p.compte_fret.numero}      # recette colis/fret : comptes de produits dédiés
 
     def resume(d, f):
         agences = _periode("agence", d, f)
@@ -187,9 +192,10 @@ def tableau_de_bord(debut, fin):
         t["resultat"] = t["produits"] - t["charges"]
         t["remplissage"] = round(100 * t["voyageurs"] / t["places"]) if t["places"] else None
         t["billets"] = Billet.objects.filter(date_vente__range=(d, f)).exclude(statut=Billet.ANNULE).count()
-        colis = Colis.objects.filter(date__range=(d, f)).exclude(statut=Colis.ANNULE)
-        t["colis"] = colis.count()
-        t["colis_recette"] = sum((c.prix or ZERO for c in colis), ZERO)
+        t["colis"] = Colis.objects.filter(date__range=(d, f)).exclude(statut=Colis.ANNULE).count()
+        # Recette colis/fret : depuis les écritures VALIDÉES (comme produits/charges), jamais la somme des prix de colis
+        t["colis_recette"] = sum((fait["montant"] for fait in pa.faits(d, f)
+                                  if fait["produit"] and fait["compte"] in comptes_colis), ZERO)
         return t
 
     duree = fin - debut
