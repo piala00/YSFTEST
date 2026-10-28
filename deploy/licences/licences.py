@@ -194,8 +194,10 @@ def emettre(a, mdp=None):
         raise SystemExit("Une licence d'agence indique le code du site (--site DLA).")
     if a.postes < 1 or a.postes > 65000:
         raise SystemExit("Nombre de postes : de 1 à 65000.")
-    rapide = (dans_mois(1) if getattr(a, "mensuelle", False) else dans_mois(3) if getattr(a, "trimestrielle", False)
-              else dans_mois(12) if getattr(a, "annuelle", False) else None)
+    mois = (1 if getattr(a, "mensuelle", False) else 3 if getattr(a, "trimestrielle", False)
+            else 6 if getattr(a, "semestrielle", False) else 12 if getattr(a, "annuelle", False)
+            else getattr(a, "mois", None) or (getattr(a, "ans", None) or 0) * 12 or None)
+    rapide = dans_mois(mois) if mois else None
     jusqu_au = None if a.definitive else rapide or date_ou_rien(a.jusqu_au) or dans_mois(12)
     maj = date_ou_rien(a.maj_jusqu_au) or jusqu_au or dans_mois(12)
     registre = cle_chemin.with_name("registre-licences.csv")
@@ -349,10 +351,9 @@ def interface(essai=False):
     duree = ttk.Frame(cadre)
     ttk.Radiobutton(duree, text="Abonnement jusqu'au", value="abonnement", variable=v["duree"]).pack(side="left")
     ttk.Entry(duree, textvariable=v["jusqu_au"], width=12).pack(side="left", padx=4)
-    ttk.Button(duree, text="1 mois", width=6, command=lambda: echeance(1)).pack(side="left", padx=(6, 1))
-    ttk.Button(duree, text="3 mois", width=6, command=lambda: echeance(3)).pack(side="left", padx=1)
-    ttk.Button(duree, text="1 an", width=6, command=lambda: echeance(12)).pack(side="left", padx=1)
-    ttk.Radiobutton(duree, text="Définitive", value="definitive", variable=v["duree"]).pack(side="left", padx=12)
+    for libelle, mois in (("1 mois", 1), ("3 mois", 3), ("6 mois", 6), ("1 an", 12), ("2 ans", 24), ("3 ans", 36)):
+        ttk.Button(duree, text=libelle, width=6, command=lambda m=mois: echeance(m)).pack(side="left", padx=1)
+    ttk.Radiobutton(duree, text="Permanente", value="definitive", variable=v["duree"]).pack(side="left", padx=(12, 0))
     ligne(8, "Durée", duree)
     ligne(9, "Mises à jour jusqu'au", ttk.Entry(cadre, textvariable=v["maj"]))
 
@@ -522,9 +523,11 @@ def menu():
                                                 edition=question("Édition (transport, commerce, toutes)", "transport"),
                                                 sortie=sortie))
     elif choix == "3":
-        duree = question("Durée : M = mensuel, T = trimestriel, A = annuel, D = définitive, ou une date", "A").upper()
-        defaut = {"M": dans_mois(1), "T": dans_mois(3), "A": dans_mois(12)}.get(duree)
-        if duree == "D":
+        duree = question("Durée : M=mensuel, T=trimestriel, S=semestriel, A=annuel, 2/3=2 ou 3 ans, "
+                         "P=permanente, ou une date AAAA-MM-JJ", "A").upper()
+        defaut = {"M": dans_mois(1), "T": dans_mois(3), "S": dans_mois(6), "A": dans_mois(12),
+                  "2": dans_mois(24), "3": dans_mois(36)}.get(duree)
+        if duree in ("D", "P"):
             jusqu_au = None
         elif defaut:
             jusqu_au = defaut
@@ -564,8 +567,11 @@ def main(argv):
     e.add_argument("--jusqu-au", dest="jusqu_au")
     e.add_argument("--mensuelle", action="store_true", help="valable 1 mois")
     e.add_argument("--trimestrielle", action="store_true", help="valable 3 mois")
+    e.add_argument("--semestrielle", action="store_true", help="valable 6 mois")
     e.add_argument("--annuelle", action="store_true", help="valable 1 an")
-    e.add_argument("--definitive", action="store_true")
+    e.add_argument("--mois", type=int, help="valable ce nombre de mois")
+    e.add_argument("--ans", type=int, help="valable ce nombre d'années")
+    e.add_argument("--definitive", "--permanente", dest="definitive", action="store_true")
     e.add_argument("--maj-jusqu-au", dest="maj_jusqu_au")
     e.add_argument("--sortie")
     e.add_argument("--fichier", help="chemin exact du fichier .erplic à créer")

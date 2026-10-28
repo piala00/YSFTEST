@@ -2,8 +2,8 @@
 
 **Statut : validé par le propriétaire le 27/10/2026 (« choisir les meilleures options et appliquer ») ; implémenté.**
 
-Choix appliqués : postes = **comptes utilisateurs actifs** ; licence **mensuelle, trimestrielle, annuelle ou définitive** au choix à
-l'émission (boutons 1 mois / 3 mois / 1 an, ou date libre ; annuelle par défaut) ; **essai : 30 ouvertures (chaque connexion compte pour une), au plus 15 jours,
+Choix appliqués : postes = **comptes utilisateurs actifs** ; licence **mensuelle, trimestrielle, semestrielle, annuelle, pluriannuelle (2-3 ans) ou permanente** au choix à
+l'émission (boutons 1 mois / 3 mois / 6 mois / 1 an / 2 ans / 3 ans, date libre, ou Permanente ; annuelle par défaut) ; **essai : 30 ouvertures (chaque connexion compte pour une), au plus 15 jours,
 3 postes** (décision du propriétaire, 28/10/2026) ; rappel 30 jours avant, **15 jours de grâce puis lecture seule** ;
 **une licence par serveur** (direction, chaque agence, site unique), regroupées par client.
 

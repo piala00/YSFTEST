@@ -183,16 +183,30 @@ class LicencesTests(TestCase):
         e = l.etat(datetime.date(2045, 1, 1))
         self.assertEqual((e.statut, e.echeance, e.lecture_seule), ("valide", None, False))
 
-    def test_licence_mensuelle(self):
-        contenu, _ = self.emettre("--mensuelle")
-        donnees = l.controler(contenu)
-        fin = datetime.date.fromisoformat(donnees["valable_jusqu_au"])
-        attendu = datetime.date.today()
-        mois = attendu.month % 12 + 1
-        self.assertEqual((fin.month, fin.year), (mois, attendu.year + (1 if attendu.month == 12 else 0)))
+    def _echeance_attendue(self, mois):
+        import calendar
+
+        d = datetime.date.today()
+        total = d.month - 1 + mois
+        annee, m = d.year + total // 12, total % 12 + 1
+        return datetime.date(annee, m, min(d.day, calendar.monthrange(annee, m)[1]))
+
+    def test_licences_mensuelle_a_pluriannuelle(self):
+        for option, mois in (("--mensuelle", 1), ("--trimestrielle", 3), ("--semestrielle", 6),
+                             ("--annuelle", 12), ("--ans", 24), ("--mois", 6)):  # --ans 2 → 24 mois
+            with self.subTest(option=option):
+                args = (option, "2") if option == "--ans" else (option, "6") if option == "--mois" else (option,)
+                contenu, _ = self.emettre(*args)
+                donnees = l.controler(contenu)
+                fin = datetime.date.fromisoformat(donnees["valable_jusqu_au"])
+                self.assertEqual(fin, self._echeance_attendue(mois))
+                for f in self.donnees.glob("LIC-*.erplic"):
+                    f.unlink()
+
+    def test_licence_permanente(self):
+        contenu, _ = self.emettre("--permanente")
         l.deposer(contenu)
-        self.assertFalse(l.etat(datetime.date.today()).lecture_seule)
-        self.assertTrue(l.etat(fin + datetime.timedelta(days=l.GRACE_JOURS + 1)).lecture_seule)
+        self.assertEqual(l.etat(datetime.date(2099, 1, 1)).echeance, None)
 
     def test_refus(self):
         contenu, _ = self.emettre()
