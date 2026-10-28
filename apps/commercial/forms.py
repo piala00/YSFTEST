@@ -70,7 +70,7 @@ class DepotForm(BootstrapMixin, forms.ModelForm):
 class DocumentForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Document
-        fields = ("tiers", "payeur", "date", "date_echeance", "depot", "depot_destination", "reference_externe", "notes")
+        fields = ("tiers", "representant", "payeur", "date", "date_echeance", "depot", "depot_destination", "reference_externe", "notes")
         widgets = {"date": DateInput(), "date_echeance": DateInput(), "notes": forms.Textarea(attrs={"rows": 2})}
 
     def __init__(self, *args, type_document=None, **kwargs):

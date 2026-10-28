@@ -532,7 +532,7 @@ GESTION_COMMERCIALE = Module(
             SEP(),
             E("etats.stats_collaborateurs", "Statistiques collaborateurs"),
             E("etats.stats_ressources", "Statistiques ressources"),
-            E("etats.commissions", "Commissions représentants"),
+            E("etats.commissions", "Commissions représentants", "commercial:statistique", "commissions"),
             SEP(),
             E("etats.tableaux_bord", "Tableaux de bord", "reporting:dashboard", icone="bi-speedometer2"),
             E("etats.journaux_comptables", "Journaux comptables", "comptabilite:journal"),

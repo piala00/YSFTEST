@@ -408,3 +408,25 @@ class EtatRemisesAccordeesTests(BaseCommerciale):
         self.assertEqual(lignes[0]["remise"], 10)
         self.assertEqual(lignes[0]["montant_remise"], Decimal("1000"))      # 10 % de 10 000
         self.assertEqual(lignes[0]["bareme"], "Fidélité")
+
+
+class CommissionsRepresentantsTests(BaseCommerciale):
+    def test_commission_par_representant(self):
+        import datetime
+
+        from apps.reporting import statistiques
+
+        from .models import Bareme
+
+        self.client_.representant = "DUPONT"
+        self.client_.save()
+        Bareme.objects.create(type_bareme="COMMISSION", sens="CLIENT", libelle="Com. Dupont", representant="DUPONT", taux=3)
+        doc = Document.objects.create(type_document=Document.FACTURE, tiers=self.client_)
+        self.assertEqual(doc.representant, "DUPONT")                    # repris de la fiche du tiers
+        LigneDocument.objects.create(document=doc, article=self.article, quantite=10, prix_unitaire=1000)
+        doc.recalculer()
+        doc.valider()
+        cols, lignes = statistiques.commissions(datetime.date(2000, 1, 1), datetime.date(2100, 1, 1))
+        rep = next(l for l in lignes if l["representant"] == "DUPONT")
+        self.assertEqual(rep["base"], Decimal("10000"))                # 10 × 1000, sans remise
+        self.assertEqual(rep["commission"], Decimal("300"))            # 3 % de 10 000

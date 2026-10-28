@@ -9,7 +9,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from decimal import Decimal
 
-from apps.commercial.models import Article, Document, LigneDocument, Tiers
+from apps.commercial.models import Article, Document, LigneDocument, Tiers, arrondi
 
 from .services import MOIS
 
@@ -394,6 +394,24 @@ def avoirs_retours(debut, fin, **_):
     return colonnes, lignes
 
 
+def commissions(debut, fin, **_):
+    """Commissions des représentants sur les ventes validées de la période (barèmes de commission)."""
+    from apps.commercial.models import Bareme
+
+    par_rep = {}
+    for ligne, signe in _lignes(debut, fin, VENTES_PLUS, VENTES_MOINS):
+        rep = ligne.document.representant or "— sans représentant —"
+        taux = Bareme.commission_pour(ligne.document.representant, ligne.document.tiers, ligne.article)
+        base = signe * ligne.montant_ht
+        g = par_rep.setdefault(rep, {"representant": rep, "base": ZERO, "commission": ZERO})
+        g["base"] += base
+        g["commission"] += arrondi(base * taux / 100) if taux else ZERO
+    lignes = sorted((g for g in par_rep.values()), key=lambda g: -g["commission"])
+    colonnes = [("representant", "Représentant", "texte"), ("base", "Ventes HT (base)", "montant"),
+                ("commission", "Commission", "montant")]
+    return colonnes, lignes
+
+
 def remises_accordees(debut, fin, **_):
     """Remises et promotions accordées sur les factures de vente de la période (ligne par ligne), avec le barème."""
     lignes = []
@@ -508,6 +526,7 @@ ETATS = {
     "avoirs_retours": ("Avoirs et retours clients", True, avoirs_retours),
     "reglements_modes": ("Règlements par mode de paiement", True, reglements_modes),
     "remises_accordees": ("Remises et promotions accordées", True, remises_accordees),
+    "commissions": ("Commissions des représentants", True, commissions),
     "cadencier_clients": ("Cadencier clients (quantités vendues par mois)", True, cadencier_clients),
     "cadencier_fournisseurs": ("Cadencier fournisseurs (quantités achetées par mois)", True, cadencier_fournisseurs),
     "cadencier_livraison": ("Cadencier de livraison (quantités livrées par mois)", True, cadencier_livraison),

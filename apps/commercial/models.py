@@ -74,6 +74,8 @@ class Tiers(models.Model):
                                    help_text="Réaction quand l'encours dépasse le plafond (clients)")
     categorie_tarifaire = models.ForeignKey(CategorieTarifaire, null=True, blank=True, on_delete=models.SET_NULL,
                                             related_name="clients", verbose_name="Catégorie tarifaire")
+    representant = models.CharField("Représentant", max_length=120, blank=True,
+                                    help_text="Commercial attribué à ce tiers ; repris sur les documents")
     compte_bloque = models.BooleanField(
         "Compte bloqué", default=False,
         help_text="Aucun document ne peut être saisi pour ce tiers (différent du code risque « Blocage », "
@@ -423,6 +425,8 @@ class Document(models.Model):
     date = models.DateField(default=timezone.localdate)
     date_echeance = models.DateField("Échéance", null=True, blank=True)
     tiers = models.ForeignKey(Tiers, null=True, blank=True, on_delete=models.PROTECT, related_name="documents")
+    representant = models.CharField("Représentant", max_length=120, blank=True,
+                                    help_text="Commercial de la pièce (repris de la fiche du tiers) ; base des commissions")
     payeur = models.ForeignKey(Tiers, null=True, blank=True, on_delete=models.PROTECT, related_name="documents_payes",
                                verbose_name="Tiers payeur", help_text="Repris de la fiche du tiers ; vide : le tiers lui-même")
     depot = models.ForeignKey(Depot, null=True, blank=True, on_delete=models.PROTECT, related_name="documents",
@@ -613,6 +617,8 @@ class Document(models.Model):
             self.date_echeance = self.date + timezone.timedelta(days=self.tiers.delai_paiement)
         if self._state.adding and not self.payeur_id and self.tiers_id:
             self.payeur_id = self.tiers.payeur_id           # payeur de la fiche, figé sur la pièce
+        if not self.representant and self.tiers_id and self.tiers.representant:
+            self.representant = self.tiers.representant      # commercial de la fiche, repris sur la pièce
         super().save(*args, **kwargs)
 
     @property
@@ -1059,6 +1065,28 @@ class Bareme(models.Model):
             if note is None or precision > note:
                 meilleur, note = b, precision
         return (meilleur.taux, meilleur) if meilleur else (None, None)
+
+    @classmethod
+    def commission_pour(cls, representant, tiers, article):
+        """Taux de commission le plus précis pour un représentant sur une vente → taux % (ou 0)."""
+        candidats = cls.objects.filter(actif=True, sens=cls.CLIENT, type_bareme=cls.COMMISSION)
+        meilleur, note = None, None
+        for b in candidats.select_related("categorie", "tiers", "famille", "article"):
+            if b.representant and b.representant != (representant or ""):
+                continue
+            if b.categorie_id and (not tiers or b.categorie_id != tiers.categorie_tarifaire_id):
+                continue
+            if b.tiers_id and (not tiers or b.tiers_id != tiers.pk):
+                continue
+            if b.famille_id and (not article or b.famille_id != article.famille_id):
+                continue
+            if b.article_id and (not article or b.article_id != article.pk):
+                continue
+            precision = (bool(b.representant), bool(b.article_id), bool(b.famille_id), bool(b.tiers_id),
+                         bool(b.categorie_id), b.taux)
+            if note is None or precision > note:
+                meilleur, note = b, precision
+        return meilleur.taux if meilleur else ZERO
 
 
 class Reglement(models.Model):
