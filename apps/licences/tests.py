@@ -183,6 +183,17 @@ class LicencesTests(TestCase):
         e = l.etat(datetime.date(2045, 1, 1))
         self.assertEqual((e.statut, e.echeance, e.lecture_seule), ("valide", None, False))
 
+    def test_licence_mensuelle(self):
+        contenu, _ = self.emettre("--mensuelle")
+        donnees = l.controler(contenu)
+        fin = datetime.date.fromisoformat(donnees["valable_jusqu_au"])
+        attendu = datetime.date.today()
+        mois = attendu.month % 12 + 1
+        self.assertEqual((fin.month, fin.year), (mois, attendu.year + (1 if attendu.month == 12 else 0)))
+        l.deposer(contenu)
+        self.assertFalse(l.etat(datetime.date.today()).lecture_seule)
+        self.assertTrue(l.etat(fin + datetime.timedelta(days=l.GRACE_JOURS + 1)).lecture_seule)
+
     def test_refus(self):
         contenu, _ = self.emettre()
         lignes = contenu.splitlines()

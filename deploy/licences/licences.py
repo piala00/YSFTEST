@@ -91,6 +91,18 @@ def date_ou_rien(texte):
         raise SystemExit(f"Date attendue au format AAAA-MM-JJ : {texte}")
 
 
+def dans_mois(nombre):
+    """Date d'aujourd'hui + N mois (fin de mois géré) → AAAA-MM-JJ."""
+    import calendar
+
+    d = datetime.date.today()
+    mois = d.month - 1 + nombre
+    annee = d.year + mois // 12
+    mois = mois % 12 + 1
+    jour = min(d.day, calendar.monthrange(annee, mois)[1])
+    return datetime.date(annee, mois, jour).isoformat()
+
+
 def prochain_numero(registre, prefixe="LIC"):
     annee = datetime.date.today().year
     n = 0
@@ -182,9 +194,10 @@ def emettre(a, mdp=None):
         raise SystemExit("Une licence d'agence indique le code du site (--site DLA).")
     if a.postes < 1 or a.postes > 65000:
         raise SystemExit("Nombre de postes : de 1 à 65000.")
-    un_an = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
-    jusqu_au = None if a.definitive else date_ou_rien(a.jusqu_au) or un_an
-    maj = date_ou_rien(a.maj_jusqu_au) or jusqu_au or un_an
+    rapide = (dans_mois(1) if getattr(a, "mensuelle", False) else dans_mois(3) if getattr(a, "trimestrielle", False)
+              else dans_mois(12) if getattr(a, "annuelle", False) else None)
+    jusqu_au = None if a.definitive else rapide or date_ou_rien(a.jusqu_au) or dans_mois(12)
+    maj = date_ou_rien(a.maj_jusqu_au) or jusqu_au or dans_mois(12)
     registre = cle_chemin.with_name("registre-licences.csv")
     conditions = {"numero": prochain_numero(registre), "edition": edition, "role": role, "postes": a.postes,
                   "emise_le": datetime.date.today().isoformat(), "valable_jusqu_au": jusqu_au, "maj_jusqu_au": maj}
@@ -294,7 +307,7 @@ def interface(essai=False):
         "dossier": preferences().get("cles", str(Path.home() / "ERP-OHADA-Licences")),
         "licences": preferences().get("licences", str(bureau() / "Licences ERP")),
         "client": "", "niu": "", "edition": "transport",
-        "role": "seul", "site": "", "postes": "5", "code": "", "demande": "", "duree": "annuelle",
+        "role": "seul", "site": "", "postes": "5", "code": "", "demande": "", "duree": "abonnement",
         "jusqu_au": (datetime.date.today() + datetime.timedelta(days=365)).isoformat(),
         "maj": (datetime.date.today() + datetime.timedelta(days=365)).isoformat()}.items()}
 
@@ -328,10 +341,18 @@ def interface(essai=False):
     serveur = ttk.Label(cadre, text="", foreground="#555")
     serveur.grid(row=12, column=1, sticky="w")
     ligne(11, "Sans demande : code d'activation", ttk.Entry(cadre, textvariable=v["code"]))
+    def echeance(mois):
+        v["duree"].set("abonnement")
+        v["jusqu_au"].set(dans_mois(mois))
+        v["maj"].set(dans_mois(mois))
+
     duree = ttk.Frame(cadre)
-    ttk.Radiobutton(duree, text="Abonnement jusqu'au", value="annuelle", variable=v["duree"]).pack(side="left")
+    ttk.Radiobutton(duree, text="Abonnement jusqu'au", value="abonnement", variable=v["duree"]).pack(side="left")
     ttk.Entry(duree, textvariable=v["jusqu_au"], width=12).pack(side="left", padx=4)
-    ttk.Radiobutton(duree, text="Licence définitive", value="definitive", variable=v["duree"]).pack(side="left", padx=12)
+    ttk.Button(duree, text="1 mois", width=6, command=lambda: echeance(1)).pack(side="left", padx=(6, 1))
+    ttk.Button(duree, text="3 mois", width=6, command=lambda: echeance(3)).pack(side="left", padx=1)
+    ttk.Button(duree, text="1 an", width=6, command=lambda: echeance(12)).pack(side="left", padx=1)
+    ttk.Radiobutton(duree, text="Définitive", value="definitive", variable=v["duree"]).pack(side="left", padx=12)
     ligne(8, "Durée", duree)
     ligne(9, "Mises à jour jusqu'au", ttk.Entry(cadre, textvariable=v["maj"]))
 
@@ -501,13 +522,18 @@ def menu():
                                                 edition=question("Édition (transport, commerce, toutes)", "transport"),
                                                 sortie=sortie))
     elif choix == "3":
-        duree = question("Durée : A = abonnement annuel, D = définitive", "A").upper()
-        un_an = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
+        duree = question("Durée : M = mensuel, T = trimestriel, A = annuel, D = définitive, ou une date", "A").upper()
+        defaut = {"M": dans_mois(1), "T": dans_mois(3), "A": dans_mois(12)}.get(duree)
+        if duree == "D":
+            jusqu_au = None
+        elif defaut:
+            jusqu_au = defaut
+        else:
+            jusqu_au = question("Valable jusqu'au (AAAA-MM-JJ)", dans_mois(12)) if "-" not in duree else duree
         a = argparse.Namespace(
             cle=str(dossier / "cle-privee.pem"), demande=question("Fichier de la demande (.erpdem)"), client=None, niu=None,
             edition=None, role=None, site=None, code=None, postes=int(question("Postes", "5")), definitive=duree == "D",
-            jusqu_au=None if duree == "D" else question("Valable jusqu'au (AAAA-MM-JJ)", un_an),
-            maj_jusqu_au=question("Mises à jour jusqu'au (AAAA-MM-JJ)", un_an), sortie=sortie, fichier=None)
+            jusqu_au=jusqu_au, maj_jusqu_au=jusqu_au or dans_mois(12), sortie=sortie, fichier=None)
         emettre(a)
     input("\nEntrée pour fermer…")
 
@@ -536,6 +562,9 @@ def main(argv):
     e.add_argument("--site")
     e.add_argument("--niu")
     e.add_argument("--jusqu-au", dest="jusqu_au")
+    e.add_argument("--mensuelle", action="store_true", help="valable 1 mois")
+    e.add_argument("--trimestrielle", action="store_true", help="valable 3 mois")
+    e.add_argument("--annuelle", action="store_true", help="valable 1 an")
     e.add_argument("--definitive", action="store_true")
     e.add_argument("--maj-jusqu-au", dest="maj_jusqu_au")
     e.add_argument("--sortie")
