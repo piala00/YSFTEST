@@ -54,6 +54,7 @@ def licence(request):
             messages.error(request, f"Refusé : {exc}")
         return redirect(request.path)
     return render(request, "licences/licence.html", {
+        "onglet_poste": "licence",
         "titre": "Licence", "etat": l.etat(), "demande": l.demande(), "installation": l.cle_installation(),
         "installation_requise": l.cle_installation_requise(), "actifs": l.comptes_actifs(), "roles": l.ROLES,
         "essai_ouvertures": l.ESSAI_OUVERTURES,
