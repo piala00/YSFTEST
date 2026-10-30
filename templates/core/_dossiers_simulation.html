@@ -1,0 +1,36 @@
+<div class="card card-body">
+  <h2 class="h6">Simulation — dossiers de sociétés fictives</h2>
+  {% if etat.erreur_dossier %}<div class="alert alert-danger small">Le dernier dossier fictif n'a pas pu être ouvert : {{ etat.erreur_dossier }}. Le logiciel est revenu au dossier de la société ; le dossier fictif défectueux a été conservé.</div>{% endif %}
+  <p class="small">Créez un dossier fictif ou importez un fichier <strong>.erpsim</strong>. Il s'ouvre dans ce logiciel, à la même adresse, et reste séparé des données de votre société. La création travaille en arrière-plan ; aucun autre navigateur n'est ouvert.</p>
+  {% if etat.simulation_active %}<div class="alert alert-warning small">Vous utilisez actuellement un dossier de simulation. Les saisies concernent uniquement ce dossier.
+    <form method="post" class="d-flex flex-wrap gap-2 mt-2">{% csrf_token %}<input class="form-control form-control-sm" style="max-width:12rem" name="confirmation" placeholder="Tapez OUVRIR" required aria-label="Confirmation du retour au dossier société">
+      <button class="btn btn-sm btn-primary" name="action" value="dossier_revenir">Revenir au dossier de la société</button></form></div>{% endif %}
+  <div class="alert alert-info small">Ouvrir un autre dossier sauvegarde le dossier courant puis redémarre le serveur. Tous les postes connectés changent de dossier et doivent se reconnecter. Terminez les saisies avant de confirmer. Votre société reste conservée à son emplacement.</div>
+  {% for d in etat.simulations %}
+  <section class="border rounded p-2 mb-2">
+    <div class="d-flex flex-wrap gap-2"><strong>{{ d.nom }}</strong><span class="badge text-bg-secondary">{{ d.etat }}</span>{% if d.actif %}<span class="badge text-bg-warning">Dossier ouvert</span>{% endif %}</div>
+    {% if d.erreur %}<div class="text-danger small">{{ d.erreur }}</div>{% endif %}
+    {% if d.etat == 'preparation' %}<div class="small mt-1">Génération en préparation, parfois longue selon le nombre de mois. Vous pouvez fermer cette page et revenir ici.</div>{% endif %}
+    {% if d.journal %}<details class="mt-1"><summary class="small">Progression</summary><pre class="small bg-light p-2" style="max-height:12rem;overflow:auto">{{ d.journal }}</pre></details>{% endif %}
+    <div class="d-flex flex-wrap align-items-end gap-2 mt-2">
+      {% if d.etat == 'prete' %}<form method="post">{% csrf_token %}<input type="hidden" name="dossier" value="{{ d.id }}"><button class="btn btn-sm btn-outline-primary" name="action" value="dossier_exporter">Télécharger ce dossier</button></form>
+      {% if not d.actif %}<form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="dossier" value="{{ d.id }}"><input class="form-control form-control-sm" style="max-width:10rem" name="confirmation" placeholder="Tapez OUVRIR" required aria-label="Confirmation d'ouverture de {{ d.nom }}"><button class="btn btn-sm btn-primary" name="action" value="dossier_ouvrir">Ouvrir dans ce logiciel</button></form>{% endif %}{% endif %}
+      {% if not d.actif %}<details><summary class="small text-danger">Supprimer ce dossier fictif</summary><form method="post" class="d-flex gap-1 mt-1">{% csrf_token %}<input type="hidden" name="dossier" value="{{ d.id }}"><input class="form-control form-control-sm" name="confirmation" placeholder="Tapez SUPPRIMER" required aria-label="Confirmation de suppression"><button class="btn btn-sm btn-outline-danger" name="action" value="simulation_supprimer">Supprimer</button></form></details>{% endif %}
+    </div>
+  </section>
+  {% empty %}<p class="small text-muted">Aucun dossier de simulation créé ou importé.</p>{% endfor %}
+  <div class="row g-3 mt-1">
+    <div class="col-lg-6"><h3 class="h6">Créer une simulation</h3><form method="post">{% csrf_token %}
+      <label class="form-label small" for="s-mois">Mois de départ</label><input id="s-mois" name="debut" type="month" class="form-control form-control-sm mb-2" value="{{ etat.mois_courant }}" required>
+      <label class="form-label small" for="s-duree">Durée</label><select id="s-duree" name="duree" class="form-select form-select-sm mb-2"><option value="aujourdhui">Jusqu'à aujourd'hui</option><option value="1">1 mois</option><option value="2">2 mois</option><option value="3">3 mois</option><option value="6">6 mois</option><option value="12">12 mois</option><option value="24">24 mois</option></select>
+      <button class="btn btn-sm btn-primary" name="action" value="simulation_creer">Créer la simulation</button>
+      <p class="form-text">Toutes les activités sont fictives. La durée de génération dépend du volume ; plusieurs mois peuvent demander plusieurs heures.</p>
+    </form></div>
+    <div class="col-lg-6"><h3 class="h6">Importer un dossier reçu</h3><form method="post" enctype="multipart/form-data">{% csrf_token %}
+      <label class="form-label small" for="s-fichier">Dossier exporté par ce logiciel (.erpsim ou .zip)</label><input id="s-fichier" name="fichier" type="file" accept=".erpsim,.zip" class="form-control form-control-sm mb-2" required>
+      <button class="btn btn-sm btn-outline-primary" name="action" value="dossier_importer">Importer comme dossier séparé</button>
+      <p class="form-text">L'importation ajoute un dossier et conserve celui de votre société. Vos identifiants administrateur servent à ouvrir la copie importée. Les mots de passe, sessions et licences du poste d'origine ne sont pas exportés.</p>
+    </form></div>
+  </div>
+  {% if etat.ancienne_simulation %}<div class="border-top pt-2 mt-2"><p class="small">Une ancienne simulation est disponible sur ce poste. Vous pouvez la réutiliser sans relancer la génération.</p><form method="post">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary" name="action" value="dossier_ancienne">Importer l'ancienne simulation</button></form></div>{% endif %}
+</div>

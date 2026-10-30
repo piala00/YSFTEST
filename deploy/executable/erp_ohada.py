@@ -7,7 +7,7 @@ anciens fichiers .bat lançaient un par un :
   - la copie miroir vers SQL Server, si elle est configurée (toutes les MIROIR_INTERVALLE_MINUTES minutes) ;
   - la synchronisation du dossier d'origine pendant la transition (toutes les heures, si elle est commencée) ;
   - les échanges direction ↔ agences par la boîte aux lettres, si elle est configurée (toutes les 5 minutes) ;
-  - le serveur de simulation (port suivant), si un dossier de simulation existe.
+  - les dossiers fictifs importables (Administration du poste > Simulation), sans serveur secondaire automatique.
 
 Les données ne sont PAS dans le dossier du programme (on peut le remplacer ou l'effacer sans rien perdre) :
   Windows : C:\\ProgramData\\ERP-OHADA\\<Édition>     (autre emplacement : ERP_DONNEES=…)
@@ -26,6 +26,7 @@ Les données ne sont PAS dans le dossier du programme (on peut le remplacer ou l
 import datetime
 import json
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -89,7 +90,7 @@ def journal(message):
     ligne = f"{datetime.datetime.now():%d/%m/%Y %H:%M} {message}"
     print(ligne, flush=True)
     try:
-        with open(dossier_donnees() / "journal.txt", "a", encoding="utf-8") as f:
+        with open(Path(os.environ.get("ERP_DOSSIER_DONNEES") or dossier_donnees()) / "journal.txt", "a", encoding="utf-8") as f:
             f.write(ligne + "\n")
     except OSError:
         pass
@@ -126,12 +127,26 @@ def preparer_environnement(base="erp.sqlite3"):
     for ligne in config.read_text(encoding="utf-8").splitlines():
         if "=" in ligne and not ligne.lstrip().startswith("#"):
             cle, valeur = ligne.split("=", 1)
-            if cle.strip() in ("ERP_LICENCE", "ERP_ASSISTANT"):   # jamais pilotés par le fichier (contournement)
+            if cle.strip() in ("ERP_LICENCE", "ERP_ASSISTANT", "ERP_DOSSIER_SIMULATION", "ERP_DOSSIER_RACINE", "ERP_SESSION_COOKIE"):   # jamais pilotés par le fichier (contournement)
                 continue
             os.environ.setdefault(cle.strip(), valeur.strip())
     os.environ.setdefault("SQLITE_FICHIER", str(donnees / base))   # chemin absolu, dans le dossier des données
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "erp.settings")
     os.environ.setdefault("ERP_DOSSIER_DONNEES", str(donnees))    # mémoire de l'essai hors de la base
+    os.environ["ERP_DOSSIER_RACINE"] = str(donnees)
+    if base == "erp.sqlite3":
+        from apps.core.dossiers_simulation import environnement_actif
+        os.environ.pop("ERP_DOSSIER_SIMULATION", None)
+        try:
+            resultat = environnement_actif(donnees, os.environ)
+            return resultat
+        except (ValueError, OSError, sqlite3.Error) as exc:
+            # Le dossier fictif défectueux reste conservé. Le serveur revient à sa société.
+            (donnees / "dossier-erreur.txt").write_text(str(exc)[:300], encoding="utf-8")
+            marqueur = donnees / "dossier-actif.json"
+            if marqueur.exists():
+                marqueur.replace(donnees / ("dossier-refuse-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + ".json"))
+            return donnees
     return donnees
 
 
@@ -282,7 +297,7 @@ def tache_periodique(nom, intervalle_s, action, attendre_d_abord=False):
                 action()
             except Exception as exc:                              # une tâche en échec n'arrête pas le serveur
                 journal(f"{nom} : ÉCHEC — {exc}")
-                with open(dossier_donnees() / "journal.txt", "a", encoding="utf-8") as f:
+                with open(Path(os.environ.get("ERP_DOSSIER_DONNEES") or dossier_donnees()) / "journal.txt", "a", encoding="utf-8") as f:
                     traceback.print_exc(file=f)
             finally:
                 connections.close_all()
@@ -408,26 +423,99 @@ def etat_simulation(donnees, port):
     return {"etat": etat, "port": port + 1, "journal": "\n".join(lignes) if etat != "prete" else ""}
 
 
+def racine_dossiers(donnees):
+    return Path(os.environ.get("ERP_DOSSIER_RACINE") or donnees)
+
+
 def creer_simulation(donnees, port, debut, duree):
-    if etat_simulation(donnees, port)["etat"] != "absente":
-        raise RuntimeError("une simulation existe déjà : supprimez-la d'abord")
-    journal(f"Simulation demandée : à partir de {debut}, " + ("jusqu'à aujourd'hui" if duree == "aujourdhui" else f"{duree} mois"))
-    demarrer_simulation(donnees, port, [debut] + ([] if duree == "aujourdhui" else [str(int(duree))]))
+    from apps.core import dossiers_simulation as ds
 
-
-def supprimer_simulation(donnees):
     p = SIMULATION["processus"]
     if p is not None and p.poll() is None:
+        raise ValueError("une génération est déjà en cours")
+    identifiant, dossier = ds.creer(racine_dossiers(donnees), debut, duree)
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("SQLITE_", "ERP_", "DB_", "MIROIR_", "ECHANGES_", "DJANGO_")) and k != "SECRET_KEY"}
+    env.update(ERP_DONNEES=str(dossier), ERP_EDITION="transport", ERP_SANS_NAVIGATEUR="1",
+               ERP_SOUS_PROCESSUS="1", ERP_PARENT_DONNEES=str(racine_dossiers(donnees)),
+               PYTHONUNBUFFERED="1", CONTROLE_HEURE_DEPART="0")
+    programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
+    try:
+        with (dossier / "simulation-journal.txt").open("w", encoding="utf-8") as sortie:
+            processus = subprocess.Popen(programme + ["simulation-dossier", debut, duree], env=env, stdout=sortie,
+                                         stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+        SIMULATION.update(processus=processus, dossier=identifiant)
+    except OSError as exc:
+        ds.terminer(dossier, str(exc))
+        raise
+    return identifiant
+
+
+def supprimer_simulation(donnees, identifiant=""):
+    from apps.core import dossiers_simulation as ds
+
+    racine = racine_dossiers(donnees)
+    if not identifiant:
+        dossiers = ds.lister(racine)
+        if len(dossiers) != 1:
+            raise ValueError("choisissez le dossier fictif à supprimer")
+        identifiant = dossiers[0]["id"]
+    if ds.identifiant_actif(racine) == identifiant:
+        raise ValueError("revenez d'abord au dossier de la société")
+    p = SIMULATION["processus"]
+    if SIMULATION.get("dossier") == identifiant and p is not None and p.poll() is None:
         p.terminate()
         try:
-            p.wait(30)
+            p.wait(15)
         except subprocess.TimeoutExpired:
             p.kill()
             p.wait(10)
-    SIMULATION["processus"] = None
-    for nom in FICHIERS_SIMULATION:
-        (donnees / nom).unlink(missing_ok=True)
-    journal("Simulation supprimée")
+        SIMULATION.update(processus=None, dossier="")
+    elif ds.generation_active(ds.emplacement(racine, identifiant)):
+        raise ValueError("cette génération appartient à un autre démarrage ; vérifiez son arrêt avant suppression")
+    ds.supprimer(racine, identifiant)
+
+
+def ouvrir_dossier(donnees, identifiant, utilisateur):
+    from apps.core import dossiers_simulation as ds
+
+    racine = racine_dossiers(donnees)
+    p = SIMULATION["processus"]
+    if p is not None and p.poll() is None:
+        raise ValueError("attendez la fin de la génération ou supprimez le dossier en préparation avant de changer de société")
+    if identifiant:
+        dossier = ds.emplacement(racine, identifiant)
+        ds.verifier_manifeste(ds.lire_json(dossier / ds.MANIFESTE))
+        # La première ouverture d'un dossier généré crée l'administrateur local.
+        with ds.ouvrir_base(dossier / ds.BASE) as c:
+            administrateurs = c.execute("SELECT count(*) FROM auth_user WHERE is_active=1 AND is_superuser=1").fetchone()[0]
+        if not administrateurs:
+            ds.nettoyer_copie(dossier / ds.BASE, utilisateur)
+    ds.prevoir_ouverture(racine, identifiant, sauvegarde_immediate(donnees))
+
+
+def importer_dossier(donnees, fichier, utilisateur):
+    from django.db.migrations.loader import MigrationLoader
+    from apps.core import dossiers_simulation as ds
+
+    return ds.importer(racine_dossiers(donnees), fichier, utilisateur, MigrationLoader(None).disk_migrations)
+
+
+def importer_ancienne_simulation(donnees, utilisateur):
+    from apps.core import dossiers_simulation as ds
+
+    racine = racine_dossiers(donnees)
+    ancienne = racine / "simulation.sqlite3"
+    ds.verifier_base(ancienne)
+    identifiant, dossier = ds.creer(racine, "ancienne", "")
+    try:
+        ds.copier_base(ancienne, dossier / ds.BASE)
+        ds.nettoyer_copie(dossier / ds.BASE, utilisateur)
+        ds.terminer(dossier)
+    except BaseException:
+        shutil.rmtree(dossier)
+        raise
+    return identifiant
 
 
 def preparer_sqlserver(donnees):
@@ -601,6 +689,7 @@ def enregistrer_actions(donnees, port):
     from apps.core import poste
 
     def etat():
+        from apps.core import dossiers_simulation as ds
         base = base_sqlite()
         return {
             "edition": edition(), "port": port, "donnees": str(donnees), "base": str(base or "SQL Server"),
@@ -614,7 +703,13 @@ def enregistrer_actions(donnees, port):
             "sauvegardes": [{"nom": f.name, "taille": f.stat().st_size,
                              "date": datetime.datetime.fromtimestamp(f.stat().st_mtime)} for f in reversed(sauvegardes(donnees))][:30],
             "restauration_prevue": restauration_prevue(donnees),
-            "simulation": etat_simulation(donnees, port), "mois_courant": f"{datetime.date.today():%Y}-01"}
+            "simulation": {"etat": "absente"},
+            "simulations": ds.lister(racine_dossiers(donnees)),
+            "simulation_active": ds.identifiant_actif(racine_dossiers(donnees)),
+            "ancienne_simulation": (racine_dossiers(donnees) / "simulation.sqlite3").is_file(),
+            "erreur_dossier": ((racine_dossiers(donnees) / "dossier-erreur.txt").read_text(encoding="utf-8")
+                                if (racine_dossiers(donnees) / "dossier-erreur.txt").exists() else ""),
+            "mois_courant": f"{datetime.date.today():%Y}-01"}
 
     def sauvegarder_maintenant():
         resultat = sauvegarde_immediate(donnees)()
@@ -625,7 +720,11 @@ def enregistrer_actions(donnees, port):
         etat=etat, sauvegarder=sauvegarder_maintenant,
         restaurer_au_demarrage=lambda nom: prevoir_restauration(donnees, nom),
         simulation_creer=lambda debut, duree: creer_simulation(donnees, port, debut, duree),
-        simulation_supprimer=lambda: supprimer_simulation(donnees),
+        simulation_supprimer=lambda identifiant="": supprimer_simulation(donnees, identifiant),
+        dossier_exporter=lambda identifiant: __import__("apps.core.dossiers_simulation", fromlist=["exporter"]).exporter(racine_dossiers(donnees), identifiant),
+        dossier_importer=lambda fichier, utilisateur: importer_dossier(donnees, fichier, utilisateur),
+        dossier_ouvrir=lambda identifiant, utilisateur: ouvrir_dossier(donnees, identifiant, utilisateur),
+        dossier_ancienne=lambda utilisateur: importer_ancienne_simulation(donnees, utilisateur),
         demarrage_auto_basculer=demarrage_automatique,
         configurer=lambda valeurs: modifier_configuration(donnees, valeurs),
         planification=lambda: PLANIFICATEUR["objet"].resume() if PLANIFICATEUR["objet"] else {},
@@ -671,6 +770,33 @@ def main(argv):
 
         execute_from_command_line(["manage.py", *argv[1:]])
         return 0
+    if action == "simulation-dossier":
+        # Travail de génération uniquement : aucun serveur ni navigateur secondaire.
+        os.environ.update(DB_ENGINE="sqlite", ERP_LICENCE="0", ERP_ASSISTANT="0", CONTROLE_HEURE_DEPART="0")
+        donnees = preparer_environnement(base="simulation.sqlite3")
+        from apps.core import dossiers_simulation as ds
+        if donnees.parent.name != "dossiers-simulation" or not re.fullmatch(r"[a-f0-9]{32}", donnees.name):
+            raise ValueError("La génération exige un dossier fictif créé par l'administration.")
+        import django
+        django.setup()
+        from django.core.management import call_command
+        from apps.core.models import Societe
+        with ds.verrou_generation(donnees):
+            try:
+                call_command("migrate", interactive=False, verbosity=0)
+                debut, duree = argv[1:3]
+                periode = ["--jusqu-au", "aujourdhui"] if duree == "aujourdhui" else ["--nombre-mois", duree]
+                rapide = (["--jours", "1", "--vehicules", "2", "--salaries", "2", "--echelle", "0.005"]
+                          if "--essai-rapide" in argv and not getattr(sys, "frozen", False) else [])
+                call_command("simulation", "--mois", debut, *periode, *rapide,
+                             "--rapport", str(donnees / "BILAN-SIMULATION.md"))
+                initialiser(edition_, donnees, demander_compte=False)
+                Societe.objects.update(assistant_termine=True)
+                ds.terminer(donnees)
+                return 0
+            except Exception as exc:
+                ds.terminer(donnees, str(exc))
+                raise
     if action == "simulation":
         os.environ["CONTROLE_HEURE_DEPART"] = "0"
         os.environ["MIROIR_DB_ENGINE"] = ""                     # jamais de copie miroir d'un dossier fictif
@@ -731,7 +857,10 @@ def main(argv):
     if not controler_base(donnees):
         return 1
     os.environ.setdefault("ERP_ASSISTANT", "1")                   # premier démarrage : assistant dans le navigateur
-    os.environ["ERP_LICENCE"] = "1"                               # toujours actif dans le programme compilé :
+    os.environ["ERP_LICENCE"] = "0" if os.environ.get("ERP_DOSSIER_SIMULATION") else "1"
+    # Comme l'ancien serveur de simulation, un dossier fictif identifié est en démonstration.
+    # Le choix résulte du catalogue local vérifié, pas d'une variable de désactivation de licence.
+    # Dossier de la société : contrôle toujours actif :
     #   ni configuration.env ni une variable d'environnement ne peuvent désactiver le contrôle de licence.
     import django
 
@@ -755,9 +884,6 @@ def main(argv):
     enregistrer_actions(donnees, port)
     reseau = action != "local" and os.environ.get("ERP_RESEAU", "1") != "0"
     resume = [f"Données : {donnees}"] + demarrer_taches(donnees)
-    simulation = demarrer_simulation(donnees, port)
-    if simulation:
-        resume.append(simulation)
     servir(port, reseau=reseau, resume=resume)
     return 0
 

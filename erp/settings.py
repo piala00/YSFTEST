@@ -107,6 +107,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.core.context_processors.societe",
+                "apps.core.context_dossier.dossier",
                 "apps.licences.context_processors.licence",
             ],
         },
@@ -190,6 +191,8 @@ elif _miroir == "sqlite":
 # Relais Internet des échanges entre sites (à activer seulement sur le serveur en ligne qui sert de boîte aux lettres)
 # Programme compilé : assistant de premier démarrage (compte administrateur créé depuis le navigateur)
 ERP_ASSISTANT = env_bool("ERP_ASSISTANT", False)
+ERP_DOSSIER_SIMULATION = env("ERP_DOSSIER_SIMULATION", "")
+SESSION_COOKIE_NAME = env("ERP_SESSION_COOKIE", "sessionid")
 # Programme compilé : licence contrôlée (essai, échéance, lecture seule, nombre de postes)
 ERP_LICENCE = env_bool("ERP_LICENCE", False)
 RELAIS_ACTIF = env_bool("RELAIS_ACTIF", False)

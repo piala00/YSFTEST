@@ -192,25 +192,52 @@ def administration_poste(request):
             elif action == "simulation_supprimer":
                 if request.POST.get("confirmation") != "SUPPRIMER":
                     raise ValueError("tapez SUPPRIMER pour confirmer")
-                poste.appeler("simulation_supprimer")
+                if request.POST.get("dossier"):
+                    poste.appeler("simulation_supprimer", request.POST["dossier"])
+                else:
+                    poste.appeler("simulation_supprimer")
                 messages.success(request, "Simulation supprimée (seul le dossier fictif est effacé).")
+            elif action == "dossier_exporter":
+                from django.http import FileResponse
+
+                fichier = poste.appeler("dossier_exporter", request.POST.get("dossier", ""))
+                return FileResponse(fichier, as_attachment=True, filename="ERP-SIMULATION.erpsim",
+                                    content_type="application/zip")
+            elif action == "dossier_importer":
+                from .dossiers_simulation import MAX_ARCHIVE
+
+                fichier = request.FILES.get("fichier")
+                if fichier is None or fichier.size > MAX_ARCHIVE:
+                    raise ValueError("choisissez un dossier de simulation .erpsim (512 Mo maximum)")
+                poste.appeler("dossier_importer", fichier, (request.user.username, request.user.password))
+                messages.success(request, "Dossier fictif importé séparément. Vous pourrez l'ouvrir dans ce logiciel avec vos identifiants administrateur.")
+            elif action == "dossier_ancienne":
+                poste.appeler("dossier_ancienne", (request.user.username, request.user.password))
+                messages.success(request, "Ancienne simulation reprise dans un dossier importable ; le fichier d'origine est conservé.")
+            elif action in ("dossier_ouvrir", "dossier_revenir"):
+                if not poste.local(request) or request.POST.get("confirmation") != "OUVRIR":
+                    raise ValueError("sur le serveur, terminez les saisies de tous les postes et tapez OUVRIR")
+                identifiant = request.POST.get("dossier", "") if action == "dossier_ouvrir" else ""
+                if action == "dossier_ouvrir" and not identifiant:
+                    raise ValueError("choisissez le dossier fictif à ouvrir")
+                poste.appeler("dossier_ouvrir", identifiant, (request.user.username, request.user.password))
+                poste.appeler("redemarrer")
+                return render(request, "core/redemarrage.html", {"titre": "Ouverture du dossier"})
             elif action == "demarrage_auto":
                 messages.success(request, poste.appeler("demarrage_auto_basculer"))
         except (ValueError, RuntimeError, OSError) as exc:
             messages.error(request, f"Impossible : {exc}")
         retour = request.GET.copy()
-        if (action or "").startswith("simulation_"):
+        if (action or "").startswith(("simulation_", "dossier_")):
             retour["onglet"] = "simulation"
         return redirect(request.path + ("?" + retour.urlencode() if retour else ""))
     etat = poste.appeler("etat")
-    hote = request.get_host().rsplit(":", 1)[0] if not request.get_host().endswith("]") else request.get_host()
     simulation = etat.get("simulation") or {}
-    if simulation.get("port"):
-        simulation["url"] = f"{request.scheme}://{hote}:{simulation['port']}/"
     from apps.licences.licence import etat as etat_licence
 
     return render(request, "core/poste.html", {"titre": "Administration du poste", "etat": etat, "simulation": simulation,
                                                "onglet_poste": onglet,
+                                               "preparation_simulation": any(d.get("etat") == "preparation" for d in etat.get("simulations", [])),
                                                "licence_etat": etat_licence(), "pro_ok": pro_ok, "pro_message": pro_message})
 
 

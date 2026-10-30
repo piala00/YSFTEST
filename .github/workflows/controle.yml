@@ -87,6 +87,8 @@ jobs:
       - run: python manage.py collectstatic --noinput -v0
       - name: Vérifier le stockage protégé (DPAPI Windows réelle)
         run: python -m unittest apps.licences.tests_stockage -v
+      - name: Vérifier les dossiers portables et leurs protections sous Windows
+        run: python -m unittest apps.core.tests_dossiers_simulation -v
       - name: Compiler le code de l'ERP en natif (protection contre le décorticage)
         run: python deploy/executable/compiler_natif.py . --supprimer-sources
       - name: Vérifier qu'il ne reste aucun code source de l'ERP
