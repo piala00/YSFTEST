@@ -32,8 +32,8 @@ def licence(request):
         try:
             if action == "installation":
                 d = l.enregistrer_cle_installation(request.POST.get("cle", ""))
-                journal.enregistrer("LICENCE", libelle=f"Clé d'installation {d['numero']} — {d['societe']}")
-                messages.success(request, f"Clé d'installation {d['numero']} enregistrée pour {d['societe']}.")
+                journal.enregistrer("LICENCE", libelle=f"Installation enregistrée — {d['societe']}")
+                messages.success(request, f"Clé d'installation enregistrée pour {d['societe']}.")
             elif action == "activation":
                 _, donnees = l.activer(request.POST.get("cle", ""), request.user)
                 journal.enregistrer("LICENCE", libelle=f"{donnees.get('numero', '')} — {donnees.get('client', '')}")
@@ -42,6 +42,11 @@ def licence(request):
                 fichier = request.FILES.get("fichier")
                 if fichier is None or fichier.size > 64 * 1024:
                     raise l.LicenceInvalide("choisissez le fichier de licence (.erplic) envoyé par l'éditeur")
+                publique = request.FILES.get("verification")
+                if publique is not None:
+                    if publique.size > 8192:
+                        raise l.LicenceInvalide("fichier de vérification trop volumineux")
+                    l.verifier_fichier_public(publique.read())
                 _, donnees = l.deposer(fichier.read(), request.user)
                 journal.enregistrer("LICENCE", libelle=f"{donnees.get('numero', '')} — {donnees.get('client', '')}")
                 messages.success(request, f"Licence {donnees.get('numero', '')} installée pour {donnees.get('client', '')}.")

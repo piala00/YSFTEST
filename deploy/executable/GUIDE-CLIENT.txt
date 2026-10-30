@@ -1,0 +1,17 @@
+ERP OHADA — GUIDE DU POSTE CLIENT
+
+Le programme est installé dans Program Files\ERP-OHADA\<Édition>.
+Les données de la société sont conservées séparément dans ProgramData\ERP-OHADA\<Édition>.
+Remplacer le programme ne doit pas effacer les données.
+
+Licence : Administration du poste > Licence. Sélectionnez le fichier .erplic
+remis pour ce serveur. Le fichier public de vérification peut être sélectionné
+depuis le même dossier ; il doit correspondre à l'éditeur intégré au programme.
+Aucune copie manuelle dans les dossiers Windows n'est nécessaire.
+Le coffre privé de l'éditeur ne doit jamais être remis au client.
+Une référence d'installation ne remplace pas une licence signée pour la machine.
+
+Conservez vos sauvegardes dans un emplacement séparé et vérifiez leur restauration
+sur un poste d'essai. Une mise à jour ne remplace pas une sauvegarde.
+Avant une opération d'administration qui demande un redémarrage, terminez les
+saisies des utilisateurs et consultez les messages affichés par le logiciel.

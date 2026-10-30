@@ -484,6 +484,6 @@ class IdentiteBinaireTests(TestCase):
             Path(dossier, "parametres.dat").write_bytes(b"ERPID\x01" + publique)
             with mock.patch.object(sys, "frozen", True, create=True), mock.patch.object(sys, "executable", str(Path(dossier, "ERP.exe"))):
                 with mock.patch.object(cle_editeur, "CLES", []):
-                    self.assertEqual(l.cles_publiques(), [base64.b64encode(publique).decode()])
+                    self.assertEqual(l.cles_publiques(), [])  # le fichier remplaçable ne crée aucune autorité
                 with mock.patch.object(cle_editeur, "CLES", ["identite-integree"]):
                     self.assertEqual(l.cles_publiques(), ["identite-integree"])
