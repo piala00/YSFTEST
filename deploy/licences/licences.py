@@ -54,30 +54,72 @@ def mot_de_passe(confirmer=False):
             print("Différents, recommencez.")
 
 
-def creer_cles(dossier):
+def creer_cles(dossier, noms_neutres=False, mdp=None):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
     dossier = Path(dossier)
     dossier.mkdir(parents=True, exist_ok=True)
-    privee, publique = dossier / "cle-privee.pem", dossier / "cle-publique.txt"
+    privee = dossier / ("coffre.dat" if noms_neutres else "cle-privee.pem")
+    publique = dossier / ("parametres.dat" if noms_neutres else "cle-publique.txt")
+    if any((dossier / nom).exists() for nom in ("coffre.dat", "cle-privee.pem", "parametres.dat", "cle-publique.txt")):
+        raise SystemExit("Ce dossier contient déjà une identité : ouvrez son coffre, ne recréez pas les clés.")
     if privee.exists():
         raise SystemExit(f"{privee} existe déjà : jamais remplacée (les licences déjà émises en dépendent).")
     cle = Ed25519PrivateKey.generate()
-    privee.write_bytes(cle.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                         serialization.BestAvailableEncryption(mot_de_passe(confirmer=True))))
+    privee.write_bytes(cle.private_bytes(serialization.Encoding.DER if noms_neutres else serialization.Encoding.PEM,
+                                         serialization.PrivateFormat.PKCS8,
+                                         serialization.BestAvailableEncryption(mdp or mot_de_passe(confirmer=True))))
     brut = cle.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-    publique.write_text(base64.b64encode(brut).decode() + "\n", encoding="utf-8")
-    print(f"Clé privée : {privee}  (secrète ; copie de secours hors ligne)")
-    print(f"Clé publique : {publique}  -> envoyez cette ligne à l'éditeur (gravée dans apps/licences/cle_editeur.py) :")
-    print("  " + publique.read_text().strip())
+    if noms_neutres:
+        publique.write_bytes(b"ERPID\x01" + brut)
+    else:
+        publique.write_text(base64.b64encode(brut).decode() + "\n", encoding="utf-8")
+    print(f"Coffre éditeur : {privee}  (secret ; copie de secours hors ligne)")
+    print(f"Identité publique : {publique}  (à fournir au logiciel, jamais le coffre)")
+    if not noms_neutres:
+        print("  " + publique.read_text().strip())
+
+
+def chemin_coffre(dossier):
+    dossier = Path(dossier)
+    for nom in ("coffre.dat", "cle-privee.pem"):
+        if (dossier / nom).is_file():
+            return dossier / nom
+    return dossier / "coffre.dat"
+
+
+class CoffreSession:
+    """Clé déverrouillée en mémoire ; aucun mot de passe dans les préférences."""
+    def __init__(self):
+        self.verrouiller()
+
+    def verrouiller(self):
+        self.cle = None
+        self.identite = None
+
+    def ouvrir(self, chemin, demander):
+        import hashlib
+
+        chemin = Path(chemin)
+        identite = (str(chemin.resolve()), hashlib.sha256(chemin.read_bytes()).digest())
+        if self.identite != identite:
+            self.verrouiller()
+            mdp = demander()
+            if not mdp:
+                return None
+            cle = charger_cle(chemin, mdp.encode() if isinstance(mdp, str) else mdp)
+            self.cle, self.identite = cle, identite
+        return self.cle
 
 
 def charger_cle(chemin, mdp=None):
     from cryptography.hazmat.primitives import serialization
 
     try:
-        return serialization.load_pem_private_key(Path(chemin).read_bytes(), password=mdp or mot_de_passe())
+        brut = Path(chemin).read_bytes()
+        lire = serialization.load_pem_private_key if brut.startswith(b"-----BEGIN") else serialization.load_der_private_key
+        return lire(brut, password=mdp or mot_de_passe())
     except (ValueError, TypeError):
         raise SystemExit("Mot de passe incorrect ou fichier de clé illisible.")
 
@@ -132,7 +174,7 @@ def nom_propre(texte, longueur=40):
     return re.sub(r"[^A-Za-z0-9]+", "-", texte).strip("-")[:longueur]
 
 
-def emettre_installation(a, mdp=None):
+def emettre_installation(a, mdp=None, cle_deverrouillee=None):
     """Clé d'installation pour une société (avant l'installation du logiciel)."""
     if a.edition not in EDITIONS:
         raise SystemExit(f"Édition : {', '.join(EDITIONS)}.")
@@ -141,9 +183,12 @@ def emettre_installation(a, mdp=None):
     cle_chemin = Path(a.cle)
     registre = cle_chemin.with_name("registre-installations.csv")
     numero = prochain_numero(registre, "INS")
-    texte = fc.installation_creer(charger_cle(cle_chemin, mdp), numero, a.client.strip(), a.edition)
+    cle = cle_deverrouillee or charger_cle(cle_chemin, mdp)
+    texte = (fc.installation_courte_creer() if getattr(a, "courte", False)
+             else fc.installation_creer(cle, numero, a.client.strip(), a.edition))
     sortie = Path(a.sortie or cle_chemin.parent) / f"CLE-INSTALLATION-{numero}-{nom_propre(a.client)}.txt"
     sortie.parent.mkdir(parents=True, exist_ok=True)
+    ecrire_identite(cle, sortie.parent)
     sortie.write_text(f"Clé d'installation {numero} — {a.client.strip()} — édition {a.edition}\r\n\r\n{texte}\r\n",
                       encoding="utf-8")
     ajouter_registre(registre, {"numero": numero, "client": a.client.strip(), "edition": a.edition,
@@ -158,7 +203,7 @@ def lire_demande(chemin, cle_privee=None):
         demande = fc.demande_lire(Path(chemin).read_bytes())
     except (OSError, fc.CleInvalide) as exc:
         raise SystemExit(f"Demande illisible : {exc}")
-    if cle_privee is not None and demande.get("cle_installation"):
+    if cle_privee is not None and demande.get("cle_installation") and not fc.est_installation_courte(demande["cle_installation"]):
         from cryptography.exceptions import InvalidSignature
 
         try:
@@ -169,11 +214,11 @@ def lire_demande(chemin, cle_privee=None):
     return demande
 
 
-def emettre(a, mdp=None):
+def emettre(a, mdp=None, cle_deverrouillee=None):
     """Émet la licence : fichier .erplic, et la clé d'activation quand la licence part d'une demande.
     a.fichier : chemin exact du fichier ; sinon a.sortie (dossier) ou, à défaut, le dossier de la clé privée."""
     cle_chemin = Path(a.cle)
-    cle_privee = charger_cle(cle_chemin, mdp)
+    cle_privee = cle_deverrouillee or charger_cle(cle_chemin, mdp)
     if getattr(a, "demande", None):
         demande = lire_demande(a.demande, cle_privee)
         edition = a.edition or demande.get("edition") or "transport"
@@ -212,6 +257,7 @@ def emettre(a, mdp=None):
     else:
         sortie = Path(a.sortie or cle_chemin.parent) / nom_fichier(donnees["numero"], donnees["client"])
     sortie.parent.mkdir(parents=True, exist_ok=True)
+    ecrire_identite(cle_privee, sortie.parent)
     sortie.write_text(fc.licence_texte(donnees, signature), encoding="utf-8")
     activation = fc.activation_creer(conditions, signature) if getattr(a, "demande", None) else ""
     if activation:
@@ -227,8 +273,31 @@ def emettre(a, mdp=None):
           f" · {a.postes} postes · {'définitive' if jusqu_au is None else 'jusqu au ' + jusqu_au}")
     if activation:
         print(f"Clé d'activation :\n{activation}")
+    notice = sortie.with_name(sortie.stem + "-LIRE-MOI.txt")
+    notice.write_text(
+        f"ERP OHADA — dossier client\nSociété : {donnees['client']}\nServeur : {donnees['machine_nom']}\n"
+        f"Licence : {donnees['numero']} — {edition} — {a.postes} postes\n"
+        f"Code d'installation : {demande.get('cle_installation') or 'non fourni (ancien parcours)'}\n\n"
+        f"ACTIVER : dans l'ERP, ouvrir Licence puis Installer le fichier et choisir {sortie.name}.\n"
+        "Ce fichier suffit. Il n'est pas nécessaire de saisir aussi une clé d'activation.\n"
+        "Si le logiciel ne connaît pas encore votre éditeur : copier parametres.dat à côté de l'exécutable\n"
+        "du serveur, puis redémarrer. Une identité déjà intégrée au programme reste prioritaire.\n"
+        "Ne jamais copier le coffre de l'éditeur dans l'installation client.\n\n"
+        + (f"Activation alternative (facultative) :\n{activation}\n" if activation else ""), encoding="utf-8")
     a.activation = activation
     return sortie
+
+
+def ecrire_identite(cle, dossier):
+    from cryptography.hazmat.primitives import serialization
+
+    Path(dossier).mkdir(parents=True, exist_ok=True)
+    chemin = Path(dossier) / "parametres.dat"
+    brut = b"ERPID\x01" + cle.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    if chemin.exists() and chemin.read_bytes() != brut:
+        raise SystemExit("Ce dossier contient l'identité d'un autre éditeur : choisissez un autre dossier.")
+    chemin.write_bytes(brut)
+    return chemin
 
 
 def nom_fichier(numero, client):
@@ -258,7 +327,9 @@ def verifier(fichier, publique):
     lignes = [l.strip() for l in Path(fichier).read_text(encoding="utf-8").splitlines() if l.strip()]
     donnees = json.loads(base64.b64decode(lignes[1]))
     try:
-        Ed25519PublicKey.from_public_bytes(base64.b64decode(Path(publique).read_text().strip())).verify(
+        brut = Path(publique).read_bytes()
+        brut = brut[6:] if len(brut) == 38 and brut.startswith(b"ERPID\x01") else base64.b64decode(brut.strip())
+        Ed25519PublicKey.from_public_bytes(brut).verify(
             base64.b64decode(lignes[2]), canonique(donnees))
     except (InvalidSignature, ValueError):
         raise SystemExit("Signature INCORRECTE.")
@@ -303,8 +374,26 @@ def interface(essai=False):
     from tkinter import filedialog, messagebox, simpledialog, ttk
 
     fen = tk.Tk()
-    fen.title("ERP OHADA — Licences (propriétaire)")
-    fen.geometry("820x720")
+    fen.title("ERP OHADA — Licences simplifiées 2.0 (propriétaire)")
+    fen.geometry("960x760")
+    session = CoffreSession()
+
+    def verrouiller():
+        session.verrouiller()
+
+    def fermer():
+        verrouiller()
+        fen.destroy()
+
+    fen.protocol("WM_DELETE_WINDOW", fermer)
+
+    def ouvrir_coffre(dossier):
+        try:
+            return session.ouvrir(chemin_coffre(dossier), lambda: simpledialog.askstring(
+                "Déverrouiller le coffre", "Mot de passe (une fois pour cette session) :", show="*", parent=fen))
+        except (OSError, SystemExit) as exc:
+            messagebox.showerror("Licences", str(exc))
+            return None
     v = {nom: tk.StringVar(value=val) for nom, val in {
         "dossier": preferences().get("cles", str(Path.home() / "ERP-OHADA-Licences")),
         "licences": preferences().get("licences", str(bureau() / "Licences ERP")),
@@ -327,7 +416,8 @@ def interface(essai=False):
     ttk.Entry(zone, textvariable=v["dossier"]).pack(side="left", fill="x", expand=True)
     ttk.Button(zone, text="Parcourir…", command=lambda: v["dossier"].set(
         filedialog.askdirectory(initialdir=v["dossier"].get()) or v["dossier"].get()) or rafraichir()).pack(side="left", padx=4)
-    ligne(0, "Dossier de vos clés", zone)
+    ttk.Button(zone, text="Verrouiller", command=verrouiller).pack(side="left", padx=4)
+    ligne(0, "Coffre de l'éditeur (à garder ici)", zone)
 
     # Société : liste des clients déjà servis, ou nouvelle société
     choix_client = ligne(1, "Société (client)", ttk.Combobox(cadre, textvariable=v["client"]))
@@ -342,7 +432,7 @@ def interface(essai=False):
     ligne(7, "Demande de licence (.erpdem)", zone_demande)
     serveur = ttk.Label(cadre, text="", foreground="#555")
     serveur.grid(row=12, column=1, sticky="w")
-    ligne(11, "Sans demande : code d'activation", ttk.Entry(cadre, textvariable=v["code"]))
+    ligne(11, "Ancienne méthode : identifiant du serveur", ttk.Entry(cadre, textvariable=v["code"]))
     def echeance(mois):
         v["duree"].set("abonnement")
         v["jusqu_au"].set(dans_mois(mois))
@@ -414,19 +504,19 @@ def interface(essai=False):
 
     def installation():
         dossier = Path(v["dossier"].get())
-        if not (dossier / "cle-privee.pem").exists():
+        if not chemin_coffre(dossier).exists():
             messagebox.showerror("Licences", "Aucune clé privée dans ce dossier : créez d'abord la paire de clés.")
             return
         if not v["client"].get().strip():
             messagebox.showerror("Licences", "Saisissez la société (client).")
             return
-        mdp = simpledialog.askstring("Licences", "Mot de passe de la clé privée :", show="*", parent=fen)
-        if not mdp:
+        cle = ouvrir_coffre(dossier)
+        if cle is None:
             return
-        a = argparse.Namespace(cle=str(dossier / "cle-privee.pem"), client=v["client"].get(), edition=v["edition"].get(),
-                               sortie=v["licences"].get())
+        a = argparse.Namespace(cle=str(chemin_coffre(dossier)), client=v["client"].get(), edition=v["edition"].get(),
+                               sortie=v["licences"].get(), courte=True)
         try:
-            numero, texte, _ = emettre_installation(a, mdp.encode())
+            numero, texte, _ = emettre_installation(a, cle_deverrouillee=cle)
         except SystemExit as exc:
             messagebox.showerror("Licences", str(exc))
             return
@@ -435,7 +525,7 @@ def interface(essai=False):
 
     def generer():
         dossier = Path(v["dossier"].get())
-        if not (dossier / "cle-privee.pem").exists():
+        if not chemin_coffre(dossier).exists():
             messagebox.showerror("Licences", "Aucune clé privée dans ce dossier : créez d'abord la paire de clés.")
             return
         if not v["client"].get().strip():
@@ -443,44 +533,40 @@ def interface(essai=False):
             return
         numero = prochain_numero(dossier / "registre-licences.csv")
         fichier = Path(v["licences"].get()) / nom_fichier(numero, v["client"].get())
-        mdp = simpledialog.askstring("Licences", "Mot de passe de la clé privée :", show="*", parent=fen)
-        if not mdp:
+        cle = ouvrir_coffre(dossier)
+        if cle is None:
             return
         a = argparse.Namespace(
-            cle=str(dossier / "cle-privee.pem"), client=v["client"].get(), niu=v["niu"].get(), edition=v["edition"].get(),
+            cle=str(chemin_coffre(dossier)), client=v["client"].get(), niu=v["niu"].get(), edition=v["edition"].get(),
             role=v["role"].get(), site=v["site"].get(), code=v["code"].get(), definitive=v["duree"].get() == "definitive",
             jusqu_au=v["jusqu_au"].get(), maj_jusqu_au=v["maj"].get(), sortie=None, fichier=fichier,
             demande=v["demande"].get() or None)
         try:
             a.postes = int(v["postes"].get())
-            sortie = emettre(a, mdp.encode())
+            sortie = emettre(a, cle_deverrouillee=cle)
         except (SystemExit, ValueError) as exc:
             messagebox.showerror("Licences", str(exc) or "Valeur incorrecte.")
             return
         retenir(cles=str(dossier), licences=str(Path(sortie).parent))
         rafraichir()
-        if a.activation:
-            montrer_cle("Clé d'activation", a.activation)
         if messagebox.askyesno("Licences", f"Licence enregistrée :\n{sortie}\n\nEnvoyez ce fichier au client.\n\n"
                                            "Ouvrir le dossier maintenant ?"):
             ouvrir_dossier(Path(sortie).parent)
 
     def creer():
         dossier = Path(v["dossier"].get())
-        if (dossier / "cle-privee.pem").exists():
+        if chemin_coffre(dossier).exists():
             messagebox.showinfo("Licences", "La paire de clés existe déjà dans ce dossier.")
             return
         mdp = simpledialog.askstring("Licences", "Mot de passe de la nouvelle clé (10 caractères ou plus) :", show="*", parent=fen)
         if not mdp or len(mdp) < 10 or mdp != simpledialog.askstring("Licences", "Confirmez :", show="*", parent=fen):
             messagebox.showerror("Licences", "Mot de passe absent, trop court ou différent.")
             return
-        os.environ["ERP_LICENCES_MDP"] = mdp
-        try:
-            creer_cles(dossier)
-        finally:
-            os.environ.pop("ERP_LICENCES_MDP", None)
-        messagebox.showinfo("Licences", f"Clés créées dans {dossier}.\nEnvoyez le contenu de cle-publique.txt à Claude ;\n"
-                                        "gardez une copie du dossier sur une clé USB au coffre.")
+        creer_cles(dossier, noms_neutres=True, mdp=mdp.encode())
+        session.ouvrir(chemin_coffre(dossier), lambda: mdp)
+        messagebox.showinfo("Licences", f"Coffre créé et déverrouillé dans {dossier}.\n"
+                                        "Gardez une copie de secours ; ne le copiez jamais chez le client.\n"
+                                        "parametres.dat contient seulement l'identité publique du logiciel.")
 
     zone_licences = ttk.Frame(cadre)
     ttk.Entry(zone_licences, textvariable=v["licences"]).pack(side="left", fill="x", expand=True)
@@ -492,9 +578,19 @@ def interface(essai=False):
     zone_licences.grid(row=10, column=1, sticky="ew", pady=(10, 3))
     boutons = ttk.Frame(cadre)
     boutons.grid(row=14, column=0, columnspan=2, sticky="e", pady=(10, 0))
-    ttk.Button(boutons, text="Créer la paire de clés", command=creer).pack(side="left", padx=4)
+    ttk.Button(boutons, text="Créer mon coffre (une seule fois)", command=creer).pack(side="left", padx=4)
     ttk.Button(boutons, text="Clé d'installation", command=installation).pack(side="left", padx=4)
-    ttk.Button(boutons, text="Générer la licence et la clé d'activation", command=generer).pack(side="left", padx=4)
+    ttk.Button(boutons, text="Générer le dossier client", command=generer).pack(side="left", padx=4)
+    avancees = tk.BooleanVar(value=False)
+    champs_avances = [w for w in cadre.winfo_children() if w.grid_info().get("row") in (2, 4, 5, 9, 11)]
+
+    def options_avancees():
+        for widget in champs_avances:
+            widget.grid() if avancees.get() else widget.grid_remove()
+
+    ttk.Checkbutton(cadre, text="Options avancées (NIU, rôle, site, mises à jour, ancien identifiant)",
+                    variable=avancees, command=options_avancees).grid(row=15, column=0, columnspan=2, sticky="w", pady=6)
+    options_avancees()
     rafraichir()
     if essai:                                                     # contrôle automatique : la fenêtre se construit
         fen.update()
@@ -535,7 +631,7 @@ def menu():
             jusqu_au = question("Valable jusqu'au (AAAA-MM-JJ)", dans_mois(12)) if "-" not in duree else duree
         a = argparse.Namespace(
             cle=str(dossier / "cle-privee.pem"), demande=question("Fichier de la demande (.erpdem)"), client=None, niu=None,
-            edition=None, role=None, site=None, code=None, postes=int(question("Postes", "5")), definitive=duree == "D",
+            edition=None, role=None, site=None, code=None, postes=int(question("Postes", "5")), definitive=duree in ("D", "P"),
             jusqu_au=jusqu_au, maj_jusqu_au=jusqu_au or dans_mois(12), sortie=sortie, fichier=None)
         emettre(a)
     input("\nEntrée pour fermer…")
@@ -552,10 +648,12 @@ def main(argv):
     s = p.add_subparsers(dest="commande", required=True)
     c = s.add_parser("cles")
     c.add_argument("--dossier", required=True)
+    c.add_argument("--noms-neutres", action="store_true", help="coffre.dat et parametres.dat (binaire)")
     i = s.add_parser("installation")
     for nom in ("--cle", "--client", "--edition"):
         i.add_argument(nom, required=True)
     i.add_argument("--sortie")
+    i.add_argument("--courte", action="store_true", help="référence de quatre groupes de six caractères")
     e = s.add_parser("emettre")
     e.add_argument("--cle", required=True)
     e.add_argument("--demande", help="demande de licence (.erpdem) envoyée par le client")
@@ -580,7 +678,7 @@ def main(argv):
     v.add_argument("--publique", required=True)
     a = p.parse_args(argv)
     if a.commande == "cles":
-        creer_cles(a.dossier)
+        creer_cles(a.dossier, noms_neutres=a.noms_neutres)
     elif a.commande == "installation":
         emettre_installation(a)
     elif a.commande == "emettre":
@@ -592,3 +690,4 @@ def main(argv):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
+

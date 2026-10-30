@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import json
 import os
+import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -47,6 +48,16 @@ def cles_publiques():
         gravees = []
     if gravees:
         return gravees
+    # Repli quand aucune identité n'est intégrée : fichier binaire public, jamais le coffre privé.
+    dossiers = [Path(__file__).parent]
+    if getattr(sys, "frozen", False):
+        dossiers.append(Path(sys.executable).parent)
+    for dossier_identite in dict.fromkeys(dossiers):
+        fichier = dossier_identite / "parametres.dat"
+        if fichier.is_file():
+            brut = fichier.read_bytes()
+            if len(brut) == 38 and brut.startswith(b"ERPID\x01"):
+                return [base64.b64encode(brut[6:]).decode()]
     cles, dossier = [], Path(__file__).parent        # les deux orthographes du fichier sont acceptées (tiret ou tiret bas)
     for nom in ("cle_publique.txt", "cle-publique.txt"):
         fichier = dossier / nom
@@ -157,6 +168,13 @@ def cle_installation_requise():
 
 def lire_cle_installation(texte):
     """Clé d'installation vérifiée (signature de l'éditeur, édition de ce logiciel) → ses données."""
+    if fc.est_installation_courte(texte):
+        from apps.core.models import Societe
+
+        code = fc.installation_courte_normaliser(texte)
+        # Une référence courte identifie l'essai. Elle ne prouve aucun droit de licence.
+        return {"numero": code, "societe": Societe.get().raison_sociale,
+                "edition": edition_logiciel(), "emise_le": "", "courte": True}
     try:
         donnees, signe, signature = fc.installation_lire(texte)
     except fc.CleInvalide as exc:
@@ -189,7 +207,9 @@ def enregistrer_cle_installation(texte):
 
     donnees = lire_cle_installation(texte)
     memoire(datetime.date.today())                                 # crée la mémoire de l'essai si besoin
-    EtatLicence.objects.update(cle_installation=fc.en_texte(fc.depuis_texte(texte)))
+    normalisee = (fc.installation_courte_normaliser(texte) if donnees.get("courte")
+                  else fc.en_texte(fc.depuis_texte(texte)))
+    EtatLicence.objects.update(cle_installation=normalisee)
     societe = Societe.get()
     if fc.nom_simple(societe.raison_sociale) != fc.nom_simple(donnees["societe"]):
         Societe.objects.filter(pk=societe.pk).update(raison_sociale=donnees["societe"][:150])
@@ -236,7 +256,17 @@ def controler(contenu):
         raise LicenceInvalide("licence faite pour un autre serveur : envoyez le code d'activation de celui-ci")
     if Societe.get().activite not in EDITIONS.get(donnees.get("edition", ""), set()):
         raise LicenceInvalide(f"licence de l'édition « {donnees.get('edition')} » : ne couvre pas ce logiciel")
+    if donnees.get("version") == 3:
+        installation = cle_installation()
+        if installation is None or donnees.get("installation") != installation["numero"]:
+            raise LicenceInvalide("ce fichier ne correspond pas au code d'installation de ce serveur")
+        if fc.nom_simple(donnees.get("client", "")) != fc.nom_simple(Societe.get().raison_sociale):
+            raise LicenceInvalide("ce fichier ne correspond pas à la société de ce serveur")
     local = site_local()
+    if donnees.get("version") == 3:
+        role = {"SIEGE": "siege", "AGENCE": "agence"}.get(getattr(local, "role", ""), "seul")
+        if donnees.get("role") != role or donnees.get("site", "") != (local.code if local and role == "agence" else ""):
+            raise LicenceInvalide("ce fichier ne correspond pas au rôle ou au site de ce serveur")
     if donnees.get("site") and local is not None and local.code != donnees["site"]:
         raise LicenceInvalide(f"licence du site {donnees['site']} : ce serveur est {local.code}")
     if not isinstance(donnees.get("postes"), int) or donnees["postes"] < 1:
@@ -520,3 +550,4 @@ def peut_activer_un_compte():
         return False, (f"{e.postes} poste(s) prévus par la {source} "
                        f"et {comptes_actifs()} compte(s) actif(s) : désactivez un compte ou étendez la licence.")
     return True, ""
+

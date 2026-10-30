@@ -33,7 +33,7 @@
     {% else %}
     <p class="small mb-1">Saisissez la clé d'installation remise par l'éditeur{% if not installation_requise %} (facultative dans cette version){% endif %} :</p>
     <form method="post">{% csrf_token %}<input type="hidden" name="action" value="installation">
-      <textarea name="cle" rows="3" class="form-control form-control-sm font-monospace mb-2" required aria-label="Clé d'installation" placeholder="XXXXX-XXXXX-XXXXX-…"></textarea>
+      <textarea name="cle" rows="3" class="form-control form-control-sm font-monospace mb-2" required aria-label="Clé d'installation" placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX"></textarea>
       <button class="btn btn-sm btn-primary">Enregistrer la clé d'installation</button></form>
     {% endif %}
   </div></div>
@@ -52,17 +52,19 @@
   </div></div>
   <div class="col-12"><div class="card card-body">
     <h2 class="h6">3. Activer la licence reçue</h2>
-    <div class="row g-3">
-      <div class="col-lg-7"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="activation">
-        <label class="form-label small mb-1" for="cle-activation">Clé d'activation</label>
-        <textarea id="cle-activation" name="cle" rows="3" class="form-control form-control-sm font-monospace mb-2" required placeholder="XXXXX-XXXXX-XXXXX-…"></textarea>
-        <button class="btn btn-sm btn-primary">Activer avec la clé</button></form></div>
-      <div class="col-lg-5"><form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="fichier">
-        <label class="form-label small mb-1" for="fichier-licence">ou fichier de licence (.erplic)</label>
-        <input id="fichier-licence" type="file" name="fichier" accept=".erplic" class="form-control form-control-sm mb-2" required>
-        <button class="btn btn-sm btn-outline-primary">Installer le fichier</button></form></div>
-    </div>
-    <div class="form-text">La clé et le fichier ne valent que pour ce serveur (identifiant matériel) : un nouveau PC ou Windows réinstallé demande une nouvelle licence.</div>
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="fichier">
+      <label class="form-label small mb-1" for="fichier-licence">Choisissez le fichier de licence reçu (.erplic)</label>
+      <input id="fichier-licence" type="file" name="fichier" accept=".erplic" class="form-control form-control-sm mb-2" required>
+      <button class="btn btn-primary">Installer le fichier de licence</button>
+    </form>
+    <div class="form-text mb-2">Le fichier suffit : aucune deuxième clé n'est nécessaire. Il ne vaut que pour le serveur et l'édition prévus.</div>
+    <details class="mt-2"><summary class="small">Autre méthode : code d'activation (facultatif)</summary>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="activation">
+        <label class="form-label small" for="cle-activation">Code d'activation alternatif</label>
+        <textarea id="cle-activation" name="cle" rows="3" class="form-control form-control-sm font-monospace mb-2" required></textarea>
+        <button class="btn btn-sm btn-outline-primary">Activer avec le code</button>
+      </form>
+    </details>
     {% if not cles %}<div class="alert alert-secondary small py-2 mt-2 mb-0">Cette version ne contient pas encore la clé de vérification de l'éditeur : elle fonctionne en version d'essai.</div>{% endif %}
   </div></div>
   {% if historique %}<div class="col-12"><div class="card">
@@ -73,3 +75,4 @@
     </tbody></table></div></div>{% endif %}
 </div>
 {% endblock %}
+

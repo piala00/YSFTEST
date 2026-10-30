@@ -15,6 +15,7 @@ import base64
 import datetime
 import json
 import re
+import secrets
 import struct
 import unicodedata
 
@@ -71,7 +72,28 @@ def numero_texte(prefixe, entier):
     return f"{prefixe}-{entier // 10000}-{entier % 10000:04d}"
 
 
-# ---------------------------------------------------------------- Clé d'installation
+# ---------------------------------------------------------------- Référence d'installation courte (pas une licence)
+def installation_courte_normaliser(texte):
+    propre = re.sub(r"[\s-]", "", texte or "").upper()
+    if not re.fullmatch(r"[A-Z2-7]{24}", propre):
+        raise CleInvalide("code attendu : quatre groupes de six lettres/chiffres")
+    return "-".join(propre[i:i + 6] for i in range(0, 24, 6))
+
+
+def est_installation_courte(texte):
+    try:
+        installation_courte_normaliser(texte)
+        return True
+    except CleInvalide:
+        return False
+
+
+def installation_courte_creer():
+    # Référence aléatoire de 120 bits ; l'autorisation reste dans le fichier signé.
+    return installation_courte_normaliser(base64.b32encode(secrets.token_bytes(15)).decode())
+
+
+# ---------------------------------------------------------------- Clé d'installation historique signée
 def installation_donnees(numero, societe, edition, emise_le):
     """Partie signée de la clé d'installation (octets)."""
     nom = societe.strip().encode("utf-8")[:120]
@@ -126,7 +148,7 @@ def demande_lire(texte):
 def licence_donnees(demande, conditions):
     """Données signées de la licence : identité tirée de la demande, conditions choisies par l'éditeur.
     conditions : numero, edition, role, postes, emise_le, valable_jusqu_au (None = définitive), maj_jusqu_au."""
-    return {"version": 2, "numero": conditions["numero"], "client": demande["societe"], "niu": demande.get("niu", ""),
+    return {"version": 3 if est_installation_courte(demande.get("cle_installation", "")) else 2, "numero": conditions["numero"], "client": demande["societe"], "niu": demande.get("niu", ""),
             "edition": conditions["edition"], "role": conditions["role"], "site": demande.get("site", ""),
             "postes": conditions["postes"], "machine": demande["materiel"], "machine_nom": demande.get("machine_nom", ""),
             "installation": demande.get("installation", ""), "emise_le": conditions["emise_le"],
@@ -172,3 +194,4 @@ def nom_simple(texte):
     """Pour comparer deux noms de société sans se soucier des accents, majuscules ni ponctuation."""
     sans_accents = unicodedata.normalize("NFKD", texte or "").encode("ascii", "ignore").decode()
     return re.sub(r"[^A-Z0-9]", "", sans_accents.upper())
+
