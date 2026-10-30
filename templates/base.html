@@ -24,6 +24,8 @@
   </script>{% endif %}
 </head>
 <body{% if selection %} class="selection-validee"{% endif %}{% if module and est_accueil %} data-bureau="1"{% endif %}>
+{% if dossier_simulation %}<div class="alert alert-warning py-2 mb-2" role="status"><strong>SIMULATION — données fictives</strong> · dossier distinct de votre société.
+  {% if user.is_superuser %}<a href="{% url 'core:poste' %}?onglet=simulation" target="_top">Changer de dossier ou revenir à la société</a>{% endif %}</div>{% endif %}
 {% if user.is_authenticated %}
   <form id="form-logout" method="post" action="{% url 'logout' %}" class="d-none">{% csrf_token %}</form>
   <header class="topbar d-print-none {% if not module %}topbar-portail{% endif %}">
