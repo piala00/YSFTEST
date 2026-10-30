@@ -291,7 +291,9 @@ def exporter_client(licence, dossier, fichier=None):
     if any(f.is_symlink() or not f.is_file() or f.resolve().parent != dossier for f in fichiers):
         raise SystemExit("Le paquet client contient un fichier absent ou lié à un autre emplacement.")
     donnees = verifier(licence, publique)
-    if donnees.get('numero') in {e['numero'] for e in journal_suppressions(dossier) if e['etat']=='supprimee'}:
+    supprimees={e['numero'] for e in journal_suppressions(dossier) if e['etat']=='supprimee'}
+    supprimees.update(l['numero'] for l in registre_lignes(dossier,inclure_supprimees=True) if l.get('supprimee_le'))
+    if donnees.get('numero') in supprimees:
         raise SystemExit("Cette licence a été supprimée du registre actif ; aucun nouvel export.")
     sortie = Path(fichier) if fichier else dossier / (licence.stem + "-CLIENT.zip")
     if sortie.suffix.lower() != ".zip":

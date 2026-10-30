@@ -177,7 +177,7 @@ class ComplementsLicencesTests(unittest.TestCase):
         self.assertEqual(coffre.read_bytes(),avant)
 
     def test_regroupement_ne_ressuscite_pas_une_licence_supprimee(self):
-        self.supprimer()
+        archive=self.supprimer()
         destination=self.root/'regroupement'
         self.appeler(outil.regrouper_identite,self.root/'coffre.dat',destination,self.mdp)
         self.assertEqual([l['client'] for l in outil.registre_lignes(destination)],['Société Beta'])
@@ -185,6 +185,10 @@ class ComplementsLicencesTests(unittest.TestCase):
         self.assertFalse((destination/self.licences[0].name).exists())
         self.assertEqual(outil.prochain_numero(destination/'registre-licences.csv'),
                          outil.prochain_numero(self.root/'registre-licences.csv'))
+        restauree=destination/self.licences[0].name
+        restauree.write_bytes(archive.read_bytes())
+        with self.assertRaisesRegex(SystemExit,'supprimée'):
+            self.appeler(outil.exporter_client,restauree,destination)
 
     def test_reexport_apres_restauration_manuelle_refuse(self):
         archive=self.supprimer()
