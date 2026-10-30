@@ -89,7 +89,7 @@ def main():
                     page.evaluate("url => { window.erpFenetres.ouvrir(url); }", url + "&mode=correspondance")
                     page.wait_for_function("document.querySelectorAll('.fenetre-mdi').length === 2 && [...document.querySelectorAll('.fenetre-mdi')].every(e=>e.getBoundingClientRect().width === 380)")
                     second = page.locator(".fenetre-mdi iframe").last.element_handle().content_frame()
-                    second.wait_for_selector('[name="depart_correspondance"]', state="visible")
+                    second.wait_for_selector('#id_depart_correspondance-recherche', state="visible")
                     assert cadre.locator('[name="voyageur"]').input_value() == "Alice Fictive"
                     # Redimensionnement choisi par le guichetier préservé après rechargement.
                     page.evaluate("() => { const f=window.erpFenetres.active(); f.ajustee=true; f.l=510; f.iframe.contentWindow.location.reload(); }")
