@@ -90,7 +90,7 @@ class IncidentColis(models.Model):
             return incident
         if not incident.autorise_par_id or not incident.compte_indemnite_id or incident.montant_autorise <= 0:
             raise ValidationError("L'indemnisation doit être autorisée avant son paiement.")
-        if not caisse.compte_tresorerie_id or solde_tresorerie(caisse.compte_tresorerie) < incident.montant_autorise:
+        if not caisse.compte_tresorerie_id or solde_tresorerie(caisse.compte_tresorerie, timezone.localdate()) < incident.montant_autorise:
             raise ValidationError("La caisse ne dispose pas du montant de l'indemnisation.")
         c, montant = incident.colis, incident.montant_autorise
         debit = {'compte': incident.compte_indemnite, 'debit': montant, 'section': c.gare_depart.section}

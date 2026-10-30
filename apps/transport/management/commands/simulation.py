@@ -469,11 +469,15 @@ class Command(SimulationMetierMixin, BaseCommand):
             lignes += ["", "## Scénarios et conséquences comptables (fictifs)", "",
                 "15 % : base du contrat réel À CONFIRMER. Les deux hypothèses sont comparées sans double comptabilisation.",
                 "Le retrait dit salaire propriétaire débite son compte tiers ; il n’est ni une paie ni une charge supplémentaire.",
-                "| Date | Module | Cas | Débit | Crédit | Lignes GL |", "|---|---|---|---:|---:|---|",
-                *[f"| {e['date']} | {e['module']} | {e['cas']} | {e['debit']} | {e['credit']} | {', '.join(str(l['source_gl_line_id']) for l in e['ecritures']) or 'Aucune écriture'} |" for e in self.scenarios],
+                "| Date | Module | Cas | Débit | Crédit | Pièces comptables |", "|---|---|---|---:|---:|---|",
+                *[f"| {e['date']} | {e['module']} | {e['cas']} | {e['debit']} | {e['credit']} | {', '.join(sorted({l['ecriture'] for l in e['ecritures']})) or 'Aucune écriture'} |" for e in self.scenarios],
                 "", "## Temps réellement mesurés", "", "| Journée | Départs (toutes agences) | Billets | Secondes |", "|---|---:|---:|---:|",
                 *[f"| {e['jour']} | {e['departs']} | {e['billets']} | {e['secondes']} |" for e in self.mesures],
                 "", "Initialisation, paie et arrêtés mensuels s’ajoutent aux temps des journées."]
+            lignes += ["", "## Comparaison des deux hypothèses de commission (non confirmées)",
+                "| Véhicule | Base | Recettes | Dépenses | Part société | Dû propriétaire | Traitement |", "|---|---|---:|---:|---:|---:|---|",
+                *[f"| {h['vehicule']} | {base} | {v['recettes']} | {v['depenses']} | {v['commission']} | {v['montant_du']} | {'Comptabilisé dans la démonstration' if base==h['base_fictive_comptabilisee'] else 'Comparaison sans écriture'} |"
+                  for h in self.hypotheses for base,v in h['comparaison_sans_ecriture'].items()]]
             controles += [("Scénarios équilibrés individuellement", all(Decimal(e['debit']) == Decimal(e['credit']) for e in self.scenarios))]
             if self.departs_jour:
                 controles += [("Nombre exact de départs quotidiens toutes agences réunies", all(e['departs']==self.departs_jour for e in self.mesures))]

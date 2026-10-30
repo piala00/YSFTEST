@@ -115,7 +115,7 @@ class PartenairesTests(TestCase):
         self.activite()
         r = self.client.post(reverse("partenaires:contrats"), {
             "vehicule": self.car.pk, "partenaire": self.proprio.pk, "modele": "COMMISSION", "debut": self.debut_mois.isoformat(),
-            "taux_commission": "20", "montant_location": "0", "periodicite": "MOIS", "charge_carburant": "on"})
+            "taux_commission": "20", "assiette_commission": "RECETTES", "montant_location": "0", "periodicite": "MOIS", "charge_carburant": "on"})
         self.assertEqual(r.status_code, 302)
         c = ContratPartenaire.objects.get()
         self.client.post(reverse("partenaires:contrats"), {"action": "activer", "contrat": c.pk})
@@ -346,3 +346,4 @@ class CompteDuCamionTests(TestCase):
         self.assertIsNotNone(d.ecriture_fixe)                                       # fixe et compte : deux écritures
         self.assertEqual(d.ecriture_fixe.lignes.get(credit__gt=0).credit, 100000)
         self.assertEqual(d.ecriture.lignes.get(credit__gt=0).credit, 550000)
+

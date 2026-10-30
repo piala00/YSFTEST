@@ -1227,6 +1227,8 @@ class Colis(models.Model):
 
     @transaction.atomic
     def charger(self, depart):
+        Colis.objects.select_for_update().get(pk=self.pk)
+        self.refresh_from_db()
         _proprietaire(self, f"L'envoi {self.numero}")
         if self.incidents_suivi.filter(resolu=False).exists():
             raise ValidationError("Un incident est encore en cours sur ce colis : chargement bloqué.")
@@ -1249,6 +1251,8 @@ class Colis(models.Model):
         """Remise au destinataire contre le code de retrait ; encaisse le port dû et le contre-remboursement."""
         from apps.comptabilite.services import creer_ecriture
 
+        Colis.objects.select_for_update().get(pk=self.pk)
+        self.refresh_from_db()
         if self.incidents_suivi.filter(resolu=False).exists():
             raise ValidationError("Un incident est encore en cours sur ce colis : livraison bloquée jusqu'à sa résolution.")
         if self.statut != self.ARRIVE:
