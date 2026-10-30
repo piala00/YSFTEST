@@ -1228,6 +1228,8 @@ class Colis(models.Model):
     @transaction.atomic
     def charger(self, depart):
         _proprietaire(self, f"L'envoi {self.numero}")
+        if self.incidents_suivi.filter(resolu=False).exists():
+            raise ValidationError("Un incident est encore en cours sur ce colis : chargement bloqué.")
         if self.statut != self.ENREGISTRE:
             raise ValidationError(f"Le colis {self.numero} est {self.get_statut_display().lower()} : chargement impossible.")
         if depart.statut != Depart.PROGRAMME:
@@ -1247,6 +1249,8 @@ class Colis(models.Model):
         """Remise au destinataire contre le code de retrait ; encaisse le port dû et le contre-remboursement."""
         from apps.comptabilite.services import creer_ecriture
 
+        if self.incidents_suivi.filter(resolu=False).exists():
+            raise ValidationError("Un incident est encore en cours sur ce colis : livraison bloquée jusqu'à sa résolution.")
         if self.statut != self.ARRIVE:
             raise ValidationError(f"Le colis {self.numero} n'est pas arrivé en gare ({self.get_statut_display().lower()}).")
         if (code or "").strip() != self.code_retrait:
@@ -1262,8 +1266,15 @@ class Colis(models.Model):
             lignes = [{"compte": caisse.compte_tresorerie, "debit": self.a_encaisser}]
             if self.port == self.DU and self.prix:            # recette du véhicule qui l'a transporté
                 vehicule = self.depart.vehicule if self.depart_id else None
-                lignes += [{**l, "section": self.gare_arrivee.section, "vehicule": vehicule}
-                           for l in _ventiler(self.prix, self.compte_produit(parametres), parametres.taxe_colis)]
+                from .models_incidents import Incident
+                transfert = (Incident.objects.filter(depart=self.depart, type_incident=Incident.TRANSBORDEMENT,
+                    vehicule_secours__isnull=False).select_related("vehicule_secours").first() if self.depart_id else None)
+                for l in _ventiler(self.prix, self.compte_produit(parametres), parametres.taxe_colis):
+                    suite = _arrondi(l["credit"] * transfert.part_restante / 100) if transfert else ZERO
+                    if l["credit"] - suite:
+                        lignes.append({**l, "credit": l["credit"] - suite, "section": self.gare_arrivee.section, "vehicule": vehicule})
+                    if suite:
+                        lignes.append({**l, "credit": suite, "section": self.gare_arrivee.section, "vehicule": transfert.vehicule_secours})
             if self.contre_remboursement:
                 # Envoi d'une autre agence : la somme est due à cette agence (qui la reverse à l'expéditeur)
                 compte_cr = _compte_liaison(self.site_origine) if self.site_origine else parametres.compte_contre_remboursement
@@ -1405,3 +1416,6 @@ from .models_incidents import FraisIncident, Incident  # noqa: E402,F401
 
 from .models_contacts import PersonneGuichet, SaisieGuichet  # noqa: E402,F401
 
+
+
+from .models_suivi_colis import IncidentColis  # noqa: E402,F401

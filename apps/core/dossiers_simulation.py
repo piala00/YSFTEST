@@ -21,6 +21,8 @@ VERSION = 1
 MAX_ARCHIVE = 512 * 1024 * 1024
 MAX_BASE = 2 * 1024 * 1024 * 1024
 BASE = "simulation.sqlite3"
+RAPPORTS = ("BILAN-SIMULATION.md", "SCENARIOS-SIMULATION.json")
+MAX_RAPPORT = 20 * 1024 * 1024
 MANIFESTE = "dossier.json"
 
 
@@ -134,13 +136,28 @@ def verifier_base(base):
         return societe[0], set(c.execute("SELECT app, name FROM django_migrations"))
 
 
-def creer(racine, debut, duree):
+def normaliser_criteres(criteres=None):
+    criteres = criteres or {}
+    if not isinstance(criteres, dict) or set(criteres) - {"departs_jour", "scenarios_complets", "echelle"}:
+        raise ValueError("Critères de simulation invalides.")
+    try:
+        n = int(criteres.get("departs_jour", 0))
+        echelle = float(criteres.get("echelle", 1))
+    except (ValueError, TypeError):
+        raise ValueError("Nombre de départs ou échelle invalide.") from None
+    profil = criteres.get("scenarios_complets", False)
+    if not isinstance(profil, bool) or not 0 <= n <= 2000 or not 0.001 <= echelle <= 1 or (profil and n == 1):
+        raise ValueError("Départs : 0 à 2000 (au moins 2 avec scénarios), échelle de 0,001 à 1.")
+    return {"departs_jour": n, "echelle": echelle, "scenarios_complets": profil}
+
+
+def creer(racine, debut, duree, criteres=None):
     identifiant = uuid.uuid4().hex
     dossier = emplacement(racine, identifiant)
     dossier.mkdir(parents=True, exist_ok=False)
     d = {"format": FORMAT, "version": VERSION, "edition": "transport", "fictif": True,
          "etat": "preparation", "nom": f"Simulation {debut}", "debut": debut, "duree": duree,
-         "cree_le": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+         "cree_le": datetime.datetime.now(datetime.timezone.utc).isoformat(), "criteres": normaliser_criteres(criteres)}
     ecrire_json(dossier / MANIFESTE, d)
     return identifiant, dossier
 
@@ -227,11 +244,18 @@ def exporter(racine, identifiant):
             copier_base(dossier / BASE, copie)
             nettoyer_copie(copie)
             d = {k: v for k, v in d.items() if k in (
-                "format", "version", "edition", "fictif", "etat", "nom", "debut", "duree", "cree_le")}
+                "format", "version", "edition", "fictif", "etat", "nom", "debut", "duree", "cree_le", "criteres")}
             d["sha256"] = empreinte(copie)
+            rapports = {nom: dossier / nom for nom in RAPPORTS if (dossier / nom).is_file()
+                        and not (dossier / nom).is_symlink() and (dossier / nom).stat().st_size <= MAX_RAPPORT}
+            d["rapports_sha256"] = {nom: empreinte(f) for nom,f in rapports.items()}
             with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as z:
                 z.writestr(MANIFESTE, json.dumps(d, ensure_ascii=False))
                 z.write(copie, BASE)
+                for nom in RAPPORTS:
+                    rapport = dossier / nom
+                    if rapport.is_file() and not rapport.is_symlink() and rapport.stat().st_size <= MAX_RAPPORT:
+                        z.write(rapport, nom)
                 z.writestr("LISEZ-MOI.txt", "Données fictives. Importer depuis Administration du poste > Simulation. Aucun mot de passe, clé ou licence n'est transporté.\n")
         archive.seek(0)
         return archive
@@ -259,12 +283,23 @@ def importer(racine, fichier, utilisateur, migrations_connues):
             infos = z.infolist()
             noms = [i.filename for i in infos]
             if (len(noms) != len(set(noms)) or not {MANIFESTE, BASE} <= set(noms)
-                    or set(noms) - {MANIFESTE, BASE, "LISEZ-MOI.txt"}):
+                    or set(noms) - {MANIFESTE, BASE, "LISEZ-MOI.txt", *RAPPORTS}):
                 raise ValueError("Contenu d'archive inattendu ; seul un dossier de simulation exporté par le logiciel est accepté.")
             if z.getinfo(MANIFESTE).file_size > 32 * 1024 or z.getinfo(BASE).file_size > MAX_BASE:
                 raise ValueError("Contenu décompressé trop volumineux.")
             d = json.loads(z.read(MANIFESTE))
             verifier_manifeste(d)
+            if "criteres" in d:
+                d["criteres"] = normaliser_criteres(d["criteres"])
+            for nom in RAPPORTS:
+                if nom in noms:
+                    if z.getinfo(nom).file_size > MAX_RAPPORT:
+                        raise ValueError("Rapport décompressé trop volumineux.")
+                    contenu = z.read(nom)
+                    attendu = d.get("rapports_sha256", {}).get(nom)
+                    if attendu != hashlib.sha256(contenu).hexdigest():
+                        raise ValueError("Rapport altéré ou incomplet.")
+                    (dossier / nom).write_bytes(contenu)
             with z.open(BASE) as entree, (dossier / BASE).open("wb") as sortie:
                 total = 0
                 for bloc in iter(lambda: entree.read(1024 * 1024), b""):
@@ -335,3 +370,4 @@ def supprimer(racine, identifiant):
     if lire_json(dossier / MANIFESTE).get("fictif") is not True:
         raise ValueError("Seul un dossier fictif reconnu peut être supprimé.")
     shutil.rmtree(dossier)
+

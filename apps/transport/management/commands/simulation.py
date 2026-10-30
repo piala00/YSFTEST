@@ -15,6 +15,9 @@ import calendar
 import contextlib
 import datetime
 import random
+import time
+
+from apps.transport.simulation_metier import SimulationMetierMixin
 from decimal import Decimal
 from unittest import mock
 
@@ -44,7 +47,7 @@ def horloge(moment):
         yield
 
 
-class Command(BaseCommand):
+class Command(SimulationMetierMixin, BaseCommand):
     help = "Simule un mois d'activité (données fictives) dans le dossier courant, qui doit être un dossier de simulation"
 
     def add_arguments(self, p):
@@ -58,6 +61,9 @@ class Command(BaseCommand):
         p.add_argument("--echelle", type=float, default=1.0, help="Fraction des voyageurs et colis (essai rapide : 0.1)")
         p.add_argument("--graine", type=int, default=2026)
         p.add_argument("--rapport", default="", help="Fichier Markdown du bilan")
+        p.add_argument("--scenarios-complets", action="store_true", help="Transit, transvasement, incidents colis, garage et retraits propriétaires (fictifs)")
+        p.add_argument("--departs-jour", type=int, default=0, help="Nombre exact de départs quotidiens pour toutes les agences réunies (0 : aléatoire)")
+        p.add_argument("--journal-scenarios", default="", help="Rapport JSON traçable des scénarios et temps réellement mesurés")
         p.add_argument("--forcer", action="store_true", help="Lever les contrôles de dossier (tests automatiques seulement)")
 
     def handle(self, *a, **o):
@@ -87,6 +93,7 @@ class Command(BaseCommand):
             o["nombre_mois"] = (fin.year - annee) * 12 + fin.month - mois + 1
         if not 1 <= o["nombre_mois"] <= 24:
             raise CommandError("De 1 à 24 mois.")
+        self.configurer_metier(o)
         self.r = random.Random(o["graine"])
         self.echelle = o["echelle"]
         self.mois = []                                           # [(premier jour, jours simulés)]
@@ -99,16 +106,25 @@ class Command(BaseCommand):
         self.moment(self.jours[0], 6)
         with horloge(self.maintenant):
             self.preparer(o["vehicules"], o["salaries"])
+            self.initialiser_metier()
         self.par_mois = []
         for jours in self.mois:
             self.mois_jours, avant = jours, dict(self.compteurs)
             for jour in jours:
+                avant_jour = dict(self.compteurs)
+                chrono = time.perf_counter()
                 self.journee(jour)
+                self.mesures.append({"jour": str(jour), "secondes": round(time.perf_counter()-chrono, 3),
+                    "departs": self.compteurs['voyages']-avant_jour['voyages'],
+                    "billets": self.compteurs['billets']-avant_jour['billets'], "echelle": self.echelle})
+                self.stdout.write(f"Durée réelle {jour} : {self.mesures[-1]['secondes']:.3f} s · {self.mesures[-1]['departs']} départs · {self.mesures[-1]['billets']} billets")
                 self.stdout.write(f"{jour:%d/%m/%Y} : {self.compteurs['voyages']} voyages, {self.compteurs['billets']} billets")
             self.moment(jours[-1], 22)
             with horloge(self.maintenant):
                 self.fin_de_mois(jours[0], jours[-1])
             self.par_mois.append((jours[0], jours[-1], {k: self.compteurs[k] - avant[k] for k in self.compteurs}))
+        if o["journal_scenarios"]:
+            self.ecrire_rapports_metier(o["journal_scenarios"])
         bilan = self.bilan()
         texte = self.texte_bilan(bilan, o)
         self.stdout.write(texte)
@@ -129,6 +145,8 @@ class Command(BaseCommand):
         """Le guichet paie en espèces s'il en a assez, sinon la dépense est réglée par la banque."""
         from apps.transport.models_caisse import solde_tresorerie
 
+        if self.profil_complet:
+            return self.assurer_especes(montant, jour)
         return self.ca if solde_tresorerie(self.ca.compte_tresorerie, jour) >= montant else self.bq
 
     def moment(self, jour, heure, minute=0):
@@ -260,21 +278,18 @@ class Command(BaseCommand):
                                                  prix_unitaire=85000, vehicule=self.cars[0]["vehicule"])
                 achat.valider(self.agent)
         departs = []
-        for c in self.cars:
-            if r.random() > 0.72:
-                continue
-            ligne = c["aller"] if (jour.day + self.cars.index(c)) % 2 else c["retour"]
-            heure = r.choice([6, 7, 8, 10, 13, 15])
+        for c, ligne, heure in self.plan_journee(jour):
             with horloge(self.moment(jour, max(heure - 3, 0))), transaction.atomic():
                 d = Depart.objects.create(ligne=ligne, date=jour, heure=datetime.time(heure), vehicule=c["vehicule"],
                                           chauffeur=c["chauffeur"])
                 if not c.get("courrier"):
                     saison = SAISON.get(jour.month, 1)                 # fêtes de fin d'année, grandes vacances
                     voyageurs = max(1, int(d.places * min(r.uniform(0.55, 0.95) * saison, 1) * self.echelle))
-                    for k in range(min(voyageurs, d.places)):
+                    reserve = self.reserve_scenarios(c, heure, jour)
+                    for k in range(min(voyageurs, d.places - reserve)):
                         bagages = r.random() < 0.15
                         Billet(depart=d, voyageur=f"Voyageur {k + 1} (fictif)",
-                               paiement=Billet.MOBILE_MONEY if r.random() < 0.2 else Billet.ESPECES,
+                               paiement=Billet.MOBILE_MONEY if r.random() < (0.05 if self.profil_complet else 0.2) else Billet.ESPECES,
                                bagages="1 colis encombrant" if bagages else "", bagages_nombre=1 if bagages else 0,
                                prix_bagages=Decimal(r.choice([1000, 2000, 3000])) if bagages else Decimal(0)).vendre(self.agent)
                         self.compteurs["billets"] += 1
@@ -286,16 +301,25 @@ class Command(BaseCommand):
                     colis.charger(d)
                     self.compteurs["colis"] += 1
             departs.append((d, c, heure))
+        with horloge(self.moment(jour, 0)), transaction.atomic():
+            self.scenarios_avant_depart(jour, departs)
         for d, c, heure in departs:
             with horloge(self.moment(jour, heure, 5)), transaction.atomic():
-                d.partir()
+                if self.profil_complet and d.pk in (getattr(self, '_depart_scenario', None), getattr(self, '_depart_suite_scenario', None)):
+                    self.tracer_scenario('Transport', 'Départ : reconnaissance des produits de cette portion, sans nouvel encaissement', d.partir)
+                else:
+                    d.partir()
+                self.scenarios_en_route(jour, d)
                 litres = Decimal(c["km"] * 35 // 100)
                 PleinCarburant(vehicule=c["vehicule"], depart=d, litres=litres, prix_litre=PRIX_LITRE,
                                caisse=self.caisse_pour(litres * PRIX_LITRE, jour), date=jour).enregistrer()
                 self.compteurs["voyages"] += 1
                 self.compteurs["pleins"] += 1
-            with horloge(self.moment(jour, min(heure + 6, 23))), transaction.atomic():
+            arrivee_jour = jour + datetime.timedelta(days=(heure+6)//24) if self.departs_jour else jour
+            arrivee_heure = (heure+6)%24 if self.departs_jour else min(heure+6,23)
+            with horloge(self.moment(arrivee_jour, arrivee_heure)), transaction.atomic():
                 d.arriver()
+                self.scenarios_apres_arrivee(jour, d)
         with horloge(self.moment(jour, 20)), transaction.atomic():
             if self.compteurs["colis"]:                          # emballages consommés pour les colis du jour
                 carton = self.articles["CART"]
@@ -328,7 +352,7 @@ class Command(BaseCommand):
                         ReglementPartenaire(partenaire=ct.partenaire, montant=ct.montant_location, caisse=self.bq,
                                             nature=ReglementPartenaire.AVANCE, date=jour).enregistrer()
             especes = solde_tresorerie(self.ca.compte_tresorerie, jour)
-            versement = (especes * Decimal("0.8")).quantize(Decimal("1"))
+            versement = Decimal(0) if self.profil_complet else (especes * Decimal("0.8")).quantize(Decimal("1"))
             if versement > 0:                                    # versement en banque du soir
                 t = TransfertFonds(origine=self.ca, destination=self.bq, montant=versement, date_envoi=jour, porteur="Convoyeur de fonds")
                 t.envoyer(self.chef)
@@ -345,19 +369,23 @@ class Command(BaseCommand):
         periode = PeriodePaie.objects.create(annee=fin.year, mois=fin.month)
         periode.generer()
         periode.valider(date=fin)
-        periode.payer(self.bq, date=fin)
-        for ct in self.contrats:
-            d = Decompte.calculer(ct, debut, fin).approuver(date=fin)
-            if d.montant_du > 0:                                 # 60 % payés, le reste dû
-                ReglementPartenaire(partenaire=ct.partenaire, decompte=d, montant=(d.montant_du * Decimal("0.6")).quantize(Decimal("1")),
-                                    caisse=self.bq, date=fin).enregistrer()
+        periode.payer(self.caisse_pour(sum((b.net for b in periode.bulletins.all()), Decimal(0)), fin) if self.profil_complet else self.bq, date=fin)
+        if self.profil_complet:
+            self.decomptes_metier(debut, fin)
+        else:
+            for ct in self.contrats:
+                d = Decompte.calculer(ct, debut, fin).approuver(date=fin)
+                if d.montant_du > 0:                             # profil historique conservé
+                    ReglementPartenaire(partenaire=ct.partenaire, decompte=d, montant=(d.montant_du * Decimal("0.6")).quantize(Decimal("1")),
+                                        caisse=self.bq, date=fin).enregistrer()
         dette = sum((l.credit - l.debit for l in LigneEcriture.objects.filter(tiers=self.fournisseur,
                                                                               compte=self.fournisseur.get_compte_collectif())),
                     Decimal(0))
         if dette > 0:                                            # règlement du fournisseur par la banque
-            creer_ecriture(self.bq, fin, "Règlement fournisseur pièces (fictif)",
+            journal = self.caisse_pour(dette,fin) if self.profil_complet else self.bq
+            creer_ecriture(journal, fin, "Règlement fournisseur pièces (fictif)",
                            [{"compte": self.fournisseur.get_compte_collectif(), "tiers": self.fournisseur, "debit": dette},
-                            {"compte": self.bq.compte_tresorerie, "credit": dette}])
+                            {"compte": journal.compte_tresorerie, "credit": dette}])
 
     # ------------------------------------------------------------------ bilan et contrôles
     def bilan(self):
@@ -435,7 +463,21 @@ class Command(BaseCommand):
             *[f"| {p} | {v} | {c} | {m(s)} |" for p, v, c, s in b["proprietaires"]], "",
             "| Contrôle | Résultat |", "|---|---|",
             *[f"| {t} | {'OK' if ok else 'ÉCART'} |" for t, ok in controles], "",
-            "Taux de paie de démonstration (5 % / 10 %), prix, salaires et contrats : fictifs, sans valeur réglementaire.\nNon simulés (le résultat est donc optimiste) : amortissements, péages, impôts et taxes, imprévus de voyage, annulations et remboursements. Saisonnalité de démonstration : janvier-février plus calmes, août et décembre plus chargés.",
+            "Taux de paie de démonstration (5 % / 10 %), prix, salaires et contrats : fictifs, sans valeur réglementaire.\nNon simulés systématiquement : amortissements, péages, impôts et taxes. Les imprévus et incidents ne sont joués que dans le profil complet ; leurs montants sont fictifs, sans fréquence statistique garantie. Saisonnalité de démonstration : janvier-février plus calmes, août et décembre plus chargés.",
         ]
+        if self.profil_complet:
+            lignes += ["", "## Scénarios et conséquences comptables (fictifs)", "",
+                "15 % : base du contrat réel À CONFIRMER. Les deux hypothèses sont comparées sans double comptabilisation.",
+                "Le retrait dit salaire propriétaire débite son compte tiers ; il n’est ni une paie ni une charge supplémentaire.",
+                "| Date | Module | Cas | Débit | Crédit | Lignes GL |", "|---|---|---|---:|---:|---|",
+                *[f"| {e['date']} | {e['module']} | {e['cas']} | {e['debit']} | {e['credit']} | {', '.join(str(l['source_gl_line_id']) for l in e['ecritures']) or 'Aucune écriture'} |" for e in self.scenarios],
+                "", "## Temps réellement mesurés", "", "| Journée | Départs (toutes agences) | Billets | Secondes |", "|---|---:|---:|---:|",
+                *[f"| {e['jour']} | {e['departs']} | {e['billets']} | {e['secondes']} |" for e in self.mesures],
+                "", "Initialisation, paie et arrêtés mensuels s’ajoutent aux temps des journées."]
+            controles += [("Scénarios équilibrés individuellement", all(Decimal(e['debit']) == Decimal(e['credit']) for e in self.scenarios))]
+            if self.departs_jour:
+                controles += [("Nombre exact de départs quotidiens toutes agences réunies", all(e['departs']==self.departs_jour for e in self.mesures))]
+            lignes += [f"{t} : {'OK' if ok else 'ÉCART'}" for t,ok in controles[-2:]]
         self.controles = controles
         return "\n".join(lignes) + "\n"
+

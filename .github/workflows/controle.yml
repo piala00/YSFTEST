@@ -57,6 +57,25 @@ jobs:
           path: ${{ runner.temp }}/guichet-navigateur
           retention-days: 7
 
+  simulation-volume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Simuler 250 départs interagences avec les scénarios complets (5 % du remplissage)
+        run: python tests_navigateur/simulation_volume.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ERP-Simulation-250-Departs-Controles
+          path: ${{ runner.temp }}/simulation-volume
+          retention-days: 7
+
   tests-sqlserver:
     runs-on: ubuntu-latest
     services:
@@ -277,4 +296,5 @@ jobs:
           name: ERP-OHADA-${{ matrix.nom }}-Installation
           path: dist/ERP-OHADA-${{ matrix.nom }}-Installation.exe
           retention-days: 7
+
 

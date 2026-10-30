@@ -88,7 +88,7 @@ class Incident(models.Model):
                                       description=description, vehicule_secours=vehicule_secours, cree_par=utilisateur)
         if vehicule_secours is not None and depart.ecriture_recettes_id:
             p = ParametresTransport.get()
-            produits = {c.pk for c in (p.compte_billets, p.compte_bagages) if c is not None}
+            produits = {c.pk for c in (p.compte_billets, p.compte_bagages, p.compte_colis, p.compte_fret) if c is not None}
             lignes = []
             for l in depart.ecriture_recettes.lignes.filter(compte_id__in=produits, vehicule_id=depart.vehicule_id):
                 montant = (Decimal(l.credit - l.debit) * part / 100).quantize(Decimal("1"))
@@ -196,4 +196,5 @@ class FraisIncident(models.Model):
             reference=self.incident.numero, origine=depart.numero)
         self.save(update_fields=["ecriture"])
         return self
+
 

@@ -11,9 +11,10 @@
     <div class="d-flex flex-wrap gap-2"><strong>{{ d.nom }}</strong><span class="badge text-bg-secondary">{{ d.etat }}</span>{% if d.actif %}<span class="badge text-bg-warning">Dossier ouvert</span>{% endif %}</div>
     {% if d.erreur %}<div class="text-danger small">{{ d.erreur }}</div>{% endif %}
     {% if d.etat == 'preparation' %}<div class="small mt-1">Génération en préparation, parfois longue selon le nombre de mois. Vous pouvez fermer cette page et revenir ici.</div>{% endif %}
+    {% if d.criteres %}<div class="small text-muted">{{ d.criteres.departs_jour }} départs/jour toutes agences · échelle {{ d.criteres.echelle }}{% if d.criteres.scenarios_complets %} · scénarios métier complets{% endif %}</div>{% endif %}
     {% if d.journal %}<details class="mt-1"><summary class="small">Progression</summary><pre class="small bg-light p-2" style="max-height:12rem;overflow:auto">{{ d.journal }}</pre></details>{% endif %}
     <div class="d-flex flex-wrap align-items-end gap-2 mt-2">
-      {% if d.etat == 'prete' %}<form method="post">{% csrf_token %}<input type="hidden" name="dossier" value="{{ d.id }}"><button class="btn btn-sm btn-outline-primary" name="action" value="dossier_exporter">Télécharger ce dossier</button></form>
+      {% if d.etat == 'prete' %}<form method="post">{% csrf_token %}<input type="hidden" name="dossier" value="{{ d.id }}"><button class="btn btn-sm btn-outline-primary" name="action" value="dossier_exporter">Télécharger ce dossier et ses rapports</button></form>
       {% if not d.actif %}<form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="dossier" value="{{ d.id }}"><input class="form-control form-control-sm" style="max-width:10rem" name="confirmation" placeholder="Tapez OUVRIR" required aria-label="Confirmation d'ouverture de {{ d.nom }}"><button class="btn btn-sm btn-primary" name="action" value="dossier_ouvrir">Ouvrir dans ce logiciel</button></form>{% endif %}{% endif %}
       {% if not d.actif %}<details><summary class="small text-danger">Supprimer ce dossier fictif</summary><form method="post" class="d-flex gap-1 mt-1">{% csrf_token %}<input type="hidden" name="dossier" value="{{ d.id }}"><input class="form-control form-control-sm" name="confirmation" placeholder="Tapez SUPPRIMER" required aria-label="Confirmation de suppression"><button class="btn btn-sm btn-outline-danger" name="action" value="simulation_supprimer">Supprimer</button></form></details>{% endif %}
     </div>
@@ -23,6 +24,12 @@
     <div class="col-lg-6"><h3 class="h6">Créer une simulation</h3><form method="post">{% csrf_token %}
       <label class="form-label small" for="s-mois">Mois de départ</label><input id="s-mois" name="debut" type="month" class="form-control form-control-sm mb-2" value="{{ etat.mois_courant }}" required>
       <label class="form-label small" for="s-duree">Durée</label><select id="s-duree" name="duree" class="form-select form-select-sm mb-2"><option value="aujourdhui">Jusqu'à aujourd'hui</option><option value="1">1 mois</option><option value="2">2 mois</option><option value="3">3 mois</option><option value="6">6 mois</option><option value="12">12 mois</option><option value="24">24 mois</option></select>
+      <label class="form-label small" for="s-departs">Départs par jour — total de toutes les agences</label>
+      <input id="s-departs" name="departs_jour" type="number" min="0" max="2000" value="250" class="form-control form-control-sm mb-2">
+      <div class="form-text mb-2">0 conserve les départs aléatoires. Un nombre impose exactement ce total par journée, pas par agence. Le planning fictif prévoit jusqu'à quatre portions par véhicule et adapte la flotte si nécessaire.</div>
+      <label class="form-label small" for="s-echelle">Volume des passagers et colis</label><select id="s-echelle" name="echelle" class="form-select form-select-sm mb-2"><option value="1">Complet — tous les passagers simulés</option><option value="0.1">Essai rapide — 10 % du remplissage</option></select>
+      <label class="small d-block mb-2"><input type="checkbox" name="scenarios_complets" value="1" checked> Inclure transit, transvasement, incidents colis, garage et retraits propriétaires</label>
+      <div class="form-text mb-2">Les hypothèses de commission à 15 % sont fictives : base recettes ou résultat comparées dans les rapports, sans fixer votre règle réelle. Les temps sont mesurés pendant la génération.</div>
       <button class="btn btn-sm btn-primary" name="action" value="simulation_creer">Créer la simulation</button>
       <p class="form-text">Toutes les activités sont fictives. La durée de génération dépend du volume ; plusieurs mois peuvent demander plusieurs heures.</p>
     </form></div>
@@ -34,3 +41,4 @@
   </div>
   {% if etat.ancienne_simulation %}<div class="border-top pt-2 mt-2"><p class="small">Une ancienne simulation est disponible sur ce poste. Vous pouvez la réutiliser sans relancer la génération.</p><form method="post">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary" name="action" value="dossier_ancienne">Importer l'ancienne simulation</button></form></div>{% endif %}
 </div>
+

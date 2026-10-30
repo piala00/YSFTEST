@@ -358,7 +358,7 @@ def billet_imprimer(request, pk):
 # ---------------------------------------------------------------- Colis et courrier
 @login_required
 def colis_liste(request):
-    qs = Colis.objects.select_related("gare_depart", "gare_arrivee", "depart")
+    qs = Colis.objects.select_related("gare_depart", "gare_arrivee", "depart").prefetch_related("incidents_suivi")
     statut, gare = request.GET.get("statut", ""), request.GET.get("gare", "")
     if request.GET.get("q"):
         q = request.GET["q"]
@@ -408,7 +408,24 @@ def colis_detail(request, pk):
     if request.method == "POST":
         action = request.POST.get("action")
         try:
-            if action == "livrer":
+            if action in ("incident_colis", "resoudre_incident", "autoriser_indemnite", "payer_indemnite"):
+                from .models_suivi_colis import IncidentColis
+                from apps.comptabilite.models import Compte, Journal
+                contacts.verifier_droit(request.user, "colis")
+                if action == "incident_colis":
+                    IncidentColis.declarer(colis, request.POST.get("nature", ""), request.POST.get("lieu", ""),
+                                          request.POST.get("description", ""), request.user)
+                else:
+                    incident = get_object_or_404(IncidentColis, pk=request.POST.get("incident"), colis=colis)
+                    if action == "resoudre_incident":
+                        incident.resoudre(request.POST.get("resolution", ""), request.user)
+                    elif action == "autoriser_indemnite":
+                        incident.autoriser(request.POST.get("montant") or 0,
+                            get_object_or_404(Compte, pk=request.POST.get("compte")), request.user)
+                    else:
+                        incident.payer(get_object_or_404(Journal, pk=request.POST.get("caisse")), request.user)
+                messages.success(request, "Suivi du colis enregistré ; les mouvements comptables restent distincts du signalement.")
+            elif action == "livrer":
                 colis.livrer(request.POST.get("code"), request.POST.get("retire_par"), utilisateur=request.user)
                 messages.success(request, "Envoi remis au destinataire" + (
                     f" : {colis.a_encaisser:,.0f} FCFA encaissés.".replace(",", " ") if colis.a_encaisser else "."))
@@ -421,12 +438,17 @@ def colis_detail(request, pk):
             elif action == "charger":
                 colis.charger(get_object_or_404(Depart, pk=request.POST.get("depart")))
                 messages.success(request, "Envoi chargé.")
-        except ValidationError as exc:
+        except (ValidationError, ArithmeticError, ValueError) as exc:
             _erreur(request, exc)
         return redirect("transport:colis_detail", colis.pk)
     departs = Depart.objects.filter(statut=Depart.PROGRAMME, ligne__gare_depart=colis.gare_depart,
                                     ligne__gare_arrivee=colis.gare_arrivee).order_by("date", "heure")
-    return render(request, "transport/colis_detail.html", {"colis": colis, "departs": departs})
+    from apps.comptabilite.models import Compte, Journal
+    from .models_suivi_colis import IncidentColis
+    return render(request, "transport/colis_detail.html", {"colis": colis, "departs": departs,
+        "incidents_suivi": colis.incidents_suivi.select_related("ecriture", "autorise_par"), "natures_incident": IncidentColis.NATURES,
+        "comptes_indemnite": Compte.objects.filter(numero__startswith="6"),
+        "caisses_indemnite": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)})
 
 
 @login_required
@@ -819,4 +841,5 @@ def contacts_rechercher(request, service):
     reponse["Cache-Control"] = "private, no-store"
     reponse["X-Content-Type-Options"] = "nosniff"
     return reponse
+
 
