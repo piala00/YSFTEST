@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
 {% block title %}Billets en transit / correspondances{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Billets en transit / correspondances</h1></div>
@@ -33,3 +33,6 @@
 {% endif %}
 </div>
 {% endblock %}
+
+
+{% block scripts %}<script src="{% static 'js/recherche_depart.js' %}"></script>{% endblock %}

@@ -64,6 +64,23 @@ def main():
                     assert cadre.locator('[name="gare_montee"]').is_hidden()
                     assert cadre.locator('[name="depart_correspondance"]').is_hidden()
                     assert cadre.evaluate("document.documentElement.scrollWidth <= innerWidth"), "Débordement horizontal"
+                    # Le choix du véhicule reste saisissable au clavier, sans liste native à parcourir.
+                    recherche = cadre.locator('#id_depart-recherche')
+                    recherche.fill(depart.numero)
+                    recherche.press("Enter")
+                    assert cadre.locator('[name="depart"]').input_value() == str(depart.pk)
+                    assert cadre.locator('[name="depart"]').is_hidden()
+                    filtre = cadre.locator('.depart-recherche').first
+                    assert filtre.get_by_label("VIP", exact=True).is_checked()
+                    assert filtre.get_by_label("Classique", exact=True).is_checked()
+                    filtre.get_by_label("VIP", exact=True).uncheck()
+                    filtre.get_by_label("Classique", exact=True).uncheck()
+                    assert cadre.locator('[name="depart"]').input_value() == ""
+                    assert filtre.locator('[role="status"]').inner_text().startswith("Aucun départ")
+                    filtre.get_by_label("VIP", exact=True).check()
+                    filtre.get_by_label("Classique", exact=True).check()
+                    recherche.fill(depart.numero)
+                    recherche.press("Enter")
                     cadre.locator('[name="voyageur"]').fill("Alice Fictive")
                     cadre.locator('[name="voyageur"]').press("Enter")
                     assert cadre.locator('[name="piece_identite"]').evaluate("e => e === document.activeElement")
@@ -72,7 +89,7 @@ def main():
                     page.evaluate("url => { window.erpFenetres.ouvrir(url); }", url + "&mode=correspondance")
                     page.wait_for_function("document.querySelectorAll('.fenetre-mdi').length === 2 && [...document.querySelectorAll('.fenetre-mdi')].every(e=>e.getBoundingClientRect().width === 380)")
                     second = page.locator(".fenetre-mdi iframe").last.element_handle().content_frame()
-                    second.wait_for_selector('[name="depart_correspondance"]', state="visible")
+                    second.wait_for_selector('#id_depart_correspondance-recherche', state="visible")
                     assert cadre.locator('[name="voyageur"]').input_value() == "Alice Fictive"
                     # Redimensionnement choisi par le guichetier préservé après rechargement.
                     page.evaluate("() => { const f=window.erpFenetres.active(); f.ajustee=true; f.l=510; f.iframe.contentWindow.location.reload(); }")
@@ -106,3 +123,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

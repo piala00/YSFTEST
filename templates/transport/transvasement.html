@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static %}
 {% block title %}Transvasement{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Transvasement vers un autre car</h1></div>
@@ -14,3 +14,6 @@
 <p class="small text-muted mt-2 mb-0">Un transvasement par départ. L'historique et les frais restent dans sa fiche. Les sièges de secours ne sont pas réattribués automatiquement.</p>
 </div></div>
 {% endblock %}
+
+
+{% block scripts %}<script src="{% static 'js/recherche_depart.js' %}"></script>{% endblock %}
