@@ -50,6 +50,8 @@ def licence(request):
                 _, donnees = l.deposer(fichier.read(), request.user)
                 journal.enregistrer("LICENCE", libelle=f"{donnees.get('numero', '')} — {donnees.get('client', '')}")
                 messages.success(request, f"Licence {donnees.get('numero', '')} installée pour {donnees.get('client', '')}.")
+                if publique is not None:
+                    messages.success(request, "Clé publique reconnue : elle correspond à l'éditeur autorisé du logiciel.")
         except l.LicenceInvalide as exc:
             messages.error(request, f"Refusé : {exc}")
         return redirect(request.path)
@@ -58,4 +60,6 @@ def licence(request):
         "titre": "Licence", "etat": l.etat(), "demande": l.demande(), "installation": l.cle_installation(),
         "installation_requise": l.cle_installation_requise(), "actifs": l.comptes_actifs(), "roles": l.ROLES,
         "essai_ouvertures": l.ESSAI_OUVERTURES,
-        "historique": LicenceDeposee.objects.select_related("deposee_par")[:20], "cles": bool(l.cles_publiques())})
+        "historique": LicenceDeposee.objects.select_related("deposee_par")[:20], "cles": bool(l.cles_publiques()),
+        "empreintes_publiques": l.empreintes_publiques()})
+

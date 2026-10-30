@@ -17,6 +17,7 @@ import base64
 import csv
 import datetime
 import getpass
+import hashlib
 import json
 import os
 import re
@@ -75,6 +76,7 @@ def creer_cles(dossier, noms_neutres=True, mdp=None):
     print(f"Identité publique : {publique}  (à fournir au logiciel, jamais le coffre)")
     if not noms_neutres:
         print("  " + publique.read_text().strip())
+    ecrire_guide(dossier, brut)
 
 
 def chemin_coffre(dossier):
@@ -123,6 +125,8 @@ def regrouper_identite(source, dossier, mdp):
         with destination.open('xb') as f:
             f.write(contenu)
     # Conserver les numéros déjà émis lors du regroupement, pour ne pas recommencer à LIC-…-0001.
+    supprimees_source = {e['numero']: e['date'] for e in journal_suppressions(source.parent)
+                         if e['etat'] == 'supprimee'}
     for nom_registre in ('registre-licences.csv','registre-installations.csv'):
         registre_source = source.parent / nom_registre
         registre_destination = dossier / nom_registre
@@ -136,10 +140,12 @@ def regrouper_identite(source, dossier, mdp):
                 with registre_destination.open(encoding='utf-8',newline='') as f:
                     connus = {(l.get('numero',''),l.get('client',''),l.get('machine','')) for l in csv.DictReader(f,delimiter=';')}
             for ligne in lignes:
+                if nom_registre == 'registre-licences.csv' and ligne.get('numero') in supprimees_source:
+                    ligne['supprimee_le'] = supprimees_source[ligne['numero']]
                 identifiant = (ligne.get('numero',''),ligne.get('client',''),ligne.get('machine',''))
                 if identifiant in connus:
                     continue
-                if nom_registre == 'registre-licences.csv' and ligne.get('fichier'):
+                if nom_registre == 'registre-licences.csv' and ligne.get('fichier') and not ligne.get('supprimee_le'):
                     ancien = Path(ligne['fichier'])
                     if ancien.is_file() and not ancien.is_symlink() and ancien.suffix.lower()=='.erplic':
                         try:
@@ -159,6 +165,7 @@ def regrouper_identite(source, dossier, mdp):
                             pass  # Le registre garde la référence historique ; aucun fichier inconnu n'est remplacé.
                 ajouter_registre(registre_destination,ligne)
                 connus.add(identifiant)
+    ecrire_guide(dossier, brut)
     return destination
 
 
@@ -283,7 +290,9 @@ def exporter_client(licence, dossier, fichier=None):
     fichiers = [licence, publique] + ([notice] if notice.exists() else [])
     if any(f.is_symlink() or not f.is_file() or f.resolve().parent != dossier for f in fichiers):
         raise SystemExit("Le paquet client contient un fichier absent ou lié à un autre emplacement.")
-    verifier(licence, publique)
+    donnees = verifier(licence, publique)
+    if donnees.get('numero') in {e['numero'] for e in journal_suppressions(dossier) if e['etat']=='supprimee'}:
+        raise SystemExit("Cette licence a été supprimée du registre actif ; aucun nouvel export.")
     sortie = Path(fichier) if fichier else dossier / (licence.stem + "-CLIENT.zip")
     if sortie.suffix.lower() != ".zip":
         sortie = sortie.with_name(sortie.name + ".zip")
@@ -421,9 +430,12 @@ def ecrire_identite(cle, dossier):
     Path(dossier).mkdir(parents=True, exist_ok=True)
     chemin = Path(dossier) / "parametres.dat"
     brut = b"ERPID\x01" + cle.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    if chemin.is_symlink():
+        raise SystemExit("Le fichier public ne doit pas être un lien vers un autre fichier.")
     if chemin.exists() and chemin.read_bytes() != brut:
         raise SystemExit("Ce dossier contient l'identité d'un autre éditeur : choisissez un autre dossier.")
     chemin.write_bytes(brut)
+    ecrire_guide(dossier, brut[6:])
     return chemin
 
 
@@ -431,12 +443,16 @@ def nom_fichier(numero, client):
     return f"{numero}-{nom_propre(client)}.erplic"
 
 
-def registre_lignes(dossier):
+def registre_lignes(dossier, inclure_supprimees=False):
     registre = Path(dossier) / "registre-licences.csv"
     if not registre.exists():
         return []
+    if registre.is_symlink() or registre.stat().st_size > 10*1024*1024:
+        raise ValueError("Registre lié ou trop volumineux : opération refusée.")
     with open(registre, encoding="utf-8", newline="") as f:
-        return list(csv.DictReader(f, delimiter=";"))
+        lignes = list(csv.DictReader(f, delimiter=";"))
+    supprimees = {e['numero'] for e in journal_suppressions(dossier) if e['etat']=='supprimee'}
+    return lignes if inclure_supprimees else [l for l in lignes if not l.get('supprimee_le') and l.get('numero') not in supprimees]
 
 
 def clients_connus(dossier):
@@ -451,16 +467,218 @@ def verifier(fichier, publique):
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-    lignes = [l.strip() for l in Path(fichier).read_text(encoding="utf-8").splitlines() if l.strip()]
-    donnees = json.loads(base64.b64decode(lignes[1]))
     try:
+        if Path(fichier).stat().st_size > 64*1024:
+            raise ValueError
+        lignes = [l.strip() for l in Path(fichier).read_text(encoding="utf-8-sig").splitlines() if l.strip()]
+        if len(lignes)!=3 or lignes[0]!=ENTETE:
+            raise ValueError
+        donnees = json.loads(base64.b64decode(lignes[1],validate=True))
+        if not isinstance(donnees,dict):
+            raise ValueError
         brut = Path(publique).read_bytes()
         brut = brut[6:] if len(brut) == 38 and brut.startswith(b"ERPID\x01") else base64.b64decode(brut.strip())
         Ed25519PublicKey.from_public_bytes(brut).verify(
             base64.b64decode(lignes[2]), canonique(donnees))
-    except (InvalidSignature, ValueError):
+    except (InvalidSignature, ValueError, IndexError, UnicodeDecodeError):
         raise SystemExit("Signature INCORRECTE.")
     print("Signature correcte :", json.dumps(donnees, ensure_ascii=False, indent=1))
+    return donnees
+
+
+def journal_suppressions(dossier):
+    """Journal propriétaire, jamais exporté ; une entrée finalisée masque la licence dans la liste active."""
+    chemin = Path(dossier)/'journal-suppressions.json'
+    if chemin.is_symlink():
+        raise ValueError('Le journal des suppressions ne doit pas être un lien.')
+    if not chemin.exists():
+        return []
+    if chemin.stat().st_size > 10*1024*1024:
+        raise ValueError('Journal des suppressions trop volumineux.')
+    d=json.loads(chemin.read_text(encoding='utf-8'))
+    if not isinstance(d,dict) or d.get('version')!=1 or not isinstance(d.get('evenements'),list):
+        raise ValueError('Journal des suppressions illisible : conservez-le pour diagnostic.')
+    evenements=d['evenements']
+    if any(not isinstance(e,dict) or not all(isinstance(e.get(k),str) for k in
+            ('numero','date','etat','fichier','sha256','archive')) or e['etat'] not in
+            ('en_cours','supprimee','annulee') for e in evenements):
+        raise ValueError('Journal des suppressions incohérent : aucune suppression autorisée.')
+    return evenements
+
+
+def enregistrer_suppressions(dossier, evenements):
+    """Remplacement atomique du seul journal, après écriture et synchronisation sur disque."""
+    import tempfile
+
+    chemin=Path(dossier)/'journal-suppressions.json'
+    if chemin.is_symlink():
+        raise ValueError('Journal lié : écriture refusée.')
+    temporaire=None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=dossier,delete=False,
+                                         prefix='.suppressions-',suffix='.tmp') as f:
+            temporaire=Path(f.name)
+            json.dump({'version':1,'evenements':evenements},f,ensure_ascii=False,indent=2)
+            f.flush();os.fsync(f.fileno())
+        os.replace(temporaire,chemin)
+    finally:
+        if temporaire and temporaire.exists():
+            temporaire.unlink()
+
+
+def preparer_suppression(dossier, numero):
+    """Photographie vérifiée de la seule licence sélectionnée, avant la confirmation de l'utilisateur."""
+    dossier=Path(dossier).resolve()
+    lignes=[l for l in registre_lignes(dossier) if l.get('numero')==numero]
+    if len(lignes)!=1:
+        raise ValueError('Sélectionnez une seule licence active, sans doublon de numéro.')
+    ligne=lignes[0]
+    fichier=Path(ligne.get('fichier',''))
+    if fichier.is_symlink() or fichier.suffix.lower()!='.erplic' or fichier.resolve().parent!=dossier or not fichier.is_file():
+        raise ValueError('La licence sélectionnée doit être un fichier du dossier propriétaire courant.')
+    if fichier.stat().st_nlink!=1:
+        raise ValueError('La licence ne doit pas être liée à un autre fichier.')
+    publique=dossier/'parametres.dat'
+    if publique.is_symlink():
+        raise ValueError('Fichier public lié : suppression refusée.')
+    donnees=verifier(fichier,publique)
+    if any(str(donnees.get(k,''))!=str(ligne.get(k,'')) for k in ('numero','client','machine')):
+        raise ValueError('Le fichier ne correspond pas à la licence sélectionnée dans le registre.')
+    return {'numero':numero,'client':donnees['client'],'edition':donnees.get('edition',''),
+            'postes':donnees.get('postes',''),'machine':donnees.get('machine',''),
+            'fichier':str(fichier.resolve()),'sha256':hashlib.sha256(fichier.read_bytes()).hexdigest(),
+            'registre_sha256':hashlib.sha256((dossier/'registre-licences.csv').read_bytes()).hexdigest(),
+            'publique_sha256':hashlib.sha256(publique.read_bytes()).hexdigest()}
+
+
+def supprimer_licence(dossier, selection, confirme=False):
+    """Retrait ciblé et réversible, avec intention durable et journal final. Ne révoque pas les clients.
+
+    Le CSV garde le numéro pour qu'il ne soit jamais réattribué ; le fichier seul est déplacé en corbeille.
+    Les clés, notices, demandes, ZIP déjà exportés et autres licences ne sont ni déplacés ni supprimés.
+    """
+    if confirme is not True:
+        raise ValueError('Confirmation explicite nécessaire ; aucune licence supprimée.')
+    dossier=Path(dossier).resolve()
+    verrou=dossier/'.suppression-licences.lock'
+    with verrou.open('x',encoding='utf-8') as f:
+        f.write(str(os.getpid()))
+    try:
+        actuelle=preparer_suppression(dossier,selection.get('numero'))
+        if actuelle!=selection:
+            raise ValueError('La sélection a changé : relisez les informations et confirmez de nouveau.')
+        evenements=journal_suppressions(dossier)
+        if any(e['etat']=='en_cours' for e in evenements):
+            raise ValueError('Une suppression est incomplète : contrôler le journal et la corbeille avant de poursuivre.')
+        corbeille=dossier/'corbeille-licences'
+        if corbeille.is_symlink():
+            raise ValueError('Corbeille liée : suppression refusée.')
+        corbeille.mkdir(exist_ok=True)
+        destination=corbeille/secrets.token_hex(16)
+        archive=destination/Path(actuelle['fichier']).name
+        evenement={k:actuelle[k] for k in ('numero','client','fichier','sha256')}
+        evenement.update(date=datetime.datetime.now(datetime.timezone.utc).isoformat(),etat='en_cours',
+                         archive=str(archive.relative_to(dossier)),acteur=getpass.getuser())
+        evenements.append(evenement)
+        enregistrer_suppressions(dossier,evenements)  # Aucun déplacement si le journal ne peut pas être écrit.
+        deplace=False
+        try:
+            destination.mkdir(mode=0o700)
+            Path(actuelle['fichier']).rename(archive)
+            deplace=True
+            evenement['etat']='supprimee'
+            enregistrer_suppressions(dossier,evenements)
+        except (OSError,ValueError):
+            if deplace:
+                if Path(actuelle['fichier']).exists():
+                    raise OSError('Suppression interrompue : fichier conservé en corbeille, contrôler le journal.')
+                archive.rename(actuelle['fichier'])
+            evenement['etat']='annulee'
+            enregistrer_suppressions(dossier,evenements)
+            raise
+        return archive
+    finally:
+        verrou.unlink()
+
+
+def ecrire_guide(dossier, publique=None):
+    """Guide placé à côté du coffre, sans secret et sans prétendre importer une nouvelle autorité."""
+    dossier=Path(dossier)
+    dossier.mkdir(parents=True,exist_ok=True)
+    guide=dossier/'INSTALLATION_CLE_PUBLIQUE.md'
+    if guide.is_symlink():
+        raise ValueError('Le guide ne doit pas être un lien vers un autre fichier.')
+    if publique is None and (dossier/'parametres.dat').is_file():
+        contenu=(dossier/'parametres.dat').read_bytes()
+        if len(contenu)==38 and contenu.startswith(b'ERPID\x01'):
+            publique=contenu[6:]
+    empreinte=hashlib.sha256(publique).hexdigest().upper() if publique else 'à relever après création ou regroupement de votre identité'
+    texte=f'''# Installer la licence et reconnaître la clé publique — ERP OHADA
+
+## Fichiers et emplacement exact
+
+Le dossier propriétaire choisi dans le générateur contient coffre.dat (privé, chiffré), parametres.dat
+(public, binaire) et les licences .erplic. Il reste sur le poste du propriétaire. Aucun coffre privé
+ne doit être envoyé, copié ou installé chez un client. Utiliser « Exporter le paquet client ».
+
+Empreinte SHA-256 de la clé publique brute de ce dossier : {empreinte}
+
+Sur le client compilé, aucun chemin de copie manuelle de parametres.dat n'est nécessaire ni accepté
+comme nouvelle autorité. L'autorité de l'éditeur est intégrée au programme compilé livré.
+Un fichier public différent ne peut pas la remplacer. Si elle manque, demander à l'éditeur une version
+personnalisée avec cette identité PUBLIQUE uniquement. Ne jamais lui transmettre le coffre privé.
+
+Emplacements par défaut de l'installateur (ils peuvent être changés à l'installation) :
+- Programme Transport : C:\\Program Files\\ERP-OHADA\\Transport ; Commerce : C:\\Program Files\\ERP-OHADA\\Commerce.
+- Données serveur Transport : C:\\ProgramData\\ERP-OHADA\\Transport ; Commerce : C:\\ProgramData\\ERP-OHADA\\Commerce.
+Ces dossiers ne sont pas des destinations où coller les clés. Les fichiers licence et public peuvent
+être choisis dans tout dossier lisible par le navigateur de l'administrateur (par exemple Téléchargements).
+La licence validée est déposée dans l'historique de la base active ; la clé privée n'est jamais requise.
+
+## Installation automatique depuis les deux fichiers
+
+1. Ouvrir l'ERP concerné et se connecter comme administrateur.
+2. Aller dans Fichier > Administration du poste > Licence.
+3. Choisir le fichier .erplic destiné à cette société, édition et machine.
+4. Choisir parametres.dat dans « Clé publique de l'éditeur ». Les anciens fichiers publics .txt restent lisibles.
+5. Cliquer « Installer la licence ». Le serveur vérifie le public autorisé, la signature et la destination
+   de la licence, puis enregistre la licence. Aucune copie dans les dossiers Windows ni deuxième code n'est nécessaire.
+6. Vérifier le message de réussite, le numéro, la société, l'édition, les postes et l'échéance dans l'état affiché.
+   Comparer l'empreinte de l'éditeur affichée par l'ERP à celle de ce guide, obtenue auprès du propriétaire.
+7. Recharger la page : la licence doit rester dans l'historique et l'état doit être cohérent avec ses dates.
+
+## Windows 10, Windows 11 et Windows Server
+
+Même procédure d'import dans le navigateur. L'installateur peut demander l'élévation administrateur pour
+Program Files, le service et le pare-feu. Aucun droit d'écriture dans Program Files n'est nécessaire pour
+importer une licence. Sous Windows Server, utiliser une session graphique/navigateur ; le générateur Tk
+n'est pas prévu pour Server Core sans interface. Depuis un poste distant, les fichiers sont sélectionnés
+sur ce poste et envoyés au serveur ERP. L'identité machine de la licence est celle du serveur, pas du navigateur.
+Nommer les OS réellement essayés dans la livraison ; un essai windows-latest ne prouve pas les trois versions.
+
+## Refus et solutions
+
+- « Identité de votre éditeur doit être intégrée » / version d'essai : obtenir la version personnalisée
+  auprès de l'éditeur ; coller un fichier ou recréer une paire ne résout pas l'absence d'autorité approuvée.
+- « Ce fichier public n'appartient pas à l'éditeur » : choisir le public correspondant à l'autorité du programme.
+- « Choisissez uniquement le fichier public » : coffre.dat ou fichier illisible sélectionné ; choisir parametres.dat.
+- « Signature incorrecte » : fichier modifié ou autre éditeur ; reprendre la licence originale auprès de l'éditeur.
+- Refus de machine, édition ou société : produire une demande .erpdem depuis le serveur et la société concernés,
+  puis demander la licence correspondante. Ne pas modifier les champs du fichier signé.
+- Fichier absent/trop volumineux : choisir le .erplic (64 Ko maximum), pas le ZIP complet ; public : 8 Ko maximum.
+- Droits insuffisants : se connecter comme administrateur. Vérifier aussi l'horloge et l'échéance affichées.
+
+## Conservation et suppression dans l'outil propriétaire
+
+Sauvegarder le dossier propriétaire dans un emplacement protégé, avec son coffre chiffré et son mot de passe.
+« Supprimer la licence » affiche les informations et exige une confirmation. Seul le .erplic sélectionné
+est déplacé vers corbeille-licences ; le numéro reste réservé et le journal est journal-suppressions.json.
+Les clés, autres licences, notices et ZIP déjà exportés sont conservés. Ce retrait local ne révoque pas
+une licence déjà remise/installée. Après interruption, vérifier le journal et la corbeille avant de retirer
+un ancien verrou .suppression-licences.lock ; conserver les fichiers pour diagnostic.
+'''
+    guide.write_text(texte,encoding='utf-8')
+    return guide
 
 
 def bureau():
@@ -504,9 +722,9 @@ def interface(essai=False):
     temporaire = tempfile.TemporaryDirectory(prefix="erp-licences-interface-") if essai else None
     prefs = {} if essai else preferences()
     fen = tk.Tk()
-    fen.title("ERP OHADA — Installation et licences 3.0 (propriétaire)")
-    fen.geometry("960x790")
-    fen.minsize(820, 680)
+    fen.title("ERP OHADA — Installation et licences 3.1 (propriétaire)")
+    fen.geometry("760x640")
+    fen.minsize(600, 440)
     session = CoffreSession()
     v = {nom: tk.StringVar(value=val) for nom, val in {
         "dossier": temporaire.name if essai else prefs.get("dossier_unique", prefs.get("cles", str(Path.home()/"ERP-OHADA-Licences"))),
@@ -531,9 +749,9 @@ def interface(essai=False):
         fen.destroy()
 
     fen.protocol("WM_DELETE_WINDOW", fermer)
-    cadre = ttk.Frame(fen, padding=12)
+    cadre = ttk.Frame(fen, padding=8)
     cadre.pack(fill='both', expand=True)
-    ttk.Label(cadre, text="Dossier de travail du propriétaire — clés et licences réunies").pack(anchor='w')
+    ttk.Label(cadre, text="Dossier propriétaire — clés et licences réunies").pack(anchor='w')
     ligne_dossier = ttk.Frame(cadre)
     ligne_dossier.pack(fill='x', pady=(3,8))
     ttk.Entry(ligne_dossier, textvariable=v['dossier']).pack(side='left', fill='x', expand=True)
@@ -548,16 +766,27 @@ def interface(essai=False):
     ttk.Button(ligne_dossier, text='Ouvrir le dossier', command=lambda: ouvrir_dossier(v['dossier'].get())).pack(side='left')
     onglets = ttk.Notebook(cadre)
     onglets.pack(fill='both', expand=True)
-    installation_tab, licence_tab = ttk.Frame(onglets, padding=12), ttk.Frame(onglets, padding=12)
+    installation_tab, licence_onglet = ttk.Frame(onglets, padding=8), ttk.Frame(onglets)
     onglets.add(installation_tab, text='1 · Installation')
-    onglets.add(licence_tab, text='2 · Licence')
+    onglets.add(licence_onglet, text='2 · Licence')
+    licence_onglet.columnconfigure(0,weight=1)
+    licence_onglet.rowconfigure(0,weight=1)
+    defilement=tk.Canvas(licence_onglet,highlightthickness=0)
+    defilement.grid(row=0,column=0,sticky='nsew')
+    barre=ttk.Scrollbar(licence_onglet,orient='vertical',command=defilement.yview)
+    barre.grid(row=0,column=1,sticky='ns')
+    defilement.configure(yscrollcommand=barre.set)
+    licence_tab=ttk.Frame(defilement,padding=8)
+    contenu=defilement.create_window((0,0),window=licence_tab,anchor='nw')
+    licence_tab.bind('<Configure>',lambda _e:defilement.configure(scrollregion=defilement.bbox('all')))
+    defilement.bind('<Configure>',lambda e:defilement.itemconfigure(contenu,width=e.width))
 
     ttk.Label(installation_tab, text="Générer un code d’installation", font=('Segoe UI',14,'bold')).pack(anchor='w')
     ttk.Label(installation_tab, text="Aucune société à saisir. Aucun coffre à ouvrir, aucun mot de passe demandé.",
-              wraplength=800).pack(anchor='w', pady=8)
+              wraplength=520).pack(anchor='w', pady=8)
     ttk.Label(installation_tab, text="Le code est enregistré dans le dossier choisi. La licence signée reste l’autorisation commerciale du logiciel.",
-              wraplength=800).pack(anchor='w', pady=4)
-    ttk.Entry(installation_tab, textvariable=resultat_installation, state='readonly', font=('Consolas',16)).pack(fill='x', pady=12)
+              wraplength=520).pack(anchor='w', pady=4)
+    ttk.Entry(installation_tab, textvariable=resultat_installation, state='readonly', font=('Consolas',14)).pack(fill='x', pady=12)
 
     def installation():
         try:
@@ -579,7 +808,7 @@ def interface(essai=False):
     generer_code_btn = ttk.Button(boutons_installation, text='Générer une clé d’installation', command=installation)
     generer_code_btn.pack(side='left', padx=(0,5))
     ttk.Button(boutons_installation, text='Copier le code', command=copier_code).pack(side='left')
-    statut_installation = ttk.Label(installation_tab, text='', wraplength=800)
+    statut_installation = ttk.Label(installation_tab, text='', wraplength=520)
     statut_installation.pack(anchor='w', pady=12)
 
     licence_tab.columnconfigure(1, weight=1)
@@ -642,12 +871,21 @@ def interface(essai=False):
             erreur(exc)
 
     identite = ttk.Frame(licence_tab)
-    creer_btn = ttk.Button(identite, text='Créer mon identité (une fois)', command=creer)
+    creer_btn = ttk.Button(identite, text='Créer l’identité', command=creer)
     creer_btn.pack(side='left')
-    ttk.Button(identite, text='Rassembler une identité existante…', command=rassembler).pack(side='left', padx=4)
+    ttk.Button(identite, text='Regrouper…', command=rassembler).pack(side='left', padx=4)
     ttk.Button(identite, text='Verrouiller', command=verrouiller).pack(side='left')
+    def guide():
+        try:
+            fichier=ecrire_guide(v['dossier'].get())
+            etat.set(f'Guide disponible : {fichier.name}')
+            if os.name=='nt' and not essai:
+                os.startfile(fichier)
+        except (OSError,ValueError) as exc:
+            erreur(exc)
+    ttk.Button(identite,text='Guide',command=guide).pack(side='left',padx=4)
     ligne(0, 'Identité de l’éditeur', identite)
-    ttk.Label(licence_tab,textvariable=etat,wraplength=780).grid(row=1,column=0,columnspan=2,sticky='w',pady=4)
+    ttk.Label(licence_tab,textvariable=etat,wraplength=520).grid(row=1,column=0,columnspan=2,sticky='w',pady=4)
     choix_client=ligne(2,'Société à licencier',ttk.Combobox(licence_tab,textvariable=v['client']))
     ligne(3,'Édition',ttk.Combobox(licence_tab,textvariable=v['edition'],values=EDITIONS,state='readonly'))
     ligne(4,'Nombre de postes',ttk.Spinbox(licence_tab,from_=1,to=65000,textvariable=v['postes']))
@@ -670,17 +908,20 @@ def interface(essai=False):
 
     demande=ttk.Frame(licence_tab)
     ttk.Entry(demande,textvariable=v['demande']).pack(side='left',fill='x',expand=True)
-    ttk.Button(demande,text='Ouvrir une demande…',command=choisir_demande).pack(side='left',padx=4)
+    ttk.Button(demande,text='Parcourir…',command=choisir_demande).pack(side='left',padx=4)
     ligne(5,'Demande du logiciel client',demande)
-    serveur=ttk.Label(licence_tab,text='',wraplength=780)
+    serveur=ttk.Label(licence_tab,text='',wraplength=520)
     serveur.grid(row=6,column=0,columnspan=2,sticky='w')
     duree=ttk.Frame(licence_tab)
     ttk.Radiobutton(duree,text='Jusqu’au',variable=v['duree'],value='abonnement').pack(side='left')
     ttk.Entry(duree,textvariable=v['jusqu_au'],width=12).pack(side='left',padx=4)
     def echeance(n):
         v['duree'].set('abonnement');v['jusqu_au'].set(dans_mois(n));v['maj'].set(dans_mois(n))
-    for nom,n in [('1 mois',1),('3 mois',3),('1 an',12),('3 ans',36)]:
-        ttk.Button(duree,text=nom,command=lambda n=n:echeance(n)).pack(side='left',padx=2)
+    choix_duree=tk.StringVar(value='1 an')
+    durees={'1 mois':1,'3 mois':3,'1 an':12,'3 ans':36}
+    raccourci=ttk.Combobox(duree,textvariable=choix_duree,values=list(durees),state='readonly',width=8)
+    raccourci.pack(side='left',padx=4)
+    raccourci.bind('<<ComboboxSelected>>',lambda _e:echeance(durees[choix_duree.get()]))
     ttk.Radiobutton(duree,text='Permanente',variable=v['duree'],value='definitive').pack(side='left')
     ligne(7,'Durée de licence',duree)
     avancees=ttk.Frame(licence_tab)
@@ -694,17 +935,25 @@ def interface(essai=False):
     def options_avancees():
         avancees.grid(row=9,column=0,columnspan=2,sticky='ew') if affiche_avancees.get() else avancees.grid_remove()
     ttk.Checkbutton(licence_tab,text='Options avancées',variable=affiche_avancees,command=options_avancees).grid(row=8,column=0,columnspan=2,sticky='w')
-    registre=ttk.Treeview(licence_tab,columns=('numero','client','postes','fin'),show='headings',height=6)
-    for col,titre,large in [('numero','Licence',120),('client','Société',320),('postes','Postes',60),('fin','Échéance',110)]:
-        registre.heading(col,text=titre);registre.column(col,width=large)
-    registre.grid(row=10,column=0,columnspan=2,sticky='nsew',pady=8)
+    historique=ttk.Frame(licence_tab)
+    historique.columnconfigure(0,weight=1);historique.rowconfigure(0,weight=1)
+    registre=ttk.Treeview(historique,columns=('numero','client','postes','fin'),show='headings',height=4,selectmode='browse')
+    for col,titre,large in [('numero','Licence',110),('client','Société',180),('postes','Postes',50),('fin','Échéance',90)]:
+        registre.heading(col,text=titre);registre.column(col,width=large,minwidth=40)
+    registre.grid(row=0,column=0,sticky='nsew')
+    ascenseur=ttk.Scrollbar(historique,orient='vertical',command=registre.yview)
+    ascenseur.grid(row=0,column=1,sticky='ns');registre.configure(yscrollcommand=ascenseur.set)
+    historique.grid(row=10,column=0,columnspan=2,sticky='nsew',pady=8)
     licence_tab.rowconfigure(10,weight=1)
 
     def rafraichir(*_):
-        choix_client['values']=list(clients_connus(v['dossier'].get()))
         registre.delete(*registre.get_children())
-        for l in reversed(registre_lignes(v['dossier'].get())):
-            registre.insert('', 'end', values=(l['numero'],l['client'],l['postes'],l['valable_jusqu_au'] or 'Permanente'))
+        try:
+            choix_client['values']=list(clients_connus(v['dossier'].get()))
+            for l in reversed(registre_lignes(v['dossier'].get())):
+                registre.insert('', 'end', values=(l['numero'],l['client'],l['postes'],l['valable_jusqu_au'] or 'Permanente'))
+        except (OSError,ValueError,KeyError) as exc:
+            etat.set(f'Registre non disponible : {exc}')
 
     def generer():
         try:
@@ -742,14 +991,46 @@ def interface(essai=False):
         except (OSError,ValueError,SystemExit) as exc:
             erreur(exc)
 
-    boutons=ttk.Frame(licence_tab)
-    boutons.grid(row=11,column=0,columnspan=2,sticky='e',pady=8)
-    generer_licence_btn=ttk.Button(boutons,text='Générer la licence dans ce dossier',command=generer)
+    confirmations_essai=iter((False,True)) if essai else None
+    def supprimer():
+        try:
+            selection=registre.selection()
+            if len(selection)!=1:
+                raise ValueError('Sélectionnez la licence à supprimer dans la liste.')
+            numero=registre.item(selection[0],'values')[0]
+            detail=preparer_suppression(v['dossier'].get(),numero)
+            texte=(f"Licence : {detail['numero']}\nSociété : {detail['client']}\n"
+                   f"Édition : {detail['edition']} — {detail['postes']} postes\nServeur : {detail['machine']}\n"
+                   f"Fichier : {Path(detail['fichier']).name}\n\n"
+                   "Déplacer ce seul fichier dans la corbeille du dossier propriétaire ?\n"
+                   "Les clés et les autres licences seront conservées.\n"
+                   "Cette suppression locale ne révoque pas les licences déjà installées.")
+            confirme=next(confirmations_essai) if essai else messagebox.askyesno('Supprimer la licence',texte,parent=fen)
+            if not confirme:
+                etat.set('Suppression annulée ; aucun fichier déplacé.')
+                return
+            supprimer_licence(v['dossier'].get(),detail,confirme=True)
+            if derniere_licence[0] and str(derniere_licence[0].resolve())==detail['fichier']:
+                derniere_licence[0]=None
+            rafraichir()
+            etat.set(f'Licence {numero} retirée et conservée en corbeille. Journal de suppression enregistré.')
+        except (OSError,ValueError,SystemExit) as exc:
+            erreur(exc)
+
+    boutons=ttk.Frame(licence_onglet,padding=6)
+    boutons.grid(row=1,column=0,columnspan=2,sticky='ew')
+    generer_licence_btn=ttk.Button(boutons,text='Générer la licence',command=generer)
     generer_licence_btn.pack(side='left',padx=4)
-    exporter_btn=ttk.Button(boutons,text='Exporter le paquet client',command=exporter)
+    exporter_btn=ttk.Button(boutons,text='Exporter au client',command=exporter)
     exporter_btn.pack(side='left')
-    ttk.Label(licence_tab,text='Le dossier complet reste chez le propriétaire. La clé publique est binaire ; seul le coffre privé doit rester secret.',
-              wraplength=800).grid(row=12,column=0,columnspan=2,sticky='w')
+    supprimer_btn=ttk.Button(boutons,text='Supprimer la licence',command=supprimer)
+    supprimer_btn.pack(side='left',padx=4)
+    ttk.Label(licence_onglet,text='Le dossier complet et le coffre privé restent chez le propriétaire.',
+              wraplength=520,padding=6).grid(row=2,column=0,columnspan=2,sticky='w')
+    def molette(e):
+        if onglets.select()==str(licence_onglet) and e.widget!=registre:
+            defilement.yview_scroll(-1 if e.delta>0 else 1,'units')
+    fen.bind('<MouseWheel>',molette)
     def dossier_change(*_):
         session.verrouiller();derniere_licence[0]=None;resultat_installation.set('')
         etat.set('Dossier sélectionné. Les nouvelles licences seront enregistrées ici avec les clés.')
@@ -764,7 +1045,7 @@ def interface(essai=False):
             generer_code_btn.invoke()
             assert fc.est_installation_courte(dernier_code[0])
             assert not chemin_coffre(dossier).exists() and not v['client'].get()
-            onglets.select(licence_tab)
+            onglets.select(licence_onglet)
             creer_btn.invoke()
             demande=dossier/'DEMANDE-ESSAI.erpdem'
             demande.write_text(fc.demande_ecrire({'societe':'Société fictive GUI','materiel':'POSTE-INTERFACE-FICTIF',
@@ -780,11 +1061,31 @@ def interface(essai=False):
             with zipfile.ZipFile(fichier) as z:
                 assert 'coffre.dat' not in z.namelist() and 'parametres.dat' in z.namelist()
                 assert len(z.namelist())==3
+            assert (dossier/'INSTALLATION_CLE_PUBLIQUE.md').is_file()
+            # Une deuxième licence reste intacte après annulation puis suppression de la première.
+            premiere=derniere_licence[0]
+            generer_licence_btn.invoke()
+            seconde=derniere_licence[0]
+            cible=next(i for i in registre.get_children() if registre.item(i,'values')[0]==registre_lignes(dossier)[0]['numero'])
+            registre.selection_set(cible)
+            supprimer_btn.invoke()
+            assert premiere.exists() and len(registre_lignes(dossier))==2
+            supprimer_btn.invoke()
+            assert not premiere.exists() and seconde.exists() and len(registre_lignes(dossier))==1
+            assert journal_suppressions(dossier)[-1]['etat']=='supprimee'
+            for largeur,hauteur in ((760,640),(600,440)):
+                fen.geometry(f'{largeur}x{hauteur}');fen.update()
+                for bouton in (generer_licence_btn,exporter_btn,supprimer_btn):
+                    assert bouton.winfo_ismapped()
+                    assert bouton.winfo_rootx()+bouton.winfo_width()<=fen.winfo_rootx()+fen.winfo_width()
+                    assert bouton.winfo_rooty()+bouton.winfo_height()<=fen.winfo_rooty()+fen.winfo_height()
+                affiche_avancees.set(True);options_avancees();fen.update()
+                defilement.yview_moveto(1.0);fen.update()
             # Le module 1 fonctionne encore après verrouillage du module Licence.
             verrouiller();onglets.select(installation_tab);generer_code_btn.invoke()
             assert session.cle is None
             fen.update()
-            print('Interface Windows : deux modules, code sans coffre/société, clés binaires et licence réunies, paquet client sans clé privée : OK')
+            print('Interface 3.1 : deux modules, 760x640 et 600x440, actions accessibles, guide, suppression confirmée/journalisée, clés conservées : OK')
         finally:
             fermer();temporaire.cleanup()
         return

@@ -262,6 +262,19 @@ def verifier_fichier_public(contenu):
     return candidate
 
 
+def empreintes_publiques():
+    """Repère visuel des seules identités déjà autorisées, comparable au guide propriétaire."""
+    empreintes=[]
+    for cle in cles_publiques():
+        try:
+            brut=base64.b64decode(cle,validate=True)
+            if len(brut)==32:
+                empreintes.append(hashlib.sha256(brut).hexdigest().upper())
+        except (ValueError,TypeError):
+            continue
+    return empreintes
+
+
 def enregistrer_cle_installation(texte):
     """Écran de premier démarrage ou écran Licence : la clé est vérifiée puis gardée ; le nom de la société vient
     de la clé (il figure ensuite sur la demande de licence)."""
@@ -614,3 +627,4 @@ def peut_activer_un_compte():
         return False, (f"{e.postes} poste(s) prévus par la {source} "
                        f"et {comptes_actifs()} compte(s) actif(s) : désactivez un compte ou étendez la licence.")
     return True, ""
+
