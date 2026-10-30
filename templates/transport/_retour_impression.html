@@ -1,0 +1,12 @@
+{% if suivant_url %}
+<div class="d-print-none mt-3" data-retour-impression="{{ suivant_url }}">
+<a class="btn btn-primary" href="{{ suivant_url }}">{{ suivant_libelle }}</a>
+<button type="button" class="btn btn-outline-secondary" onclick="window.print()">Imprimer à nouveau</button>
+</div>
+<script>
+(function () {
+  var retour = document.querySelector('[data-retour-impression]');
+  window.addEventListener('afterprint', function () { if (retour) window.location.replace(retour.dataset.retourImpression); }, {once:true});
+})();
+</script>
+{% endif %}

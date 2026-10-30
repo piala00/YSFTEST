@@ -31,6 +31,8 @@ urlpatterns = [
     path("colis/caisse/", views.ma_caisse, {"service": "COLIS"}, name="ma_caisse_colis"),
     path("colis/cloture/", views.cloture_journee, {"perimetre": "COLIS"}, name="cloture_colis"),
     path("garage/cloture/", views.cloture_journee, {"perimetre": "GARAGE"}, name="cloture_garage"),
+    path("billetterie/contacts/rechercher/", views.contacts_rechercher, {"service": "billetterie"}, name="contacts_billetterie"),
+    path("colis/contacts/rechercher/", views.contacts_rechercher, {"service": "colis"}, name="contacts_colis"),
     # Billetterie
     path("billetterie/departs/", views.departs, name="departs"),
     path("billetterie/departs/nouveau/", views.depart_form, name="depart_create"),
@@ -56,3 +58,4 @@ urlpatterns = [
     path("garage/depenses/", views.depenses, name="depenses"),
     path("garage/depenses/nouvelle/", views.depense_form, name="depense_create"),
 ]
+

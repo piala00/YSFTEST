@@ -5,6 +5,8 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -12,6 +14,7 @@ from django.utils import timezone
 
 from apps.commercial.models import Tiers
 
+from . import contacts
 from .forms import (BilletForm, ChauffeurForm, ColisForm, DepartForm, DepenseVehiculeForm, GareForm, LigneForm,
                     ParametresTransportForm, VehiculeForm)
 from .models import Billet, Chauffeur, Colis, Depart, DepenseVehicule, Gare, Ligne, ParametresTransport, Vehicule
@@ -265,18 +268,28 @@ def billets(request):
 
 @login_required
 def billet_vente(request):
-    initial = {}
+    initial = {"cle_saisie": contacts.nouveau_jeton(request.user, "billet")}
     if request.GET.get("depart"):
-        depart = Depart.objects.filter(pk=request.GET["depart"]).first()
+        try:
+            depart = Depart.objects.filter(pk=int(request.GET["depart"])).first()
+        except (ValueError, TypeError):
+            depart = None
         if depart:
-            initial = {"depart": depart, "siege": request.GET.get("siege")}         # prix : tarif du trajet choisi
+            initial.update(depart=depart, siege=request.GET.get("siege"))
     form = BilletForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
-        billet = form.save(commit=False)
         try:
-            billet.vendre(request.user, depart_correspondance=form.cleaned_data.get("depart_correspondance"),
-                          siege_correspondance=form.cleaned_data.get("siege_correspondance"))
+            def enregistrer():
+                billet = form.save(commit=False)
+                billet.vendre(request.user, depart_correspondance=form.cleaned_data.get("depart_correspondance"),
+                              siege_correspondance=form.cleaned_data.get("siege_correspondance"))
+                contacts.memoriser(billet.voyageur, billet.telephone, billet.piece_identite, request.user,
+                                   form.cleaned_data.get("personne"))
+                return billet
+            billet = contacts.enregistrer_une_fois(request, "billet", enregistrer)
             messages.success(request, f"Billet {billet.numero} vendu ({billet.prix:,.0f} FCFA).".replace(",", " "))
+            if request.POST.get("imprimer"):
+                return redirect(reverse("transport:billet_imprimer", args=[billet.pk]) + "?suivant=1")
             if request.POST.get("suivant"):
                 return redirect(f"{reverse('transport:billet_vente')}?depart={billet.depart_id}")
             return redirect("transport:billet_detail", billet.pk)
@@ -326,7 +339,9 @@ def billet_detail(request, pk):
 
 @login_required
 def billet_imprimer(request, pk):
-    return render(request, "transport/billet_print.html", {"billet": get_object_or_404(Billet, pk=pk)})
+    billet = get_object_or_404(Billet, pk=pk)
+    suivant = f"{reverse('transport:billet_vente')}?depart={billet.depart_id}" if request.GET.get("suivant") == "1" else ""
+    return render(request, "transport/billet_print.html", {"billet": billet, "suivant_url": suivant})
 
 
 # ---------------------------------------------------------------- Colis et courrier
@@ -351,12 +366,25 @@ def colis_liste(request):
 
 @login_required
 def colis_form(request):
-    form = ColisForm(request.POST or None, initial={"nature": request.GET.get("nature", Colis.COLIS)})
+    initial = {"nature": request.GET.get("nature", Colis.COLIS),
+               "cle_saisie": contacts.nouveau_jeton(request.user, "colis")}
+    form = ColisForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
-        colis = form.save(commit=False)
         try:
-            colis.enregistrer(request.user)
+            def enregistrer():
+                colis = form.save(commit=False)
+                colis.enregistrer(request.user)
+                contacts.memoriser(colis.expediteur, colis.tel_expediteur, utilisateur=request.user,
+                                   personne=form.cleaned_data.get("personne_expediteur"))
+                contacts.memoriser(colis.destinataire, colis.tel_destinataire, utilisateur=request.user,
+                                   personne=form.cleaned_data.get("personne_destinataire"))
+                return colis
+            colis = contacts.enregistrer_une_fois(request, "colis", enregistrer)
             messages.success(request, f"{colis.get_nature_display()} {colis.numero} enregistré — code de retrait {colis.code_retrait}.")
+            if request.POST.get("imprimer"):
+                return redirect(reverse("transport:colis_imprimer", args=[colis.pk]) + "?suivant=1")
+            if request.POST.get("suivant"):
+                return redirect(reverse("transport:colis_create") + "?nature=" + colis.nature)
             return redirect("transport:colis_detail", colis.pk)
         except ValidationError as exc:
             _erreur(request, exc)
@@ -392,7 +420,9 @@ def colis_detail(request, pk):
 
 @login_required
 def colis_imprimer(request, pk):
-    return render(request, "transport/colis_print.html", {"colis": get_object_or_404(Colis, pk=pk)})
+    colis = get_object_or_404(Colis, pk=pk)
+    suivant = reverse("transport:colis_create") + "?nature=" + colis.nature if request.GET.get("suivant") == "1" else ""
+    return render(request, "transport/colis_print.html", {"colis": colis, "suivant_url": suivant})
 
 
 # ---------------------------------------------------------------- Flotte
@@ -765,3 +795,16 @@ def comparaisons(request):
     return render(request, "transport/comparaisons.html", {
         "axes": reporting.AXES, "axe": axe, "gammes": GAMMES, "gamme": gamme, "a_du": a_debut, "a_au": a_fin,
         "b_du": b_debut, "b_au": b_fin, **reporting.comparer(axe, (a_debut, a_fin), (b_debut, b_fin), gamme)})
+
+
+
+@login_required
+@require_POST
+def contacts_rechercher(request, service):
+    contacts.verifier_droit(request.user, service, request.POST.get("nature", "COLIS"))
+    resultat = contacts.rechercher(request.POST.get("telephone", "")[:60], request.POST.get("nom", "")[:120],
+                                   avec_piece=service == "billetterie")
+    reponse = JsonResponse(resultat)
+    reponse["Cache-Control"] = "private, no-store"
+    reponse["X-Content-Type-Options"] = "nosniff"
+    return reponse
