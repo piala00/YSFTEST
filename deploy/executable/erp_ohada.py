@@ -427,13 +427,14 @@ def racine_dossiers(donnees):
     return Path(os.environ.get("ERP_DOSSIER_RACINE") or donnees)
 
 
-def creer_simulation(donnees, port, debut, duree):
+def creer_simulation(donnees, port, debut, duree, criteres=None):
     from apps.core import dossiers_simulation as ds
 
     p = SIMULATION["processus"]
     if p is not None and p.poll() is None:
         raise ValueError("une génération est déjà en cours")
-    identifiant, dossier = ds.creer(racine_dossiers(donnees), debut, duree)
+    criteres = ds.normaliser_criteres(criteres)
+    identifiant, dossier = ds.creer(racine_dossiers(donnees), debut, duree, criteres)
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("SQLITE_", "ERP_", "DB_", "MIROIR_", "ECHANGES_", "DJANGO_")) and k != "SECRET_KEY"}
     env.update(ERP_DONNEES=str(dossier), ERP_EDITION="transport", ERP_SANS_NAVIGATEUR="1",
@@ -442,7 +443,7 @@ def creer_simulation(donnees, port, debut, duree):
     programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
     try:
         with (dossier / "simulation-journal.txt").open("w", encoding="utf-8") as sortie:
-            processus = subprocess.Popen(programme + ["simulation-dossier", debut, duree], env=env, stdout=sortie,
+            processus = subprocess.Popen(programme + ["simulation-dossier", debut, duree, json.dumps(criteres)], env=env, stdout=sortie,
                                          stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
         SIMULATION.update(processus=processus, dossier=identifiant)
     except OSError as exc:
@@ -719,7 +720,7 @@ def enregistrer_actions(donnees, port):
     poste.ACTIONS.update(
         etat=etat, sauvegarder=sauvegarder_maintenant,
         restaurer_au_demarrage=lambda nom: prevoir_restauration(donnees, nom),
-        simulation_creer=lambda debut, duree: creer_simulation(donnees, port, debut, duree),
+        simulation_creer=lambda debut, duree, criteres=None: creer_simulation(donnees, port, debut, duree, criteres),
         simulation_supprimer=lambda identifiant="": supprimer_simulation(donnees, identifiant),
         dossier_exporter=lambda identifiant: __import__("apps.core.dossiers_simulation", fromlist=["exporter"]).exporter(racine_dossiers(donnees), identifiant),
         dossier_importer=lambda fichier, utilisateur: importer_dossier(donnees, fichier, utilisateur),
@@ -794,7 +795,13 @@ def main(argv):
                 periode = ["--jusqu-au", "aujourdhui"] if duree == "aujourdhui" else ["--nombre-mois", duree]
                 rapide = (["--jours", "1", "--vehicules", "2", "--salaries", "2", "--echelle", "0.005"]
                           if "--essai-rapide" in argv and not getattr(sys, "frozen", False) else [])
-                call_command("simulation", "--mois", debut, *periode, *rapide,
+                criteres = ds.normaliser_criteres(json.loads(argv[3]) if len(argv) > 3 and argv[3].startswith("{") else None)
+                metier = (["--scenarios-complets"] if criteres["scenarios_complets"] else [])
+                metier += ["--departs-jour", str(criteres["departs_jour"]), "--echelle", str(criteres["echelle"])]
+                if rapide and criteres["scenarios_complets"]:
+                    metier += ["--departs-jour", "4"]
+                call_command("simulation", "--mois", debut, *periode, *metier, *rapide,
+                             "--journal-scenarios", str(donnees / "SCENARIOS-SIMULATION.json"),
                              "--rapport", str(donnees / "BILAN-SIMULATION.md"))
                 initialiser(edition_, donnees, demander_compte=False)
                 Societe.objects.update(assistant_termine=True)
@@ -896,3 +903,4 @@ def main(argv):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
+

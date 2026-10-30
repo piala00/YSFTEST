@@ -1,0 +1,19 @@
+{% load erp %}
+<div class="card card-body mb-3">
+<h2 class="h6">Recherche, pertes et dommages</h2>
+<p class="small">Un colis sans trace reste en recherche. Le signalement ne déclenche ni remboursement ni indemnité automatique. Une indemnité nécessite un montant et un compte approuvés ; le paiement reste une opération distincte.</p>
+{% for i in incidents_suivi %}<section class="border rounded p-2 mb-2 small">
+<strong>{{ i.get_nature_display }}</strong> · {{ i.declare_le|date:"d/m/Y H:i" }} · {{ i.lieu }}<br>{{ i.description }}
+{% if i.resolu %}<div class="text-success">Résolu : {{ i.resolution }}</div>{% else %}<div class="text-danger">Incident ouvert : chargement et livraison bloqués.</div>
+<form method="post" class="d-flex gap-1 mt-1">{% csrf_token %}<input type="hidden" name="incident" value="{{ i.pk }}"><input name="resolution" required maxlength="250" class="form-control form-control-sm" placeholder="Résultat de recherche / traitement du dommage" aria-label="Résolution"><button class="btn btn-sm btn-outline-success" name="action" value="resoudre_incident">Résoudre</button></form>{% endif %}
+{% if i.ecriture %}<div>Indemnité payée : {{ i.montant_autorise|montant }} FCFA · <a href="{% url 'comptabilite:ecriture_detail' i.ecriture_id %}">Écriture {{ i.ecriture.numero }}</a></div>{% else %}
+{% if perms.transport.autoriser_indemnite_colis %}<form method="post" class="d-flex flex-wrap gap-1 mt-1">{% csrf_token %}<input type="hidden" name="incident" value="{{ i.pk }}"><input name="montant" required type="number" min="1" step="1" class="form-control form-control-sm" style="max-width:10rem" placeholder="Montant autorisé" aria-label="Montant de l'indemnité">
+<select name="compte" required class="form-select form-select-sm" style="max-width:22rem" aria-label="Compte d'indemnisation"><option value="">Compte validé par le comptable</option>{% for c in comptes_indemnite %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-warning" name="action" value="autoriser_indemnite">Autoriser l'indemnité</button></form>{% endif %}
+{% if i.autorise_par %}<div>Autorisé : {{ i.montant_autorise|montant }} FCFA par {{ i.autorise_par }}</div>{% if perms.transport.payer_indemnite_colis %}<form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="incident" value="{{ i.pk }}"><select name="caisse" class="form-select form-select-sm" aria-label="Caisse de paiement">{% for c in caisses_indemnite %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select><button class="btn btn-sm btn-warning" name="action" value="payer_indemnite">Payer l'indemnité autorisée</button></form>{% endif %}{% endif %}
+{% endif %}</section>{% endfor %}
+{% if colis.statut != 'LIVRE' and colis.statut != 'ANNULE' %}<details><summary class="small">Déclarer un incident de colis</summary><form method="post" class="mt-2">{% csrf_token %}
+<label class="form-label small" for="i-nature">Constat</label><select id="i-nature" name="nature" class="form-select form-select-sm mb-1">{% for code, nom in natures_incident %}<option value="{{ code }}">{{ nom }}</option>{% endfor %}</select>
+<label class="form-label small" for="i-lieu">Dernier lieu connu</label><input id="i-lieu" name="lieu" maxlength="120" required class="form-control form-control-sm mb-1">
+<label class="form-label small" for="i-description">Constatations</label><input id="i-description" name="description" maxlength="250" required class="form-control form-control-sm mb-1">
+<button class="btn btn-sm btn-outline-danger" name="action" value="incident_colis">Enregistrer le signalement</button></form></details>{% endif %}
+</div>

@@ -143,3 +143,20 @@ class DossiersSimulationTests(unittest.TestCase):
         self.assertFalse(ds.generation_active(self.dossier))
         ds.supprimer(self.racine, self.id)
         self.assertFalse(self.dossier.exists())
+
+    def test_criteres_volume_et_scenarios_sont_valides(self):
+        self.assertEqual(ds.normaliser_criteres({'departs_jour':250,'echelle':1,'scenarios_complets':True})['departs_jour'],250)
+        for c in ({'departs_jour':-1},{'departs_jour':2501},{'echelle':float('nan')},{'echelle':0},{'commande':'effacer'},
+                  {'departs_jour':1,'scenarios_complets':True}):
+            with self.assertRaises(ValueError):
+                ds.normaliser_criteres(c)
+
+    def test_rapports_exportes_importes_et_integrite_verifiee(self):
+        for nom in ds.RAPPORTS:
+            (self.dossier/nom).write_text('Scénario fictif et écritures de test',encoding='utf-8')
+        archive=self.archive()
+        identifiant=ds.importer(self.racine,archive,('local','hash-local'),self.connues)
+        for nom in ds.RAPPORTS:
+            self.assertEqual((ds.emplacement(self.racine,identifiant)/nom).read_text(encoding='utf-8'),'Scénario fictif et écritures de test')
+        with self.assertRaisesRegex(ValueError,'Rapport altéré'):
+            ds.importer(self.racine,self.archive(lambda d:d.update(rapports_sha256={})),('local','hash-local'),self.connues)
