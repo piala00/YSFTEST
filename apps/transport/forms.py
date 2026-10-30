@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 
 from apps.commercial.models import Tiers
@@ -124,8 +126,28 @@ class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
     cle_saisie = forms.CharField(required=False, widget=forms.HiddenInput)
     personne = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
     groupes_contacts = [("personne", "voyageur", "telephone")]
-    rapides = ("telephone", "voyageur", "piece_identite", "gare_arrivee", "siege", "prix", "paiement")
-    complementaires = ("gare_montee", "caisse", "client", "depart_correspondance", "siege_correspondance")
+    mode = forms.ChoiceField(required=False, widget=forms.HiddenInput,
+                             choices=[("direct", "Vente habituelle"), ("transit", "Montée intermédiaire"),
+                                      ("correspondance", "Avec correspondance")])
+    rapides = ("telephone", "voyageur", "piece_identite", "siege", "prix", "paiement")
+    complementaires = ("gare_arrivee", "gare_montee", "caisse", "client", "depart_correspondance", "siege_correspondance")
+
+    @property
+    def champs_trajet(self):
+        return self.champs(self.trajet)
+
+    def clean(self):
+        donnees = super().clean()
+        depart = donnees.get("depart")
+        if depart is not None and donnees.get("mode") == "transit":
+            montee = donnees.get("gare_montee")
+            if montee is None or montee not in depart.ligne.gares()[1:-1]:
+                self.add_error("gare_montee", "Choisissez un arrêt intermédiaire de ce départ.")
+        if depart is not None and donnees.get("mode") == "correspondance":
+            destination = donnees.get("gare_arrivee")
+            if destination is None or destination in depart.ligne.gares():
+                self.add_error("gare_arrivee", "Choisissez la destination au-delà du terminus du premier véhicule.")
+        return donnees
     bagages_champs = ("bagages", "bagages_nombre", "bagages_poids", "prix_bagages")
 
     @property
@@ -162,6 +184,13 @@ class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         programmes = Depart.objects.filter(statut=Depart.PROGRAMME, site_origine="").select_related("ligne", "vehicule").order_by("date", "heure")
+        self.mode_vente = (self.data.get("mode") if self.is_bound else self.initial.get("mode")) or "direct"
+        self.trajet = {"transit": ("gare_montee", "gare_arrivee"),
+                       "correspondance": ("gare_arrivee", "depart_correspondance", "siege_correspondance")}.get(self.mode_vente, ())
+        self.complementaires = tuple(n for n in self.complementaires if n not in self.trajet)
+        self.fields["gare_arrivee"].empty_label = "Terminus du départ"
+        self.fields["gare_montee"].empty_label = "Origine du départ"
+        self.fields["depart_correspondance"].empty_label = "À choisir à la gare de changement"
         self.fields["telephone"].widget.attrs.update({"inputmode": "tel", "autocomplete": "off"})
         self.fields["voyageur"].widget.attrs["autocomplete"] = "off"
         self.fields["depart"].label_from_instance = lambda d: (
@@ -241,3 +270,34 @@ class ParametresTransportForm(BootstrapMixin, forms.ModelForm):
                   "taxe_colis", "retenue_annulation", "sessions_caisse_obligatoires", "plafond_depense_sans_autorisation",
                   "avance_depart_toleree")
 
+
+
+
+class TransitDepartForm(BootstrapMixin, forms.Form):
+    depart = forms.ModelChoiceField(queryset=Depart.objects.none(), label="Véhicule / départ de cette agence")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["depart"].queryset = Depart.objects.filter(statut=Depart.PROGRAMME, site_origine="").select_related(
+            "ligne", "vehicule").order_by("date", "heure")
+        self.fields["depart"].label_from_instance = lambda d: f"{d.numero} — {d.ligne} — {d.vehicule or 'Sans véhicule'}"
+
+
+class TransitPlacementForm(BootstrapMixin, forms.Form):
+    siege = forms.IntegerField(required=False, min_value=1, label="Siège dans ce véhicule")
+
+
+class TransvasementForm(BootstrapMixin, forms.Form):
+    depart = forms.ModelChoiceField(queryset=Depart.objects.none(), label="Voyage interrompu")
+    vehicule_secours = forms.ModelChoiceField(queryset=Vehicule.objects.none(), required=False, label="Véhicule de secours",
+                                            empty_label="Car loué à un transporteur")
+    part_restante = forms.DecimalField(label="Part du trajet restant (%)", min_value=Decimal("0.01"), max_value=100,
+                                       max_digits=5, decimal_places=2)
+    lieu = forms.CharField(max_length=120, label="Lieu")
+    description = forms.CharField(max_length=250, label="Motif")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["depart"].queryset = Depart.objects.filter(statut__in=[Depart.PARTI, Depart.ARRIVE], site_origine="").select_related(
+            "ligne", "vehicule").order_by("-date", "heure")
+        self.fields["vehicule_secours"].queryset = Vehicule.objects.filter(actif=True)

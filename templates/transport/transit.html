@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Billets en transit / correspondances{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Billets en transit / correspondances</h1></div>
+{% include "transport/_style_rapide.html" %}
+<div class="saisie-rapide mx-auto">
+<div class="card mb-2"><div class="card-body">
+<form method="get">{% include "transport/_champ_rapide.html" with field=choix.depart %}<button class="btn btn-primary btn-sm">Ouvrir ce véhicule</button></form>
+{% if depart %}<div class="small mt-2">{{ depart.ligne }} · {{ depart.date|date:"d/m/Y" }} {{ depart.heure|time:"H:i" }}<br>{{ depart.vehicule|default:"Véhicule à désigner" }}</div>{% endif %}
+</div></div>
+{% if erreur %}<div class="alert alert-danger small">{{ erreur }}</div>{% endif %}
+{% if placement.errors %}<div class="alert alert-danger small">{{ placement.errors }}</div>{% endif %}
+{% if depart %}
+<div class="card mb-2"><div class="card-body d-grid gap-2">
+<strong class="small">Un nouveau billet à vendre</strong>
+<a class="btn btn-outline-primary btn-sm" href="{% url 'transport:billet_vente' %}?depart={{ depart.pk }}">Vendre sur la portion de cette agence</a>
+<a class="btn btn-outline-primary btn-sm" href="{% url 'transport:billet_vente' %}?depart={{ depart.pk }}&amp;mode=transit">Montée à un arrêt intermédiaire</a>
+<a class="btn btn-outline-primary btn-sm" href="{% url 'transport:billet_vente' %}?depart={{ depart.pk }}&amp;mode=correspondance">Vendre avec une correspondance</a>
+<div class="small text-muted">Un car de passage poursuit le voyage avec le départ de cette agence. Chaque portion garde son propre départ.</div>
+</div></div>
+<div class="card"><div class="card-body">
+<strong class="small">Billet déjà payé : placer le passager</strong>
+<p class="small text-muted mb-2">Aucun nouvel encaissement. Les billets des autres agences apparaissent après import de leurs échanges.</p>
+<form method="get" class="mb-2"><input type="hidden" name="depart" value="{{ depart.pk }}"><label class="form-label" for="recherche-billet">Numéro du billet</label><input id="recherche-billet" class="form-control mb-1" name="q" value="{{ recherche }}"><button class="btn btn-outline-secondary btn-sm">Rechercher</button></form>
+{% for t in attentes %}<form method="post" class="border-top py-2">{% csrf_token %}<input type="hidden" name="troncon" value="{{ t.pk }}">
+<div class="small"><strong>{{ t.billet.numero }} · {{ t.billet.voyageur }}</strong><br>{{ t.gare_depart.nom }} → {{ t.gare_arrivee.nom }}</div>
+<label class="form-label" for="siege-{{ t.pk }}">Siège dans ce véhicule</label><input id="siege-{{ t.pk }}" class="form-control mb-1" type="number" min="1" {% if depart.places %}max="{{ depart.places }}"{% endif %} name="siege">
+<button class="btn btn-primary btn-sm" name="imprimer" value="1">Placer et imprimer</button>
+<button class="btn btn-outline-secondary btn-sm">Placer sans imprimer</button></form>
+{% empty %}<p class="small mb-0">Aucun billet en attente pour ce trajet{% if recherche %} avec ce numéro{% endif %}.</p>{% endfor %}
+<div class="small text-muted mt-2">100 résultats au maximum : utilisez le numéro pour retrouver un billet précis.</div>
+</div></div>
+{% endif %}
+</div>
+{% endblock %}

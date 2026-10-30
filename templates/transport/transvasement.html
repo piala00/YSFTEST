@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Transvasement{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Transvasement vers un autre car</h1></div>
+{% include "transport/_style_rapide.html" %}
+<div class="saisie-rapide mx-auto card"><div class="card-body">
+<p class="small">Panne ou interruption : les passagers poursuivent leur portion dans le véhicule de secours. Leurs billets restent payés.</p>
+<form method="post">{% csrf_token %}
+{% if form.non_field_errors %}<div class="alert alert-danger small">{{ form.non_field_errors }}</div>{% endif %}
+{% for field in form %}{% include "transport/_champ_rapide.html" %}{% endfor %}
+<p class="small text-muted">La part restante répartit les recettes billets et bagages entre les deux véhicules de la société. Pour un car loué, les frais se saisissent ensuite dans la fiche du départ.</p>
+<button class="btn btn-primary w-100">Enregistrer le transvasement</button>
+</form>
+<p class="small text-muted mt-2 mb-0">Un transvasement par départ. L'historique et les frais restent dans sa fiche. Les sièges de secours ne sont pas réattribués automatiquement.</p>
+</div></div>
+{% endblock %}

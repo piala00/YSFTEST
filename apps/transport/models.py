@@ -1085,6 +1085,8 @@ class Troncon(models.Model):
         if self.depart_id != depart.pk:
             if depart.places and depart.places_libres_entre(self.gare_depart, self.gare_arrivee) <= 0:
                 raise ValidationError(f"Le départ {depart.numero} est complet.")
+        if siege is not None and (siege < 1 or (depart.places and siege > depart.places)):
+            raise ValidationError(f"Siège {siege} inexistant sur le départ {depart.numero} (1 à {depart.places}).")
         occupes = depart.sieges_occupes(self.gare_depart, self.gare_arrivee)
         if siege is not None and siege in occupes - ({self.siege} if self.depart_id == depart.pk else set()):
             raise ValidationError(f"Le siège {siege} est déjà vendu sur ce départ.")
@@ -1402,3 +1404,4 @@ from .models_incidents import FraisIncident, Incident  # noqa: E402,F401
 
 
 from .models_contacts import PersonneGuichet, SaisieGuichet  # noqa: E402,F401
+
