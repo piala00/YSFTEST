@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 from django.core.management import call_command
-from django.db import transaction
+from django.db import transaction, connection
 
 CONTENU = ["auth.group", "auth.user", "authtoken", "core", "commercial", "comptabilite",
            "transport", "echanges", "garage", "personnel", "partenaires", "reporting", "relais", "licences"]
@@ -25,7 +25,22 @@ def empreinte_objets(objets):
 def sauvegarder():
     """Contenu JSON de la sauvegarde (texte)."""
     sortie = io.StringIO()
-    call_command("dumpdata", *CONTENU, natural_foreign=True, indent=1, stdout=sortie)
+    # Un même instant logique pour les pièces et leurs écritures : SQLite conserve
+    # sa lecture transactionnelle ; SQL Server protège aussi les nouvelles lignes.
+    isolation = None
+    try:
+        if connection.settings_dict["ENGINE"] == "mssql":
+            with connection.cursor() as cur:
+                cur.execute("SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id=@@SPID")
+                isolation = {1: "READ UNCOMMITTED", 2: "READ COMMITTED", 3: "REPEATABLE READ",
+                             4: "SERIALIZABLE", 5: "SNAPSHOT"}.get(cur.fetchone()[0], "READ COMMITTED")
+                cur.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+        with transaction.atomic():
+            call_command("dumpdata", *CONTENU, natural_foreign=True, indent=1, stdout=sortie)
+    finally:
+        if isolation:
+            with connection.cursor() as cur:
+                cur.execute("SET TRANSACTION ISOLATION LEVEL " + isolation)
     donnees = json.loads(sortie.getvalue())
     from django.utils import timezone
 
