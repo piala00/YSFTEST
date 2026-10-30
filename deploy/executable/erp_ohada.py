@@ -745,6 +745,11 @@ def main(argv):
     edition_ = edition()
     port = int(os.environ.get("ERP_PORT") or PORTS.get(edition_, 8000))
     action = argv[0] if argv else ""
+    if getattr(sys, "frozen", False) and action in ("manage", "simulation"):
+        # L'entrée de maintenance Python permettrait sinon de lancer un serveur
+        # de développement avant le contrôle de licence, ou d'exécuter du code.
+        print("Commande réservée à l'atelier de développement. Dans ce programme client, utilisez Administration du poste.")
+        return 2
     if action in ("sans-navigateur", "service"):                  # démarrage Windows, ou service Windows
         os.environ["ERP_SANS_NAVIGATEUR"] = "1"
         if action == "service":
@@ -772,7 +777,8 @@ def main(argv):
         return 0
     if action == "simulation-dossier":
         # Travail de génération uniquement : aucun serveur ni navigateur secondaire.
-        os.environ.update(DB_ENGINE="sqlite", ERP_LICENCE="0", ERP_ASSISTANT="0", CONTROLE_HEURE_DEPART="0")
+        os.environ.update(DB_ENGINE="sqlite", ERP_LICENCE="0", ERP_ASSISTANT="0", CONTROLE_HEURE_DEPART="0",
+                          SQLITE_FICHIER=str(dossier_donnees() / "simulation.sqlite3"))
         donnees = preparer_environnement(base="simulation.sqlite3")
         from apps.core import dossiers_simulation as ds
         if donnees.parent.name != "dossiers-simulation" or not re.fullmatch(r"[a-f0-9]{32}", donnees.name):

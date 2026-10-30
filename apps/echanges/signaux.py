@@ -6,7 +6,9 @@ LIENS = {"ecriture", "ecriture_annulation", "ecriture_remboursement", "embarque"
          "sequence_integree", "derniere_reception"}          # rattachements et compteurs de réception : rien à publier
 
 
-def _apres_enregistrement(sender, instance, created, update_fields=None, **kwargs):
+def _apres_enregistrement(sender, instance, created, update_fields=None, raw=False, **kwargs):
+    if raw:  # Restauration : les événements sont eux-mêmes rechargés, ce n'est pas une nouvelle opération.
+        return
     if update_fields and set(update_fields) <= LIENS:            # simple rattachement de l'écriture : déjà publié
         return
     from .publication import publier_objet, site_local

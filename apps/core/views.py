@@ -298,13 +298,24 @@ def sauvegarde(request, module):
             messages.error(request, "Choisissez le fichier et tapez RESTAURER pour confirmer.")
         else:
             try:
-                entete = s.restaurer(fichier.read().decode("utf-8"))
+                contenu = fichier.read().decode("utf-8")
+                s.lire(contenu)  # Refuser les anciens exports partiels avant toute opération.
+                from . import poste
+
+                if poste.disponible():
+                    poste.appeler("sauvegarder")  # Une erreur empêche le remplacement.
+                entete = s.restaurer(contenu)
             except (ValueError, UnicodeDecodeError) as exc:
                 messages.error(request, str(exc))
             except Exception as exc:          # fichier incohérent : la transaction a tout annulé
                 messages.error(request, f"Restauration impossible, aucune donnée modifiée : {exc}")
             else:
-                journal.enregistrer("RESTAURATION", libelle=f"sauvegarde du {entete.get('date', '')[:16]}")
+                from django.contrib.auth import logout
+
+                auteur = request.user.get_username()
+                logout(request)  # Le compte courant peut ne pas exister dans la sauvegarde restaurée.
+                journal.enregistrer("RESTAURATION", libelle=f"sauvegarde du {entete.get('date', '')[:16]}",
+                                    details={"auteur_avant_restauration": auteur})
                 messages.success(request, f"Données restaurées ({entete['objets']} enregistrements). "
                                           "Reconnectez-vous si besoin.")
         return redirect(request.path)
