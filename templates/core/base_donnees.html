@@ -4,6 +4,7 @@
 {% block content %}
 <div class="page-title d-flex align-items-center"><h1><i class="bi bi-database-gear" style="color:var(--module)"></i> Base de données</h1>
   <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'core:poste' %}">Administration du poste</a></div>
+{% include "core/_onglets_poste.html" %}
 
 {% if essai_bloque %}<div class="alert alert-warning d-flex align-items-center gap-2">
   <i class="bi bi-lock"></i><span>{{ essai_bloque }}</span>
@@ -18,7 +19,8 @@
   <form method="post" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-link p-0" name="action" value="annuler_restauration">Annuler</button></form></div>{% endif %}
 
 <div class="row g-3">
-  <div class="col-lg-6"><div class="card card-body h-100">
+{% if onglet_poste == "base" %}
+  <div class="col-12"><div class="card card-body h-100">
     <h2 class="h6">Base actuelle</h2>
     <table class="table table-sm small mb-2"><tbody>
       <tr><th>Moteur</th><td>{{ info.libelle }}</td></tr>
@@ -31,15 +33,22 @@
     </tbody></table>
     <form method="post" class="d-flex flex-wrap gap-2">{% csrf_token %}
       <button class="btn btn-sm btn-outline-primary" name="action" value="verifier" title="{% if info.moteur == 'mssql' %}DBCC CHECKDB{% else %}PRAGMA integrity_check{% endif %}"><i class="bi bi-clipboard-check"></i> Vérifier l'intégrité</button>
+      <button class="btn btn-sm btn-outline-primary" name="action" value="structure">Analyser la structure</button>
       <button class="btn btn-sm btn-outline-primary" name="action" value="optimiser"><i class="bi bi-speedometer"></i> Optimiser{% if info.moteur == "sqlite" %} et compacter{% else %} (index, statistiques){% endif %}</button>
       <button class="btn btn-sm btn-outline-warning" name="action" value="reparer"><i class="bi bi-wrench"></i> Réparer</button>
       {% if compile %}<button class="btn btn-sm btn-outline-secondary ms-auto" name="action" value="redemarrer"><i class="bi bi-arrow-clockwise"></i> Redémarrer le logiciel</button>{% endif %}
     </form>
+    <details class="mt-3"><summary class="small">Mettre à jour la structure prévue par cette version</summary>
+      <p class="small mt-2">Terminez les saisies sur tous les postes. Sur le serveur, les migrations officielles en attente sont appliquées après une sauvegarde réussie. Une table ou colonne déjà migrée mais absente nécessite une restauration ou l'intervention de l'éditeur.</p>
+      <form method="post" class="d-flex gap-2">{% csrf_token %}<input name="confirmation" class="form-control form-control-sm" placeholder="Tapez METTRE A JOUR" required aria-label="Confirmation de mise à jour de structure">
+        <button class="btn btn-sm btn-outline-warning" name="action" value="migrer">Appliquer les migrations prévues</button></form>
+    </details>
     <div class="form-text">Réparer reconstruit les index puis revérifie. Une base encore abîmée se répare en restaurant la dernière
       sauvegarde saine : jamais de réparation qui accepterait de perdre des données.</div>
   </div></div>
 
-  <div class="col-lg-6"><div class="card card-body h-100">
+{% endif %}
+{% if onglet_poste == "sauvegardes" %}  <div class="col-12"><div class="card card-body h-100">
     <h2 class="h6">Sauvegardes{% if info.moteur == "mssql" %} SQL Server (.bak, sur le serveur SQL){% endif %}</h2>
     {% if info.moteur == "mssql" or compile %}
     <form method="post" class="mb-2">{% csrf_token %}<button class="btn btn-sm btn-primary" name="action" value="sauvegarder"><i class="bi bi-hdd"></i> Sauvegarder maintenant</button>
@@ -55,7 +64,7 @@
     {% else %}<div class="small text-muted">Sauvegardes de fichiers : dans le programme compilé (ERP-OHADA-&lt;Édition&gt;.exe).</div>{% endif %}
   </div></div>
 
-  {% if compile %}
+{% if compile %}
   <div class="col-12"><div class="card card-body">
     <h2 class="h6"><i class="bi bi-alarm"></i> Sauvegardes et vérifications automatiques</h2>
     <div class="row g-2 small mb-2">
@@ -86,7 +95,8 @@
     </form>
   </div></div>
 
-  <div class="col-12"><div class="card card-body">
+{% endif %}{% endif %}
+{% if onglet_poste == "base" and compile %}  <div class="col-12"><div class="card card-body">
     <h2 class="h6">Changer de base de données</h2>
     <p class="small text-muted">Toutes les données sont recopiées dans la nouvelle base puis contrôlées table par table ; la base actuelle
       n'est pas modifiée. Le logiciel travaille sur la nouvelle base après « Redémarrer le logiciel ». Une base qui contient les tables
@@ -119,7 +129,7 @@
       <button class="btn btn-sm btn-primary" name="action" value="vers_sqlite">Passer sur SQLite</button></form>
     {% endif %}
   </div></div>
-  {% endif %}
+{% endif %}
 </div>
 {% endif %}
 {% endblock %}

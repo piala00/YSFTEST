@@ -156,10 +156,12 @@ def administration_poste(request):
             "chemin": "Fichier › Administration du poste", "operation": "administrer le serveur",
             "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
     if not poste.disponible():
-        return render(request, "core/poste.html", {"indisponible": True, "titre": "Administration du poste"})
+        return render(request, "core/poste.html", {"indisponible": True, "titre": "Administration du poste",
+            "onglet_poste": "simulation" if request.GET.get("onglet") == "simulation" else "poste"})
     from apps.licences.licence import fonctions_pro_disponibles
 
     pro_ok, pro_message = fonctions_pro_disponibles()
+    onglet = "simulation" if request.GET.get("onglet") == "simulation" else "poste"
     if request.method == "POST":
         action = request.POST.get("action")
         if not pro_ok and action in ("sauvegarder", "restaurer", "annuler_restauration"):
@@ -196,7 +198,10 @@ def administration_poste(request):
                 messages.success(request, poste.appeler("demarrage_auto_basculer"))
         except (ValueError, RuntimeError, OSError) as exc:
             messages.error(request, f"Impossible : {exc}")
-        return redirect(request.get_full_path())
+        retour = request.GET.copy()
+        if (action or "").startswith("simulation_"):
+            retour["onglet"] = "simulation"
+        return redirect(request.path + ("?" + retour.urlencode() if retour else ""))
     etat = poste.appeler("etat")
     hote = request.get_host().rsplit(":", 1)[0] if not request.get_host().endswith("]") else request.get_host()
     simulation = etat.get("simulation") or {}
@@ -205,6 +210,7 @@ def administration_poste(request):
     from apps.licences.licence import etat as etat_licence
 
     return render(request, "core/poste.html", {"titre": "Administration du poste", "etat": etat, "simulation": simulation,
+                                               "onglet_poste": onglet,
                                                "licence_etat": etat_licence(), "pro_ok": pro_ok, "pro_message": pro_message})
 
 
@@ -243,7 +249,8 @@ def base_donnees(request):
         if request.method == "POST":
             messages.error(request, pro_message)
             return redirect(request.path)
-        return render(request, "core/base_donnees.html", {"titre": "Base de données", "essai_bloque": pro_message})
+        return render(request, "core/base_donnees.html", {"titre": "Base de données", "essai_bloque": pro_message,
+            "onglet_poste": "sauvegardes" if request.GET.get("onglet") == "sauvegardes" else "base"})
     compile_ = poste.disponible()
     resultat = None
     if request.method == "POST":
@@ -252,10 +259,28 @@ def base_donnees(request):
             if action == "verifier":
                 intacte, details = bd.verifier()
                 resultat = {"ok": intacte, "titre": "Vérification de l'intégrité", "details": details}
+            elif action == "structure":
+                from . import structure_base
+
+                resultat = {**structure_base.analyser(), "titre": "Analyse de la structure"}
+            elif action == "migrer":
+                from . import structure_base
+
+                if not poste.local(request) or request.POST.get("confirmation") != "METTRE A JOUR":
+                    raise ValueError("sur le poste serveur, terminez les saisies et tapez METTRE A JOUR pour confirmer")
+                def sauvegarde_avant_structure():
+                    return bd.sauvegarder_sqlserver() if bd.moteur() == "mssql" else poste.appeler("sauvegarder")
+                resultat = {**structure_base.appliquer_migrations(sauvegarde_avant_structure), "titre": "Mise à jour de structure"}
             elif action == "reparer":
+                if not poste.local(request):
+                    raise ValueError("la réparation se lance sur le poste serveur après arrêt des saisies")
+                bd.sauvegarder_sqlserver() if bd.moteur() == "mssql" else poste.appeler("sauvegarder")
                 ok, message = bd.reparer()
                 resultat = {"ok": ok, "titre": "Réparation", "details": [message]}
             elif action == "optimiser":
+                if not poste.local(request):
+                    raise ValueError("l'optimisation se lance sur le poste serveur après arrêt des saisies")
+                bd.sauvegarder_sqlserver() if bd.moteur() == "mssql" else poste.appeler("sauvegarder")
                 resultat = {"ok": True, "titre": "Optimisation", "details": [bd.optimiser()]}
             elif action == "sauvegarder":
                 fichier = bd.sauvegarder_sqlserver() if bd.moteur() == "mssql" else poste.appeler("sauvegarder")
@@ -332,9 +357,21 @@ def base_donnees(request):
 
     planif = poste.appeler("planification") if "planification" in poste.ACTIONS else {}
     return render(request, "core/base_donnees.html", {
+        "onglet_poste": "sauvegardes" if request.GET.get("onglet") == "sauvegardes" else "base",
         "planif": planif, "reglages": planif.get("config") or planification.reglages(), "modes": planification.MODES,
         "titre": "Base de données", "info": info, "resultat": resultat, "sauvegardes": sauvegardes, "compile": compile_,
         "changement": bd.ETAT_CHANGEMENT,
         "restauration": (poste.appeler("restauration_sqlserver_prevue") or poste.appeler("etat")["restauration_prevue"])
         if compile_ else "",
         "miroir": f"{miroir.get('HOST', '')} · {miroir['NAME']}" if miroir else ""})
+
+
+@login_required
+def echanges_poste(request):
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {"chemin": "Import et export agences",
+            "operation": "administrer les échanges", "niveau": "réservé à l'administrateur"}, status=403)
+    from apps.echanges.views import echanges
+
+    return echanges(request, module="transport" if Societe.get().activite == "TRANSPORT" else "commercial",
+                    administration=True)

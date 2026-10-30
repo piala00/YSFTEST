@@ -3,16 +3,18 @@
 {% block head %}{% if simulation.etat == "preparation" %}<meta http-equiv="refresh" content="20">{% endif %}{% endblock %}
 {% block content %}
 <div class="page-title"><h1><i class="bi bi-pc-display" style="color:var(--module)"></i> Administration du poste</h1></div>
+{% include "core/_onglets_poste.html" %}
 {% if indisponible %}
 <div class="alert alert-info">Ces opérations (sauvegardes de la base, simulation, démarrage avec Windows) se font dans le programme
   compilé <strong>ERP-OHADA-&lt;Édition&gt;.exe</strong>. Le logiciel n'a pas été lancé par lui sur ce serveur.</div>
 {% else %}
 <div class="row g-3">
+{% if onglet_poste == "poste" %}
   <div class="col-12"><div class="card card-body py-2 d-flex flex-row align-items-center gap-2">
     <i class="bi bi-key"></i><span class="small">Licence : {% if licence_etat.mode == "licence" %}{{ licence_etat.licence.client }} · {{ licence_etat.postes }} postes{% if licence_etat.echeance %} · jusqu'au {{ licence_etat.echeance|date:"d/m/Y" }}{% else %} · définitive{% endif %}{% else %}version d'essai{% endif %}{% if licence_etat.message %} — {{ licence_etat.message }}{% endif %}</span>
     {% if pro_ok %}<a class="btn btn-sm btn-outline-primary ms-auto" href="{% url 'core:base_donnees' %}"><i class="bi bi-database-gear"></i> Base de données</a>{% endif %}
     <a class="btn btn-sm btn-outline-primary{% if not pro_ok %} ms-auto{% endif %}" href="{% url 'licence' %}">Licence et code d'activation</a></div></div>
-  <div class="col-lg-6"><div class="card card-body h-100">
+  <div class="col-12"><div class="card card-body h-100">
     <h2 class="h6"><i class="bi bi-folder2-open"></i> Ce serveur</h2>
     <table class="table table-sm small mb-2"><tbody>
       <tr><th>Édition</th><td>{{ etat.edition|capfirst }} · port {{ etat.port|stringformat:"d" }}</td></tr>
@@ -29,35 +31,8 @@
     <div class="form-text">Le programme peut être remplacé par une nouvelle version : les données ne sont pas dans son dossier.</div>
   </div></div>
 
-  <div class="col-lg-6"><div class="card card-body h-100">
-    <h2 class="h6"><i class="bi bi-hdd"></i> Sauvegardes de la base</h2>
-    {% if not pro_ok %}
-    <div class="alert alert-warning small py-2 mb-0 d-flex align-items-center gap-2"><i class="bi bi-lock"></i>
-      <span>{{ pro_message }}</span></div>
-    <a class="btn btn-sm btn-primary mt-2 align-self-start" href="{% url 'licence' %}">Déposer une licence</a>
-    {% else %}
-    <p class="small text-muted mb-2">Automatiques toutes les {{ etat.sauvegarde_heures }} h, {{ etat.sauvegarde_garder }} gardées, dans
-      <code>{{ etat.donnees }}\sauvegardes</code>{% if etat.sauvegarde_copie %} et <code>{{ etat.sauvegarde_copie }}</code>{% endif %}.</p>
-    <form method="post" class="mb-2">{% csrf_token %}<button class="btn btn-sm btn-primary" name="action" value="sauvegarder">
-      <i class="bi bi-hdd"></i> Sauvegarder maintenant</button></form>
-    {% if etat.restauration_prevue %}
-    <div class="alert alert-warning small py-2 mb-2">Restauration prévue au prochain démarrage : <strong>{{ etat.restauration_prevue }}</strong>.
-      Fermez la fenêtre noire du logiciel puis relancez-le.
-      <form method="post" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-link p-0" name="action" value="annuler_restauration">Annuler</button></form></div>
-    {% elif etat.sauvegardes %}
-    <form method="post" class="border-top pt-2">{% csrf_token %}
-      <label class="form-label small mb-0" for="p-sauv">Restaurer une sauvegarde (la base actuelle est mise de côté, pas effacée)</label>
-      <select id="p-sauv" name="fichier" class="form-select form-select-sm mb-1">{% for s in etat.sauvegardes %}
-        <option value="{{ s.nom }}">{{ s.date|date:"d/m/Y H:i" }} — {{ s.taille|filesizeformat }}</option>{% endfor %}</select>
-      <div class="d-flex gap-2"><input name="confirmation" class="form-control form-control-sm" placeholder="Tapez RESTAURER" autocomplete="off" required>
-        <button class="btn btn-sm btn-outline-danger text-nowrap" name="action" value="restaurer">Restaurer</button></div>
-      <div class="form-text">Prend effet au prochain démarrage du logiciel.</div>
-    </form>
-    {% else %}<div class="small text-muted">Aucune sauvegarde pour l'instant.</div>{% endif %}
-    {% endif %}
-  </div></div>
-
-  {% if etat.edition == "transport" %}
+{% endif %}
+  {% if onglet_poste == "simulation" and etat.edition == "transport" %}
   <div class="col-12"><div class="card card-body">
     <h2 class="h6"><i class="bi bi-play-circle"></i> Simulation (données fictives, dossier séparé)</h2>
     <p class="small text-muted mb-2">Une société de transport fictive (agences, cars, billets, colis, garage, paie, comptabilité) pour essayer
@@ -91,5 +66,6 @@
   </div></div>
   {% endif %}
 </div>
+{% if onglet_poste == "simulation" and etat.edition != "transport" %}<div class="alert alert-info">La simulation de transport nécessite l'édition Transport.</div>{% endif %}
 {% endif %}
 {% endblock %}
