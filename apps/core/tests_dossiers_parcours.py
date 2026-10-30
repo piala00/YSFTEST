@@ -74,9 +74,17 @@ class DossierGenereReelTests(SimpleTestCase):
                                         env=env, capture_output=True, text=True, timeout=240)
             self.assertEqual(generation.returncode, 0, generation.stdout[-4000:] + generation.stderr[-4000:])
             self.assertEqual(ds.lire_json(dossier / ds.MANIFESTE)["etat"], "prete")
+            descripteur = ds.lire_json(dossier / ds.MANIFESTE)
+            descripteur.update(nom="Essai fictif — 1er septembre 2026, une journée, deux véhicules", duree="échantillon réduit d'une journée")
+            ds.ecrire_json(dossier / ds.MANIFESTE, descripteur)
             with ds.ouvrir_base(dossier / ds.BASE) as c:
                 self.assertGreater(c.execute("SELECT count(*) FROM transport_depart").fetchone()[0], 0)
             with ds.exporter(racine, identifiant) as archive:
+                if os.environ.get("RUNNER_TEMP"):
+                    import shutil
+                    with (Path(os.environ["RUNNER_TEMP"]) / "ERP-SIMULATION-ESSAI.erpsim").open("wb") as exemple:
+                        shutil.copyfileobj(archive, exemple)
+                    archive.seek(0)
                 ident_importe = ds.importer(racine, archive, ("essai", make_password("Essai-2030-ok")),
                                            MigrationLoader(None).disk_migrations)
             # On crée un vrai dossier société indépendant avec un témoin, puis on ouvre la copie fictive.
