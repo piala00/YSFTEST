@@ -76,6 +76,22 @@ jobs:
           path: ${{ runner.temp }}/simulation-volume
           retention-days: 7
 
+  licences-deux-modules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install cryptography
+      - name: Contrôler les deux modules, le regroupement et les paquets clients
+        run: python -m unittest apps.licences.tests_outil_simple apps.licences.tests_deux_modules apps.licences.tests_complements -v
+      - name: Préparer l'écran virtuel pour la vraie interface
+        run: sudo apt-get update -qq && sudo apt-get install -y xvfb libtk8.6 > /dev/null
+      - name: Exécuter le parcours de la vraie interface (dossier et identité fictifs)
+        run: xvfb-run -a python deploy/licences/licences.py interface-essai
+
   tests-sqlserver:
     runs-on: ubuntu-latest
     services:
@@ -273,12 +289,12 @@ jobs:
           $cles = "$env:RUNNER_TEMP\cles-essai"
           & $outil cles --dossier $cles
           if ($LASTEXITCODE -ne 0) { throw "Création des clés en échec" }
-          & $outil installation --cle "$cles\cle-privee.pem" --client "Société Essai" --edition transport --sortie $cles
+          & $outil installation --cle "$cles\coffre.dat" --client "Société Essai" --edition transport --sortie $cles
           if (($LASTEXITCODE -ne 0) -or -not (Get-ChildItem "$cles\CLE-INSTALLATION-INS-*.txt")) { throw "Clé d'installation en échec" }
-          & $outil emettre --cle "$cles\cle-privee.pem" --client "Société Essai" --edition transport --role siege --postes 5 --code T-AAAA-BBBB-CCCC-DDDD --sortie $cles
+          & $outil emettre --cle "$cles\coffre.dat" --client "Société Essai" --edition transport --role siege --postes 5 --code T-AAAA-BBBB-CCCC-DDDD --sortie $cles
           if ($LASTEXITCODE -ne 0) { throw "Émission en échec" }
           $lic = Get-ChildItem "$cles\LIC-*.erplic" | Select-Object -First 1
-          & $outil verifier $lic.FullName --publique "$cles\cle-publique.txt"
+          & $outil verifier $lic.FullName --publique "$cles\parametres.dat"
           if ($LASTEXITCODE -ne 0) { throw "Vérification en échec" }
           $f = Start-Process $outil -ArgumentList "interface-essai" -Wait -PassThru
           if ($f.ExitCode -ne 0) { throw "La fenêtre de l'outil ne se construit pas" }
@@ -296,5 +312,6 @@ jobs:
           name: ERP-OHADA-${{ matrix.nom }}-Installation
           path: dist/ERP-OHADA-${{ matrix.nom }}-Installation.exe
           retention-days: 7
+
 
 

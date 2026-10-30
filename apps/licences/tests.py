@@ -29,7 +29,7 @@ class LicencesTests(TestCase):
         super().setUpClass()
         cls.dossier = tempfile.TemporaryDirectory()
         cls.env = {**os.environ, "ERP_LICENCES_MDP": "Mot-de-passe-essai-2030"}
-        subprocess.run([sys.executable, str(OUTIL), "cles", "--dossier", cls.dossier.name], env=cls.env, check=True,
+        subprocess.run([sys.executable, str(OUTIL), "cles", "--ancien-format", "--dossier", cls.dossier.name], env=cls.env, check=True,
                        capture_output=True)
         cls.publique = Path(cls.dossier.name, "cle-publique.txt").read_text().strip()
 
@@ -136,7 +136,7 @@ class LicencesTests(TestCase):
         # Demande dont la clé d'installation n'a pas été émise par le propriétaire : l'outil refuse
         autre = tempfile.TemporaryDirectory()
         self.addCleanup(autre.cleanup)
-        subprocess.run([sys.executable, str(OUTIL), "cles", "--dossier", autre.name], env=self.env, check=True,
+        subprocess.run([sys.executable, str(OUTIL), "cles", "--ancien-format", "--dossier", autre.name], env=self.env, check=True,
                        capture_output=True)
         pirate = subprocess.run([sys.executable, str(OUTIL), "installation", "--cle", str(Path(autre.name, "cle-privee.pem")),
                                  "--client", "Pirate", "--edition", "transport", "--sortie", autre.name],
@@ -463,7 +463,7 @@ class CleEditeurTests(TestCase):
         dossier = tempfile.TemporaryDirectory()
         self.addCleanup(dossier.cleanup)
         env = {**os.environ, "ERP_LICENCES_MDP": "Mot-de-passe-essai-2030"}
-        subprocess.run([sys.executable, str(OUTIL), "cles", "--dossier", dossier.name], env=env, check=True,
+        subprocess.run([sys.executable, str(OUTIL), "cles", "--ancien-format", "--dossier", dossier.name], env=env, check=True,
                        capture_output=True)
         publique = Path(dossier.name, "cle-publique.txt").read_text().strip()
         with mock.patch("apps.licences.cle_editeur.CLES", [publique]):
@@ -487,3 +487,4 @@ class IdentiteBinaireTests(TestCase):
                     self.assertEqual(l.cles_publiques(), [])  # le fichier remplaçable ne crée aucune autorité
                 with mock.patch.object(cle_editeur, "CLES", ["identite-integree"]):
                     self.assertEqual(l.cles_publiques(), ["identite-integree"])
+

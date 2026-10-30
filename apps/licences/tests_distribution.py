@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import os
 import sys
 import tempfile
@@ -69,6 +70,23 @@ class DistributionLicenceTests(TestCase):
                 "verification": SimpleUploadedFile("parametres.dat", b"ERPID\x01" + self.publique)}, follow=True)
         self.assertContains(reponse, "installée pour Société Fictive")
         self.assertTrue(LicenceDeposee.objects.get().valide)
+        self.assertContains(reponse,"Clé publique reconnue")
+        self.assertContains(reponse,hashlib.sha256(self.publique).hexdigest().upper())
+
+    def test_import_ne_peut_initialiser_une_autorite_absente(self):
+        with mock.patch('apps.licences.cle_editeur.CLES',[]),mock.patch.object(sys,'frozen',True,create=True):
+            reponse=self.client.post(reverse('licence'),{'action':'fichier','fichier':self.fichier_licence(),
+                'verification':SimpleUploadedFile('parametres.dat',b'ERPID\x01'+self.publique)},follow=True)
+            self.assertContains(reponse,'version personnalisée')
+            self.assertFalse(LicenceDeposee.objects.exists())
+
+    def test_coffre_der_et_public_trop_volumineux_ne_sont_pas_installes(self):
+        coffre=self.privee.private_bytes(serialization.Encoding.DER,serialization.PrivateFormat.PKCS8,
+            serialization.BestAvailableEncryption(b'Essai-chiffre-fictif-2026'))
+        for contenu in (coffre,b'x'*8193):
+            self.client.post(reverse('licence'),{'action':'fichier','fichier':self.fichier_licence(),
+                'verification':SimpleUploadedFile('coffre.dat',contenu)})
+            self.assertFalse(LicenceDeposee.objects.exists())
 
     def test_mauvais_editeur_ou_coffre_prive_refuse(self):
         for contenu in (b"ERPID\x01" + b"x" * 32, b"-----BEGIN ENCRYPTED PRIVATE KEY-----\nsecret"):
@@ -100,3 +118,4 @@ class IdentiteCompileeTests(SimpleTestCase):
         self.assertIn('documentation / "GUIDE-CLIENT.txt"', spec)
         self.assertNotIn('copytree(RACINE / "docs"', spec)
         self.assertNotIn("cle-installation.txt", installateur)
+
