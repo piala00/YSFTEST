@@ -5,7 +5,7 @@
   function filtrer(options, recherche, gammes) {
     const mots = normaliser(recherche).split(/\s+/).filter(Boolean);
     return options.filter(o => gammes.includes(o.gamme) && mots.every(m =>
-      normaliser(o.recherche).split(/[|\s-]+/).some(v => v.startsWith(m))));
+      normaliser(o.recherche).split('|').some(v => v.startsWith(m) || v.split(/[\s-]+/).some(x => x.startsWith(m)))));
   }
   function installer(select) {
     if (select.dataset.rechercheInstallee) return;

@@ -13,4 +13,5 @@ assert.deepEqual(ids('eto'),['1']);
 assert.deepEqual(ids('DEP002'),['2']);
 assert.deepEqual(ids('', ['VIP']),['1','3']);
 assert.deepEqual(ids('', []),[]);
+assert.deepEqual(filtrer([{gamme:'VIP',recherche:'DEP-2026-0001|AB-123'}], 'DEP-2026-0001', ['VIP']).length, 1);
 console.log('Recherche départ : préfixes, accents, combinaison de mots et filtres OK');
