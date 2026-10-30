@@ -49,6 +49,8 @@
 
 {% endif %}
 {% if onglet_poste == "sauvegardes" %}  <div class="col-12"><div class="card card-body h-100">
+    <details class="mb-3"><summary class="small">Option avancée : sauvegarde complète JSON</summary><p class="small mt-2">Le fichier contient les données et paramètres confidentiels de la société. Conservez-le dans un emplacement protégé ; pour partager une démonstration, utilisez Simulation.</p>
+      <a class="btn btn-sm btn-outline-secondary" href="{% if societe.activite == 'TRANSPORT' %}{% url 'transport:sauvegarde' %}{% else %}{% url 'commercial:sauvegarde' %}{% endif %}">Ouvrir l'export et la restauration JSON complets</a></details>
     <h2 class="h6">Sauvegardes{% if info.moteur == "mssql" %} SQL Server (.bak, sur le serveur SQL){% endif %}</h2>
     {% if info.moteur == "mssql" or compile %}
     <form method="post" class="mb-2">{% csrf_token %}<button class="btn btn-sm btn-primary" name="action" value="sauvegarder"><i class="bi bi-hdd"></i> Sauvegarder maintenant</button>
