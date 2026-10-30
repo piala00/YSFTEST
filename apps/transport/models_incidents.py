@@ -65,15 +65,25 @@ class Incident(models.Model):
         from apps.comptabilite.models import Journal
         from apps.comptabilite.services import creer_ecriture
 
-        from .models import Depart, ParametresTransport
+        from .models import Depart, ParametresTransport, _proprietaire
 
+        depart = Depart.objects.select_for_update().get(pk=depart.pk)
+        _proprietaire(depart, f"Le départ {depart.numero}")
         if depart.statut not in (Depart.PARTI, Depart.ARRIVE):
             raise ValidationError("Le transbordement concerne un car parti.")
         part = Decimal(part_restante)
-        if not ZERO < part <= 100:
+        if not part.is_finite() or not ZERO < part <= 100:
             raise ValidationError("La part du trajet restant est un pourcentage entre 0 et 100.")
         if vehicule_secours is not None and vehicule_secours.pk == depart.vehicule_id:
             raise ValidationError("Le car de secours doit être un autre véhicule.")
+        if vehicule_secours is not None and not vehicule_secours.actif:
+            raise ValidationError("Le véhicule de secours est inactif.")
+        precedent = cls.objects.filter(depart=depart, type_incident=cls.TRANSBORDEMENT).first()
+        if precedent is not None:
+            if (precedent.part_restante == part and precedent.vehicule_secours_id == getattr(vehicule_secours, "pk", None)
+                    and precedent.lieu == lieu and precedent.description == description):
+                return precedent  # même opération réémise : aucune seconde écriture
+            raise ValidationError("Un transvasement est déjà enregistré pour ce départ. Consultez son historique avant tout nouveau changement.")
         incident = cls.objects.create(depart=depart, type_incident=cls.TRANSBORDEMENT, part_restante=part, lieu=lieu,
                                       description=description, vehicule_secours=vehicule_secours, cree_par=utilisateur)
         if vehicule_secours is not None and depart.ecriture_recettes_id:
@@ -186,3 +196,4 @@ class FraisIncident(models.Model):
             reference=self.incident.numero, origine=depart.numero)
         self.save(update_fields=["ecriture"])
         return self
+

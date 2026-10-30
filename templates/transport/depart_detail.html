@@ -23,6 +23,7 @@
 {% block content %}
 <div class="page-title"><h1>Départ {{ depart.numero }} <span class="badge text-bg-{% if depart.statut == 'PROGRAMME' %}primary{% elif depart.statut == 'PARTI' %}warning{% elif depart.statut == 'ARRIVE' or depart.statut == 'CLOTURE' %}success{% else %}secondary{% endif %} fs-6">{{ depart.get_statut_display }}</span></h1>
   <div class="d-flex gap-2">
+    {% if depart.statut == "PROGRAMME" %}<a class="btn btn-sm btn-outline-primary" href="{% url 'transport:billets_transit' %}?depart={{ depart.pk }}">Billets en transit</a>{% endif %}
     <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:manifeste' depart.pk %}" target="_blank"><i class="bi bi-printer"></i> Manifeste</a>
     {% if depart.statut == "PROGRAMME" %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:depart_update' depart.pk %}"><i class="bi bi-pencil"></i> Modifier</a>{% endif %}
     <a class="btn btn-sm btn-outline-secondary" href="{% url 'transport:depense_create' %}?depart={{ depart.pk }}&amp;vehicule={{ depart.vehicule_id|default:'' }}"><i class="bi bi-fuel-pump"></i> Dépense de route</a>
@@ -118,11 +119,7 @@
   <input name="motif" required class="form-control form-control-sm" style="width:16rem" placeholder="motif (panne, route coupée…)" aria-label="Motif">
   <select name="nouveau_depart" class="form-select form-select-sm" style="width:16rem" aria-label="Report"><option value="">Rembourser sans retenue</option>{% for d in departs_report %}<option value="{{ d.pk }}">Reporter sur {{ d.numero }} {{ d.date|date:"d/m" }} {{ d.heure|time:"H:i" }}</option>{% endfor %}</select>
   <button class="btn btn-sm btn-outline-danger py-0" name="action" value="annuler_compagnie" onclick="return confirm('Annuler ce départ ?')">Annuler le départ</button></form>{% endif %}
-{% if depart.statut == "PARTI" or depart.statut == "ARRIVE" %}<form method="post" class="d-flex flex-wrap gap-1 mb-2 border-top pt-2">{% csrf_token %}<strong class="w-100">Panne en route : transbordement</strong>
-  <select name="vehicule_secours" class="form-select form-select-sm" style="width:14rem" aria-label="Car de secours"><option value="">Car loué à un transporteur</option>{% for v in vehicules_secours %}<option value="{{ v.pk }}">{{ v.immatriculation }} ({{ v.get_gamme_display }})</option>{% endfor %}</select>
-  <input name="part_restante" type="number" min="1" max="100" step="0.01" required class="form-control form-control-sm" style="width:9rem" placeholder="% trajet restant" aria-label="Part du trajet restant">
-  <input name="lieu" class="form-control form-control-sm" style="width:10rem" placeholder="lieu" aria-label="Lieu">
-  <button class="btn btn-sm btn-outline-warning py-0" name="action" value="transborder">Enregistrer le transbordement</button></form>
+{% if depart.statut == "PARTI" or depart.statut == "ARRIVE" %}<a class="btn btn-sm btn-outline-warning mb-2" href="{% url 'transport:transvasement' %}?depart={{ depart.pk }}">Transvasement vers un autre car</a>
 <form method="post" class="d-flex flex-wrap gap-1 mb-2 border-top pt-2">{% csrf_token %}<strong class="w-100">Voyageurs pris en route (recette remise par le convoyeur)</strong>
   <input name="nombre" type="number" min="1" value="1" class="form-control form-control-sm" style="width:6rem" aria-label="Nombre">
   <input name="montant" type="number" min="1" required class="form-control form-control-sm" style="width:8rem" placeholder="montant" aria-label="Montant">
@@ -145,3 +142,4 @@
   Comptes proposés, à valider par l'expert-comptable.</p>
 </div></div>
 {% endblock %}
+

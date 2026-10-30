@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load static %}
-{% block title %}Vendre un billet{% endblock %}
+{% block title %}{{ titre }}{% endblock %}
 {% block content %}
-<div class="page-title"><h1>Vendre un billet</h1></div>
+<div class="page-title"><h1>{{ titre }}</h1></div>
 {% include "transport/_style_rapide.html" %}
 <div class="saisie-rapide mx-auto card"><div class="card-body">
 <form method="post" data-saisie-rapide data-contacts-url="{% url 'transport:contacts_billetterie' %}">{% csrf_token %}
@@ -9,19 +9,23 @@
 {% for hidden in form.hidden_fields %}{{ hidden }}{% for e in hidden.errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}{% endfor %}
 {% if form.non_field_errors %}<div class="alert alert-danger small">{{ form.non_field_errors }}</div>{% endif %}
 {% include "transport/_champ_rapide.html" with field=form.depart %}
-<div class="small text-muted mb-2">Le départ reste sélectionné pour le passager suivant.</div>
+<div class="small text-muted mb-2">Ce départ reste sélectionné pour le passager suivant.</div>
+{% if form.mode_vente == "transit" %}<p class="small mb-2">Montée à un arrêt du trajet, avant le bouclage de ce départ.</p>{% endif %}
+{% if form.mode_vente == "correspondance" %}<p class="small mb-2">Un seul paiement pour les deux portions. Le véhicule suivant peut être choisi à la gare de changement.</p>{% endif %}
+{% for field in form.champs_trajet %}{% include "transport/_champ_rapide.html" %}{% endfor %}
 {% include "transport/_contact_rapide.html" with telephone="telephone" nom="voyageur" piece="piece_identite" selection="personne" telephone_field=form.telephone nom_field=form.voyageur piece_field=form.piece_identite %}
 {% for field in form.champs_rapides %}{% if field.name != "telephone" and field.name != "voyageur" and field.name != "piece_identite" %}{% include "transport/_champ_rapide.html" %}{% endif %}{% endfor %}
 <details class="mb-2" {% if form.bagages_ouverts %}open{% endif %}><summary class="small">Bagages du passager</summary>
 {% for field in form.champs_bagages %}{% include "transport/_champ_rapide.html" %}{% endfor %}</details>
-<details class="mb-2" data-complements {% if form.complements_ouverts %}open{% endif %}><summary class="small">Caisse, client en compte, montée ou correspondance</summary>
+<details class="mb-2" data-complements {% if form.complements_ouverts %}open{% endif %}><summary class="small">Autres réglages (trajet, caisse, client)</summary>
 {% for field in form.champs_complementaires %}{% include "transport/_champ_rapide.html" %}{% endfor %}</details>
 <div class="d-grid gap-1 mt-2">
-<button type="submit" name="imprimer" value="1" class="btn btn-primary" data-enchaine>Vendre, imprimer et passager suivant</button>
+<button type="submit" name="imprimer" value="1" class="btn btn-primary" data-enchaine>Vendre et imprimer · suivant</button>
 <button type="submit" name="suivant" value="1" class="btn btn-outline-primary btn-sm">Vendre sans imprimer et continuer</button>
-<button type="submit" class="btn btn-outline-secondary btn-sm">Vendre et ouvrir le billet</button>
+<details><summary class="small">Ouvrir le billet après la vente</summary><button type="submit" class="btn btn-outline-secondary btn-sm mt-1">Vendre et ouvrir</button></details>
 </div>
 <div class="small text-muted mt-2">Tab ou Entrée : champ suivant. Les coordonnées sont mémorisées après la vente.</div>
 </form></div></div>
 {% endblock %}
 {% block scripts %}<script src="{% static 'js/saisie_rapide.js' %}"></script>{% endblock %}
+

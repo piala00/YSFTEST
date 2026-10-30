@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from apps.commercial.models import Tiers
 
+from .guichet_views import billets_transit, transvasement, _droit_operation, _mode_suite
 from . import contacts
 from .forms import (BilletForm, ChauffeurForm, ColisForm, DepartForm, DepenseVehiculeForm, GareForm, LigneForm,
                     ParametresTransportForm, VehiculeForm)
@@ -169,6 +170,7 @@ def depart_detail(request, pk):
                 depart.pointer_embarquement(request.POST.getlist("embarques"), request.user)
                 messages.success(request, "Liste d'embarquement enregistrée.")
             elif action == "affecter":
+                _droit_operation(request, "billetterie.transit")
                 from .models import Troncon
 
                 troncon = get_object_or_404(Troncon, pk=request.POST.get("troncon"))
@@ -204,6 +206,7 @@ def _imprevu(request, depart, action):
     from apps.comptabilite.models import Journal
 
     if action == "transborder":
+        _droit_operation(request, "billetterie.transvasement")
         secours = Vehicule.objects.filter(pk=request.POST.get("vehicule_secours") or None).first()
         i = Incident.transborder(depart, request.POST.get("part_restante") or 0, secours, request.POST.get("lieu", ""),
                                  request.POST.get("description", ""), request.user)
@@ -268,7 +271,10 @@ def billets(request):
 
 @login_required
 def billet_vente(request):
-    initial = {"cle_saisie": contacts.nouveau_jeton(request.user, "billet")}
+    mode = request.GET.get("mode", "direct")
+    if mode not in ("direct", "transit", "correspondance"):
+        mode = "direct"
+    initial = {"cle_saisie": contacts.nouveau_jeton(request.user, "billet"), "mode": mode}
     if request.GET.get("depart"):
         try:
             depart = Depart.objects.filter(pk=int(request.GET["depart"])).first()
@@ -289,13 +295,14 @@ def billet_vente(request):
             billet = contacts.enregistrer_une_fois(request, "billet", enregistrer)
             messages.success(request, f"Billet {billet.numero} vendu ({billet.prix:,.0f} FCFA).".replace(",", " "))
             if request.POST.get("imprimer"):
-                return redirect(reverse("transport:billet_imprimer", args=[billet.pk]) + "?suivant=1")
+                return redirect(reverse("transport:billet_imprimer", args=[billet.pk]) + "?suivant=1" + _mode_suite(form.mode_vente))
             if request.POST.get("suivant"):
-                return redirect(f"{reverse('transport:billet_vente')}?depart={billet.depart_id}")
+                return redirect(f"{reverse('transport:billet_vente')}?depart={billet.depart_id}" + _mode_suite(form.mode_vente))
             return redirect("transport:billet_detail", billet.pk)
         except ValidationError as exc:
             _erreur(request, exc)
-    return render(request, "transport/billet_form.html", {"form": form, "titre": "Vendre un billet"})
+    return render(request, "transport/billet_form.html", {"form": form, "titre": {"transit": "Billet en transit — montée intermédiaire",
+        "correspondance": "Billet avec correspondance"}.get(form.mode_vente, "Vendre un billet") })
 
 
 @login_required
@@ -340,8 +347,12 @@ def billet_detail(request, pk):
 @login_required
 def billet_imprimer(request, pk):
     billet = get_object_or_404(Billet, pk=pk)
-    suivant = f"{reverse('transport:billet_vente')}?depart={billet.depart_id}" if request.GET.get("suivant") == "1" else ""
-    return render(request, "transport/billet_print.html", {"billet": billet, "suivant_url": suivant})
+    suivant = f"{reverse('transport:billet_vente')}?depart={billet.depart_id}" + _mode_suite(request.GET.get("mode")) if request.GET.get("suivant") == "1" else ""
+    transit = request.GET.get("transit")
+    if transit and transit.isdecimal() and billet.troncons.filter(depart_id=int(transit)).exists():
+        suivant = f"{reverse('transport:billets_transit')}?depart={int(transit)}"
+    return render(request, "transport/billet_print.html", {"billet": billet, "suivant_url": suivant,
+        "troncons": billet.troncons.select_related("gare_depart", "gare_arrivee", "depart__vehicule").order_by("ordre")})
 
 
 # ---------------------------------------------------------------- Colis et courrier
@@ -808,3 +819,4 @@ def contacts_rechercher(request, service):
     reponse["Cache-Control"] = "private, no-store"
     reponse["X-Content-Type-Options"] = "nosniff"
     return reponse
+
