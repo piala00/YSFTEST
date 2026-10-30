@@ -1,21 +1,16 @@
-"""Outil du PROPRIÉTAIRE pour émettre les licences de l'ERP OHADA (jamais livré aux clients).
+"""Outil du propriétaire : deux modules indépendants, identité et licences regroupées.
 
-Parcours : 1. clé d'installation remise à la société (avant l'installation) ; 2. la société envoie la DEMANDE de
-licence produite par son serveur (nom de la machine, société, identifiant matériel, clé d'installation) ;
-3. l'outil produit le fichier de licence .erplic ET la clé d'activation (le client utilise l'un ou l'autre).
+    ERP-OHADA-Licences.exe                         interface à deux onglets
+    ERP-OHADA-Licences.exe installation --dossier D  code 4×6 sans société ni coffre
+    ERP-OHADA-Licences.exe cles --dossier D          coffre.dat chiffré + parametres.dat binaire
+    ERP-OHADA-Licences.exe emettre --cle D\\coffre.dat --demande DEMANDE.erpdem --postes 5
+    ERP-OHADA-Licences.exe verifier fichier.erplic --publique D\\parametres.dat
 
-    ERP-OHADA-Licences.exe                       fenêtre (double-clic)
-    ERP-OHADA-Licences.exe cles --dossier D      crée la paire de clés (une seule fois, sur VOTRE ordinateur)
-    ERP-OHADA-Licences.exe installation --cle D\\cle-privee.pem --client "…" --edition transport [--sortie D]
-    ERP-OHADA-Licences.exe emettre --cle D\\cle-privee.pem --demande DEMANDE-….erpdem --postes 10 [--role siege]
-                          [--jusqu-au 2027-10-31 | --definitive] [--maj-jusqu-au 2027-10-31] [--sortie D | --fichier F]
-        (sans demande : --client "…" --edition transport --role siege --code T-ABCD-EFGH-IJKL-MNOP [--site …] [--niu …],
-         fichier .erplic seulement)
-    ERP-OHADA-Licences.exe verifier fichier.erplic --publique D\\cle-publique.txt
-
-La clé privée est chiffrée par un mot de passe ; gardez-en une copie hors ligne (clé USB au coffre). Elle ne doit
-JAMAIS être envoyée, ni déposée sur GitHub. Seule cle-publique.txt est copiée dans le logiciel (sans danger).
-Chaque licence émise est inscrite dans registre-licences.csv, à côté de la clé privée.
+Le format historique reste lisible ; « cles --ancien-format » est réservé à sa compatibilité.
+Le code court est une référence d'installation, pas une signature d'autorisation. Le droit commercial reste
+porté par la licence signée et l'autorité publique intégrée dans le client. La clé publique est non secrète ;
+son format binaire ne remplace pas le chiffrement du coffre privé. Aucun mot de passe n'est mémorisé sur disque.
+Le dossier complet reste au propriétaire. Exporter le paquet client exclut le coffre et les registres.
 """
 import argparse
 import base64
@@ -55,7 +50,7 @@ def mot_de_passe(confirmer=False):
             print("Différents, recommencez.")
 
 
-def creer_cles(dossier, noms_neutres=False, mdp=None):
+def creer_cles(dossier, noms_neutres=True, mdp=None):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -90,6 +85,83 @@ def chemin_coffre(dossier):
     return dossier / "coffre.dat"
 
 
+def regrouper_identite(source, dossier, mdp):
+    """Copie binaire chiffrée de l'identité existante, sans recréer la paire ni effacer l'original."""
+    from cryptography.hazmat.primitives import serialization
+
+    source, dossier = Path(source), Path(dossier)
+    if source.is_symlink() or not source.is_file() or source.stat().st_size > 64*1024:
+        raise SystemExit("Choisissez un coffre privé existant, non lié à un autre fichier.")
+    cle = charger_cle(source, mdp)
+    brut = cle.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    destination = dossier / 'coffre.dat'
+    for nom in ('coffre.dat','cle-privee.pem'):
+        candidat = dossier / nom
+        if candidat.is_symlink():
+            raise SystemExit("Un fichier lié ne peut pas servir de coffre.")
+        if candidat.exists() and candidat.resolve() != source.resolve():
+            existante = charger_cle(candidat, mdp)
+            if existante.public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw) != brut:
+                raise SystemExit("Le dossier contient une autre identité : aucun fichier n'a été remplacé.")
+    for nom in ('parametres.dat','cle-publique.txt','cle_publique.txt'):
+        f=dossier/nom
+        if f.is_symlink():
+            raise SystemExit("Un fichier lié ne peut pas servir d'identité publique.")
+        if f.exists():
+            contenu=f.read_bytes()
+            try:
+                lu=contenu[6:] if contenu.startswith(b'ERPID\x01') and len(contenu)==38 else base64.b64decode(contenu.strip(),validate=True)
+            except ValueError:
+                raise SystemExit("Le dossier contient une identité publique illisible ; aucun remplacement automatique.")
+            if lu != brut:
+                raise SystemExit("Le dossier contient une autre identité publique : aucun fichier remplacé.")
+    dossier.mkdir(parents=True,exist_ok=True)
+    ecrire_identite(cle,dossier)
+    if not destination.exists():
+        contenu=cle.private_bytes(serialization.Encoding.DER,serialization.PrivateFormat.PKCS8,
+                                  serialization.BestAvailableEncryption(mdp))
+        with destination.open('xb') as f:
+            f.write(contenu)
+    # Conserver les numéros déjà émis lors du regroupement, pour ne pas recommencer à LIC-…-0001.
+    for nom_registre in ('registre-licences.csv','registre-installations.csv'):
+        registre_source = source.parent / nom_registre
+        registre_destination = dossier / nom_registre
+        if registre_source.is_file() and registre_source.resolve() != registre_destination.resolve():
+            if registre_source.is_symlink() or registre_source.stat().st_size > 10*1024*1024:
+                raise SystemExit("Registre historique lié ou trop volumineux : original conservé.")
+            with registre_source.open(encoding='utf-8',newline='') as f:
+                lignes = list(csv.DictReader(f,delimiter=';'))
+            connus = set()
+            if registre_destination.exists():
+                with registre_destination.open(encoding='utf-8',newline='') as f:
+                    connus = {(l.get('numero',''),l.get('client',''),l.get('machine','')) for l in csv.DictReader(f,delimiter=';')}
+            for ligne in lignes:
+                identifiant = (ligne.get('numero',''),ligne.get('client',''),ligne.get('machine',''))
+                if identifiant in connus:
+                    continue
+                if nom_registre == 'registre-licences.csv' and ligne.get('fichier'):
+                    ancien = Path(ligne['fichier'])
+                    if ancien.is_file() and not ancien.is_symlink() and ancien.suffix.lower()=='.erplic':
+                        try:
+                            verifier(ancien,dossier/'parametres.dat')
+                            nouveau = dossier / ancien.name
+                            if not nouveau.exists():
+                                with nouveau.open('xb') as f:
+                                    f.write(ancien.read_bytes())
+                            if nouveau.read_bytes()==ancien.read_bytes():
+                                ligne['fichier'] = str(nouveau)
+                                notice = ancien.with_name(ancien.stem+'-LIRE-MOI.txt')
+                                copie = dossier / notice.name
+                                if notice.is_file() and not notice.is_symlink() and not copie.exists():
+                                    with copie.open('xb') as f:
+                                        f.write(notice.read_bytes())
+                        except (OSError,ValueError,SystemExit,IndexError,KeyError):
+                            pass  # Le registre garde la référence historique ; aucun fichier inconnu n'est remplacé.
+                ajouter_registre(registre_destination,ligne)
+                connus.add(identifiant)
+    return destination
+
+
 class CoffreSession:
     """Clé déverrouillée en mémoire ; aucun mot de passe dans les préférences."""
     def __init__(self):
@@ -120,7 +192,11 @@ def charger_cle(chemin, mdp=None):
     try:
         brut = Path(chemin).read_bytes()
         lire = serialization.load_pem_private_key if brut.startswith(b"-----BEGIN") else serialization.load_der_private_key
-        return lire(brut, password=mdp or mot_de_passe())
+        cle = lire(brut, password=mdp or mot_de_passe())
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        if not isinstance(cle, Ed25519PrivateKey):
+            raise ValueError("Clé Ed25519 attendue")
+        return cle
     except (ValueError, TypeError):
         raise SystemExit("Mot de passe incorrect ou fichier de clé illisible.")
 
@@ -175,11 +251,60 @@ def nom_propre(texte, longueur=40):
     return re.sub(r"[^A-Za-z0-9]+", "-", texte).strip("-")[:longueur]
 
 
+def generer_installation(dossier):
+    """Module autonome : code 4×6 sans société, édition, coffre ni mot de passe.
+
+    Il identifie une installation ; seule la licence signée prouve un droit commercial.
+    """
+    dossier = Path(dossier)
+    dossier.mkdir(parents=True, exist_ok=True)
+    registre = dossier / "registre-installations.csv"
+    numero = prochain_numero(registre, "INS")
+    code = fc.installation_courte_creer()
+    fichier = dossier / f"INSTALLATION-{numero}.txt"
+    with fichier.open("x", encoding="utf-8") as f:
+        f.write(f"ERP OHADA — code d'installation {numero}\n\n{code}\n\n"
+                "Ce code se génère indépendamment de la société. La licence signée reste nécessaire à l'usage commercial.\n")
+    ajouter_registre(registre, {"numero": numero, "emise_le": datetime.date.today().isoformat(),
+                                "cle": code, "fichier": str(fichier)})
+    print(f"Code d'installation {numero} : {fichier}\n{code}")
+    return numero, code, fichier
+
+
+def exporter_client(licence, dossier, fichier=None):
+    """Paquet partageable sur liste fermée ; le coffre et les registres ne sont jamais exportés."""
+    import zipfile
+
+    dossier, licence = Path(dossier).resolve(), Path(licence)
+    if licence.is_symlink() or licence.suffix.lower() != ".erplic" or licence.resolve().parent != dossier:
+        raise SystemExit("Choisissez une licence du dossier de travail courant.")
+    publique = dossier / "parametres.dat"
+    notice = licence.with_name(licence.stem + "-LIRE-MOI.txt")
+    fichiers = [licence, publique] + ([notice] if notice.exists() else [])
+    if any(f.is_symlink() or not f.is_file() or f.resolve().parent != dossier for f in fichiers):
+        raise SystemExit("Le paquet client contient un fichier absent ou lié à un autre emplacement.")
+    verifier(licence, publique)
+    sortie = Path(fichier) if fichier else dossier / (licence.stem + "-CLIENT.zip")
+    if sortie.suffix.lower() != ".zip":
+        sortie = sortie.with_name(sortie.name + ".zip")
+    with zipfile.ZipFile(sortie, "x", compression=zipfile.ZIP_DEFLATED) as z:
+        for f in fichiers:
+            z.write(f, f.name)
+    return sortie
+
+
 def emettre_installation(a, mdp=None, cle_deverrouillee=None):
-    """Clé d'installation pour une société (avant l'installation du logiciel)."""
+    """Anciennes clés signées conservées ; les nouveaux codes courts sont autonomes."""
+    if getattr(a, "courte", False) or not getattr(a, "cle", None):
+        dossier = getattr(a, "sortie", None) or getattr(a, "dossier", None)
+        if not dossier and getattr(a, "cle", None):
+            dossier = Path(a.cle).parent
+        if not dossier:
+            raise SystemExit("Choisissez le dossier d'enregistrement du code d'installation.")
+        return generer_installation(dossier)
     if a.edition not in EDITIONS:
         raise SystemExit(f"Édition : {', '.join(EDITIONS)}.")
-    if not a.client.strip():
+    if not (a.client or "").strip():
         raise SystemExit("Nom de la société absent.")
     cle_chemin = Path(a.cle)
     registre = cle_chemin.with_name("registre-installations.csv")
@@ -281,8 +406,9 @@ def emettre(a, mdp=None, cle_deverrouillee=None):
         f"Code d'installation : {demande.get('cle_installation') or 'non fourni (ancien parcours)'}\n\n"
         f"ACTIVER : dans l'ERP, ouvrir Licence puis Installer le fichier et choisir {sortie.name}.\n"
         "Ce fichier suffit. Il n'est pas nécessaire de saisir aussi une clé d'activation.\n"
-        "Si le logiciel ne connaît pas encore votre éditeur : copier parametres.dat à côté de l'exécutable\n"
-        "du serveur, puis redémarrer. Une identité déjà intégrée au programme reste prioritaire.\n"
+        "Identité publique : parametres.dat, à sélectionner dans Administration > Licence si demandé.\n"
+        "Elle doit correspondre à l'éditeur autorisé dans ce logiciel. Une identité commerciale doit être\n"
+        "intégrée au programme par l'éditeur ; copier un autre fichier public ne remplace pas cette identité.\n"
         "Ne jamais copier le coffre de l'éditeur dans l'installation client.\n\n"
         + (f"Activation alternative (facultative) :\n{activation}\n" if activation else ""), encoding="utf-8")
     a.activation = activation
@@ -370,234 +496,297 @@ def ouvrir_dossier(dossier):
 
 
 def interface(essai=False):
-    """Fenêtre du propriétaire : choisir la société, régler la licence, choisir où l'enregistrer."""
+    """Deux modules : installation autonome ; licence et identité réunies dans le dossier propriétaire."""
+    import tempfile
     import tkinter as tk
     from tkinter import filedialog, messagebox, simpledialog, ttk
 
+    temporaire = tempfile.TemporaryDirectory(prefix="erp-licences-interface-") if essai else None
+    prefs = {} if essai else preferences()
     fen = tk.Tk()
-    fen.title("ERP OHADA — Licences simplifiées 2.0 (propriétaire)")
-    fen.geometry("960x760")
+    fen.title("ERP OHADA — Installation et licences 3.0 (propriétaire)")
+    fen.geometry("960x790")
+    fen.minsize(820, 680)
     session = CoffreSession()
+    v = {nom: tk.StringVar(value=val) for nom, val in {
+        "dossier": temporaire.name if essai else prefs.get("dossier_unique", prefs.get("cles", str(Path.home()/"ERP-OHADA-Licences"))),
+        "client": "", "niu": "", "edition": "transport", "role": "seul", "site": "", "postes": "5",
+        "code": "", "demande": "", "duree": "abonnement", "jusqu_au": dans_mois(12), "maj": dans_mois(12)}.items()}
+    resultat_installation = tk.StringVar()
+    etat = tk.StringVar()
+    derniere_licence = [None]
+    dernier_code = [None]
 
-    def verrouiller():
-        session.verrouiller()
+    def erreur(exc):
+        if essai:
+            raise RuntimeError(str(exc)) from exc
+        messagebox.showerror("Installation et licences", str(exc), parent=fen)
+
+    def memoriser():
+        if not essai:
+            retenir(dossier_unique=v['dossier'].get(), cles=v['dossier'].get(), licences=v['dossier'].get())
 
     def fermer():
-        verrouiller()
+        session.verrouiller()
         fen.destroy()
 
     fen.protocol("WM_DELETE_WINDOW", fermer)
-
-    def ouvrir_coffre(dossier):
-        try:
-            return session.ouvrir(chemin_coffre(dossier), lambda: simpledialog.askstring(
-                "Déverrouiller le coffre", "Mot de passe (une fois pour cette session) :", show="*", parent=fen))
-        except (OSError, SystemExit) as exc:
-            messagebox.showerror("Licences", str(exc))
-            return None
-    v = {nom: tk.StringVar(value=val) for nom, val in {
-        "dossier": preferences().get("cles", str(Path.home() / "ERP-OHADA-Licences")),
-        "licences": preferences().get("licences", str(bureau() / "Licences ERP")),
-        "client": "", "niu": "", "edition": "transport",
-        "role": "seul", "site": "", "postes": "5", "code": "", "demande": "", "duree": "abonnement",
-        "jusqu_au": (datetime.date.today() + datetime.timedelta(days=365)).isoformat(),
-        "maj": (datetime.date.today() + datetime.timedelta(days=365)).isoformat()}.items()}
-
     cadre = ttk.Frame(fen, padding=12)
-    cadre.pack(fill="both", expand=True)
-    cadre.columnconfigure(1, weight=1)
+    cadre.pack(fill='both', expand=True)
+    ttk.Label(cadre, text="Dossier de travail du propriétaire — clés et licences réunies").pack(anchor='w')
+    ligne_dossier = ttk.Frame(cadre)
+    ligne_dossier.pack(fill='x', pady=(3,8))
+    ttk.Entry(ligne_dossier, textvariable=v['dossier']).pack(side='left', fill='x', expand=True)
 
-    def ligne(rang, libelle, widget):
-        ttk.Label(cadre, text=libelle).grid(row=rang, column=0, sticky="w", pady=3, padx=(0, 8))
-        widget.grid(row=rang, column=1, sticky="ew", pady=3)
-        return widget
+    def choisir_dossier():
+        d = filedialog.askdirectory(initialdir=v['dossier'].get(), title="Dossier du propriétaire")
+        if d:
+            v['dossier'].set(d)
+            memoriser()
 
-    # Dossier des clés
-    zone = ttk.Frame(cadre)
-    ttk.Entry(zone, textvariable=v["dossier"]).pack(side="left", fill="x", expand=True)
-    ttk.Button(zone, text="Parcourir…", command=lambda: v["dossier"].set(
-        filedialog.askdirectory(initialdir=v["dossier"].get()) or v["dossier"].get()) or rafraichir()).pack(side="left", padx=4)
-    ttk.Button(zone, text="Verrouiller", command=verrouiller).pack(side="left", padx=4)
-    ligne(0, "Coffre de l'éditeur (à garder ici)", zone)
+    ttk.Button(ligne_dossier, text='Parcourir…', command=choisir_dossier).pack(side='left', padx=4)
+    ttk.Button(ligne_dossier, text='Ouvrir le dossier', command=lambda: ouvrir_dossier(v['dossier'].get())).pack(side='left')
+    onglets = ttk.Notebook(cadre)
+    onglets.pack(fill='both', expand=True)
+    installation_tab, licence_tab = ttk.Frame(onglets, padding=12), ttk.Frame(onglets, padding=12)
+    onglets.add(installation_tab, text='1 · Installation')
+    onglets.add(licence_tab, text='2 · Licence')
 
-    # Société : liste des clients déjà servis, ou nouvelle société
-    choix_client = ligne(1, "Société (client)", ttk.Combobox(cadre, textvariable=v["client"]))
-    ligne(2, "NIU", ttk.Entry(cadre, textvariable=v["niu"]))
-    ligne(3, "Édition", ttk.Combobox(cadre, textvariable=v["edition"], values=EDITIONS, state="readonly"))
-    ligne(4, "Rôle du serveur", ttk.Combobox(cadre, textvariable=v["role"], values=ROLES, state="readonly"))
-    ligne(5, "Code du site (agence)", ttk.Entry(cadre, textvariable=v["site"]))
-    ligne(6, "Postes", ttk.Spinbox(cadre, from_=1, to=500, textvariable=v["postes"]))
-    zone_demande = ttk.Frame(cadre)
-    ttk.Entry(zone_demande, textvariable=v["demande"]).pack(side="left", fill="x", expand=True)
-    ttk.Button(zone_demande, text="Ouvrir une demande…", command=lambda: ouvrir_demande()).pack(side="left", padx=4)
-    ligne(7, "Demande de licence (.erpdem)", zone_demande)
-    serveur = ttk.Label(cadre, text="", foreground="#555")
-    serveur.grid(row=12, column=1, sticky="w")
-    ligne(11, "Ancienne méthode : identifiant du serveur", ttk.Entry(cadre, textvariable=v["code"]))
-    def echeance(mois):
-        v["duree"].set("abonnement")
-        v["jusqu_au"].set(dans_mois(mois))
-        v["maj"].set(dans_mois(mois))
-
-    duree = ttk.Frame(cadre)
-    ttk.Radiobutton(duree, text="Abonnement jusqu'au", value="abonnement", variable=v["duree"]).pack(side="left")
-    ttk.Entry(duree, textvariable=v["jusqu_au"], width=12).pack(side="left", padx=4)
-    for libelle, mois in (("1 mois", 1), ("3 mois", 3), ("6 mois", 6), ("1 an", 12), ("2 ans", 24), ("3 ans", 36)):
-        ttk.Button(duree, text=libelle, width=6, command=lambda m=mois: echeance(m)).pack(side="left", padx=1)
-    ttk.Radiobutton(duree, text="Permanente", value="definitive", variable=v["duree"]).pack(side="left", padx=(12, 0))
-    ligne(8, "Durée", duree)
-    ligne(9, "Mises à jour jusqu'au", ttk.Entry(cadre, textvariable=v["maj"]))
-
-    registre = ttk.Treeview(cadre, columns=("numero", "client", "role", "postes", "fin"), show="headings", height=8)
-    for col, titre, large in (("numero", "Licence", 110), ("client", "Société", 260), ("role", "Rôle", 90),
-                              ("postes", "Postes", 60), ("fin", "Jusqu'au", 100)):
-        registre.heading(col, text=titre)
-        registre.column(col, width=large)
-    registre.grid(row=13, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
-    cadre.rowconfigure(13, weight=1)
-
-    def rafraichir(*_):
-        connus = clients_connus(v["dossier"].get())
-        choix_client["values"] = list(connus)
-        registre.delete(*registre.get_children())
-        for l in reversed(registre_lignes(v["dossier"].get())):
-            registre.insert("", "end", values=(l["numero"], l["client"], f"{l['role']} {l['site']}".strip(), l["postes"],
-                                               l["valable_jusqu_au"] or "définitive"))
-
-    def client_choisi(*_):
-        connu = clients_connus(v["dossier"].get()).get(v["client"].get())
-        if connu:
-            v["niu"].set(connu.get("niu", ""))
-            v["edition"].set(connu.get("edition") or v["edition"].get())
-
-    choix_client.bind("<<ComboboxSelected>>", client_choisi)
-
-    def ouvrir_demande():
-        chemin = filedialog.askopenfilename(title="Demande de licence du client",
-                                            filetypes=[("Demande de licence", "*.erpdem"), ("Tous les fichiers", "*.*")])
-        if not chemin:
-            return
-        try:
-            d = lire_demande(chemin)
-        except SystemExit as exc:
-            messagebox.showerror("Licences", str(exc))
-            return
-        v["demande"].set(chemin)
-        v["client"].set(d["societe"])
-        v["niu"].set(d.get("niu", ""))
-        v["edition"].set(d.get("edition") or v["edition"].get())
-        v["role"].set(d.get("role") or v["role"].get())
-        v["site"].set(d.get("site", ""))
-        v["code"].set(d.get("code", ""))
-        serveur.configure(text=f"Serveur « {d.get('machine_nom', '?')} » · identifiant matériel {d['materiel']} · "
-                               f"clé d'installation {d.get('installation') or 'aucune'}")
-
-    def montrer_cle(titre, texte):
-        fen.clipboard_clear()
-        fen.clipboard_append(texte)
-        boite = tk.Toplevel(fen)
-        boite.title(titre)
-        ttk.Label(boite, text=f"{titre} (déjà copiée : collez-la dans votre e-mail ou WhatsApp) :").pack(padx=10, pady=(10, 4))
-        zone = tk.Text(boite, height=6, width=70, font=("Consolas", 10), wrap="word")
-        zone.insert("1.0", texte)
-        zone.pack(padx=10)
-        ttk.Button(boite, text="Fermer", command=boite.destroy).pack(pady=8)
+    ttk.Label(installation_tab, text="Générer un code d’installation", font=('Segoe UI',14,'bold')).pack(anchor='w')
+    ttk.Label(installation_tab, text="Aucune société à saisir. Aucun coffre à ouvrir, aucun mot de passe demandé.",
+              wraplength=800).pack(anchor='w', pady=8)
+    ttk.Label(installation_tab, text="Le code est enregistré dans le dossier choisi. La licence signée reste l’autorisation commerciale du logiciel.",
+              wraplength=800).pack(anchor='w', pady=4)
+    ttk.Entry(installation_tab, textvariable=resultat_installation, state='readonly', font=('Consolas',16)).pack(fill='x', pady=12)
 
     def installation():
-        dossier = Path(v["dossier"].get())
-        if not chemin_coffre(dossier).exists():
-            messagebox.showerror("Licences", "Aucune clé privée dans ce dossier : créez d'abord la paire de clés.")
-            return
-        if not v["client"].get().strip():
-            messagebox.showerror("Licences", "Saisissez la société (client).")
-            return
-        cle = ouvrir_coffre(dossier)
-        if cle is None:
-            return
-        a = argparse.Namespace(cle=str(chemin_coffre(dossier)), client=v["client"].get(), edition=v["edition"].get(),
-                               sortie=v["licences"].get(), courte=True)
         try:
-            numero, texte, _ = emettre_installation(a, cle_deverrouillee=cle)
-        except SystemExit as exc:
-            messagebox.showerror("Licences", str(exc))
-            return
-        retenir(cles=str(dossier), licences=v["licences"].get())
-        montrer_cle(f"Clé d'installation {numero}", texte)
+            numero, code, fichier = generer_installation(v['dossier'].get())
+            dernier_code[0] = code
+            resultat_installation.set(code)
+            statut_installation.configure(text=f"{numero} · enregistré : {fichier.name}")
+            memoriser()
+        except (OSError, ValueError, SystemExit) as exc:
+            erreur(exc)
 
-    def generer():
-        dossier = Path(v["dossier"].get())
-        if not chemin_coffre(dossier).exists():
-            messagebox.showerror("Licences", "Aucune clé privée dans ce dossier : créez d'abord la paire de clés.")
-            return
-        if not v["client"].get().strip():
-            messagebox.showerror("Licences", "Choisissez ou saisissez la société.")
-            return
-        numero = prochain_numero(dossier / "registre-licences.csv")
-        fichier = Path(v["licences"].get()) / nom_fichier(numero, v["client"].get())
-        cle = ouvrir_coffre(dossier)
-        if cle is None:
-            return
-        a = argparse.Namespace(
-            cle=str(chemin_coffre(dossier)), client=v["client"].get(), niu=v["niu"].get(), edition=v["edition"].get(),
-            role=v["role"].get(), site=v["site"].get(), code=v["code"].get(), definitive=v["duree"].get() == "definitive",
-            jusqu_au=v["jusqu_au"].get(), maj_jusqu_au=v["maj"].get(), sortie=None, fichier=fichier,
-            demande=v["demande"].get() or None)
+    def copier_code():
+        if resultat_installation.get():
+            fen.clipboard_clear()
+            fen.clipboard_append(resultat_installation.get())
+
+    boutons_installation = ttk.Frame(installation_tab)
+    boutons_installation.pack(anchor='w')
+    generer_code_btn = ttk.Button(boutons_installation, text='Générer une clé d’installation', command=installation)
+    generer_code_btn.pack(side='left', padx=(0,5))
+    ttk.Button(boutons_installation, text='Copier le code', command=copier_code).pack(side='left')
+    statut_installation = ttk.Label(installation_tab, text='', wraplength=800)
+    statut_installation.pack(anchor='w', pady=12)
+
+    licence_tab.columnconfigure(1, weight=1)
+    def ligne(rang, texte, widget):
+        ttk.Label(licence_tab, text=texte).grid(row=rang, column=0, sticky='w', padx=(0,8), pady=3)
+        widget.grid(row=rang, column=1, sticky='ew', pady=3)
+        return widget
+
+    def verrouiller():
+        session.verrouiller()
+        etat.set('Coffre verrouillé. Le code d’installation reste disponible sans mot de passe.')
+
+    def demander_mdp(texte):
+        return (os.environ.get('ERP_LICENCES_MDP') or 'Essai-Interface-Fictif-2026') if essai else simpledialog.askstring(
+            'Coffre du propriétaire', texte, show='*', parent=fen)
+
+    def ouvrir_coffre():
         try:
-            a.postes = int(v["postes"].get())
-            sortie = emettre(a, cle_deverrouillee=cle)
-        except (SystemExit, ValueError) as exc:
-            messagebox.showerror("Licences", str(exc) or "Valeur incorrecte.")
-            return
-        retenir(cles=str(dossier), licences=str(Path(sortie).parent))
-        rafraichir()
-        if messagebox.askyesno("Licences", f"Licence enregistrée :\n{sortie}\n\nEnvoyez ce fichier au client.\n\n"
-                                           "Ouvrir le dossier maintenant ?"):
-            ouvrir_dossier(Path(sortie).parent)
+            cle = session.ouvrir(chemin_coffre(v['dossier'].get()), lambda: demander_mdp('Mot de passe — une fois pour cette session :'))
+            if cle:
+                ecrire_identite(cle, v['dossier'].get())
+                etat.set('Coffre ouvert pour cette session. Clé publique binaire : parametres.dat.')
+            return cle
+        except (OSError, ValueError, SystemExit) as exc:
+            erreur(exc)
 
     def creer():
-        dossier = Path(v["dossier"].get())
+        dossier = Path(v['dossier'].get())
         if chemin_coffre(dossier).exists():
-            messagebox.showinfo("Licences", "La paire de clés existe déjà dans ce dossier.")
+            ouvrir_coffre()
             return
-        mdp = simpledialog.askstring("Licences", "Mot de passe de la nouvelle clé (10 caractères ou plus) :", show="*", parent=fen)
-        if not mdp or len(mdp) < 10 or mdp != simpledialog.askstring("Licences", "Confirmez :", show="*", parent=fen):
-            messagebox.showerror("Licences", "Mot de passe absent, trop court ou différent.")
+        mdp = demander_mdp('Choisissez le mot de passe du coffre (10 caractères minimum) :')
+        if not mdp:
             return
-        creer_cles(dossier, noms_neutres=True, mdp=mdp.encode())
-        session.ouvrir(chemin_coffre(dossier), lambda: mdp)
-        messagebox.showinfo("Licences", f"Coffre créé et déverrouillé dans {dossier}.\n"
-                                        "Gardez une copie de secours ; ne le copiez jamais chez le client.\n"
-                                        "parametres.dat contient seulement l'identité publique du logiciel.")
+        if len(mdp)<10 or (not essai and mdp != demander_mdp('Confirmez le mot de passe :')):
+            erreur(ValueError('Mot de passe trop court ou confirmation différente.'))
+            return
+        try:
+            creer_cles(dossier, mdp=mdp.encode())
+            session.ouvrir(chemin_coffre(dossier), lambda: mdp)
+            etat.set('Identité créée : coffre.dat chiffré et parametres.dat binaire, dans ce dossier.')
+            memoriser()
+        except (OSError, ValueError, SystemExit) as exc:
+            erreur(exc)
 
-    zone_licences = ttk.Frame(cadre)
-    ttk.Entry(zone_licences, textvariable=v["licences"]).pack(side="left", fill="x", expand=True)
-    ttk.Button(zone_licences, text="Parcourir…", command=lambda: v["licences"].set(
-        filedialog.askdirectory(initialdir=v["licences"].get(), title="Dossier où enregistrer les licences")
-        or v["licences"].get())).pack(side="left", padx=4)
-    ttk.Button(zone_licences, text="Ouvrir", command=lambda: ouvrir_dossier(v["licences"].get())).pack(side="left")
-    ttk.Label(cadre, text="Dossier où enregistrer les licences").grid(row=10, column=0, sticky="w", pady=(10, 3), padx=(0, 8))
-    zone_licences.grid(row=10, column=1, sticky="ew", pady=(10, 3))
-    boutons = ttk.Frame(cadre)
-    boutons.grid(row=14, column=0, columnspan=2, sticky="e", pady=(10, 0))
-    ttk.Button(boutons, text="Créer mon coffre (une seule fois)", command=creer).pack(side="left", padx=4)
-    ttk.Button(boutons, text="Clé d'installation", command=installation).pack(side="left", padx=4)
-    ttk.Button(boutons, text="Générer le dossier client", command=generer).pack(side="left", padx=4)
-    avancees = tk.BooleanVar(value=False)
-    champs_avances = [w for w in cadre.winfo_children() if w.grid_info().get("row") in (2, 4, 5, 9, 11)]
+    def rassembler():
+        source = filedialog.askopenfilename(title='Votre clé privée existante — elle restera sur votre poste',
+            filetypes=[('Coffre existant','*.dat *.pem'),('Tous fichiers','*.*')])
+        if not source:
+            return
+        mdp = demander_mdp('Mot de passe du coffre existant :')
+        if not mdp:
+            return
+        try:
+            chemin = regrouper_identite(source, v['dossier'].get(), mdp.encode())
+            session.ouvrir(chemin, lambda: mdp)
+            etat.set('Identité rassemblée au format binaire. L’original est conservé à son emplacement.')
+            memoriser()
+        except (OSError, ValueError, SystemExit) as exc:
+            erreur(exc)
 
+    identite = ttk.Frame(licence_tab)
+    creer_btn = ttk.Button(identite, text='Créer mon identité (une fois)', command=creer)
+    creer_btn.pack(side='left')
+    ttk.Button(identite, text='Rassembler une identité existante…', command=rassembler).pack(side='left', padx=4)
+    ttk.Button(identite, text='Verrouiller', command=verrouiller).pack(side='left')
+    ligne(0, 'Identité de l’éditeur', identite)
+    ttk.Label(licence_tab,textvariable=etat,wraplength=780).grid(row=1,column=0,columnspan=2,sticky='w',pady=4)
+    choix_client=ligne(2,'Société à licencier',ttk.Combobox(licence_tab,textvariable=v['client']))
+    ligne(3,'Édition',ttk.Combobox(licence_tab,textvariable=v['edition'],values=EDITIONS,state='readonly'))
+    ligne(4,'Nombre de postes',ttk.Spinbox(licence_tab,from_=1,to=65000,textvariable=v['postes']))
+
+    def charger_demande(chemin):
+        d=lire_demande(chemin)
+        v['demande'].set(str(chemin))
+        for champ, cle in [('client','societe'),('niu','niu'),('edition','edition'),('role','role'),('site','site')]:
+            if d.get(cle) is not None:
+                v[champ].set(d[cle])
+        serveur.configure(text=f"Serveur : {d.get('machine_nom','')} · {d['materiel']}")
+
+    def choisir_demande():
+        chemin=filedialog.askopenfilename(title='Demande de licence du client',filetypes=[('Demande de licence','*.erpdem')])
+        if chemin:
+            try:
+                charger_demande(chemin)
+            except (OSError, ValueError, SystemExit) as exc:
+                erreur(exc)
+
+    demande=ttk.Frame(licence_tab)
+    ttk.Entry(demande,textvariable=v['demande']).pack(side='left',fill='x',expand=True)
+    ttk.Button(demande,text='Ouvrir une demande…',command=choisir_demande).pack(side='left',padx=4)
+    ligne(5,'Demande du logiciel client',demande)
+    serveur=ttk.Label(licence_tab,text='',wraplength=780)
+    serveur.grid(row=6,column=0,columnspan=2,sticky='w')
+    duree=ttk.Frame(licence_tab)
+    ttk.Radiobutton(duree,text='Jusqu’au',variable=v['duree'],value='abonnement').pack(side='left')
+    ttk.Entry(duree,textvariable=v['jusqu_au'],width=12).pack(side='left',padx=4)
+    def echeance(n):
+        v['duree'].set('abonnement');v['jusqu_au'].set(dans_mois(n));v['maj'].set(dans_mois(n))
+    for nom,n in [('1 mois',1),('3 mois',3),('1 an',12),('3 ans',36)]:
+        ttk.Button(duree,text=nom,command=lambda n=n:echeance(n)).pack(side='left',padx=2)
+    ttk.Radiobutton(duree,text='Permanente',variable=v['duree'],value='definitive').pack(side='left')
+    ligne(7,'Durée de licence',duree)
+    avancees=ttk.Frame(licence_tab)
+    avancees.columnconfigure(1,weight=1)
+    for i,(champ,texte) in enumerate([('niu','NIU'),('role','Rôle (seul / siège / agence)'),('site','Site agence'),
+        ('maj','Mises à jour jusqu’au'),('code','Ancien identifiant serveur')]):
+        ttk.Label(avancees,text=texte).grid(row=i,column=0,sticky='w',padx=(0,8),pady=2)
+        widget = ttk.Combobox(avancees,textvariable=v[champ],values=ROLES,state='readonly') if champ=='role' else ttk.Entry(avancees,textvariable=v[champ])
+        widget.grid(row=i,column=1,sticky='ew')
+    affiche_avancees=tk.BooleanVar(value=False)
     def options_avancees():
-        for widget in champs_avances:
-            widget.grid() if avancees.get() else widget.grid_remove()
+        avancees.grid(row=9,column=0,columnspan=2,sticky='ew') if affiche_avancees.get() else avancees.grid_remove()
+    ttk.Checkbutton(licence_tab,text='Options avancées',variable=affiche_avancees,command=options_avancees).grid(row=8,column=0,columnspan=2,sticky='w')
+    registre=ttk.Treeview(licence_tab,columns=('numero','client','postes','fin'),show='headings',height=6)
+    for col,titre,large in [('numero','Licence',120),('client','Société',320),('postes','Postes',60),('fin','Échéance',110)]:
+        registre.heading(col,text=titre);registre.column(col,width=large)
+    registre.grid(row=10,column=0,columnspan=2,sticky='nsew',pady=8)
+    licence_tab.rowconfigure(10,weight=1)
 
-    ttk.Checkbutton(cadre, text="Options avancées (NIU, rôle, site, mises à jour, ancien identifiant)",
-                    variable=avancees, command=options_avancees).grid(row=15, column=0, columnspan=2, sticky="w", pady=6)
-    options_avancees()
+    def rafraichir(*_):
+        choix_client['values']=list(clients_connus(v['dossier'].get()))
+        registre.delete(*registre.get_children())
+        for l in reversed(registre_lignes(v['dossier'].get())):
+            registre.insert('', 'end', values=(l['numero'],l['client'],l['postes'],l['valable_jusqu_au'] or 'Permanente'))
+
+    def generer():
+        try:
+            dossier=Path(v['dossier'].get())
+            if not chemin_coffre(dossier).exists():
+                raise ValueError('Créez votre identité, ou rassemblez le coffre existant dans ce dossier.')
+            if not v['client'].get().strip():
+                raise ValueError('Indiquez la société à licencier ou ouvrez sa demande.')
+            cle=ouvrir_coffre()
+            if cle is None:
+                return
+            a=argparse.Namespace(cle=str(chemin_coffre(dossier)), client=v['client'].get(), niu=v['niu'].get(),
+                edition=v['edition'].get(), role=v['role'].get(), site=v['site'].get(), code=v['code'].get(),
+                demande=v['demande'].get() or None, postes=int(v['postes'].get()), definitive=v['duree'].get()=='definitive',
+                jusqu_au=v['jusqu_au'].get(),maj_jusqu_au=v['maj'].get(),sortie=str(dossier),fichier=None)
+            fichier=emettre(a,cle_deverrouillee=cle)
+            derniere_licence[0]=fichier
+            memoriser();rafraichir()
+            etat.set(f'Licence {fichier.name} créée à côté de coffre.dat et parametres.dat. Exportez le paquet client pour la remettre.')
+        except (OSError,ValueError,SystemExit) as exc:
+            erreur(exc)
+
+    def exporter():
+        try:
+            chemin=derniere_licence[0]
+            selection=registre.selection()
+            if selection:
+                numero=registre.item(selection[0],'values')[0]
+                chemin=next((Path(l['fichier']) for l in registre_lignes(v['dossier'].get()) if l['numero']==numero),chemin)
+            if not chemin:
+                raise ValueError('Générez ou sélectionnez une licence dans la liste.')
+            fichier=exporter_client(chemin,v['dossier'].get())
+            etat.set(f'Paquet client : {fichier.name}. Il contient la licence, l’identité publique et la notice, jamais votre coffre.')
+            return fichier
+        except (OSError,ValueError,SystemExit) as exc:
+            erreur(exc)
+
+    boutons=ttk.Frame(licence_tab)
+    boutons.grid(row=11,column=0,columnspan=2,sticky='e',pady=8)
+    generer_licence_btn=ttk.Button(boutons,text='Générer la licence dans ce dossier',command=generer)
+    generer_licence_btn.pack(side='left',padx=4)
+    exporter_btn=ttk.Button(boutons,text='Exporter le paquet client',command=exporter)
+    exporter_btn.pack(side='left')
+    ttk.Label(licence_tab,text='Le dossier complet reste chez le propriétaire. La clé publique est binaire ; seul le coffre privé doit rester secret.',
+              wraplength=800).grid(row=12,column=0,columnspan=2,sticky='w')
+    def dossier_change(*_):
+        session.verrouiller();derniere_licence[0]=None;resultat_installation.set('')
+        etat.set('Dossier sélectionné. Les nouvelles licences seront enregistrées ici avec les clés.')
+        rafraichir()
+    v['dossier'].trace_add('write',dossier_change)
     rafraichir()
-    if essai:                                                     # contrôle automatique : la fenêtre se construit
-        if not fc.est_installation_courte(fc.installation_courte_creer()):
-            raise RuntimeError("Le générateur de code court ne fonctionne pas dans ce programme.")
-        fen.update()
-        fen.destroy()
+    etat.set('Choisissez votre dossier. La création du code d’installation ne nécessite aucune clé.')
+    if essai:
+        try:
+            dossier=Path(temporaire.name)
+            assert len(onglets.tabs())==2
+            generer_code_btn.invoke()
+            assert fc.est_installation_courte(dernier_code[0])
+            assert not chemin_coffre(dossier).exists() and not v['client'].get()
+            onglets.select(licence_tab)
+            creer_btn.invoke()
+            demande=dossier/'DEMANDE-ESSAI.erpdem'
+            demande.write_text(fc.demande_ecrire({'societe':'Société fictive GUI','materiel':'POSTE-INTERFACE-FICTIF',
+                'machine_nom':'GUI-FICTIVE','edition':'transport','role':'seul','site':'',
+                'installation':dernier_code[0],'cle_installation':dernier_code[0]}),encoding='utf-8')
+            charger_demande(demande)
+            generer_licence_btn.invoke()
+            assert derniere_licence[0] and derniere_licence[0].parent==dossier
+            assert (dossier/'coffre.dat').exists() and (dossier/'parametres.dat').read_bytes().startswith(b'ERPID\x01')
+            assert not (dossier/'cle-publique.txt').exists()
+            fichier=exporter()
+            import zipfile
+            with zipfile.ZipFile(fichier) as z:
+                assert 'coffre.dat' not in z.namelist() and 'parametres.dat' in z.namelist()
+                assert len(z.namelist())==3
+            # Le module 1 fonctionne encore après verrouillage du module Licence.
+            verrouiller();onglets.select(installation_tab);generer_code_btn.invoke()
+            assert session.cle is None
+            fen.update()
+            print('Interface Windows : deux modules, code sans coffre/société, clés binaires et licence réunies, paquet client sans clé privée : OK')
+        finally:
+            fermer();temporaire.cleanup()
         return
     fen.mainloop()
 
@@ -608,35 +797,23 @@ def question(texte, defaut=""):
 
 
 def menu():
-    print("ERP OHADA — émission des licences\n  1. Créer la paire de clés (une seule fois)\n"
-          "  2. Clé d'installation pour une société\n  3. Licence et clé d'activation (depuis la demande du client)\n"
-          "  4. Quitter")
-    choix = question("Choix", "3")
-    dossier = Path(question("Dossier des clés", preferences().get("cles", str(Path.home() / "ERP-OHADA-Licences"))))
-    sortie = question("Dossier où enregistrer", preferences().get("licences", str(bureau() / "Licences ERP")))
-    retenir(cles=str(dossier), licences=sortie)
+    print("ERP OHADA — deux modules\n  1. Code d'installation autonome\n  2. Créer une licence\n  3. Quitter")
+    choix = question("Choix", "1")
+    if choix == "3":
+        return
+    dossier = Path(question("Dossier de travail", preferences().get("dossier_unique", preferences().get("cles", str(Path.home()/"ERP-OHADA-Licences")))))
+    retenir(dossier_unique=str(dossier), cles=str(dossier), licences=str(dossier))
     if choix == "1":
-        creer_cles(dossier)
+        generer_installation(dossier)
     elif choix == "2":
-        emettre_installation(argparse.Namespace(cle=str(dossier / "cle-privee.pem"), client=question("Société"),
-                                                edition=question("Édition (transport, commerce, toutes)", "transport"),
-                                                sortie=sortie))
-    elif choix == "3":
-        duree = question("Durée : M=mensuel, T=trimestriel, S=semestriel, A=annuel, 2/3=2 ou 3 ans, "
-                         "P=permanente, ou une date AAAA-MM-JJ", "A").upper()
-        defaut = {"M": dans_mois(1), "T": dans_mois(3), "S": dans_mois(6), "A": dans_mois(12),
-                  "2": dans_mois(24), "3": dans_mois(36)}.get(duree)
-        if duree in ("D", "P"):
-            jusqu_au = None
-        elif defaut:
-            jusqu_au = defaut
-        else:
-            jusqu_au = question("Valable jusqu'au (AAAA-MM-JJ)", dans_mois(12)) if "-" not in duree else duree
-        a = argparse.Namespace(
-            cle=str(dossier / "cle-privee.pem"), demande=question("Fichier de la demande (.erpdem)"), client=None, niu=None,
-            edition=None, role=None, site=None, code=None, postes=int(question("Postes", "5")), definitive=duree in ("D", "P"),
-            jusqu_au=jusqu_au, maj_jusqu_au=jusqu_au or dans_mois(12), sortie=sortie, fichier=None)
-        emettre(a)
+        if not chemin_coffre(dossier).exists():
+            creer_cles(dossier)
+        duree = question("Durée en mois (ou P = permanente)", "12").upper()
+        permanente = duree == "P"
+        jusqu_au = None if permanente else dans_mois(int(duree))
+        emettre(argparse.Namespace(cle=str(chemin_coffre(dossier)), demande=question("Demande du client (.erpdem)"),
+            client=None, niu=None, edition=None, role=None, site=None, code=None, postes=int(question("Postes", "5")),
+            definitive=permanente, jusqu_au=jusqu_au, maj_jusqu_au=jusqu_au or dans_mois(12), sortie=str(dossier), fichier=None))
     input("\nEntrée pour fermer…")
 
 
@@ -651,10 +828,13 @@ def main(argv):
     s = p.add_subparsers(dest="commande", required=True)
     c = s.add_parser("cles")
     c.add_argument("--dossier", required=True)
-    c.add_argument("--noms-neutres", action="store_true", help="coffre.dat et parametres.dat (binaire)")
+    c.set_defaults(noms_neutres=True)
+    c.add_argument("--noms-neutres", action="store_true", help="format binaire par défaut : coffre.dat et parametres.dat")
+    c.add_argument("--ancien-format", dest="noms_neutres", action="store_false", help="compatibilité explicite PEM / texte")
     i = s.add_parser("installation")
     for nom in ("--cle", "--client", "--edition"):
-        i.add_argument(nom, required=True)
+        i.add_argument(nom, help="ancienne clé signée seulement ; inutile pour le module autonome")
+    i.add_argument("--dossier", help="dossier du code autonome, sans société ni clé")
     i.add_argument("--sortie")
     i.add_argument("--courte", action="store_true", help="référence de quatre groupes de six caractères")
     e = s.add_parser("emettre")
@@ -693,4 +873,5 @@ def main(argv):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
+
 

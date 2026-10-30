@@ -47,7 +47,7 @@ class OutilSimpleTests(unittest.TestCase):
     def test_ancien_coffre_toujours_reconnu(self):
         ancien = self.dossier / "ancien"
         with contextlib.redirect_stdout(io.StringIO()):
-            outil.creer_cles(ancien, mdp=self.mdp)
+            outil.creer_cles(ancien, noms_neutres=False, mdp=self.mdp)
         self.assertEqual(outil.chemin_coffre(ancien).name, "cle-privee.pem")
         outil.charger_cle(outil.chemin_coffre(ancien), self.mdp)
 
@@ -139,3 +139,4 @@ class OutilSimpleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
