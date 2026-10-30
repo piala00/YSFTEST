@@ -122,6 +122,23 @@ class CoordonneesMixin:
         return [self[n] for n in noms]
 
 
+class SelectDepart(forms.Select):
+    """Sélection native utilisable sans JS ; métadonnées pour la recherche progressive locale."""
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        depart = getattr(value, "instance", None)
+        if depart is not None:
+            vehicule = depart.vehicule
+            option["attrs"]["data-gamme"] = depart.ligne.gamme
+            option["attrs"]["data-recherche"] = "|".join([depart.numero, depart.ligne.gamme,
+                vehicule.immatriculation if vehicule else "", vehicule.designation if vehicule else ""])
+        return option
+
+
+def recherche_depart(champ):
+    champ.widget = SelectDepart(attrs={**champ.widget.attrs, "data-depart-select": "1"}, choices=champ.choices)
+
+
 class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
     cle_saisie = forms.CharField(required=False, widget=forms.HiddenInput)
     personne = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
@@ -197,6 +214,8 @@ class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
             f"{d.numero} — {d.date:%d/%m} {d.heure:%H:%M} — {d.ligne} — {d.vehicule or 'Sans véhicule'}")
         self.fields["depart"].queryset = programmes
         self.fields["depart_correspondance"].queryset = programmes
+        recherche_depart(self.fields["depart"])
+        recherche_depart(self.fields["depart_correspondance"])
         self.fields["gare_arrivee"].queryset = Gare.objects.filter(actif=True)
         self.fields["gare_montee"].queryset = Gare.objects.filter(actif=True)
         self.fields["caisse"].queryset = _caisses()
@@ -281,6 +300,7 @@ class TransitDepartForm(BootstrapMixin, forms.Form):
         self.fields["depart"].queryset = Depart.objects.filter(statut=Depart.PROGRAMME, site_origine="").select_related(
             "ligne", "vehicule").order_by("date", "heure")
         self.fields["depart"].label_from_instance = lambda d: f"{d.numero} — {d.ligne} — {d.vehicule or 'Sans véhicule'}"
+        recherche_depart(self.fields["depart"])
 
 
 class TransitPlacementForm(BootstrapMixin, forms.Form):
@@ -301,3 +321,6 @@ class TransvasementForm(BootstrapMixin, forms.Form):
         self.fields["depart"].queryset = Depart.objects.filter(statut__in=[Depart.PARTI, Depart.ARRIVE], site_origine="").select_related(
             "ligne", "vehicule").order_by("-date", "heure")
         self.fields["vehicule_secours"].queryset = Vehicule.objects.filter(actif=True)
+        self.fields["depart"].label_from_instance = lambda d: f"{d.numero} — {d.vehicule or 'Sans véhicule'} — {d.ligne}"
+        recherche_depart(self.fields["depart"])
+
