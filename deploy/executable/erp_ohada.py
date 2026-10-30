@@ -576,10 +576,11 @@ def lien_installateur():
 def installation_prevue(donnees):
     """Rôle choisi dans l'installateur (et fichier de l'agence), proposé par l'assistant du premier démarrage."""
     role, fichier = donnees / "role-installation.txt", donnees / "installation-agence.erpx"
-    cle = donnees / "cle-installation.txt"
+    cle = donnees / "installation.dat"
+    from apps.licences.licence import ouvrir_stockage
     return {"role": role.read_text(encoding="utf-8").strip() if role.exists() else "",
             "fichier_agence": fichier if fichier.exists() else None,
-            "cle_installation": cle.read_text(encoding="utf-8-sig").strip() if cle.exists() else ""}
+            "cle_installation": ouvrir_stockage(cle.read_text(encoding="ascii")) if cle.exists() else ""}
 
 
 def demarrage_automatique():
@@ -748,6 +749,9 @@ def main(argv):
         journal(f"Restauration SQL Server depuis {fichier} (base actuelle sauvegardée dans "
                 f"{restaurer_sqlserver(settings.DATABASES['default'], fichier)})")
     initialiser(edition_, donnees)
+    from apps.licences.licence import proteger_ancienne_installation
+
+    proteger_ancienne_installation(donnees)
     enregistrer_actions(donnees, port)
     reseau = action != "local" and os.environ.get("ERP_RESEAU", "1") != "0"
     resume = [f"Données : {donnees}"] + demarrer_taches(donnees)

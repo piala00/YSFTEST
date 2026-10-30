@@ -60,7 +60,7 @@ def installation(request):
         if texte:
             try:
                 d = lic.enregistrer_cle_installation(texte)
-                messages.success(request, f"Clé d'installation {d['numero']} acceptée : {d['societe']}.")
+                messages.success(request, f"Clé d'installation acceptée : {d['societe']}.")
                 return redirect(f"{request.path}?etape=identite")
             except lic.LicenceInvalide as exc:
                 messages.error(request, f"Clé d'installation refusée : {exc}")

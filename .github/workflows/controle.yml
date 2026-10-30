@@ -85,6 +85,8 @@ jobs:
           cache: pip
       - run: pip install -r deploy/windows/outils/composants.txt -r deploy/windows/outils/compilation.txt
       - run: python manage.py collectstatic --noinput -v0
+      - name: Vérifier le stockage protégé (DPAPI Windows réelle)
+        run: python -m unittest apps.licences.tests_stockage -v
       - name: Compiler le code de l'ERP en natif (protection contre le décorticage)
         run: python deploy/executable/compiler_natif.py . --supprimer-sources
       - name: Vérifier qu'il ne reste aucun code source de l'ERP

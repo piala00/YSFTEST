@@ -32,7 +32,8 @@ donnees = (collect_data_files("apps", include_py_files=False) + collect_data_fil
 
 # Traductions de Django : français et anglais seulement
 donnees = [(src, dst) for src, dst in donnees
-           if "locale" not in Path(dst).parts or {"fr", "en"} & set(Path(dst).parts)]
+           if ("locale" not in Path(dst).parts or {"fr", "en"} & set(Path(dst).parts))
+           and not Path(src).name.lower().endswith((".pem", ".key", ".erplic", ".erpdem", ".sqlite3", ".env"))]
 
 a = Analysis([str(RACINE / "deploy" / "executable" / "erp_ohada.py")], pathex=[str(RACINE)], hiddenimports=modules,
              datas=donnees, excludes=["tkinter", "django.contrib.gis", "numpy", "PIL", "yaml", "pandas", "matplotlib",
@@ -41,9 +42,13 @@ pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=NOM, console=True, upx=False)
 coll = COLLECT(exe, a.binaries, a.datas, upx=False, name=NOM)
 
-# À côté du programme : la notice et la documentation (sans les paquets .zip)
+# Documentation cliente explicitement autorisée, sans dossiers techniques d'émission.
 import shutil  # noqa: E402
 
 DOSSIER = Path(DISTPATH) / NOM
 shutil.copy2(RACINE / "deploy" / "executable" / "LISEZ-MOI.txt", DOSSIER / "LISEZ-MOI.txt")
-shutil.copytree(RACINE / "docs", DOSSIER / "documentation", ignore=shutil.ignore_patterns("*.zip"), dirs_exist_ok=True)
+documentation = DOSSIER / "documentation"
+if documentation.exists():
+    shutil.rmtree(documentation)
+documentation.mkdir()
+shutil.copy2(RACINE / "deploy" / "executable" / "GUIDE-CLIENT.txt", documentation / "GUIDE-CLIENT.txt")
