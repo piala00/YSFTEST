@@ -13,4 +13,6 @@
 <div>Total payé : <strong>{{ billet.total|montant }} FCFA</strong></div>{% endif %}
 <hr class="my-1"><div class="small">Vendu le {{ billet.date_vente|date:"d/m/Y" }} à {{ billet.gare.nom }} par {{ billet.vendu_par|default:"" }}.
 Présentez-vous 30 minutes avant le départ.</div>
+{% include "transport/_retour_impression.html" with suivant_libelle="Passager suivant" %}
 </body></html>
+

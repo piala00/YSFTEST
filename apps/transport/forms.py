@@ -4,6 +4,9 @@ from apps.commercial.models import Tiers
 from apps.comptabilite.models import Compte, Journal
 from apps.core.forms import BootstrapMixin, DateInput
 
+from .models_contacts import PersonneGuichet
+from .contacts_normalisation import nom_normalise, telephone_normalise
+
 from .models import Billet, Chauffeur, Colis, Depart, DepenseVehicule, Gare, Ligne, ParametresTransport, Vehicule
 
 
@@ -103,7 +106,49 @@ class DepartForm(BootstrapMixin, forms.ModelForm):
         self.fields["convoyeur"].queryset = Employe.objects.filter(actif=True)
 
 
-class BilletForm(BootstrapMixin, forms.ModelForm):
+class CoordonneesMixin:
+    def clean(self):
+        donnees = super().clean()
+        for selection, nom, telephone in self.groupes_contacts:
+            personne = donnees.get(selection)
+            if personne is not None and (personne.telephone_normalise != telephone_normalise(donnees.get(telephone))
+                                        or personne.nom_normalise != nom_normalise(donnees.get(nom))):
+                raise forms.ValidationError("Les coordonnées ont changé : effacez la sélection ou relancez la recherche.")
+        return donnees
+
+    def champs(self, noms):
+        return [self[n] for n in noms]
+
+
+class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
+    cle_saisie = forms.CharField(required=False, widget=forms.HiddenInput)
+    personne = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
+    groupes_contacts = [("personne", "voyageur", "telephone")]
+    rapides = ("telephone", "voyageur", "piece_identite", "gare_arrivee", "siege", "prix", "paiement")
+    complementaires = ("gare_montee", "caisse", "client", "depart_correspondance", "siege_correspondance")
+    bagages_champs = ("bagages", "bagages_nombre", "bagages_poids", "prix_bagages")
+
+    @property
+    def champs_rapides(self):
+        return self.champs(self.rapides)
+
+    @property
+    def champs_complementaires(self):
+        return self.champs(self.complementaires)
+
+    @property
+    def champs_bagages(self):
+        return self.champs(self.bagages_champs)
+
+    @property
+    def complements_ouverts(self):
+        return self.is_bound and any(self.errors.get(n) for n in self.complementaires)
+
+    @property
+    def bagages_ouverts(self):
+        return self.is_bound and any(self.errors.get(n) or self[n].value() not in (None, "", 0, "0", "0.0", "0.00")
+                                     for n in self.bagages_champs)
+
     depart_correspondance = forms.ModelChoiceField(
         queryset=Depart.objects.none(), required=False, label="Départ de correspondance",
         help_text="Si la destination est au-delà du terminus : véhicule pris à la gare de changement (vide : choisi sur place)")
@@ -116,7 +161,11 @@ class BilletForm(BootstrapMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        programmes = Depart.objects.filter(statut=Depart.PROGRAMME, site_origine="").select_related("ligne").order_by("date", "heure")
+        programmes = Depart.objects.filter(statut=Depart.PROGRAMME, site_origine="").select_related("ligne", "vehicule").order_by("date", "heure")
+        self.fields["telephone"].widget.attrs.update({"inputmode": "tel", "autocomplete": "off"})
+        self.fields["voyageur"].widget.attrs["autocomplete"] = "off"
+        self.fields["depart"].label_from_instance = lambda d: (
+            f"{d.numero} — {d.date:%d/%m} {d.heure:%H:%M} — {d.ligne} — {d.vehicule or 'Sans véhicule'}")
         self.fields["depart"].queryset = programmes
         self.fields["depart_correspondance"].queryset = programmes
         self.fields["gare_arrivee"].queryset = Gare.objects.filter(actif=True)
@@ -137,7 +186,27 @@ class BilletForm(BootstrapMixin, forms.ModelForm):
         return self.cleaned_data.get("prix_bagages") or 0
 
 
-class ColisForm(BootstrapMixin, forms.ModelForm):
+class ColisForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
+    cle_saisie = forms.CharField(required=False, widget=forms.HiddenInput)
+    personne_expediteur = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
+    personne_destinataire = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
+    groupes_contacts = [("personne_expediteur", "expediteur", "tel_expediteur"),
+                        ("personne_destinataire", "destinataire", "tel_destinataire")]
+    rapides = ("gare_depart", "gare_arrivee", "description", "prix", "port")
+    complementaires = ("nombre", "poids", "nature", "valeur_declaree", "contre_remboursement", "client")
+
+    @property
+    def champs_rapides(self):
+        return self.champs(self.rapides)
+
+    @property
+    def champs_complementaires(self):
+        return self.champs(self.complementaires)
+
+    @property
+    def complements_ouverts(self):
+        return self.is_bound and any(self.errors.get(n) for n in self.complementaires)
+
     class Meta:
         model = Colis
         fields = ("nature", "gare_depart", "gare_arrivee", "expediteur", "tel_expediteur", "destinataire", "tel_destinataire",
@@ -171,3 +240,4 @@ class ParametresTransportForm(BootstrapMixin, forms.ModelForm):
                   "compte_colis_a_transporter", "compte_remboursements", "compte_proprietaires", "compte_carburant", "compte_pieces", "compte_main_oeuvre", "taxe_billets",
                   "taxe_colis", "retenue_annulation", "sessions_caisse_obligatoires", "plafond_depense_sans_autorisation",
                   "avance_depart_toleree")
+

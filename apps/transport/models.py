@@ -1399,3 +1399,6 @@ from .models_caisse import ClotureJournee, SessionCaisse, TransfertFonds  # noqa
 from .models_exploitation import AvanceMission, JustificatifMission  # noqa
 from .models_depenses import DemandeDepense  # noqa
 from .models_incidents import FraisIncident, Incident  # noqa: E402,F401
+
+
+from .models_contacts import PersonneGuichet, SaisieGuichet  # noqa: E402,F401
