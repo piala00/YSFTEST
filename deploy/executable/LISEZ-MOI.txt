@@ -1,144 +1,32 @@
-ERP OHADA - PROGRAMME COMPILÉ (.exe)
-=====================================
+ERP OHADA — PROGRAMME WINDOWS
 
-1. DÉMARRER
------------
-Installé avec l'installateur (ERP-OHADA-<Édition>-Installation.exe), le serveur tourne
-en arrière-plan comme SERVICE WINDOWS (choix recommandé) : il démarre avec l'ordinateur,
-même sans session ouverte, se relance tout seul s'il s'arrête, et aucune fenêtre ne peut
-être fermée par erreur. L'icône « ERP OHADA <Édition> » ouvre simplement le navigateur.
-Service : « ERP OHADA <Édition> » (services.msc) ; journaux dans le dossier des données,
-sous-dossier journaux-service. Sans service (programme lancé à la main) :
-Double-cliquez sur ERP-OHADA-<Édition>.exe. Tout démarre dans la même fenêtre :
-  - le serveur du logiciel, ouvert aux autres postes du réseau local
-    (ils ouvrent l'adresse affichée dans leur navigateur, rien à installer) ;
-  - les sauvegardes automatiques de la base ;
-  - la copie miroir vers SQL Server, si elle est réglée (paragraphe 4) ;
-  - la synchronisation du dossier d'origine pendant la transition, si elle a été
-    commencée à l'écran (Fichier > Reprise d'un dossier existant) ;
-  - les échanges direction / agences par la boîte aux lettres, si elle est
-    réglée (paragraphe 5) ;
-  - le serveur de simulation (port suivant), si une simulation a été créée.
-Gardez la fenêtre ouverte ; la fermer arrête tout.
-Un second double-clic ne lance pas un second serveur : il ouvre le navigateur.
+Démarrez le logiciel depuis son raccourci Windows. Les autres postes utilisent
+l'adresse du serveur dans leur navigateur. Le service Windows démarre et se
+relance automatiquement lorsqu'il a été choisi à l'installation.
 
-Premier démarrage : la base SQLite est créée automatiquement, avec le plan
-comptable à 7 chiffres, les journaux et l'exercice. Le navigateur s'ouvre sur
-l'assistant de première configuration : 1. compte administrateur (à créer sur
-le serveur lui-même), 2. identité de la société, 3. rôle de ce serveur
-(un seul site, Direction (siège) ou Agence avec le fichier remis par la direction).
+Fichier > Administration du poste regroupe les onglets :
+  Ce poste ; Licence ; Base de données ; Sauvegarde et restauration ;
+  Import et export agences ; Simulation.
 
-Ensuite, tout se fait à l'écran : Fichier > Administration du poste (ou le
-bouton en bas du portail) pour sauvegarder, restaurer une sauvegarde, créer ou
-supprimer la simulation, démarrer le logiciel avec Windows. Les commandes du
-paragraphe 6 restent possibles mais ne sont plus nécessaires.
+Le programme se trouve dans Program Files\ERP-OHADA\<Édition>.
+Les données sont conservées dans ProgramData\ERP-OHADA\<Édition>.
+Une mise à jour du programme conserve les données.
 
-2. OÙ SONT LES DONNÉES
-----------------------
-PAS dans le dossier du programme : on peut le remplacer (nouvelle version) ou
-l'effacer sans rien perdre. Emplacement :
-    C:\ProgramData\ERP-OHADA\<Édition>
-        configuration.env   réglages (clé secrète, base, sauvegardes, miroir)
-        erp.sqlite3         la base
-        sauvegardes\        sauvegardes automatiques (lecture seule)
-        journal.txt         compte rendu des sauvegardes, copies miroir, erreurs
-Pour l'afficher :  ERP-OHADA-<Édition>.exe dossier
-Autre emplacement : variable d'environnement ERP_DONNEES (ex. D:\ERP-DONNEES).
+Pour activer, sélectionnez le fichier de licence reçu dans l'onglet Licence.
+Le coffre privé reste chez l'éditeur. Aucune copie de clés dans les dossiers
+d'installation n'est nécessaire.
 
-3. PROTECTION CONTRE UN EFFACEMENT PAR INADVERTANCE
----------------------------------------------------
-- Pendant que le logiciel tourne, Windows refuse d'effacer la base (fichier ouvert).
-- Sauvegarde au démarrage puis toutes les 4 heures (ERP_SAUVEGARDE_HEURES),
-  60 gardées (ERP_SAUVEGARDE_GARDER), en lecture seule, chacune contrôlée.
-- Recommandé : une seconde copie sur un autre disque, une clé USB ou un NAS.
-  Dans configuration.env :  ERP_SAUVEGARDE_COPIE=E:\Sauvegardes-ERP
-- Si la base a disparu, le programme ne recrée PAS une base vide : il le signale
-  et propose de remettre la dernière sauvegarde.
-- Remettre une sauvegarde (logiciel arrêté) :
-      ERP-OHADA-<Édition>.exe restaurer               la plus récente
-      ERP-OHADA-<Édition>.exe restaurer <fichier>     une sauvegarde précise
-  La base remplacée est mise de côté (erp-avant-restauration-<date>.sqlite3).
-- Sauvegarde immédiate :  ERP-OHADA-<Édition>.exe sauvegarder
+Les agences utilisent les fichiers .erpx dans l'onglet Import et export agences.
+Les dossiers fictifs utilisent les fichiers .erpsim dans l'onglet Simulation.
+Un dossier de simulation s'ouvre dans le même logiciel, à la même adresse,
+après sauvegarde et redémarrage confirmé sur le serveur. Il reste séparé de
+votre société. Tous les postes connectés doivent terminer leurs saisies avant
+ce changement. Le bandeau SIMULATION rappelle en permanence le dossier ouvert.
 
-4. BASE DE DONNÉES : SQLITE OU SQL SERVER (À L'ÉCRAN)
-------------------------------------------------------
-Au premier démarrage, l'assistant propose : SQLite (recommandé, rien à
-installer), SQL Server (serveur\instance, base, compte Windows ou compte SQL,
-avec « Tester la connexion » ; la base est créée si besoin), ou SQLite avec
-copie miroir automatique vers SQL Server.
-Ensuite : Fichier > Administration du poste > Base de données :
-  - état (moteur, emplacement, version, taille, tables) ;
-  - Vérifier l'intégrité (SQLite : integrity_check ; SQL Server : DBCC CHECKDB) ;
-  - Optimiser (index, statistiques ; SQLite : compactage) ; Réparer ;
-  - Sauvegarder maintenant et Restaurer (SQL Server : .bak natif sur le serveur
-    SQL, vérifié ; la restauration se fait au redémarrage, la base actuelle est
-    sauvegardée avant) ; sauvegardes automatiques toutes les 4 h ;
-  - Changer de base (SQLite <-> SQL Server) : copie complète contrôlée table
-    par table, la base actuelle n'est pas modifiée ;
-  - Redémarrer le logiciel (sans aller dans la fenêtre noire).
-Une base qui contient les tables d'un autre logiciel (ex. Sage) est toujours
-refusée : l'ERP n'écrit jamais dans une base Sage.
+La copie exportée d'une simulation ne contient pas les mots de passe, sessions
+ou licences du poste d'origine. Le poste qui l'importe y crée son administrateur.
+Ne transmettez que des données fictives ; vérifiez les ajouts manuels éventuels.
 
-Réglages équivalents dans configuration.env (pour mémoire) :
------------------------------------
-La société travaille sur SQLite (rapide, hors ligne). Une copie complète est
-reportée automatiquement dans une base SQL Server, à chaque intervalle.
-Dans configuration.env, retirez le # devant :
-    MIROIR_DB_ENGINE=mssql
-    MIROIR_DB_HOST=SERVEUR\INSTANCE
-    MIROIR_DB_NAME=ERP_MIROIR          (créée si elle n'existe pas)
-    MIROIR_DB_USER=                    (vide : compte Windows)
-    MIROIR_DB_PASSWORD=
-    MIROIR_DB_PYTHON_DRIVER=mssql_python
-    MIROIR_INTERVALLE_MINUTES=60
-- Sens unique : SQLite -> SQL Server. On n'écrit jamais dans SQL Server pour le
-  reprendre ensuite ; la base SQL Server sert aux consultations, aux outils de
-  reporting et de secours.
-- Tout ou rien, puis contrôle table par table (nombre de lignes identique).
-- Refus d'une base SQL Server qui contient d'autres tables que celles de l'ERP
-  (une base d'un autre logiciel n'est jamais touchée).
-- Copie à la demande :  ERP-OHADA-<Édition>.exe manage miroir
-
-Travailler directement sur SQL Server (sans SQLite) reste possible :
-DB_ENGINE=mssql, DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PYTHON_DRIVER=mssql_python.
-
-5. DIRECTION ET AGENCES : ÉCHANGES AUTOMATIQUES
------------------------------------------------
-Dès qu'Internet est là, chaque serveur dépose les lots destinés aux autres sites
-dans une boîte aux lettres et retire les siens (toutes les 5 minutes). Les lots
-sont signés et chiffrés : la boîte ne peut pas les lire. Les fichiers .erpx
-(écran Échanges) restent le secours. Dans configuration.env :
-
-    ECHANGES_RELAIS_URL=https://relais.exemple.com    (relais Internet)
-    ECHANGES_RELAIS_JETON=jeton donné par la direction
-ou
-    ECHANGES_DOSSIER_PARTAGE=\\SERVEUR\Echanges-ERP     (dossier partagé)
-    ECHANGES_INTERVALLE_MINUTES=5
-
-Écran Échanges : « Synchroniser maintenant ». Détails : docs\ECHANGES_AGENCES.md
-
-6. AUTRES COMMANDES
--------------------
-    ERP-OHADA-<Édition>.exe local             ce poste seulement (pas de réseau)
-    ERP-OHADA-<Édition>.exe simulation 3      simulation fictive de 3 mois dès 09/2026 (dossier séparé)
-    ERP-OHADA-<Édition>.exe simulation 2026-01    de janvier 2026 jusqu'à aujourd'hui
-    ERP-OHADA-<Édition>.exe simulation 2026-01 6  six mois à partir de janvier 2026
-    ERP-OHADA-<Édition>.exe demarrage-auto    démarrer à l'ouverture de session Windows
-                                              (relancer pour retirer)
-    ERP-OHADA-<Édition>.exe manage <commande> administration (echanges, longueur_comptes…)
-Accès réseau désactivé : ERP_RESEAU=0 dans configuration.env.
-
-7. LICENCE
-----------
-  1. Clé d'installation : remise par l'éditeur avec le logiciel ; saisie dans
-     l'installateur ou au premier démarrage. Elle porte le nom de votre société.
-  2. Essai : 30 ouvertures (chaque connexion compte pour une), au plus 15 jours,
-     3 postes. Ensuite le logiciel passe en lecture seule (consultation, états,
-     exports et sauvegardes restent possibles).
-  3. Fichier > Administration du poste > Licence : « Télécharger la demande de
-     licence » (nom de la machine, société, identifiant matériel, clé
-     d'installation) et envoyez-la à l'éditeur.
-  4. L'éditeur renvoie un fichier de licence (.erplic) et une clé d'activation :
-     installez le fichier OU collez la clé, sur le même écran.
-
-La documentation du logiciel est dans le dossier « documentation ».
+Conservez des sauvegardes sur un support séparé et testez leur restauration.
+Une réparation qui nécessite de perdre des données n'est pas effectuée par le logiciel.
+Guide complémentaire : documentation\GUIDE-CLIENT.txt.
