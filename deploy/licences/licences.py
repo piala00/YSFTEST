@@ -610,6 +610,8 @@ def ecrire_guide(dossier, publique=None):
     guide=dossier/'INSTALLATION_CLE_PUBLIQUE.md'
     if guide.is_symlink():
         raise ValueError('Le guide ne doit pas être un lien vers un autre fichier.')
+    if guide.exists() and (not guide.is_file() or guide.stat().st_nlink!=1):
+        raise ValueError('Le guide doit être un fichier ordinaire non partagé ; aucun remplacement.')
     if publique is None and (dossier/'parametres.dat').is_file():
         contenu=(dossier/'parametres.dat').read_bytes()
         if len(contenu)==38 and contenu.startswith(b'ERPID\x01'):

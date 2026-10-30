@@ -175,6 +175,10 @@ class ComplementsLicencesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             outil.ecrire_guide(self.root)
         self.assertEqual(coffre.read_bytes(),avant)
+        guide.unlink();os.link(coffre,guide)
+        with self.assertRaisesRegex(ValueError,'non partagé'):
+            outil.ecrire_guide(self.root)
+        self.assertEqual(coffre.read_bytes(),avant)
 
     def test_regroupement_ne_ressuscite_pas_une_licence_supprimee(self):
         archive=self.supprimer()
