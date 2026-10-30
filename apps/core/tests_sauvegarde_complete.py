@@ -4,7 +4,7 @@ from unittest import mock
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, SimpleTestCase
 from django.urls import reverse
 
 from apps.comptabilite.models import Ecriture
@@ -107,3 +107,16 @@ class SauvegardeCompleteTests(TransactionTestCase):
                 "fichier": SimpleUploadedFile("sauvegarde.json", contenu.encode())})
         restaurer.assert_not_called()
         self.assertEqual(list(Societe.objects.values()), avant)
+
+class CommandesClientTests(SimpleTestCase):
+    def test_commandes_python_et_ancienne_simulation_refusees_avant_ouverture_de_base(self):
+        import sys
+        from .tests_executable import lanceur
+
+        with mock.patch.object(sys, "frozen", True, create=True), \
+                mock.patch.object(lanceur, "edition", return_value="transport"), \
+                mock.patch.object(lanceur, "preparer_environnement") as preparer, mock.patch("builtins.print"):
+            for commande in (["manage", "shell"], ["manage", "runserver"], ["simulation", "1"]):
+                self.assertEqual(lanceur.main(commande), 2)
+        preparer.assert_not_called()
+

@@ -129,6 +129,17 @@ jobs:
           & $exe sauvegarder
           if ($LASTEXITCODE -ne 0) { throw "Sauvegarde à la demande en échec" }
           Write-Output "Programme Windows ${{ matrix.nom }} : compilé, démarré, page de connexion servie, sauvegardes faites."
+      - name: Refuser les commandes de développement dans le programme client compilé
+        shell: pwsh
+        run: |
+          $exe = "dist\ERP-OHADA-${{ matrix.nom }}\ERP-OHADA-${{ matrix.nom }}.exe"
+          foreach ($arguments in @("manage check", "simulation 1")) {
+            $p = Start-Process $exe -ArgumentList $arguments -PassThru -NoNewWindow
+            if (-not $p.WaitForExit(20000)) { Stop-Process -Id $p.Id -Force; throw "Commande cliente non refusée : $arguments" }
+            $p.WaitForExit()
+            if ($p.ExitCode -ne 2) { throw "Refus attendu (2), obtenu $($p.ExitCode) : $arguments" }
+          }
+          $global:LASTEXITCODE = 0
       - uses: actions/upload-artifact@v4
         with:
           name: ERP-OHADA-${{ matrix.nom }}-Windows-exe
