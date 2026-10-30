@@ -35,7 +35,7 @@ class Champs(HTMLParser):
         attr = dict(attrs)
         if tag in ("input", "select", "textarea"):
             self.noms.append(attr.get("name"))
-            if not self.details and attr.get("type") != "hidden":
+            if attr.get("name") and not self.details and attr.get("type") != "hidden":
                 self.visibles.append(attr.get("name"))
 
     def handle_endtag(self, tag):
