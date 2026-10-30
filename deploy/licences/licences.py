@@ -25,6 +25,7 @@ import getpass
 import json
 import os
 import re
+import secrets  # import explicite pour PyInstaller : format_cles est compilé en module natif
 import sys
 from pathlib import Path
 
@@ -593,6 +594,8 @@ def interface(essai=False):
     options_avancees()
     rafraichir()
     if essai:                                                     # contrôle automatique : la fenêtre se construit
+        if not fc.est_installation_courte(fc.installation_courte_creer()):
+            raise RuntimeError("Le générateur de code court ne fonctionne pas dans ce programme.")
         fen.update()
         fen.destroy()
         return
