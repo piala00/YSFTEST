@@ -107,6 +107,21 @@ def serialiser(o):
                          "contre_remboursement": _d(o.contre_remboursement), "depart": _uid(o.depart), "statut": o.statut,
                          "code_retrait": o.code_retrait, "livre_le": _date(o.livre_le), "retire_par": o.retire_par,
                          "livre_site": o.livre_site, "cr_reverse_le": _date(o.cr_reverse_le)}, o.date, o.cree_par or ""
+    from apps.transport.models_suivi_colis import IncidentColis
+
+    if isinstance(o, IncidentColis):
+        auteurs = {champ: str(getattr(o, champ) or "") for champ in
+                   ("declare_par", "resolu_par", "autorise_par", "paye_par")}
+        auteurs_ids = {champ: getattr(o, champ + "_id") for champ in auteurs}
+        return "incident_colis", {"v": VERSION, "uid": str(o.uid), "colis": _uid(o.colis),
+                                  "nature": o.nature, "lieu": o.lieu, "description": o.description,
+                                  "declare_le": _date(o.declare_le), "resolu": o.resolu,
+                                  "resolution": o.resolution, "resolu_le": _date(o.resolu_le),
+                                  "montant_autorise": _d(o.montant_autorise), "auteurs": auteurs, "auteurs_ids": auteurs_ids,
+                                  "compte": ({"numero": o.compte_indemnite.numero, "intitule": o.compte_indemnite.intitule}
+                                             if o.compte_indemnite_id else None),
+                                  "ecriture": _uid(o.ecriture),
+                                  "numero_ecriture": o.ecriture.numero if o.ecriture_id else ""}, o.colis.date, auteurs["declare_par"]
     if isinstance(o, DepenseVehicule):
         return "depense", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "date": _date(o.date),
                            "vehicule": _uid(o.vehicule), "depart": _uid(o.depart), "nature": o.nature, "libelle": o.libelle,
@@ -613,20 +628,84 @@ def _correction_suivi(p, origine, local):
     d.save()
 
 
+def _incident_colis(p, origine, local, *, revision):
+    """Copie de suivi : aucun appel aux services de déclaration, autorisation ou paiement."""
+    from apps.comptabilite.models import Compte, Ecriture
+    from apps.transport.models import Colis
+    from apps.transport.models_suivi_colis import IncidentColis
+    from django.utils import timezone
+
+    colis = _par_uid(Colis, p["colis"], "colis")
+    # Sérialiser aussi la première réception, avant qu'une ligne de suivi existe.
+    colis = Colis.objects.select_for_update().get(pk=colis.pk)
+    if colis.site_origine != origine.code:
+        raise Conflit("Le suivi doit provenir du site propriétaire du colis.")
+    if not _concerne(local, colis.gare_depart, colis.gare_arrivee):
+        raise SansObjet("suivi d'un envoi d'une autre agence")
+    o = _copie(IncidentColis, p["uid"], origine)
+    if o.site_origine != origine.code:
+        raise Conflit("Le suivi appartient à un autre site.")
+    if type(revision) is not int or revision <= 0:
+        raise Conflit("Révision du suivi invalide.")
+    if revision <= o.trace_origine.get("revision", 0):
+        raise SansObjet("version du suivi déjà reçue ou plus récente")
+    montant = Decimal(p.get("montant_autorise") or "0")
+    if not montant.is_finite() or montant < 0 or montant >= 10**14 or montant != montant.quantize(Decimal("1")):
+        raise Conflit("Montant d'indemnisation invalide.")
+    declare_le = parse_datetime(p["declare_le"])
+    resolu_le = parse_datetime(p["resolu_le"]) if p.get("resolu_le") else None
+    if (p["nature"] not in dict(IncidentColis.NATURES) or not p["lieu"].strip() or len(p["lieu"]) > 120
+            or not p["description"].strip() or len(p["description"]) > 250 or declare_le is None
+            or timezone.is_naive(declare_le) or (resolu_le is not None and timezone.is_naive(resolu_le))
+            or not isinstance(p.get("resolu"), bool) or len(p.get("resolution", "")) > 250
+            or (p["resolu"] and (not p.get("resolution", "").strip() or resolu_le is None))):
+        raise Conflit("Constat ou résolution du suivi invalide.")
+    auteurs = p.get("auteurs") or {}
+    if not isinstance(auteurs, dict) or any(not isinstance(v, str) or len(v) > 150 for v in auteurs.values()):
+        raise Conflit("Auteurs du suivi invalides.")
+    auteurs_ids = p.get("auteurs_ids") or {}
+    if not isinstance(auteurs_ids, dict) or any(v is not None and (type(v) is not int or v <= 0) for v in auteurs_ids.values()):
+        raise Conflit("Identifiants d'auteurs du suivi invalides.")
+    compte = p.get("compte")
+    if montant and (not compte or not compte["numero"].startswith("6") or not auteurs.get("autorise_par")):
+        raise Conflit("L'autorisation d'indemnisation doit conserver son auteur et son compte de charge.")
+    ecriture = None
+    if p.get("ecriture"):
+        if not montant or not auteurs.get("paye_par"):
+            raise Conflit("Le paiement doit conserver son autorisation et son auteur.")
+        # Les écritures sont consolidées au siège ; une autre agence ne reçoit que la référence du paiement.
+        if local.role == local.SIEGE:
+            ecriture = _par_uid(Ecriture, p["ecriture"], "écriture d'indemnisation")
+            if ecriture.site_origine != origine.code:
+                raise Conflit("L'écriture d'indemnisation appartient à un autre site.")
+    o.colis, o.nature, o.lieu, o.description = colis, p["nature"], p["lieu"], p["description"]
+    o.resolu, o.resolution, o.resolu_le = p["resolu"], p.get("resolution", ""), resolu_le
+    o.montant_autorise, o.ecriture = montant, ecriture
+    o.compte_indemnite = Compte.objects.get_or_create(numero=compte["numero"], defaults={"intitule": compte["intitule"]})[0] if compte else None
+    o.trace_origine = {"revision": revision, "auteurs": auteurs, "auteurs_ids": auteurs_ids, "ecriture": p.get("ecriture"),
+                      "numero_ecriture": p.get("numero_ecriture", "")}
+    # Ne jamais rattacher un auteur distant à un compte utilisateur local homonyme.
+    o.declare_par = o.resolu_par = o.autorise_par = o.paye_par = None
+    _enregistrer(o, "Suivi colis", p["uid"])
+    # auto_now_add ne doit pas remplacer la date du constat d'origine lors de la première réception.
+    IncidentColis.objects.filter(pk=o.pk).update(declare_le=declare_le)
+
+
 INTEGRATIONS = {"agence": _agence, "gare": _gare, "ligne": _ligne, "vehicule": _vehicule, "chauffeur": _chauffeur,
                 "depart": _depart, "billet": _billet, "colis": _colis, "colis_livraison": _colis_livraison,
                 "depart_arrivee": _depart_arrivee, "depense": _depense, "ecriture": _ecriture,
                 "troncon_affecte": _troncon_affecte, "troncon_effectue": _troncon_effectue,
                 "plein": _plein, "reparation": _reparation, "depense_demande": _depense_demande,
                 "depense_decision": _depense_decision, "depense_payee": _depense_payee,
-                "correction_demande": _correction_demande, "correction_suivi": _correction_suivi}
+                "correction_demande": _correction_demande, "correction_suivi": _correction_suivi,
+                "incident_colis": _incident_colis}
 
 # Ordre d'intégration d'un même lot : les référentiels avant les faits qui les utilisent
 PRIORITE = {"agence": 0, "gare": 1, "vehicule": 1, "chauffeur": 1, "ligne": 2, "depart": 3, "billet": 4, "colis": 4,
             "depense": 4, "plein": 4, "reparation": 4, "colis_livraison": 5, "depart_arrivee": 5, "troncon_affecte": 5, "troncon_effectue": 5,
             "ecriture": 6, "depense_demande": 4, "depense_decision": 5, "depense_payee": 5,
-            "correction_demande": 7, "correction_suivi": 7}
+            "correction_demande": 7, "correction_suivi": 7, "incident_colis": 7}
 
 # Faits qu'une agence doit connaître quand ils viennent d'une autre agence (relais par le siège)
 RELAYES = {"agence", "gare", "ligne", "vehicule", "chauffeur", "depart", "colis", "colis_livraison", "depart_arrivee",
-           "billet", "troncon_affecte", "troncon_effectue", "depense_payee"}
+           "billet", "troncon_affecte", "troncon_effectue", "depense_payee", "incident_colis"}
