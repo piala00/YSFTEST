@@ -155,6 +155,12 @@ contient aussi cet état. La nouvelle validation complète reste nécessaire, sa
 précédents réussis.
 Après ce dernier ajout : 14 tests ciblés locaux OK en 0,167 s (`NETTOYAGE_PLANIFICATEUR_APRES.log`).
 
+Run41195307911 au SHA a71acfc : 558 tests SQLite OK en 127,799 s (4 ignorés), activation compilée des deux
+éditions réussie. Les deux parcours nettoient maintenant entièrement les données ; l'inspection immédiate
+trouve encore `unins000.exe` dans le programme. La recette attendait seulement le retrait de l'ERP, pas celui
+du désinstallateur. Elle attend désormais les deux, avec borne et fin du journal Inno affichée. Aucun exécutable
+supplémentaire n'est ajouté à la liste des suppressions du nettoyeur. Le résultat Windows doit être reconfirmé.
+
 
 ## Émission propriétaire et activation unifiée
 

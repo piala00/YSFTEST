@@ -353,9 +353,16 @@ jobs:
             $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=`"$journal`"")
             $code = Executer-Installation "$dossier\unins000.exe" $parametres $journal
             if ($code -ne 0) { throw "Désinstallation en échec ($code)" }
-            for ($n = 0; $n -lt 60 -and (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe"); $n++) { Start-Sleep -Seconds 2 }
+            # Inno peut terminer depuis sa copie temporaire après le retour du lanceur initial.
+            # Attendre aussi son propre retrait ; le nettoyeur n'est pas autorisé à effacer un exécutable inconnu.
+            for ($n = 0; $n -lt 60; $n++) {
+              if (-not (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") -and -not (Test-Path "$dossier\unins000.exe")) { break }
+              Start-Sleep -Seconds 2
+            }
+            Get-Content $journal -Tail 50 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
             if (Get-Service $service -ErrorAction SilentlyContinue) { throw "Service toujours présent après désinstallation" }
             if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme toujours présent après désinstallation" }
+            if (Test-Path "$dossier\unins000.exe") { throw "Désinstallateur Inno toujours présent ; consulter son journal" }
           }
           # Une installation initiale sans autorisation est refusée, avant de toucher au service ou aux données.
           Refuser-Sans-Autorisation "$env:RUNNER_TEMP\installateur-refus-initial.log"
