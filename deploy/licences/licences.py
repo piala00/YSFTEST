@@ -208,6 +208,29 @@ def charger_cle(chemin, mdp=None):
         raise SystemExit("Mot de passe incorrect ou fichier de clé illisible.")
 
 
+def creer_autorisation_installation(cle, code, reference, jusqu_au, dossier):
+    """Permission de copier le programme, distincte d'une licence d'exploitation ; identité conservée."""
+    from cryptography.hazmat.primitives import serialization
+    code = code.strip().upper()
+    if not CODE.fullmatch(code):
+        raise ValueError("Code matériel attendu : T-, C- ou M- suivi des quatre groupes affichés par l'installateur.")
+    fin = datetime.date.fromisoformat(jusqu_au)
+    if fin < datetime.date.today():
+        raise ValueError("L'autorisation ne peut pas être émise déjà expirée.")
+    reference = fc.installation_courte_normaliser(reference) if reference else fc.installation_courte_creer()
+    public = cle.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    d = {"version": 1, "reference": reference, "edition": {"T": "transport", "C": "commerce", "M": "toutes"}[code[0]],
+         "machine": code[2:], "key_id": hashlib.sha256(public).hexdigest().upper(),
+         "emise_le": datetime.date.today().isoformat(), "valable_jusqu_au": fin.isoformat()}
+    contenu = fc.autorisation_texte(d, cle.sign(fc.DOMAINE_AUTORISATION + fc.canonique(d)))
+    dossier = Path(dossier)
+    dossier.mkdir(parents=True, exist_ok=True)
+    fichier = dossier / ("AUTORISATION-" + hashlib.sha256(fc.canonique(d)).hexdigest()[:16].upper() + ".erpinst")
+    with fichier.open("x", encoding="utf-8") as f:
+        f.write(contenu)
+    return fichier
+
+
 def date_ou_rien(texte):
     if not texte:
         return None
@@ -644,8 +667,8 @@ La licence validée est déposée dans l'historique de la base active ; la clé 
 1. Ouvrir l'ERP concerné et se connecter comme administrateur.
 2. Aller dans Fichier > Administration du poste > Licence.
 3. Choisir le fichier .erplic destiné à cette société, édition et machine.
-4. Choisir parametres.dat dans « Clé publique de l'éditeur ». Les anciens fichiers publics .txt restent lisibles.
-5. Cliquer « Installer la licence ». Le serveur vérifie le public autorisé, la signature et la destination
+4. Aucun fichier public à choisir : l’identité de l’éditeur doit déjà être intégrée au programme.
+5. Cliquer « Installer la licence ». Le serveur vérifie l’autorité intégrée, la signature et la destination
    de la licence, puis enregistre la licence. Aucune copie dans les dossiers Windows ni deuxième code n'est nécessaire.
 6. Vérifier le message de réussite, le numéro, la société, l'édition, les postes et l'échéance dans l'état affiché.
    Comparer l'empreinte de l'éditeur affichée par l'ERP à celle de ce guide, obtenue auprès du propriétaire.
@@ -838,6 +861,27 @@ def interface(essai=False):
             return cle
         except (OSError, ValueError, SystemExit) as exc:
             erreur(exc)
+
+    def autoriser_installation():
+        code = simpledialog.askstring('Autorisation d’installation', 'Code matériel affiché par l’installateur (T-… ou C-…) :', parent=fen)
+        if not code:
+            return
+        fin = simpledialog.askstring('Durée de l’autorisation', 'Autorisation d’installation valable jusqu’au (AAAA-MM-JJ) :',
+                                     initialvalue=(datetime.date.today()+datetime.timedelta(days=30)).isoformat(), parent=fen)
+        if not fin:
+            return
+        try:
+            cle = ouvrir_coffre()
+            if cle is None:
+                return
+            fichier = creer_autorisation_installation(cle, code, resultat_installation.get(), fin, v['dossier'].get())
+            statut_installation.configure(text=f'Autorisation signée créée : {fichier.name}. Ce fichier ne remplace pas la licence d’exploitation.')
+        except (OSError, ValueError, SystemExit) as exc:
+            erreur(exc)
+
+    ttk.Button(installation_tab, text='Autoriser une installation (.erpinst)…', command=autoriser_installation).pack(anchor='w', pady=8)
+    ttk.Label(installation_tab, text='Le code court reste autonome. Signer une autorisation exige le coffre existant et le code matériel du serveur ; aucune société à saisir.',
+              wraplength=520).pack(anchor='w')
 
     def creer():
         dossier = Path(v['dossier'].get())
@@ -1161,6 +1205,10 @@ def main(argv):
     e.add_argument("--maj-jusqu-au", dest="maj_jusqu_au")
     e.add_argument("--sortie")
     e.add_argument("--fichier", help="chemin exact du fichier .erplic à créer")
+    ai = s.add_parser("autoriser-installation")
+    for nom in ("--cle", "--code", "--jusqu-au", "--sortie"):
+        ai.add_argument(nom, required=True)
+    ai.add_argument("--reference", help="référence autonome 4×6 déjà générée, facultative")
     v = s.add_parser("verifier")
     v.add_argument("fichier")
     v.add_argument("--publique", required=True)
@@ -1171,6 +1219,8 @@ def main(argv):
         emettre_installation(a)
     elif a.commande == "emettre":
         emettre(a)
+    elif a.commande == "autoriser-installation":
+        print(creer_autorisation_installation(charger_cle(a.cle), a.code, a.reference, a.jusqu_au, a.sortie))
     else:
         verifier(a.fichier, a.publique)
     return 0

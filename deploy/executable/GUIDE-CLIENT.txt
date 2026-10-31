@@ -5,8 +5,8 @@ Les données de la société sont conservées séparément dans ProgramData\ERP-
 Remplacer le programme ne doit pas effacer les données.
 
 Licence : Administration du poste > Licence. Sélectionnez le fichier .erplic
-remis pour ce serveur. Le fichier public de vérification peut être sélectionné
-depuis le même dossier ; il doit correspondre à l'éditeur intégré au programme.
+remis pour ce serveur. L’identité publique de vérification est intégrée
+au programme : aucun fichier public à sélectionner.
 Aucune copie manuelle dans les dossiers Windows n'est nécessaire.
 Le coffre privé de l'éditeur ne doit jamais être remis au client.
 Une référence d'installation ne remplace pas une licence signée pour la machine.
@@ -15,3 +15,8 @@ Conservez vos sauvegardes dans un emplacement séparé et vérifiez leur restaur
 sur un poste d'essai. Une mise à jour ne remplace pas une sauvegarde.
 Avant une opération d'administration qui demande un redémarrage, terminez les
 saisies des utilisateurs et consultez les messages affichés par le logiciel.
+
+Installation/réinstallation : sélectionner l’autorisation signée .erpinst remise pour ce
+serveur et cette édition. Elle est distincte de la licence .erplic qui active l’exploitation.
+La désinstallation conserve les données par défaut. Un nettoyage interactif présente
+l’inventaire, vérifie une nouvelle sauvegarde hors des dossiers ERP et demande confirmation.

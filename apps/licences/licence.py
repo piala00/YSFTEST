@@ -99,13 +99,16 @@ def verifier_signature(donnees, signature):
     return verifier_octets(canonique(donnees), signature)
 
 
-def verifier_octets(message, signature, quoi="fichier"):
+def verifier_octets(message, signature, quoi="fichier", *, key_id=None):
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
     for cle in cles_publiques():
         try:
-            Ed25519PublicKey.from_public_bytes(base64.b64decode(cle)).verify(signature, message)
+            brut = base64.b64decode(cle)
+            if key_id is not None and hashlib.sha256(brut).hexdigest().upper() != key_id:
+                continue
+            Ed25519PublicKey.from_public_bytes(brut).verify(signature, message)
             return True
         except (InvalidSignature, ValueError):
             continue

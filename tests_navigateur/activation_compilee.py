@@ -75,6 +75,11 @@ class Navigateur:
 def verifier(exe, edition):
     from apps.licences import format_cles as fc
 
+    paquet = Path(exe).resolve().parent
+    for f in paquet.rglob("*"):
+        if f.is_file() and (f.name.lower() in ("coffre.dat", "cle-privee.pem", "cle_publique.txt", "cle-publique.txt") or f.suffix.lower() == ".erpinst"):
+            raise AssertionError("Fichier d'émission ou autorisation à exclure du paquet client : " + str(f))
+
     privee = serialization.load_der_private_key((DOSSIER / "privee-fictive.der").read_bytes(), password=None)
     port = 18300 if edition == "commerce" else 18310
     data = DOSSIER / edition
@@ -131,6 +136,10 @@ def verifier(exe, edition):
                 verifier_texte(navigateur.post("/licence/", {"action": "fichier"}, signer(d)), "installée pour")
                 verifier_texte(navigateur.get("/licence/"), "LIC-2026-0001")
                 resultats.append("activation réelle .erplic seul, aucun fichier public sélectionné")
+                cle_texte = fc.activation_creer(conditions, privee.sign(fc.canonique(d)))
+                verifier_texte(navigateur.post("/licence/", {"action": "activation", "cle": cle_texte}), "activée pour")
+                verifier_texte(navigateur.get("/licence/"), "LIC-2026-0001")
+                resultats.append("activation réelle par clé texte signée, mêmes conditions et même serveur")
             finally:
                 if os.name == "nt":
                     subprocess.run(["taskkill", "/F", "/T", "/PID", str(serveur.pid)], capture_output=True, check=False)

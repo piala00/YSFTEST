@@ -36,7 +36,8 @@ donnees = (collect_data_files("apps", include_py_files=False) + collect_data_fil
 # Traductions de Django : français et anglais seulement
 donnees = [(src, dst) for src, dst in donnees
            if ("locale" not in Path(dst).parts or {"fr", "en"} & set(Path(dst).parts))
-           and not Path(src).name.lower().endswith((".pem", ".key", ".erplic", ".erpdem", ".sqlite3", ".env"))]
+           and not Path(src).name.lower().endswith((".pem", ".key", ".dat", ".erpinst", ".erplic", ".erpdem", ".sqlite3", ".env"))
+           and Path(src).name.lower() not in ("cle_publique.txt", "cle-publique.txt")]
 
 a = Analysis([str(RACINE / "deploy" / "executable" / "erp_ohada.py")], pathex=[str(RACINE)], hiddenimports=modules,
              datas=donnees, excludes=["tkinter", "django.contrib.gis", "numpy", "PIL", "yaml", "pandas", "matplotlib",

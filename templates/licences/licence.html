@@ -43,7 +43,7 @@
     <table class="table table-sm small mb-2"><tbody>
       <tr><th>Société</th><td>{{ demande.societe }}</td></tr>
       <tr><th>Nom de la machine</th><td>{{ demande.machine_nom }}</td></tr>
-      <tr><th>Identifiant matériel</th><td class="font-monospace">{{ demande.materiel }}</td></tr>
+      <tr><th>Identifiant matériel du serveur</th><td><input id="identifiant-materiel" class="form-control form-control-sm font-monospace" value="{{ demande.materiel }}" readonly aria-label="Identifiant matériel du serveur"><button type="button" class="btn btn-sm btn-outline-secondary mt-1" id="copier-identifiant">Copier l’identifiant</button></td></tr>
       <tr><th>Installation</th><td>{{ installation.reference|default:"—" }}</td></tr>
       <tr><th>Rôle du serveur</th><td>{% for k, v in roles.items %}{% if k == demande.role %}{{ v }}{% endif %}{% endfor %}{% if demande.site %} ({{ demande.site }}){% endif %}</td></tr>
     </tbody></table>
@@ -57,11 +57,7 @@
     <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="fichier">
       <label class="form-label small mb-1" for="fichier-licence">Choisissez le fichier de licence reçu (.erplic)</label>
       <input id="fichier-licence" type="file" name="fichier" accept=".erplic" class="form-control form-control-sm mb-2" required>
-      <details class="mb-2"><summary class="small">Vérification supplémentaire de l'éditeur (facultative)</summary>
-        <label class="form-label small mb-1" for="fichier-verification">Clé publique de l'éditeur — parametres.dat</label>
-        <input id="fichier-verification" type="file" name="verification" accept=".dat,.txt" class="form-control form-control-sm mb-2">
-      </details>
-      <div class="form-text mb-2">Sélectionnez les fichiers reçus dans leur dossier : aucune copie dans Program Files ou ProgramData n'est nécessaire. Le coffre privé reste sur le poste d'émission de l'éditeur.</div>
+      <div class="form-text mb-2">Importez uniquement votre fichier .erplic. L’identité publique est intégrée au programme ; aucun fichier public à choisir, aucune copie dans les dossiers Windows. Le coffre privé reste chez l’éditeur.</div>
       <button class="btn btn-primary">Installer la licence</button>
     </form>
     <div class="form-text mb-2">Lorsque l'identité de l'éditeur est intégrée, le fichier .erplic suffit : aucune deuxième clé ni fichier public n'est nécessaire. Il ne vaut que pour le serveur et l'édition prévus.</div>
@@ -71,7 +67,7 @@
       {% for empreinte in empreintes_publiques %}<div class="small font-monospace text-break">{{ empreinte }}</div>{% endfor %}
     </details>
     {% endif %}
-    <details class="mt-2"><summary class="small">Autre méthode : code d'activation (facultatif)</summary>
+    <details class="mt-2"><summary class="small">Saisir une clé d’activation signée</summary>
       <form method="post">{% csrf_token %}<input type="hidden" name="action" value="activation">
         <label class="form-label small" for="cle-activation">Code d'activation alternatif</label>
         <textarea id="cle-activation" name="cle" rows="3" class="form-control form-control-sm font-monospace mb-2" required></textarea>
@@ -87,5 +83,16 @@
       <td>{% if h.valide %}<span class="text-success">acceptée</span>{% else %}<span class="text-danger">refusée</span> : {{ h.motif }}{% endif %}</td></tr>{% endfor %}
     </tbody></table></div></div>{% endif %}
 </div>
+<script>
+document.getElementById('copier-identifiant').addEventListener('click', async function () {
+  const champ = document.getElementById('identifiant-materiel');
+  champ.focus(); champ.select();
+  try {
+    if (navigator.clipboard) await navigator.clipboard.writeText(champ.value);
+    else if (!document.execCommand('copy')) throw new Error('copie');
+    this.textContent = 'Identifiant copié';
+  } catch (_) { this.textContent = 'Identifiant sélectionné — Ctrl+C'; }
+});
+</script>
 {% endblock %}
 
