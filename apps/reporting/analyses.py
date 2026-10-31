@@ -167,6 +167,7 @@ def catalogue():
             ("Recette du jour par agence", "transport:recette", (), {}, "Recettes constatées par agence et par service"),
             ("Billetterie par point de vente", "reporting:transport_billetterie", (), {}, "Billets, annulations, bagages, modes de paiement"),
             ("Colis, courrier et fret", "reporting:transport_colis", (), {}, "Envois, poids, recettes, port dû, livraisons"),
+            ("Colis non livrés", "reporting:transport_colis_non_livres", (), {}, "Ancienneté des envois, seuil de retard et gare d'arrivée"),
             ("Rentabilité par véhicule", "transport:rentabilite", (), {}, "Produits, charges et résultat de chaque véhicule"),
             ("Balance des véhicules", "transport:balance_vehicules", (), {}, "Mouvements et soldes par véhicule"),
             ("Grand-livre des véhicules", "transport:grand_livre_vehicules", (), {}, "Chaque écriture de chaque véhicule"),
