@@ -48,6 +48,8 @@ class Incident(models.Model):
              (ANNULATION, "Départ annulé par la compagnie"), (AUTRE, "Autre imprévu")]
 
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False)
+    trace_origine = models.JSONField(default=dict, blank=True, editable=False)
     numero = models.CharField(max_length=30, unique=True, blank=True)
     depart = models.ForeignKey("transport.Depart", on_delete=models.PROTECT, related_name="incidents")
     type_incident = models.CharField("Imprévu", max_length=15, choices=TYPES)
@@ -69,8 +71,12 @@ class Incident(models.Model):
         return f"{self.numero} {self.get_type_incident_display()} ({self.depart.numero})"
 
     def save(self, *args, **kwargs):
-        self.numero = self.numero or Sequence.piece("INC", self.date.year)
-        super().save(*args, **kwargs)
+        using = kwargs.get("using") or self._state.db or "default"
+        with transaction.atomic(using=using):
+            if not self.numero and using != "default":
+                raise ValidationError("La référence métier doit être conservée dans cette copie.")
+            self.numero = self.numero or Sequence.piece("INC", self.date.year)
+            super().save(*args, **kwargs)
 
     @classmethod
     @transaction.atomic
@@ -178,6 +184,11 @@ class FraisIncident(models.Model):
 
     class Meta:
         verbose_name = "Frais d'imprévu"
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or self._state.db or "default"
+        with transaction.atomic(using=using):
+            super().save(*args, **kwargs)
 
     @transaction.atomic
     def enregistrer(self):

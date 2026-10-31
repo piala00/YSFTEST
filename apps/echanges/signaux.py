@@ -9,10 +9,14 @@ LIENS = {"ecriture", "ecriture_annulation", "ecriture_remboursement", "embarque"
 def _apres_enregistrement(sender, instance, created, update_fields=None, raw=False, **kwargs):
     if raw:  # Restauration : les événements sont eux-mêmes rechargés, ce n'est pas une nouvelle opération.
         return
-    if update_fields and set(update_fields) <= LIENS:            # simple rattachement de l'écriture : déjà publié
+    if sender.__name__ in ("Incident", "FraisIncident") and kwargs.get("using", "default") != "default":
+        return  # copie miroir, sans publication dans le journal de saisie
+    if update_fields and set(update_fields) <= LIENS and sender.__name__ not in ("Incident", "FraisIncident"):
         return
     from .publication import publier_objet, site_local
 
+    if sender.__name__ == "FraisIncident":
+        instance = instance.incident  # état complet et références GL, pas de second paiement chez le destinataire
     if sender.__name__ == "Billet" and created:                 # publié par Billet.vendre, avec ses tronçons
         return
     if sender.__name__ == "Troncon":                            # un tronçon change : on republie son billet
@@ -34,7 +38,8 @@ def connecter():
 
     from apps.transport.models import DemandeDepense
     from apps.transport.models_suivi_colis import IncidentColis
+    from apps.transport.models_incidents import Incident, FraisIncident
 
     for modele in (Agence, Gare, Ligne, Vehicule, Chauffeur, Depart, Billet, Troncon, Colis, DepenseVehicule, PleinCarburant,
-                   OrdreReparation, DemandeDepense, IncidentColis):
+                   OrdreReparation, DemandeDepense, IncidentColis, Incident, FraisIncident):
         post_save.connect(_apres_enregistrement, sender=modele, dispatch_uid=f"echanges-{modele.__name__}")
