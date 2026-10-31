@@ -3,7 +3,7 @@
 Comptes proposés, modifiables sur chaque frais : à valider par l'expert-comptable.
 """
 import uuid
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -19,6 +19,22 @@ def _compte(numero, intitule):
     from apps.comptabilite.models import Compte
 
     return Compte.objects.get_or_create(numero=numero, defaults={"intitule": intitule})[0]
+
+
+def _depart_de_saisie(depart):
+    """Sous transaction : refuser les copies et décider sur le départ réellement stocké."""
+    from apps.core.synchronisation import verifier_saisie
+    from .models import Depart, _proprietaire
+
+    if depart._state.db not in (None, "default"):
+        raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+    verifier_saisie("la saisie des imprévus de voyage")
+    try:
+        depart = Depart.objects.select_for_update().get(pk=depart.pk)
+    except Depart.DoesNotExist:
+        raise ValidationError("Ce départ n'existe plus. Actualisez la liste des départs.") from None
+    _proprietaire(depart, f"Le départ {depart.numero}")
+    return depart
 
 
 class Incident(models.Model):
@@ -65,10 +81,9 @@ class Incident(models.Model):
         from apps.comptabilite.models import Journal
         from apps.comptabilite.services import creer_ecriture
 
-        from .models import Depart, ParametresTransport, _proprietaire
+        from .models import Depart, ParametresTransport
 
-        depart = Depart.objects.select_for_update().get(pk=depart.pk)
-        _proprietaire(depart, f"Le départ {depart.numero}")
+        depart = _depart_de_saisie(depart)
         if depart.statut not in (Depart.PARTI, Depart.ARRIVE):
             raise ValidationError("Le transbordement concerne un car parti.")
         part = Decimal(part_restante)
@@ -111,10 +126,11 @@ class Incident(models.Model):
 
         from .models import Depart, ParametresTransport, _ventiler
 
+        depart = _depart_de_saisie(depart)
         if depart.statut not in (Depart.PARTI, Depart.ARRIVE, Depart.CLOTURE):
             raise ValidationError("La recette à bord concerne un car parti.")
         montant = Decimal(montant)
-        if montant <= 0:
+        if not montant.is_finite() or montant <= 0:
             raise ValidationError("Le montant doit être positif.")
         p = ParametresTransport.get()
         incident = cls.objects.create(depart=depart, type_incident=cls.VENTE_A_BORD, lieu=lieu, cree_par=utilisateur,
@@ -168,9 +184,27 @@ class FraisIncident(models.Model):
         from apps.comptabilite.models import Journal
         from apps.comptabilite.services import creer_ecriture
 
-        if self.montant is None or self.montant <= 0:
-            raise ValidationError("Le montant doit être positif.")
-        depart = self.incident.depart
+        if self._state.db not in (None, "default"):
+            raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+        if self.pk:
+            try:
+                self.refresh_from_db(from_queryset=type(self).objects.select_for_update())
+            except type(self).DoesNotExist:
+                raise ValidationError("Ce frais n'existe plus. Actualisez la liste des imprévus.") from None
+        if self.ecriture_id:
+            raise ValidationError("Ce frais est déjà comptabilisé. Aucun nouveau décaissement n'est enregistré.")
+        if self.incident._state.db not in (None, "default"):
+            raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+        # Ordre partagé avec le transbordement : départ avant la lecture de l'imprévu.
+        depart = _depart_de_saisie(self.incident.depart)
+        self.incident = Incident.objects.get(pk=self.incident_id)
+        try:
+            self.montant = Decimal(self.montant)
+        except (InvalidOperation, TypeError, ValueError):
+            raise ValidationError("Indiquez un montant entier positif.") from None
+        if (not self.montant.is_finite() or self.montant <= 0 or self.montant >= 10**14
+                or self.montant != self.montant.quantize(Decimal("1"))):
+            raise ValidationError("Indiquez un montant entier positif compatible avec le champ de saisie.")
         vehicule = self.vehicule or depart.vehicule
         compte = self.compte or _compte(*self.COMPTES[self.nature])
         if self.paiement == self.FOURNISSEUR:

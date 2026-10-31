@@ -204,6 +204,11 @@ def depart_detail(request, pk):
 def _imprevu(request, depart, action):
     """Imprévus du voyage (docs/IMPREVUS_VOYAGE.md) depuis la fiche du départ."""
     from apps.comptabilite.models import Journal
+    from apps.core.synchronisation import verifier_saisie
+    from .models import _proprietaire
+
+    verifier_saisie("la saisie des imprévus de voyage")
+    _proprietaire(depart, f"Le départ {depart.numero}")
 
     if action == "transborder":
         _droit_operation(request, "billetterie.transvasement")
