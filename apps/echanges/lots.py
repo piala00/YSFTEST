@@ -90,7 +90,7 @@ def _gares_de(evt):
     if evt.type in ("colis_livraison", "incident_colis"):
         c = Colis.objects.filter(uid=p.get("colis")).first()
         return [c.gare_depart, c.gare_arrivee] if c else []
-    if evt.type == "depart_arrivee":
+    if evt.type in ("depart_arrivee", "incident_voyage"):
         d = Depart.objects.filter(uid=p.get("depart")).select_related("ligne").first()
         return [d.ligne.gare_depart, d.ligne.gare_arrivee] if d else []
     return None                                                     # référentiel : utile à tous
@@ -345,7 +345,7 @@ def _integrer_en_attente(local, rapport):
                 if plus_recent:
                     raise contrats.SansObjet("version plus récente déjà intégrée")
                 with transaction.atomic(), import_en_cours():
-                    if evt.type == "incident_colis":
+                    if evt.type in ("incident_colis", "incident_voyage"):
                         contrats.INTEGRATIONS[evt.type](evt.payload, evt.site_origine, local, revision=evt.revision)
                     else:
                         contrats.INTEGRATIONS[evt.type](evt.payload, evt.site_origine, local)
@@ -475,6 +475,7 @@ def publier_existant():
     from apps.garage.models import OrdreReparation, PleinCarburant
     from apps.transport.models import Billet, Chauffeur, Colis, Depart, DepenseVehicule, Gare, Ligne, Vehicule
     from apps.transport.models_suivi_colis import IncidentColis
+    from apps.transport.models_incidents import Incident
 
     from .publication import publier_ecriture
 
@@ -486,7 +487,7 @@ def publier_existant():
             if a.uid not in connus:
                 publier_objet(a)
                 n += 1
-    for modele in (Gare, Vehicule, Chauffeur, Ligne, Depart, Billet, Colis, DepenseVehicule, PleinCarburant, OrdreReparation, IncidentColis):
+    for modele in (Gare, Vehicule, Chauffeur, Ligne, Depart, Billet, Colis, DepenseVehicule, PleinCarburant, OrdreReparation, IncidentColis, Incident):
         for o in modele.objects.filter(site_origine=""):
             if o.uid not in connus:
                 publier_objet(o)

@@ -122,6 +122,21 @@ def serialiser(o):
                                              if o.compte_indemnite_id else None),
                                   "ecriture": _uid(o.ecriture),
                                   "numero_ecriture": o.ecriture.numero if o.ecriture_id else ""}, o.colis.date, auteurs["declare_par"]
+    from apps.transport.models_incidents import Incident
+
+    if isinstance(o, Incident):
+        return "incident_voyage", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "depart": _uid(o.depart),
+                                   "type_incident": o.type_incident, "date": _date(o.date), "lieu": o.lieu,
+                                   "description": o.description, "vehicule_secours": _uid(o.vehicule_secours),
+                                   "part_restante": _d(o.part_restante), "cree_le": _date(o.cree_le),
+                                   "auteur": str(o.cree_par or ""), "auteur_id": o.cree_par_id,
+                                   "ecriture": _uid(o.ecriture), "numero_ecriture": o.ecriture.numero if o.ecriture_id else "",
+                                   "frais": [{"id": f.pk, "nature": f.nature, "libelle": f.libelle, "montant": _d(f.montant),
+                                              "paiement": f.paiement, "vehicule": _uid(f.vehicule),
+                                              "compte": f.compte.numero if f.compte_id else None,
+                                              "fournisseur": str(f.fournisseur or ""), "ecriture": _uid(f.ecriture),
+                                              "numero_ecriture": f.ecriture.numero if f.ecriture_id else ""}
+                                             for f in o.frais.select_related("compte", "vehicule", "fournisseur", "ecriture").order_by("pk")]}, o.date, str(o.cree_par or "")
     if isinstance(o, DepenseVehicule):
         return "depense", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "date": _date(o.date),
                            "vehicule": _uid(o.vehicule), "depart": _uid(o.depart), "nature": o.nature, "libelle": o.libelle,
@@ -691,6 +706,70 @@ def _incident_colis(p, origine, local, *, revision):
     IncidentColis.objects.filter(pk=o.pk).update(declare_le=declare_le)
 
 
+def _incident_voyage(p, origine, local, *, revision):
+    """Suivi distant et liens GL ; aucun appel au transbordement ni à l'enregistrement des frais."""
+    from django.utils import timezone
+    from apps.comptabilite.models import Ecriture
+    from apps.transport.models import Depart, Vehicule
+    from apps.transport.models_incidents import Incident, FraisIncident
+
+    depart = _par_uid(Depart, p["depart"], "départ")
+    depart = Depart.objects.select_for_update().get(pk=depart.pk)
+    if depart.site_origine != origine.code:
+        raise Conflit("L'imprévu doit provenir du propriétaire du départ.")
+    if not _concerne(local, depart.ligne.gare_depart, depart.ligne.gare_arrivee):
+        raise SansObjet("imprévu d'un départ d'une autre agence")
+    o = _copie(Incident, p["uid"], origine)
+    if o.site_origine != origine.code:
+        raise Conflit("L'imprévu appartient à un autre site.")
+    if type(revision) is not int or revision <= 0:
+        raise Conflit("Révision d'imprévu invalide.")
+    if revision <= o.trace_origine.get("revision", 0):
+        raise SansObjet("version de l'imprévu déjà reçue ou plus récente")
+    part = Decimal(p.get("part_restante") or "0")
+    cree_le = parse_datetime(p["cree_le"])
+    if (not part.is_finite() or not 0 <= part <= 100 or p["type_incident"] not in dict(Incident.TYPES)
+            or (p["type_incident"] == Incident.TRANSBORDEMENT and not part)
+            or not p.get("numero") or len(p["numero"]) > 30 or len(p.get("lieu", "")) > 120
+            or len(p.get("description", "")) > 250 or cree_le is None or timezone.is_naive(cree_le)
+            or not isinstance(p.get("auteur", ""), str) or len(p.get("auteur", "")) > 150):
+        raise Conflit("Données de l'imprévu invalides.")
+    auteur_id = p.get("auteur_id")
+    if auteur_id is not None and (type(auteur_id) is not int or auteur_id <= 0):
+        raise Conflit("Identifiant d'auteur invalide.")
+    def ecriture_recue(ref):
+        if not ref or local.role != local.SIEGE:
+            return None
+        e = _par_uid(Ecriture, ref, "écriture d'imprévu")
+        if e.site_origine != origine.code:
+            raise Conflit("L'écriture d'imprévu appartient à un autre site.")
+        return e
+    ecriture = ecriture_recue(p.get("ecriture"))
+    frais = p.get("frais", [])
+    if not isinstance(frais, list):
+        raise Conflit("Liste des frais invalide.")
+    ids, copies = set(), []
+    for f in frais:
+        montant = Decimal(f["montant"])
+        if (type(f.get("id")) is not int or f["id"] <= 0 or f["id"] in ids
+                or f["nature"] not in dict(FraisIncident.NATURES) or f["paiement"] not in dict(FraisIncident.PAIEMENTS)
+                or not montant.is_finite() or not 0 < montant < 10**14 or montant != montant.quantize(Decimal("1"))
+                or len(f["libelle"]) > 150):
+            raise Conflit("Frais d'imprévu invalides.")
+        ids.add(f["id"])
+        ecriture_recue(f.get("ecriture"))
+        copies.append({**f, "nature_libelle": dict(FraisIncident.NATURES)[f["nature"]],
+                       "paiement_libelle": dict(FraisIncident.PAIEMENTS)[f["paiement"]]})
+    o.depart, o.numero, o.type_incident = depart, p["numero"], p["type_incident"]
+    o.date, o.lieu, o.description = datetime.date.fromisoformat(p["date"]), p.get("lieu", ""), p.get("description", "")
+    o.vehicule_secours = _par_uid(Vehicule, p["vehicule_secours"], "véhicule de secours") if p.get("vehicule_secours") else None
+    o.part_restante, o.ecriture, o.cree_par = part, ecriture, None
+    o.trace_origine = {"revision": revision, "auteur": p.get("auteur", ""), "auteur_id": auteur_id,
+                      "ecriture": p.get("ecriture"), "numero_ecriture": p.get("numero_ecriture", ""), "frais": copies}
+    _enregistrer(o, "N° d'imprévu", p["numero"])
+    Incident.objects.filter(pk=o.pk).update(cree_le=cree_le)
+
+
 INTEGRATIONS = {"agence": _agence, "gare": _gare, "ligne": _ligne, "vehicule": _vehicule, "chauffeur": _chauffeur,
                 "depart": _depart, "billet": _billet, "colis": _colis, "colis_livraison": _colis_livraison,
                 "depart_arrivee": _depart_arrivee, "depense": _depense, "ecriture": _ecriture,
@@ -698,14 +777,14 @@ INTEGRATIONS = {"agence": _agence, "gare": _gare, "ligne": _ligne, "vehicule": _
                 "plein": _plein, "reparation": _reparation, "depense_demande": _depense_demande,
                 "depense_decision": _depense_decision, "depense_payee": _depense_payee,
                 "correction_demande": _correction_demande, "correction_suivi": _correction_suivi,
-                "incident_colis": _incident_colis}
+                "incident_colis": _incident_colis, "incident_voyage": _incident_voyage}
 
 # Ordre d'intégration d'un même lot : les référentiels avant les faits qui les utilisent
 PRIORITE = {"agence": 0, "gare": 1, "vehicule": 1, "chauffeur": 1, "ligne": 2, "depart": 3, "billet": 4, "colis": 4,
             "depense": 4, "plein": 4, "reparation": 4, "colis_livraison": 5, "depart_arrivee": 5, "troncon_affecte": 5, "troncon_effectue": 5,
             "ecriture": 6, "depense_demande": 4, "depense_decision": 5, "depense_payee": 5,
-            "correction_demande": 7, "correction_suivi": 7, "incident_colis": 7}
+            "correction_demande": 7, "correction_suivi": 7, "incident_colis": 7, "incident_voyage": 7}
 
 # Faits qu'une agence doit connaître quand ils viennent d'une autre agence (relais par le siège)
 RELAYES = {"agence", "gare", "ligne", "vehicule", "chauffeur", "depart", "colis", "colis_livraison", "depart_arrivee",
-           "billet", "troncon_affecte", "troncon_effectue", "depense_payee", "incident_colis"}
+           "billet", "troncon_affecte", "troncon_effectue", "depense_payee", "incident_colis", "incident_voyage"}

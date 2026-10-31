@@ -110,9 +110,11 @@
 <div class="card-body small">
 {% for i in incidents %}<div class="border rounded p-2 mb-2"><strong>{{ i.numero }}</strong> · {{ i.get_type_incident_display }} · {{ i.date|date:"d/m/Y" }}{% if i.lieu %} · {{ i.lieu }}{% endif %}
   {% if i.description %}<div>{{ i.description }}</div>{% endif %}
+  {% if i.site_origine %}<div class="text-muted">Imprévu transmis par {{ i.site_origine }}, en lecture seule. Auteur : {{ i.trace_origine.auteur|default:"non renseigné" }}.</div>{% endif %}
   {% if i.vehicule_secours %}<div>Car de secours {{ i.vehicule_secours.immatriculation }} pour {{ i.part_restante|floatformat:"-2" }} % du trajet</div>{% endif %}
-  {% if i.ecriture %}<div>Écriture <a href="{% url 'comptabilite:ecriture_detail' i.ecriture.pk %}">{{ i.ecriture.numero }}</a></div>{% endif %}
-  {% for f in i.frais.all %}<div>{{ f.get_nature_display }} : {{ f.libelle }} · {{ f.montant|montant }} ({{ f.get_paiement_display|lower }}){% if f.ecriture %} · <a href="{% url 'comptabilite:ecriture_detail' f.ecriture_id %}">écriture</a>{% endif %}</div>{% endfor %}</div>
+  {% if i.ecriture %}<div>Écriture <a href="{% url 'comptabilite:ecriture_detail' i.ecriture.pk %}">{{ i.ecriture.numero }}</a></div>{% elif i.trace_origine.ecriture %}<div>Écriture {{ i.trace_origine.numero_ecriture }} du site {{ i.site_origine }}</div>{% endif %}
+  {% for f in i.frais.all %}<div>{{ f.get_nature_display }} : {{ f.libelle }} · {{ f.montant|montant }} ({{ f.get_paiement_display|lower }}){% if f.ecriture %} · <a href="{% url 'comptabilite:ecriture_detail' f.ecriture_id %}">écriture</a>{% endif %}</div>{% endfor %}
+  {% for f in i.trace_origine.frais %}<div>{{ f.nature_libelle }} : {{ f.libelle }} · {{ f.montant|montant }} ({{ f.paiement_libelle|lower }}){% if f.ecriture %} · Écriture {{ f.numero_ecriture }} du site {{ i.site_origine }}{% endif %}</div>{% endfor %}</div>
 {% empty %}<div class="text-muted mb-2">Aucun imprévu.</div>{% endfor %}
 {% if not depart.site_origine %}
 {% if depart.statut == "PROGRAMME" %}<form method="post" class="d-flex flex-wrap gap-1 mb-2 border-top pt-2">{% csrf_token %}<strong class="w-100">Annuler le départ (imprévu de la compagnie)</strong>
