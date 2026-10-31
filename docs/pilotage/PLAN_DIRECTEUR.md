@@ -30,3 +30,9 @@ Chaque lot indique : exigences couvertes, responsable, dépendances, critères, 
 ## Documents associés
 
 [Exigences](REGISTRE_EXIGENCES.md) · [PR et dépendances](MATRICE_PR_DEPENDANCES.md) · [Décisions](JOURNAL_DECISIONS.md) · [Avancement](TABLEAU_AVANCEMENT.md) · [Anomalies](REGISTRE_ANOMALIES.md).
+
+Compléments de la première réconciliation : [rapport du31/10](RAPPORT_RECONCILIATION_2026-10-31.md),
+[demandes non vérifiées](DEMANDES_NON_VERIFIEES.md), [correspondance des transmissions](CORRESPONDANCE_TRANSMISSION.csv).
+Les 46 ID initiaux sont conservés et neuf détails retrouvés sont ajoutés :55 entrées ERP. Les81 lignes de transmission
+séparent55 demandes et26 propositions ; leur rattachement ne signifie ni test ni acceptation. Aucune exhaustivité
+globale n'est revendiquée sur cette seule correspondance.

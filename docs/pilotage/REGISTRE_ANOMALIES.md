@@ -11,5 +11,6 @@
 | ANO-G-001 | 250 départs testés à remplissage réduit, #20 | Limite connue, pas mesure d’un mois complet | Benchmark complet mesuré, sans extrapolation du petit essai |
 | ANO-F-001 | Nouveaux faits d’incidents/garage/décomptes pas tous échangés, transmission #20 | Écart à traiter | Aller-retour siège/agences, doubles lots, désordre et reprise éprouvés |
 | ANO-Q-001 | Recettes Windows10/11, deux services co-installés et PC propriétaire non acquises | Ouvert | Nommer OS/conditions réellement testés ; ne pas extrapoler un runner WindowsServer |
+| ANO-P-001 | Matrice globale des boutons à en-tête seul, malgré427 entrées dans le recensement Commercial (SHA ae724335) | Écart de suivi confirmé, consolidation Q-002 ouverte | Réutiliser/dédupliquer le recensement et relier implémentations/tests/correctifs ; aucune couverture exhaustive déduite d'un comptage |
 
 TR-01 annoncé corrigé au commit7e6f935 et déjà vérifié dans les travaux antérieurs : réutiliser ce résultat. Aucune nouvelle anomalie n’est déduite d’une simple déclaration. Les éléments de cette liste ne sont pas tous des bugs : les limites et couvertures manquantes restent explicitement distinguées.
