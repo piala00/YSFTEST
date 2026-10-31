@@ -7,7 +7,7 @@ Les urgences H-005/H-006/H-008/H-009 et Q-001 restent prioritaires. La réconcil
 Consigne confirmée par le propriétaire le 31/10 : organiser les tâches depuis GitHub et poursuivre les développements,
 corrections, tests et PR sans confirmation courante (Q-003, DEC-010). Les limites de production restent celles de DEC-001.
 Après la qualification fictive des P0 #23/#25, la personnalisation réelle reste bloquée ; le lot indépendant Documents
-#27/#28 poursuit D-002/Q-001. Les résultats du tableau d'avancement fixent le prochain point de reprise. Reporting03.1 #29 et P004 règlements #30 ont ensuite passé leurs huit contrôles CI ; Menus05.1 #31 consolide les427 ID historiques sans nouvel inventaire. F03.1 (incidents de colis entre agences) poursuit maintenant ANO-F-001, sans clôturer les autres contrats d'échange.
+#27/#28 poursuit D-002/Q-001. Les résultats du tableau d'avancement fixent le prochain point de reprise. Reporting03.1 #29 et P004 règlements #30 ont ensuite passé leurs huit contrôles CI ; Menus05.1 #31 consolide les427 ID historiques sans nouvel inventaire. F03.1 #32 et P004.2 frais #33 ont ensuite passé leurs huit CI. F03.2 poursuit la transmission des transvasements/port dû (ANO-F-002). Le benchmark mensuel à250 départs/jour, échelle1, reste en cours sur le produit validé #30 ; aucun mois complet n’est déduit de ses premières journées. ANO-F-001, les autres contrats et les décisions réelles restent ouverts.
 
 ## Sources et portée
 
