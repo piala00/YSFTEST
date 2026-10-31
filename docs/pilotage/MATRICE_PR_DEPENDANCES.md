@@ -27,7 +27,10 @@ Relevé du 31 octobre 2026 ; sources : métadonnées GitHub. La branche commune 
 | [#25](https://github.com/piala00/YSFTEST/pull/25) | gpt/installation-desinstallation-p0 | gpt/activation-licences-identite | Brouillon ouvert | dea6c9161872b46d08c9756baad8bd2ad036e301 |
 | [#26](https://github.com/piala00/YSFTEST/pull/26) | gpt/pilotage-registre-demandes | gpt/installation-desinstallation-p0 | Brouillon ouvert, documentation seule | Voir le dernier commit de cette PR documentaire |
 | [#28](https://github.com/piala00/YSFTEST/pull/28) | gpt/p0-documents-commerciaux | gpt/installation-desinstallation-p0 | Brouillon ouvert | ae724335d7117189378309eefbaa44e4fca3f3ce |
+| [#29](https://github.com/piala00/YSFTEST/pull/29) | gpt/reporting-catalogue-transport | gpt/p0-documents-commerciaux | Brouillon ouvert | 965fb2fb822eb96a5ab080591261a42034e7a74a |
+| [#30](https://github.com/piala00/YSFTEST/pull/30) | gpt/p0-reglements-clients | gpt/reporting-catalogue-transport | Brouillon ouvert | ae95eae1464079c671e6be1ef58beb903bc99d80 |
+| [#31](https://github.com/piala00/YSFTEST/pull/31) | gpt/menus05-consolidation | gpt/p0-documents-commerciaux | Brouillon documentaire parallèle | 27e581197286a7e8aa6b493af9c53ed5f2faf5ac |
 
-Chaîne produit actuelle : #11 → #12 → #13 → #14 → #15 → #16 → #17 → #19 → #20 → #21 → #22 → #23 → #25 → #28. #26 est un suivi documentaire parallèle sur #25. #8 et #9 sont des retours documentaires sur la branche commune. #10, #18, #24 et #27 sont des **issues**, pas des PR.
+Chaîne produit actuelle : #11 → #12 → #13 → #14 → #15 → #16 → #17 → #19 → #20 → #21 → #22 → #23 → #25 → #28 → #29 → #30. #26 est un suivi documentaire parallèle sur #25 ; #31 est une consolidation documentaire parallèle sur #28, sans les derniers deltas produit. #8 et #9 sont des retours documentaires sur la branche commune. #10, #18, #24 et #27 sont des **issues**, pas des PR.
 
 Intégration proposée seulement après autorisation : examiner chaque delta dans l’ordre, conserver les preuves de son SHA, résoudre les conflits dans une branche propre, refaire les vérifications nécessaires puis présenter le résultat au propriétaire. Aucune fusion automatique. Les corrections non fusionnées d’un parent doivent rester dans les descendants ; ne pas les recopier manuellement en double.
