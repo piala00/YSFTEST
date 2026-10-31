@@ -11,6 +11,8 @@ class IncidentColis(models.Model):
     PERDU, ENDOMMAGE, SANS_TRACE = 'PERDU', 'ENDOMMAGE', 'SANS_TRACE'
     NATURES = [(PERDU, 'Colis perdu'), (ENDOMMAGE, 'Colis endommagé'), (SANS_TRACE, 'Colis sans trace : recherche en cours')]
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False)
+    trace_origine = models.JSONField(default=dict, blank=True, editable=False)
     colis = models.ForeignKey('transport.Colis', on_delete=models.PROTECT, related_name='incidents_suivi')
     nature = models.CharField(max_length=10, choices=NATURES)
     lieu = models.CharField(max_length=120)
@@ -51,7 +53,9 @@ class IncidentColis(models.Model):
 
     @transaction.atomic
     def resoudre(self, motif, utilisateur):
+        from .models import _proprietaire
         incident = type(self).objects.select_for_update().get(pk=self.pk)
+        _proprietaire(incident, "Ce suivi de colis")
         if not motif.strip() or len(motif)>250:
             raise ValidationError("Indiquez comment le colis a été retrouvé ou le dommage traité.")
         if incident.resolu:
@@ -63,7 +67,9 @@ class IncidentColis(models.Model):
 
     @transaction.atomic
     def autoriser(self, montant, compte, utilisateur):
+        from .models import _proprietaire
         incident = type(self).objects.select_for_update().get(pk=self.pk)
+        _proprietaire(incident, "Ce suivi de colis")
         if not utilisateur.has_perm('transport.autoriser_indemnite_colis'):
             from django.core.exceptions import PermissionDenied
             raise PermissionDenied
@@ -86,6 +92,8 @@ class IncidentColis(models.Model):
             from django.core.exceptions import PermissionDenied
             raise PermissionDenied
         incident = type(self).objects.select_for_update().get(pk=self.pk)
+        from .models import _proprietaire
+        _proprietaire(incident, "Ce suivi de colis")
         if incident.ecriture_id:
             return incident
         if not incident.autorise_par_id or not incident.compte_indemnite_id or incident.montant_autorise <= 0:
