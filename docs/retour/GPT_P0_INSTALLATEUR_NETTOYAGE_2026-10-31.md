@@ -129,6 +129,23 @@ la confirmation avant examen d'un nouvel inventaire.
 Avant correction : deux régressions ciblées reproduites (WAL et répertoire connu vide). Après correction :
 13 tests ciblés OK, 0,149 s. La suite complète et les deux parcours Windows doivent être reconfirmés en CI.
 
+### Sauvegarde protégée en lecture seule et reprise du nettoyage
+
+Run41192541591 au SHA c976f191 : les suites Linux/SQL, l'activation des deux EXE et les fenêtres de nettoyage
+réussissent. Les deux installations, mises à jour, retraits et réinstallations réussissent aussi ; leur nettoyage
+final échoue sur une sauvegarde SQLite que l'ERP marque volontairement en lecture seule (WinError5).
+
+Après confirmation et vérification de l'archive, le nettoyage ne lève cet attribut que sur le fichier déjà
+inventorié dont l'empreinte est encore identique. Aucun changement d'ACL ni prise de possession. Si le nouvel
+essai échoue, le mode initial est rétabli et l'erreur est consignée. Le marqueur du dossier reste présent en cas
+d'échec partiel afin de permettre un nouvel inventaire et une reprise ; l'inventaire approuvé reste immuable.
+Rafraîchir réactive le bouton et exige une nouvelle confirmation. Le rapport liste aussi les répertoires retirés.
+
+14 tests ciblés locaux : OK en 0,120 s, dont refus sans confirmation, simulation d'un refus ACL persistant,
+restauration de l'attribut et reprise réussie. La recette réelle Windows doit encore confirmer le correctif.
+La CI contrôle également la nouvelle commande d'autorisation dans le générateur propriétaire réellement
+compilé, avec vérification indépendante de sa signature publique ; aucune clé privée fictive n'est publiée.
+
 
 ## Émission propriétaire et activation unifiée
 

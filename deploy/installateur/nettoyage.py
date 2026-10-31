@@ -85,6 +85,7 @@ def main(argv=None, _essai=False):
         try:
             approuve.set(False)
             afficher()
+            bouton.configure(state="normal" if plan["fichiers"] or plan["repertoires"] else "disabled")
         except (ValueError, OSError) as exc:
             messagebox.showerror("Inventaire impossible", str(exc))
     tk.Button(fenetre, text="Rafraîchir l'inventaire", command=rafraichir).pack(pady=2)

@@ -424,6 +424,13 @@ jobs:
           $lic = Get-ChildItem "$cles\LIC-*.erplic" | Select-Object -First 1
           & $outil verifier $lic.FullName --publique "$cles\parametres.dat"
           if ($LASTEXITCODE -ne 0) { throw "Vérification en échec" }
+          $fin = (Get-Date).AddDays(2).ToString("yyyy-MM-dd")
+          & $outil autoriser-installation --cle "$cles\coffre.dat" --code T-AAAA-BBBB-CCCC-DDDD --jusqu-au $fin --sortie $cles
+          if ($LASTEXITCODE -ne 0) { throw "Émission d'autorisation d'installation en échec" }
+          $autorisationOutil = Get-ChildItem "$cles\*.erpinst" | Select-Object -First 1
+          if (-not $autorisationOutil) { throw "Autorisation .erpinst absente" }
+          python tests_navigateur/installateur_p0.py verifier-emission "$cles\parametres.dat" $autorisationOutil.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Signature de l'autorisation émise par l'outil compilé invalide" }
           $f = Start-Process $outil -ArgumentList "interface-essai" -Wait -PassThru
           if ($f.ExitCode -ne 0) { throw "La fenêtre de l'outil ne se construit pas" }
           if (Get-ChildItem -Recurse "dist\ERP-OHADA-${{ matrix.nom }}" -Filter "licences.py*") { throw "L'outil du propriétaire ne doit pas être dans le programme client" }

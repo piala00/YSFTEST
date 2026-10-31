@@ -220,7 +220,8 @@ def effacer(plan, archive, *, confirmation=False):
     json.dump({"etat": "en-cours", "sauvegarde": str(archive), "inventaire": plan}, journal, ensure_ascii=False)
     journal.flush()
     os.fsync(journal.fileno())
-    resultat = {"supprimes": [], "erreurs": [], "conserves": plan["conserves"], "sauvegarde": str(archive)}
+    resultat = {"supprimes": [], "repertoires_supprimes": [], "erreurs": [], "conserves": list(plan["conserves"]), "sauvegarde": str(archive)}
+    genres_en_erreur = set()
     dossiers_attribues = {Path(plan["racines"][d["genre"]]) / d["relatif"] for d in plan["repertoires"]}
     for f in plan["fichiers"]:
         racine = Path(plan["racines"][f["genre"]])
@@ -230,18 +231,43 @@ def effacer(plan, archive, *, confirmation=False):
             if courant == racine:
                 break
             courant = courant.parent
-    for f in plan["fichiers"]:
+    # Garder l'identité du dossier pour une reprise si un fichier n'a pas pu être supprimé.
+    fichiers = sorted(plan["fichiers"], key=lambda f: (f["relatif"] == MARQUEUR, f["genre"], f["relatif"]))
+    for f in fichiers:
         chemin = Path(plan["racines"][f["genre"]]) / f["relatif"]
+        if f["relatif"] == MARQUEUR and f["genre"] in genres_en_erreur:
+            resultat["conserves"].append({"chemin": str(chemin), "raison": "Marqueur conservé pour reprendre les fichiers non supprimés."})
+            continue
         try:
             if digest(chemin) != f["sha256"]:
                 raise ValueError("Fichier modifié après vérification.")
-            chemin.unlink()
+            try:
+                chemin.unlink()
+            except PermissionError:
+                mode = stat.S_IMODE(chemin.stat().st_mode)
+                if mode & stat.S_IWRITE:
+                    raise  # ACL ou verrou : ne jamais prendre possession ni élargir les droits.
+                if digest(chemin) != f["sha256"]:
+                    raise ValueError("Fichier modifié avant retrait de l'attribut lecture seule.")
+                chemin.chmod(mode | stat.S_IWRITE)
+                try:
+                    chemin.unlink()
+                except OSError as exc:
+                    if chemin.exists():
+                        sur(chemin)
+                        try:
+                            chemin.chmod(mode)
+                        except OSError as restauration:
+                            raise OSError(f"{exc} ; attribut initial non rétabli : {restauration}") from exc
+                    raise
             resultat["supprimes"].append(str(chemin))
         except (OSError, ValueError) as exc:
+            genres_en_erreur.add(f["genre"])
             resultat["erreurs"].append({"chemin": str(chemin), "raison": str(exc)})
     for dossier in sorted(dossiers_attribues, key=lambda p: len(p.parts), reverse=True):
         try:
             sur(dossier).rmdir()  # uniquement vide et attribué ; jamais un dossier inconnu ou un parent partagé
+            resultat["repertoires_supprimes"].append(str(dossier))
         except (OSError, ValueError) as exc:
             if not isinstance(exc, OSError) or exc.errno not in (errno.ENOTEMPTY, errno.EEXIST):
                 resultat["erreurs"].append({"chemin": str(dossier), "raison": str(exc)})

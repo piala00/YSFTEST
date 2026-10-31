@@ -3,6 +3,8 @@ import os
 from contextlib import closing
 from pathlib import Path
 import sqlite3
+import shutil
+import stat
 import tempfile
 import zipfile
 from unittest import mock
@@ -137,3 +139,38 @@ class NettoyageTests(SimpleTestCase):
         (self.donnees / n.MARQUEUR).write_text("commerce")
         plan = self.plan()
         self.assertFalse(any(f["genre"] == "donnees" for f in plan["fichiers"]))
+
+    def test_lecture_seule_refus_acl_puis_reprise_sans_affaiblir_la_protection(self):
+        dossier = self.donnees / "sauvegardes"
+        dossier.mkdir()
+        fichier = dossier / "erp-20300101-000000.sqlite3"
+        shutil.copyfile(self.donnees / "erp.sqlite3", fichier)
+        fichier.chmod(stat.S_IREAD)
+        mode = stat.S_IMODE(fichier.stat().st_mode)
+        plan = self.plan()
+        n.sauvegarder(plan, self.archive)
+        with self.assertRaises(ValueError):
+            n.effacer(plan, self.archive)
+        self.assertEqual(stat.S_IMODE(fichier.stat().st_mode), mode)
+        unlink = Path.unlink
+        def refus_acl(p, *a, **k):
+            if p == fichier:
+                raise PermissionError("Refus Windows simulé")
+            return unlink(p, *a, **k)
+        with mock.patch.object(Path, "unlink", new=refus_acl):
+            resultat = n.effacer(plan, self.archive, confirmation=True)
+        self.assertEqual(len(resultat["erreurs"]), 1)
+        self.assertEqual(stat.S_IMODE(fichier.stat().st_mode), mode)
+        self.assertTrue((self.donnees / n.MARQUEUR).is_file())
+        n.verifier_sauvegarde(plan, self.archive)  # l'inventaire initial n'a pas été modifié par le rapport.
+        nouveau = self.plan()
+        archive = self.racine / "reprise.zip"
+        n.sauvegarder(nouveau, archive)
+        def readonly_windows(p, *a, **k):
+            if p == fichier and not p.stat().st_mode & stat.S_IWRITE:
+                raise PermissionError("Attribut Windows lecture seule simulé")
+            return unlink(p, *a, **k)
+        with mock.patch.object(Path, "unlink", new=readonly_windows):
+            resultat = n.effacer(nouveau, archive, confirmation=True)
+        self.assertEqual(resultat["erreurs"], [])
+        self.assertFalse(self.donnees.exists())

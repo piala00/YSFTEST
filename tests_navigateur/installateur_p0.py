@@ -33,6 +33,23 @@ def autorisation(outil, edition):
     assert r.returncode == 2, "Le contrôle compilé a accepté une licence d'un autre PC."
 
 
+def verifier_emission(publique, fichier):
+    """Vérifie indépendamment la preuve émise par le vrai outil propriétaire compilé."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from apps.licences import format_cles as fc
+    from apps.licences.identite import lire_publique
+
+    brut = lire_publique(Path(publique).read_bytes())
+    donnees, signature = fc.autorisation_lire(Path(fichier).read_bytes())
+    Ed25519PublicKey.from_public_bytes(brut).verify(signature, fc.DOMAINE_AUTORISATION + fc.canonique(donnees))
+    assert donnees["key_id"] == hashlib.sha256(brut).hexdigest().upper()
+    assert donnees["version"] == 1 and donnees["edition"] == "transport"
+    assert donnees["machine"] == "AAAA-BBBB-CCCC-DDDD"
+    assert fc.est_installation_courte(donnees["reference"])
+    assert datetime.date.fromisoformat(donnees["valable_jusqu_au"]) >= datetime.date.today()
+    print("Outil propriétaire compilé : autorisation .erpinst émise, signature et conditions vérifiées avec son public.")
+
+
 def nettoyer(programme, donnees, edition):
     from apps.licences import nettoyage as n
     assert os.environ.get("GITHUB_ACTIONS") == "true", "Recette réservée au runner jetable."
@@ -57,6 +74,8 @@ def nettoyer(programme, donnees, edition):
         print("Inventaire du runner modifié ; diagnostic sauvegardé, aucune suppression exécutée.")
         raise
     resultat = n.effacer(plan, archive, confirmation=True)
+    (temporaire / f"NETTOYAGE-DIAGNOSTIC-suppression-{edition}.json").write_text(
+        json.dumps(resultat, ensure_ascii=False, indent=2), encoding="utf-8")
     assert not resultat["erreurs"], resultat["erreurs"]
     assert not donnees.exists(), f"Résidus données : {list(donnees.rglob('*'))}"
     assert not programme.exists(), f"Résidus programme : {list(programme.rglob('*'))}"
@@ -69,5 +88,7 @@ def nettoyer(programme, donnees, edition):
 if __name__ == "__main__":
     if sys.argv[1] == "autorisation":
         autorisation(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == "verifier-emission":
+        verifier_emission(sys.argv[2], sys.argv[3])
     else:
         nettoyer(sys.argv[2], sys.argv[3], sys.argv[4])
