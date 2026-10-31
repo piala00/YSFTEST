@@ -22,6 +22,8 @@ import unicodedata
 ENTETE_LICENCE = "ERP-OHADA-LICENCE-V1"
 ENTETE_DEMANDE = "ERP-OHADA-DEMANDE-V1"
 DOMAINE_INSTALLATION = b"ERP-OHADA-INSTALLATION|"
+ENTETE_AUTORISATION = "ERP-OHADA-AUTORISATION-INSTALLATION-V1"
+DOMAINE_AUTORISATION = b"ERP-OHADA|AUTORISATION-INSTALLATION|V1|"
 EDITIONS = ("transport", "commerce", "toutes")
 ROLES = ("seul", "siege", "agence")
 ORIGINE = datetime.date(2020, 1, 1)
@@ -34,6 +36,26 @@ class CleInvalide(ValueError):
 
 def canonique(donnees):
     return json.dumps(donnees, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def autorisation_texte(donnees, signature):
+    return "\n".join((ENTETE_AUTORISATION, base64.b64encode(canonique(donnees)).decode(),
+                      base64.b64encode(signature).decode(), ""))
+
+
+def autorisation_lire(contenu):
+    try:
+        texte = contenu.decode("utf-8-sig") if isinstance(contenu, bytes) else contenu
+        lignes = texte.strip().splitlines()
+        if len(lignes) != 3 or lignes[0] != ENTETE_AUTORISATION:
+            raise ValueError
+        d = json.loads(base64.b64decode(lignes[1], validate=True))
+        s = base64.b64decode(lignes[2], validate=True)
+        if not isinstance(d, dict) or len(s) != 64:
+            raise ValueError
+        return d, s
+    except (ValueError, UnicodeError, TypeError):
+        raise CleInvalide("choisissez l'autorisation signée .erpinst ; une licence d'exploitation ou un code court ne la remplace pas") from None
 
 
 # ---------------------------------------------------------------- Texte des clés

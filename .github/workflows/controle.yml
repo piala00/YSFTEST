@@ -173,6 +173,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -208,10 +209,16 @@ jobs:
             python deploy/executable/personnaliser_identite.py --publique-base64 "$env:PUBLIQUE_AUTORISEE" --empreinte "$env:EMPREINTE_AUTORISEE"
             if ($LASTEXITCODE -ne 0) { throw "Identité publique non autorisée : compilation annulée" }
             "ERP_VERSION_ESSAI=0" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "ERP_TYPE_PAQUET=Personnalise" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "ERP_DISTRIBUTION_FICTIVE=0" | Out-File -FilePath $env:GITHUB_ENV -Append
             python deploy/executable/compiler_natif.py . --supprimer-sources
           } else {
-            "ERP_VERSION_ESSAI=1" | Out-File -FilePath $env:GITHUB_ENV -Append
-            python deploy/executable/compiler_natif.py . --version-essai --supprimer-sources
+            python tests_navigateur/activation_compilee.py preparer
+            if ($LASTEXITCODE -ne 0) { throw "Préparation de l'identité fictive en échec" }
+            "ERP_VERSION_ESSAI=0" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "ERP_TYPE_PAQUET=ESSAI-IDENTITE-FICTIVE" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "ERP_DISTRIBUTION_FICTIVE=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+            python deploy/executable/compiler_natif.py . --supprimer-sources
           }
           if ($LASTEXITCODE -ne 0) { throw "Compilation native refusée" }
       - name: Vérifier qu'il ne reste aucun code source de l'ERP
@@ -259,7 +266,7 @@ jobs:
           $global:LASTEXITCODE = 0
       - uses: actions/upload-artifact@v4
         with:
-          name: ERP-OHADA-${{ matrix.nom }}-Windows-exe
+          name: ERP-OHADA-${{ matrix.nom }}-${{ env.ERP_TYPE_PAQUET }}-Windows-exe
           path: dist/ERP-OHADA-${{ matrix.nom }}
           retention-days: 7
       - name: Service Windows (WinSW, version et empreinte vérifiées)
@@ -272,6 +279,16 @@ jobs:
           Copy-Item "$env:RUNNER_TEMP\winsw.exe" "$dist\ERP-OHADA-${{ matrix.nom }}-service.exe"
           (Get-Content deploy\installateur\service.xml -Raw).Replace("@EDITION@", "${{ matrix.nom }}").Replace("@PORT@", "${{ matrix.port }}") |
             Set-Content "$dist\ERP-OHADA-${{ matrix.nom }}-service.xml" -Encoding utf8
+      - name: Compiler les outils embarqués de contrôle et nettoyage
+        run: python -m PyInstaller deploy/installateur/outils.spec --noconfirm --workpath build-outils --distpath dist-outils
+      - name: Vérifier la vraie fenêtre de nettoyage compilée sur ses propres fichiers fictifs
+        shell: pwsh
+        run: |
+          $p = Start-Process "dist-outils\ERP-Nettoyage.exe" -ArgumentList "--recette-fictive" -PassThru
+          if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw "Interface nettoyage bloquée" }
+          $p.WaitForExit()
+          if ($p.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\NETTOYAGE-INTERFACE-ERREUR.txt" -ErrorAction SilentlyContinue; throw "Interface nettoyage en échec" }
+          Get-Content "$env:RUNNER_TEMP\NETTOYAGE-INTERFACE-FICTIVE.json"
       - name: Fabriquer l'installateur (Inno Setup)
         shell: pwsh
         run: |
@@ -280,12 +297,16 @@ jobs:
           & $iscc /Q "/DEdition=${{ matrix.nom }}" "/DPort=${{ matrix.port }}" "/DVersion=1.0.${{ github.run_number }}" deploy\installateur\erp_ohada.iss
           if ($LASTEXITCODE -ne 0) { throw "Compilation de l'installateur en échec" }
       - name: Installer en service sans question, mettre à jour, désinstaller
+        if: env.ERP_DISTRIBUTION_FICTIVE == '1'
         shell: pwsh
         run: |
           $setup = "dist\ERP-OHADA-${{ matrix.nom }}-Installation.exe"
           $dossier = "$env:RUNNER_TEMP\programme"
           $service = "ERP-OHADA-${{ matrix.nom }}"
           $donnees = "$env:ProgramData\ERP-OHADA\${{ matrix.nom }}"
+          python tests_navigateur/installateur_p0.py autorisation "dist-outils\ERP-Controle-Installation.exe" "${{ matrix.edition }}"
+          if ($LASTEXITCODE -ne 0) { throw "Préparation autorisation fictive en échec" }
+          $autorisation = "$env:RUNNER_TEMP\activation-fictive\autorisation-${{ matrix.edition }}.erpinst"
           function Attendre-Serveur {
             for ($n = 0; $n -lt 120; $n++) {
               Start-Sleep -Seconds 2
@@ -307,10 +328,45 @@ jobs:
             }
             return $false
           }
-          function Installer($journal) {
-            $i = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/BASE=sqlite", "/TASKS=parefeu,service", "/DIR=`"$dossier`"", "/LOG=`"$journal`"" -Wait -PassThru
-            if ($i.ExitCode -ne 0) { Get-Content $journal -Tail 40; throw "Installation en échec ($($i.ExitCode))" }
+          function Executer-Installation($programmeInstalleur, $parametresInstalleur, $journalInstalleur) {
+            Write-Host "Exécution contrôlée : $journalInstalleur"
+            $p = Start-Process $programmeInstalleur -ArgumentList $parametresInstalleur -PassThru
+            if (-not $p.WaitForExit(240000)) {
+              taskkill.exe /F /T /PID $p.Id | Out-Null
+              Get-Content $journalInstalleur -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+              throw "Délai de quatre minutes dépassé : $journalInstalleur"
+            }
+            $p.WaitForExit()
+            return $p.ExitCode
           }
+          function Installer($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/BASE=sqlite", "/TASKS=parefeu,service", "/AUTORISATION=`"$autorisation`"", "/DIR=`"$dossier`"", "/LOG=`"$journal`"")
+            $code = Executer-Installation $setup $parametres $journal
+            if ($code -ne 0) { Get-Content $journal -Tail 40; throw "Installation en échec ($code)" }
+          }
+          function Refuser-Sans-Autorisation($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/DIR=`"$dossier`"", "/LOG=`"$journal`"")
+            $code = Executer-Installation $setup $parametres $journal
+            if ($code -eq 0) { throw "Installation sans autorisation acceptée : $journal" }
+          }
+          function Desinstaller($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=`"$journal`"")
+            $code = Executer-Installation "$dossier\unins000.exe" $parametres $journal
+            if ($code -ne 0) { throw "Désinstallation en échec ($code)" }
+            # Inno peut terminer depuis sa copie temporaire après le retour du lanceur initial.
+            # Attendre aussi son propre retrait ; le nettoyeur n'est pas autorisé à effacer un exécutable inconnu.
+            for ($n = 0; $n -lt 60; $n++) {
+              if (-not (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") -and -not (Test-Path "$dossier\unins000.exe")) { break }
+              Start-Sleep -Seconds 2
+            }
+            Get-Content $journal -Tail 50 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+            if (Get-Service $service -ErrorAction SilentlyContinue) { throw "Service toujours présent après désinstallation" }
+            if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme toujours présent après désinstallation" }
+            if (Test-Path "$dossier\unins000.exe") { throw "Désinstallateur Inno toujours présent ; consulter son journal" }
+          }
+          # Une installation initiale sans autorisation est refusée, avant de toucher au service ou aux données.
+          Refuser-Sans-Autorisation "$env:RUNNER_TEMP\installateur-refus-initial.log"
+          if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme copié sans autorisation" }
           Installer "$env:RUNNER_TEMP\installation.log"
           if (-not (Attendre-Service)) { Diagnostic; Get-Content "$env:RUNNER_TEMP\installation.log" -Tail 30; throw "Service non démarré" }
           if ((Get-Service $service).StartType -notin @("Automatic", "AutomaticDelayedStart")) { throw "Service pas en démarrage automatique" }
@@ -332,15 +388,32 @@ jobs:
           if ((Get-Content "$donnees\configuration.env" -Raw) -ne $config) { throw "La mise à jour a modifié la configuration" }
 
           # Désinstallation : service retiré, données conservées
-          Start-Process "$dossier\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
-          for ($n = 0; $n -lt 60 -and (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe"); $n++) { Start-Sleep -Seconds 2 }
-          if (Get-Service $service -ErrorAction SilentlyContinue) { throw "Service toujours présent après désinstallation" }
-          if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme toujours présent après désinstallation" }
+          Desinstaller "$env:RUNNER_TEMP\installateur-desinstallation.log"
           if (-not (Test-Path "$donnees\erp.sqlite3")) { throw "La désinstallation a effacé les données" }
+          # La conservation des anciennes données ne doit pas autoriser une nouvelle installation.
+          Refuser-Sans-Autorisation "$env:RUNNER_TEMP\installateur-refus-reinstallation.log"
+          Installer "$env:RUNNER_TEMP\installateur-reinstallation.log"
+          if (-not (Attendre-Service) -or -not (Attendre-Serveur)) { Diagnostic; throw "Réinstallation autorisée non fonctionnelle" }
+          Desinstaller "$env:RUNNER_TEMP\installateur-seconde-desinstallation.log"
+          python tests_navigateur/installateur_p0.py nettoyer "$dossier" "$donnees" "${{ matrix.edition }}"
+          if ($LASTEXITCODE -ne 0) { throw "Nettoyage fictif en échec" }
           netsh advfirewall firewall show rule name="ERP OHADA (port ${{ matrix.port }})" | Out-Null
           if ($LASTEXITCODE -eq 0) { throw "Règle du pare-feu restée après désinstallation" }
           $global:LASTEXITCODE = 0
           Write-Output "Installateur ${{ matrix.nom }} : service Windows installé, relancé seul, mis à jour, désinstallé ; données conservées."
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ERP-Installateur-${{ matrix.nom }}-Diagnostics
+          path: |
+            ${{ runner.temp }}/installateur-*.log
+            ${{ runner.temp }}/installation.log
+            ${{ runner.temp }}/mise-a-jour.log
+            ${{ runner.temp }}/NETTOYAGE-INTERFACE-*.json
+            ${{ runner.temp }}/NETTOYAGE-INTERFACE-ERREUR.txt
+            ${{ runner.temp }}/NETTOYAGE-DIAGNOSTIC-*.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Outil d'émission des licences (propriétaire, jamais livré aux clients)
         if: matrix.edition == 'transport'
         shell: pwsh
@@ -358,6 +431,13 @@ jobs:
           $lic = Get-ChildItem "$cles\LIC-*.erplic" | Select-Object -First 1
           & $outil verifier $lic.FullName --publique "$cles\parametres.dat"
           if ($LASTEXITCODE -ne 0) { throw "Vérification en échec" }
+          $fin = (Get-Date).AddDays(2).ToString("yyyy-MM-dd")
+          & $outil autoriser-installation --cle "$cles\coffre.dat" --code T-AAAA-BBBB-CCCC-DDDD --jusqu-au $fin --sortie $cles
+          if ($LASTEXITCODE -ne 0) { throw "Émission d'autorisation d'installation en échec" }
+          $autorisationOutil = Get-ChildItem "$cles\*.erpinst" | Select-Object -First 1
+          if (-not $autorisationOutil) { throw "Autorisation .erpinst absente" }
+          python tests_navigateur/installateur_p0.py verifier-emission "$cles\parametres.dat" $autorisationOutil.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Signature de l'autorisation émise par l'outil compilé invalide" }
           $f = Start-Process $outil -ArgumentList "interface-essai" -Wait -PassThru
           if ($f.ExitCode -ne 0) { throw "La fenêtre de l'outil ne se construit pas" }
           if (Get-ChildItem -Recurse "dist\ERP-OHADA-${{ matrix.nom }}" -Filter "licences.py*") { throw "L'outil du propriétaire ne doit pas être dans le programme client" }
@@ -371,7 +451,7 @@ jobs:
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: ERP-OHADA-${{ matrix.nom }}-Installation
+          name: ERP-OHADA-${{ matrix.nom }}-${{ env.ERP_TYPE_PAQUET }}-Installation
           path: dist/ERP-OHADA-${{ matrix.nom }}-Installation.exe
           retention-days: 7
 

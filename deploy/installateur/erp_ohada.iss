@@ -21,6 +21,7 @@
 #define Programme "ERP-OHADA-" + Edition + ".exe"
 #define Nom "ERP OHADA " + Edition
 #define Service "ERP-OHADA-" + Edition + "-service.exe"
+#define Outils "..\..\dist-outils"
 
 [Setup]
 AppId=ERP-OHADA-{#Edition}
@@ -55,6 +56,8 @@ Name: "parefeu"; Description: "Autoriser les autres postes du réseau local (par
 
 [Files]
 Source: "{#Source}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: EstServeur
+Source: "{#Outils}\ERP-Controle-Installation.exe"; Flags: dontcopy
+Source: "{#Outils}\ERP-Nettoyage.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: EstServeur
 
 [InstallDelete]
 Type: files; Name: "{app}\documentation\AUDIT_COMPTABILITE_SOURCE_UNIQUE_2026-10-26.md"; Check: EstServeur
@@ -169,6 +172,33 @@ var
   PageRole: TInputOptionWizardPage;
   PageAgence: TInputFileWizardPage;
   PageServeur: TInputQueryWizardPage;
+  PageAutorisation: TInputFileWizardPage;
+  NettoyageVoulu: Boolean;
+  OutilNettoyageTemp: String;
+
+function FichierAutorisation(): String;
+begin
+  Result := ExpandConstant('{param:AUTORISATION|}');
+  if (Result = '') and (PageAutorisation <> nil) then
+    Result := PageAutorisation.Values[0];
+end;
+
+function Controle(Arguments: String; var MessageControle: String): Boolean;
+var
+  Code: Integer;
+  Brut: AnsiString;
+  Rapport: String;
+begin
+  Rapport := ExpandConstant('{tmp}\controle-autorisation.txt');
+  DeleteFile(Rapport);
+  Result := Exec(ExpandConstant('{tmp}\ERP-Controle-Installation.exe'),
+    '--edition {#LowerCase(Edition)} --rapport "' + Rapport + '" ' + Arguments,
+    '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+  if LoadStringFromFile(Rapport, Brut) then
+    MessageControle := UTF8Decode(Brut)
+  else
+    MessageControle := 'Le contrôle embarqué n''a pas pu produire de résultat. Aucune installation autorisée.';
+end;
 
 function RoleParametre(): String;
 begin
@@ -246,7 +276,11 @@ begin
 end;
 
 procedure InitializeWizard();
+var
+  Identifiant: String;
 begin
+  ExtractTemporaryFile('ERP-Controle-Installation.exe');
+  Controle('', Identifiant);
   PageRole := CreateInputOptionPage(wpWelcome, 'Rôle de cet ordinateur',
     'Comment cet ordinateur sera-t-il utilisé ?',
     'Le serveur garde les données ; les autres postes du réseau l''ouvrent simplement dans leur navigateur.',
@@ -257,7 +291,14 @@ begin
   PageRole.Add('Poste de travail : accès au serveur par le navigateur (rien d''autre n''est installé)');
   PageRole.SelectedValueIndex := 0;
 
-  PageBase := CreateInputOptionPage(PageRole.ID, 'Base de données',
+  PageAutorisation := CreateInputFilePage(PageRole.ID, 'Autorisation de cette installation',
+    'Choisissez l’autorisation .erpinst signée remise pour ce serveur et cette édition.',
+    'Code à communiquer à l''éditeur avant une première installation : ' + Identifiant + #13#10 +
+    'Chaque installation, réinstallation, mise à jour et réparation vérifie cette autorisation hors ligne. ' +
+    'Un code court ou une ancienne configuration ne suffit pas. Cette autorisation ne remplace pas la licence d''exploitation.');
+  PageAutorisation.Add('Autorisation signée (.erpinst) :', 'Autorisation ERP (*.erpinst)|*.erpinst', '.erpinst');
+
+  PageBase := CreateInputOptionPage(PageAutorisation.ID, 'Base de données',
     'Où le logiciel garde-t-il ses données ?',
     'Vous pourrez changer plus tard (Administration du poste › Base de données) : les données sont alors recopiées et contrôlées.',
     True, False);
@@ -292,6 +333,8 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
+  if PageID = PageAutorisation.ID then
+    Result := Role() = 'poste';
   if PageID = PageAgence.ID then
     Result := Role() <> 'agence';
   if PageID = PageServeur.ID then
@@ -305,11 +348,19 @@ begin
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  MessageControle: String;
 begin
   Result := True;
+  { Le mode silencieux valide toujours dans PrepareToInstall, sans ouvrir de dialogue bloquant. }
+  if not WizardSilent and (CurPageID = PageAutorisation.ID) and not Controle('--verifier "' + FichierAutorisation() + '"', MessageControle) then
+  begin
+    MsgBox(MessageControle, mbError, MB_OK);
+    Result := False;
+  end;
   if (CurPageID = PageServeur.ID) and (Pos('SERVEUR:', Uppercase(PageServeur.Values[0])) > 0) then
   begin
-    MsgBox('Remplacez SERVEUR par le nom ou l''adresse IP du serveur (ex. http://192.168.1.10:{#Port}).', mbError, MB_OK);
+    SuppressibleMsgBox('Remplacez SERVEUR par le nom ou l''adresse IP du serveur (ex. http://192.168.1.10:{#Port}).', mbError, MB_OK, IDOK);
     Result := False;
   end;
 end;
@@ -329,6 +380,8 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  MessageControle: String;
 begin
   if (CurStep = ssInstall) and EstServeur() and not DejaConfigure() then
   begin
@@ -341,6 +394,8 @@ begin
   end;
   if (CurStep = ssPostInstall) and EstServeur() then
   begin
+    if not Controle('--marquer-programme "' + ExpandConstant('{app}') + '" --marquer-donnees "' + Donnees() + '"', MessageControle) then
+      RaiseException(MessageControle + #13#10 + 'Les données restent conservées ; les dossiers doivent être identifiés avant installation.');
     { L'assistant du premier démarrage proposera ce rôle (et installera l'agence avec ce fichier) }
     ForceDirectories(Donnees());
     SaveStringToFile(Donnees() + '\role-installation.txt', Role(), False);
@@ -352,7 +407,21 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Code: Integer;
+  MessageControle: String;
 begin
+  Result := '';
+  if EstServeur() and ((FichierAutorisation() = '') or (Pos('"', FichierAutorisation()) > 0) or
+    (Pos(#13, FichierAutorisation()) > 0) or (Pos(#10, FichierAutorisation()) > 0)) then
+  begin
+    Result := 'Choisissez une autorisation .erpinst valide (/AUTORISATION=chemin pour une installation silencieuse).';
+    exit;
+  end;
+  { Toujours vérifié, même en mode silencieux et avec une base/clé résiduelle. Aucun service arrêté avant ce contrôle. }
+  if EstServeur() and (not Controle('--verifier "' + FichierAutorisation() + '" --dossier-cible "' + ExpandConstant('{app}') + '"', MessageControle)) then
+  begin
+    Result := MessageControle;
+    exit;
+  end;
   { Mise à jour : le service et le programme en marche sont arrêtés (les données ne bougent pas) }
   if FileExists(ExpandConstant('{app}\{#Service}')) then
   begin
@@ -361,4 +430,35 @@ begin
   end;
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM "{#Programme}"', '', SW_HIDE, ewWaitUntilTerminated, Code);
   Result := '';
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  Result := True;
+  NettoyageVoulu := False;
+  { Une désinstallation silencieuse conserve toujours les données. Pas de commutateur d'effacement automatique. }
+  if UninstallSilent then
+    exit;
+  NettoyageVoulu := MsgBox('Les données sont conservées par défaut. Après le retrait du programme et de son service, voulez-vous ouvrir le nettoyage contrôlé ?' + #13#10 +
+    'Il présentera les fichiers, demandera une sauvegarde vérifiée et une confirmation avant tout effacement. Les bases SQL Server, dossiers partagés et autres éditions seront préservés.',
+    mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES;
+  if NettoyageVoulu then
+  begin
+    OutilNettoyageTemp := ExpandConstant('{tmp}\ERP-Nettoyage.exe');
+    if not FileCopy(ExpandConstant('{app}\ERP-Nettoyage.exe'), OutilNettoyageTemp, False) then
+    begin
+      MsgBox('Impossible de préparer le nettoyage. Désinstallation arrêtée ; toutes les données sont conservées.', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Code: Integer;
+begin
+  if (CurUninstallStep = usPostUninstall) and NettoyageVoulu then
+    if not Exec(OutilNettoyageTemp, '--edition {#LowerCase(Edition)} --programme "' + ExpandConstant('{app}') +
+      '" --donnees "' + Donnees() + '"', '', SW_SHOW, ewWaitUntilTerminated, Code) or (Code <> 0) then
+      MsgBox('Le nettoyage n''a pas abouti. Les données non traitées sont conservées ; consultez le rapport ou relancez le diagnostic.', mbError, MB_OK);
 end;
