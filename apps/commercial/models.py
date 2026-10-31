@@ -1220,6 +1220,22 @@ class Reglement(models.Model):
             if doublon.exclude(pk=self.pk).exists():
                 raise ValidationError({"reference": f"Le reçu {self.reference} de {self.agence_encaissement.nom} est déjà enregistré."})
 
+    def _verrouiller_et_relire(self):
+        """Décider sur le reçu stocké, sous la transaction de l'opération."""
+        if self._state.db not in (None, "default"):
+            raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+        if self.pk:
+            try:
+                self.refresh_from_db(from_queryset=type(self).objects.select_for_update())
+            except type(self).DoesNotExist:
+                raise ValidationError("Ce reçu n'existe plus. Actualisez la liste des règlements.") from None
+
+    @staticmethod
+    def _verrouiller_factures(factures):
+        # Même ordre pour deux reçus visant plusieurs factures ; l'ordre FIFO d'imputation reste inchangé.
+        for facture in sorted(factures, key=lambda f: f.pk or 0):
+            facture._verrouiller_et_relire()
+
     @transaction.atomic
     def enregistrer(self, factures=None, montants=None, en_attente=False):
         """Numérote, comptabilise et impute le règlement : sur les factures choisies (reçu client), sur la facture issue
@@ -1230,8 +1246,15 @@ class Reglement(models.Model):
         from apps.comptabilite.services import comptabiliser_reglement
         from apps.core.synchronisation import verifier_saisie
 
+        self._verrouiller_et_relire()
         verifier_saisie("la saisie des règlements")
-        self.controler_rattachement(factures, en_attente=en_attente)
+        if self.ecriture_id or self.reprise_sage:
+            raise ValidationError("Ce règlement est déjà comptabilisé. Utilisez son reste en attente pour le rattacher.")
+        cibles = list(factures) if factures is not None else ([self.facture] if self.facture_id else [])
+        self._verrouiller_factures(cibles)
+        if self.commande_id:
+            self.commande._verrouiller_et_relire()
+        self.controler_rattachement(cibles, en_attente=en_attente)
         montants = {int(k): Decimal(v) for k, v in (montants or {}).items() if v not in (None, "")}
         if montants:
             for f in self._cibles or []:
@@ -1260,7 +1283,8 @@ class Reglement(models.Model):
             cibles = self._cibles
         else:
             types = (Document.FACTURE,) if self.est_encaissement else (Document.ACHAT_FACTURE,)
-            cibles = self.tiers.factures_a_regler().filter(type_document__in=types).order_by("date", "numero")
+            cibles = list(self.tiers.factures_a_regler().filter(type_document__in=types).order_by("date", "numero"))
+        self._verrouiller_factures(cibles)
         disponible = self.montant_non_impute
         for facture in cibles:
             if disponible <= 0:
@@ -1283,7 +1307,11 @@ class Reglement(models.Model):
         """Rattache (tout ou partie de) le reste en attente du reçu à une nouvelle facture du client."""
         from apps.core.synchronisation import verifier_saisie
 
+        self._verrouiller_et_relire()
+        if not self.pk:
+            raise ValidationError("Enregistrez le reçu avant de le rattacher.")
         verifier_saisie("le rattachement des règlements")
+        facture._verrouiller_et_relire()
         reste_recu = self.en_attente_de_rattachement
         if reste_recu <= 0:
             raise ValidationError("Ce reçu n'a plus de reste à rattacher.")
