@@ -51,6 +51,7 @@ qui protège leur usage commercial, pas la seule présence de cet écran.
 | `journaux-service/ERP-OHADA-<Édition>*` | WinSW de cette édition | Inventoriés et sauvegardés avant retrait confirmé |
 | `_internal/{apps,erp,django}/**/__pycache__/*.pyc` | Caches générés du programme | Même nettoyage ciblé ; aucun effacement récursif générique |
 | `ProgramData/ERP-OHADA/<Édition>` | Base SQLite, configuration, mémoire d'essai, journaux | Liste explicite de noms connus, archive vérifiée, confirmation |
+| `planification.json` dans cette racine | État des sauvegardes et vérifications, créé par `apps/core/planification.py` | Nom exact inventorié ; autres fichiers JSON non assimilés |
 | `sauvegardes/erp-*` | Sauvegardes de l'ERP | Inventoriées avant effacement ; une archive extérieure reste conservée |
 | `dossiers-simulation/` | Dossiers fictifs gérés par l'ERP | Extensions gérées seulement ; autres fichiers conservés |
 | Base SQL Server, `.mdf/.ldf`, chemins SQLite externes | Ressources potentiellement partagées ou hébergées ailleurs | Jamais supprimés par cet outil ; aucune instruction SQL |
@@ -145,6 +146,14 @@ Rafraîchir réactive le bouton et exige une nouvelle confirmation. Le rapport l
 restauration de l'attribut et reprise réussie. La recette réelle Windows doit encore confirmer le correctif.
 La CI contrôle également la nouvelle commande d'autorisation dans le générateur propriétaire réellement
 compilé, avec vérification indépendante de sa signature publique ; aucune clé privée fictive n'est publiée.
+
+Le run41194456975 confirme le retrait de la sauvegarde protégée sur les deux éditions ; la dernière inspection
+révèle toutefois `planification.json`, créé par le planificateur, encore conservé comme inconnu. Son nom exact
+rejoint la liste des fichiers attribués. Le test de nettoyage complet reproduit l'échec avant correction ; un
+fichier voisin `planification-personnelle.json` doit rester conservé. La fixture de la vraie fenêtre compilée
+contient aussi cet état. La nouvelle validation complète reste nécessaire, sans déclarer les deux jobs Windows
+précédents réussis.
+Après ce dernier ajout : 14 tests ciblés locaux OK en 0,167 s (`NETTOYAGE_PLANIFICATEUR_APRES.log`).
 
 
 ## Émission propriétaire et activation unifiée

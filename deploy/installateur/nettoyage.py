@@ -123,6 +123,7 @@ def recette_fictive():
         n.marquer(donnees, "transport")
         with closing(sqlite3.connect(donnees / "erp.sqlite3")) as c, c:
             c.execute("CREATE TABLE fictif (texte TEXT)")
+        (donnees / "planification.json").write_text('{"sauvegarde_ok": true}', encoding="utf-8")
         temoin = racine / "autre-edition.txt"
         temoin.write_text("préserver")
         erreurs = []

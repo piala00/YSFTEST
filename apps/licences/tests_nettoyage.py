@@ -44,6 +44,7 @@ class NettoyageTests(SimpleTestCase):
 
     def test_effacement_cible_et_autre_edition_parent_partage_preserves(self):
         (self.donnees / "dossiers-simulation").mkdir()
+        (self.donnees / "planification.json").write_text('{"derniere_sauvegarde": "2030-01-01"}')
         plan = self.plan()
         fermees = []
         connexion = sqlite3.connect
@@ -86,13 +87,15 @@ class NettoyageTests(SimpleTestCase):
 
     def test_fichier_inconnu_sql_externe_et_dossier_inconnu_preserves(self):
         (self.donnees / "notes-utilisateur.txt").write_text("préserver")
+        (self.donnees / "planification-personnelle.json").write_text("préserver")
         (self.donnees / "autre-base.mdf").write_text("préserver")
         (self.donnees / "dossier-utilisateur-vide").mkdir()
         plan = self.plan()
         n.sauvegarder(plan, self.archive)
         resultat = n.effacer(plan, self.archive, confirmation=True)
-        self.assertEqual(len(resultat["conserves"]), 3)
+        self.assertEqual(len(resultat["conserves"]), 4)
         self.assertTrue((self.donnees / "notes-utilisateur.txt").exists())
+        self.assertTrue((self.donnees / "planification-personnelle.json").exists())
         self.assertTrue((self.donnees / "autre-base.mdf").exists())
         self.assertTrue((self.donnees / "dossier-utilisateur-vide").is_dir())
 

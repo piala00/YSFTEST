@@ -16,7 +16,7 @@ MARQUEUR = ".erp-produit"
 DONNEES = re.compile(r"^(configuration(?:-[0-9-]+)?\.env|erp(?:-avant-restauration-[0-9-]+)?\.sqlite3(?:-wal|-shm)?|"
                      r"simulation\.sqlite3(?:-wal|-shm)?|journal\.txt|simulation-journal\.txt|\.erp-essai|"
                      r"installation\.dat|cle-installation\.txt|role-installation\.txt|installation-agence\.erpx|"
-                     r"installation-base\.env(?:\.applique)?|base-creee\.txt|erreur-base\.txt|dossier-actif\.json|"
+                     r"installation-base\.env(?:\.applique)?|base-creee\.txt|erreur-base\.txt|planification\.json|dossier-actif\.json|"
                      r"dossier-erreur\.txt|dossier-refuse-[0-9-]+\.json|restaurer-au-demarrage\.txt|restaurer-sqlserver\.txt)$")
 
 
