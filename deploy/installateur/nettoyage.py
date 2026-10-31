@@ -1,5 +1,6 @@
 """Écran de nettoyage proposé APRÈS désinstallation ; jamais d'effacement silencieux."""
 import argparse
+from contextlib import closing
 import datetime
 import json
 import os
@@ -110,7 +111,7 @@ def recette_fictive():
         programme, donnees = racine / "programme", racine / "donnees"
         n.marquer(programme, "transport")
         n.marquer(donnees, "transport")
-        with sqlite3.connect(donnees / "erp.sqlite3") as c:
+        with closing(sqlite3.connect(donnees / "erp.sqlite3")) as c, c:
             c.execute("CREATE TABLE fictif (texte TEXT)")
         temoin = racine / "autre-edition.txt"
         temoin.write_text("préserver")

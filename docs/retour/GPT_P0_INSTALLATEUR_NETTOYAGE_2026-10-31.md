@@ -93,6 +93,16 @@ jamais un chemin de société en mode recette. Les résultats ne sont acquis qu'
 Coexistence des deux services sur un même PC, permissions de plusieurs profils, Windows 10/11 distincts et
 réseau physiquement déconnecté restent des recettes à nommer séparément ; aucune certification générale.
 
+### Correction issue de la première recette Windows
+
+Run41182218496 : Linux/SQL et activation compilée réussis, mais la vraie fenêtre de nettoyage échoue sur
+les deux éditions avec WinError32 (fichier SQLite encore ouvert). Le contexte transactionnel d'une connexion
+SQLite ne ferme pas le fichier. Le contrôle de sauvegarde et la fixture GUI utilisent maintenant
+`contextlib.closing` ; la recette vérifie aussi explicitement la fermeture avant effacement.
+12 tests ciblés locaux du correctif : OK, 0,075 s. La nouvelle suite complète locale n'a pas démarré : les
+sockets de boucle locale sont interdites par le bac à sable ; le résultat de 556 tests précédent ne lui est
+pas réattribué. La CI du nouveau commit doit revalider la suite et les deux outils Windows avant succès.
+
 
 ## Émission propriétaire et activation unifiée
 

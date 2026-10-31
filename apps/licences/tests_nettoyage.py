@@ -1,5 +1,6 @@
 """Dossiers fictifs : confirmation, sauvegarde relue, liens, collisions et coexistence des éditions."""
 import os
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -21,7 +22,7 @@ class NettoyageTests(SimpleTestCase):
         (self.autre / "erp.sqlite3").write_text("Autre édition préservée")
         n.marquer(self.programme, "transport")
         n.marquer(self.donnees, "transport")
-        with sqlite3.connect(self.donnees / "erp.sqlite3") as c:
+        with closing(sqlite3.connect(self.donnees / "erp.sqlite3")) as c, c:
             c.execute("CREATE TABLE essai (texte TEXT)")
             c.execute("INSERT INTO essai VALUES ('Fictif')")
         (self.donnees / "configuration.env").write_text("DB_ENGINE=sqlite\n")
@@ -40,7 +41,15 @@ class NettoyageTests(SimpleTestCase):
 
     def test_effacement_cible_et_autre_edition_parent_partage_preserves(self):
         plan = self.plan()
-        n.sauvegarder(plan, self.archive)
+        fermees = []
+        connexion = sqlite3.connect
+        class ConnexionSuivie(sqlite3.Connection):
+            def close(self):
+                fermees.append(True)
+                super().close()
+        with mock.patch.object(n.sqlite3, "connect", side_effect=lambda *a, **k: connexion(*a, **k, factory=ConnexionSuivie)):
+            n.sauvegarder(plan, self.archive)
+        self.assertEqual(fermees, [True], "Le contrôle doit libérer le fichier avant la suppression Windows.")
         resultat = n.effacer(plan, self.archive, confirmation=True)
         self.assertEqual(resultat["erreurs"], [])
         self.assertFalse(self.donnees.exists())

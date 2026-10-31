@@ -1,5 +1,6 @@
 """Inventaire et sauvegarde vérifiée avant suppression ciblée ; aucune connexion SQL Server."""
 import datetime
+from contextlib import closing
 import errno
 import hashlib
 import json
@@ -138,7 +139,7 @@ def sauvegarder(plan, destination):
         source = Path(plan["racines"][f["genre"]]) / f["relatif"]
         if source.suffix == ".sqlite3":
             try:
-                with sqlite3.connect("file:" + quote(str(source)) + "?mode=ro", uri=True) as c:
+                with closing(sqlite3.connect("file:" + quote(str(source)) + "?mode=ro", uri=True)) as c:
                     if c.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
                         raise ValueError(f"Base SQLite à réparer avant suppression : {source}")
             except sqlite3.Error:
