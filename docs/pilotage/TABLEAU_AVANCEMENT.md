@@ -1,0 +1,15 @@
+# Tableau d’avancement — 31 octobre 2026
+
+| Chantier | Avancement exact | Preuve / limite |
+|---|---|---|
+| Socle historique #2–#7 | Fusion historique observée dans GitHub | Ces fusions n’ont pas été réalisées dans cette session |
+| Licences 3.1 #21 | Code en PR brouillon, essais CI/Windows acquis dans leur périmètre | Run41130741908 : 523 tests SQL/SQLite ; Windows Server2025, pas essais Windows10/11 séparés |
+| P0 comptable/architecture #22 | Code en PR ; essais locaux et SQL acquis, audit technique documenté | Run41144731640 : 536 tests SQL sans ignoré, dont concurrence ; pas certification comptable exhaustive |
+| Activation #23 | Code en PR ; huit contrôles CI réussis | [Run41152023209](https://github.com/piala00/YSFTEST/actions/runs/41152023209) : SQLite544 OK180,051s(4 ignorés), SQL544 OK1165,497s(0 ignoré) ; deux vrais EXE, identité/base fictives, activation fichier et redémarrage |
+| Installation/nettoyage #25 | Code en PR ; 556 locaux sur4320838, 12 ciblés surcorrectif3d37149 OK0,075s ; nouvelle CI en cours | Ancien run41182218496 : Linux/SQL/activation OK, deux jobsWindows échoués surverrouSQLite. Fermeture explicite dans3d37149 ; [nouveau run41189566461](https://github.com/piala00/YSFTEST/actions/runs/41189566461) à vérifier avant succès du nettoyage. Aucun test complet local post-correctif exécuté : sockets interdites. |
+| Personnalisation et PC du propriétaire | BLOQUÉ / non vérifié | Identité publique réelle non fournie ; ne pas remplacer la paire, ne pas demander le privé |
+| Registre directeur | Documentation initiale préparée | Réconciliation exhaustive non close ; aucune acceptation finale du propriétaire inférée |
+| SN/SMT, Reporting03, P004, Menus05, échanges, charge et simulateur | À poursuivre selon dépendances | Réutiliser rapports/matrices existants ; décisions et preuves spécifiques restent nécessaires |
+| Intégration et production | En attente d’autorisation distincte | Aucune fusion ni déploiement effectué |
+
+Le succès d’une suite cumulée ne prouve pas toute la recette fonctionnelle ni tous les cas Windows. Toute mise à jour de ce tableau doit citer le SHA testé, les ignorés et les limites ; pas de pourcentage inventé.
