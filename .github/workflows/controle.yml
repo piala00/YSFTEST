@@ -10,6 +10,15 @@ on:
     branches: [ccr-5592a371-fusjt2, main, "gpt/**", "codex/**"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      identite_publique:
+        description: "Personnalisation : clé PUBLIQUE base64 existante (jamais le coffre privé)"
+        required: false
+        type: string
+      empreinte_sha256:
+        description: "Empreinte SHA-256 publique autorisée, obtenue dans le guide propriétaire"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -123,6 +132,45 @@ jobs:
       - name: Tests (SQL Server 2022)
         run: python manage.py test --noinput -v1
 
+  activation-compilee:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      ERP_VERSION_ESSAI: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r deploy/windows/outils/composants.txt -r deploy/windows/outils/compilation.txt
+      - run: python manage.py collectstatic --noinput -v0
+      - name: Préparer une identité fictive, privée uniquement dans le dossier temporaire du runner
+        run: python tests_navigateur/activation_compilee.py preparer
+      - name: Compiler l'identité et l'ERP, sans repli en essai
+        run: python deploy/executable/compiler_natif.py . --supprimer-sources
+      - name: Activer les deux vrais EXE et vérifier après redémarrage (données fictives)
+        shell: pwsh
+        run: |
+          foreach ($edition in @("transport", "commerce")) {
+            $nom = if ($edition -eq "transport") { "Transport" } else { "Commerce" }
+            $env:ERP_EDITION = $edition
+            python -m PyInstaller deploy/executable/erp_ohada.spec --noconfirm --workpath "build-$edition" --distpath "dist-activation"
+            if ($LASTEXITCODE -ne 0) { throw "Compilation $edition en échec" }
+            python tests_navigateur/activation_compilee.py verifier "dist-activation\ERP-OHADA-$nom\ERP-OHADA-$nom.exe" $edition
+            if ($LASTEXITCODE -ne 0) { throw "Activation compilée $edition en échec" }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ERP-Activation-Compilee-Preuves-Fictives
+          path: |
+            ${{ runner.temp }}/activation-fictive/RESULTATS-*.json
+            ${{ runner.temp }}/activation-fictive/*/serveur-*.log
+          retention-days: 7
+      # Aucun exécutable ancré sur cette identité fictive ni aucune clé privée n'est publié.
+
   windows:
     runs-on: windows-latest
     strategy:
@@ -151,7 +199,21 @@ jobs:
       - name: Vérifier les dossiers portables et leurs protections sous Windows
         run: python -m unittest apps.core.tests_dossiers_simulation -v
       - name: Compiler le code de l'ERP en natif (protection contre le décorticage)
-        run: python deploy/executable/compiler_natif.py . --supprimer-sources
+        shell: pwsh
+        env:
+          PUBLIQUE_AUTORISEE: ${{ inputs.identite_publique }}
+          EMPREINTE_AUTORISEE: ${{ inputs.empreinte_sha256 }}
+        run: |
+          if ($env:PUBLIQUE_AUTORISEE -or $env:EMPREINTE_AUTORISEE) {
+            python deploy/executable/personnaliser_identite.py --publique-base64 "$env:PUBLIQUE_AUTORISEE" --empreinte "$env:EMPREINTE_AUTORISEE"
+            if ($LASTEXITCODE -ne 0) { throw "Identité publique non autorisée : compilation annulée" }
+            "ERP_VERSION_ESSAI=0" | Out-File -FilePath $env:GITHUB_ENV -Append
+            python deploy/executable/compiler_natif.py . --supprimer-sources
+          } else {
+            "ERP_VERSION_ESSAI=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+            python deploy/executable/compiler_natif.py . --version-essai --supprimer-sources
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Compilation native refusée" }
       - name: Vérifier qu'il ne reste aucun code source de l'ERP
         shell: pwsh
         run: |

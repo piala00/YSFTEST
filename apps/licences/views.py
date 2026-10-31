@@ -47,7 +47,7 @@ def licence(request):
                     if publique.size > 8192:
                         raise l.LicenceInvalide("fichier de vérification trop volumineux")
                     l.verifier_fichier_public(publique.read())
-                _, donnees = l.deposer(fichier.read(), request.user)
+                _, donnees = l.deposer(fichier.read(), request.user, activation_nouvelle=True)
                 journal.enregistrer("LICENCE", libelle=f"{donnees.get('numero', '')} — {donnees.get('client', '')}")
                 messages.success(request, f"Licence {donnees.get('numero', '')} installée pour {donnees.get('client', '')}.")
                 if publique is not None:

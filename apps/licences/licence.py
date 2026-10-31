@@ -241,19 +241,12 @@ def proteger_ancienne_installation(dossier):
 
 def verifier_fichier_public(contenu):
     """Sélection facultative d'une clé publique déjà autorisée, jamais import d'une nouvelle autorité."""
-    if len(contenu) > 8192:
-        raise LicenceInvalide("fichier de vérification trop volumineux")
-    if contenu.startswith(b"ERPID\x01") and len(contenu) == 38:
-        candidate = base64.b64encode(contenu[6:]).decode()
-    else:
-        try:
-            lignes = [x.strip() for x in contenu.decode("utf-8-sig").splitlines()
-                      if x.strip() and not x.lstrip().startswith("#")]
-            if len(lignes) != 1 or len(base64.b64decode(lignes[0], validate=True)) != 32:
-                raise ValueError
-            candidate = lignes[0]
-        except (ValueError, UnicodeDecodeError):
-            raise LicenceInvalide("choisissez uniquement le fichier public de vérification ; le coffre privé reste chez l'éditeur")
+    from .identite import lire_publique
+
+    try:
+        candidate = base64.b64encode(lire_publique(contenu)).decode()
+    except ValueError:
+        raise LicenceInvalide("choisissez uniquement le fichier public de vérification ; le coffre privé reste chez l'éditeur") from None
     autorisees = cles_publiques()
     if not autorisees:
         raise LicenceInvalide("l'identité de votre éditeur doit être intégrée à ce programme : demandez la version personnalisée")
@@ -353,13 +346,17 @@ def controler(contenu):
     return donnees
 
 
-def deposer(contenu, utilisateur=None):
+def deposer(contenu, utilisateur=None, *, activation_nouvelle=False):
     """Écran Licence : le fichier est gardé dans l'historique même refusé (avec le motif)."""
     texte = contenu.decode("utf-8-sig", errors="replace") if isinstance(contenu, bytes) else contenu
     from .models import LicenceDeposee
 
     try:
         donnees = controler(texte)
+        if activation_nouvelle:
+            fin = _date(donnees.get("valable_jusqu_au"))
+            if fin is not None and fin < datetime.date.today():
+                raise LicenceInvalide("licence déjà expirée : demandez son renouvellement ; l'historique existant est conservé")
     except LicenceInvalide as exc:
         LicenceDeposee.objects.create(contenu=texte[:20000], valide=False, motif=str(exc)[:200], deposee_par=utilisateur)
         raise
@@ -395,7 +392,7 @@ def activer(texte, utilisateur=None):
     except LicenceInvalide as exc:
         LicenceDeposee.objects.create(contenu=texte[:2000], valide=False, motif=str(exc)[:200], deposee_par=utilisateur)
         raise
-    return deposer(licence_texte, utilisateur)
+    return deposer(licence_texte, utilisateur, activation_nouvelle=True)
 
 
 # ---------------------------------------------------------------- Mémoire de l'essai

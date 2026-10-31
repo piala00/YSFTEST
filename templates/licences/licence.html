@@ -53,15 +53,18 @@
   </div></div>
   <div class="col-12"><div class="card card-body">
     <h2 class="h6">3. Activer la licence reçue</h2>
+    {% if not cles %}<div class="alert alert-warning small py-2">Activation indisponible dans cette version d'essai : l'identité de votre éditeur doit être intégrée au programme. Conservez votre licence et demandez la distribution personnalisée ; recréer des clés ou copier parametres.dat ne résout pas ce problème.</div>{% endif %}
     <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="fichier">
       <label class="form-label small mb-1" for="fichier-licence">Choisissez le fichier de licence reçu (.erplic)</label>
       <input id="fichier-licence" type="file" name="fichier" accept=".erplic" class="form-control form-control-sm mb-2" required>
-      <label class="form-label small mb-1" for="fichier-verification">Clé publique de l'éditeur — parametres.dat (facultatif si déjà intégrée)</label>
-      <input id="fichier-verification" type="file" name="verification" accept=".dat,.txt" class="form-control form-control-sm mb-2">
+      <details class="mb-2"><summary class="small">Vérification supplémentaire de l'éditeur (facultative)</summary>
+        <label class="form-label small mb-1" for="fichier-verification">Clé publique de l'éditeur — parametres.dat</label>
+        <input id="fichier-verification" type="file" name="verification" accept=".dat,.txt" class="form-control form-control-sm mb-2">
+      </details>
       <div class="form-text mb-2">Sélectionnez les fichiers reçus dans leur dossier : aucune copie dans Program Files ou ProgramData n'est nécessaire. Le coffre privé reste sur le poste d'émission de l'éditeur.</div>
       <button class="btn btn-primary">Installer la licence</button>
     </form>
-    <div class="form-text mb-2">Le fichier suffit : aucune deuxième clé n'est nécessaire. Il ne vaut que pour le serveur et l'édition prévus.</div>
+    <div class="form-text mb-2">Lorsque l'identité de l'éditeur est intégrée, le fichier .erplic suffit : aucune deuxième clé ni fichier public n'est nécessaire. Il ne vaut que pour le serveur et l'édition prévus.</div>
     {% if empreintes_publiques %}
     <details class="mb-2"><summary class="small">Vérifier l'identité publique de l'éditeur</summary>
       <p class="small mb-1">Comparez cette empreinte SHA-256 avec le guide reçu du propriétaire. Un fichier importé ne remplace pas l'autorité intégrée au programme.</p>

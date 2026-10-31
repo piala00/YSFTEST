@@ -9,6 +9,9 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 RACINE = Path(SPECPATH).resolve().parents[1]
 sys.path.insert(0, str(RACINE))                        # pour inventorier apps et erp (sous-processus compris)
+from apps.licences.cle_editeur import CLES
+from apps.licences.identite import verifier_distribution
+IDENTITE = verifier_distribution(CLES, version_essai=os.environ.get("ERP_VERSION_ESSAI") == "1")
 os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, [str(RACINE), os.environ.get("PYTHONPATH", "")]))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "erp.settings")
 EDITION = os.environ.get("ERP_EDITION", "transport").lower()
@@ -52,3 +55,5 @@ if documentation.exists():
     shutil.rmtree(documentation)
 documentation.mkdir()
 shutil.copy2(RACINE / "deploy" / "executable" / "GUIDE-CLIENT.txt", documentation / "GUIDE-CLIENT.txt")
+import json
+(documentation / "IDENTITE-DISTRIBUTION.json").write_text(json.dumps(IDENTITE, ensure_ascii=False, indent=2), encoding="utf-8")
