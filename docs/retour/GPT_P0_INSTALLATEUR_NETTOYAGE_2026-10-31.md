@@ -112,6 +112,23 @@ limite de quatre minutes avec journaux distincts ; le job Windows est borné à 
 diagnostics même en échec. Une réinstallation autorisée est maintenant éprouvée après le refus sans autorisation.
 Ce nouveau parcours doit encore réussir en CI avant d'être présenté comme validé.
 
+### Sauvegarde isolée et répertoires vides
+
+Run41190936832 : installation, service, redémarrage automatique, mise à jour, retrait, refus sans autorisation et
+réinstallation autorisée passent sur les deux éditions. Le nettoyage refuse ensuite un inventaire modifié durant
+la sauvegarde. Reproduction locale : une lecture SQLite en mode ro peut modifier WAL/SHM ; le ZIP ne correspond
+alors plus aux empreintes initiales. La comparaison stricte a bien empêché toute suppression.
+
+Le contrôle copie maintenant les seuls fichiers inventoriés hors des racines à supprimer, vérifie leurs empreintes,
+puis ouvre une seconde copie SQLite avec ses annexes WAL/SHM. Le ZIP est construit depuis le premier instantané,
+intact ; la source n'est jamais ouverte avec SQLite. Les comparaisons de source et d'archive restent obligatoires.
+Une restauration du contenu WAL est vérifiée dans le nouveau test. Les répertoires connus vides sont eux aussi
+inventoriés/archivés et retirés s'ils sont vides ; les inconnus restent conservés. Le bouton Rafraîchir réinitialise
+la confirmation avant examen d'un nouvel inventaire.
+
+Avant correction : deux régressions ciblées reproduites (WAL et répertoire connu vide). Après correction :
+13 tests ciblés OK, 0,149 s. La suite complète et les deux parcours Windows doivent être reconfirmés en CI.
+
 
 ## Émission propriétaire et activation unifiée
 

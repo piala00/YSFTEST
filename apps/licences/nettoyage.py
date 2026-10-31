@@ -1,5 +1,4 @@
 """Inventaire et sauvegarde vérifiée avant suppression ciblée ; aucune connexion SQL Server."""
-import datetime
 from contextlib import closing
 import errno
 import hashlib
@@ -9,7 +8,8 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
-from urllib.parse import quote
+import shutil
+import tempfile
 import zipfile
 
 MARQUEUR = ".erp-produit"
@@ -68,8 +68,8 @@ def inventorier(programme, donnees, edition):
     p, d = racines.values()
     if p == d or p in d.parents or d in p.parents:
         raise ValueError("Les dossiers programme et données doivent être distincts et indépendants.")
-    plan = {"version": 1, "edition": edition, "racines": {k: str(v) for k, v in racines.items()},
-            "fichiers": [], "conserves": [], "avertissements": [
+    plan = {"version": 2, "edition": edition, "racines": {k: str(v) for k, v in racines.items()},
+            "fichiers": [], "repertoires": [], "conserves": [], "avertissements": [
                 "Aucune base SQL Server, aucun chemin SQLite externe ni dossier partagé ne sera effacé.",
                 "La mémoire d'essai HKCU\\Software\\ERP-OHADA est commune aux éditions : conservée.",
                 "Les profils d'autres utilisateurs Windows et leurs raccourcis ne sont pas parcourus."]}
@@ -84,6 +84,8 @@ def inventorier(programme, donnees, edition):
         # Anciennes données : seul le chemin standard explicitement nommé est reconnu, jamais un parent partagé.
         ancienne = (not marqueur.exists() and not marqueur.is_symlink() and genre == "donnees"
                     and racine.name.lower() == edition and racine.parent.name == "ERP-OHADA")
+        if reconnue or ancienne:
+            plan["repertoires"].append({"genre": genre, "relatif": ""})
         for dossier, repertoires, noms in os.walk(racine, followlinks=False):
             for nom in list(repertoires):
                 enfant = Path(dossier) / nom
@@ -92,7 +94,9 @@ def inventorier(programme, donnees, edition):
                     premier = enfant.relative_to(racine).parts[0]
                     dossier_attribue = ((genre == "donnees" and (reconnue or ancienne) and premier in ("sauvegardes", "dossiers-simulation"))
                                         or (genre == "programme" and reconnue and premier in ("journaux-service", "_internal")))
-                    if not dossier_attribue:
+                    if dossier_attribue:
+                        plan["repertoires"].append({"genre": genre, "relatif": enfant.relative_to(racine).as_posix()})
+                    else:
                         plan["conserves"].append({"chemin": str(enfant), "raison": "Dossier non attribué exclusivement à l'application."})
                 except ValueError as exc:
                     repertoires.remove(nom)
@@ -118,6 +122,7 @@ def inventorier(programme, donnees, edition):
                 except (ValueError, OSError) as exc:
                     plan["conserves"].append({"chemin": str(f), "raison": str(exc)})
     plan["fichiers"].sort(key=lambda f: (f["genre"], f["relatif"]))
+    plan["repertoires"].sort(key=lambda d: (d["genre"], d["relatif"]))
     plan["conserves"].sort(key=lambda f: f["chemin"])
     return plan
 
@@ -135,19 +140,43 @@ def sauvegarder(plan, destination):
     for racine in map(Path, plan["racines"].values()):
         if destination == racine or racine in destination.parents:
             raise ValueError("La sauvegarde doit être placée hors des dossiers à nettoyer.")
-    for f in plan["fichiers"]:
-        source = Path(plan["racines"][f["genre"]]) / f["relatif"]
-        if source.suffix == ".sqlite3":
-            try:
-                with closing(sqlite3.connect("file:" + quote(str(source)) + "?mode=ro", uri=True)) as c:
-                    if c.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
-                        raise ValueError(f"Base SQLite à réparer avant suppression : {source}")
-            except sqlite3.Error:
-                raise ValueError(f"Contrôle SQLite impossible ; aucune suppression : {source}") from None
-    with zipfile.ZipFile(destination, "x", compression=zipfile.ZIP_DEFLATED) as z:
-        z.writestr("INVENTAIRE.json", json.dumps(plan, ensure_ascii=False, indent=2))
+    # Même mode=ro peut créer/modifier les annexes WAL/SHM. Ne jamais ouvrir la source avec SQLite.
+    # La copie d'archive reste immuable ; une seconde copie sert uniquement au contrôle SQLite.
+    with tempfile.TemporaryDirectory(prefix="erp-sauvegarde-controle-", dir=destination.parent) as travail:
+        instantane = Path(travail) / "instantane"
+        for d in plan["repertoires"]:
+            (instantane / d["genre"] / d["relatif"]).mkdir(parents=True, exist_ok=True)
         for f in plan["fichiers"]:
-            z.write(Path(plan["racines"][f["genre"]]) / f["relatif"], f["genre"] + "/" + f["relatif"])
+            source = Path(plan["racines"][f["genre"]]) / f["relatif"]
+            copie = instantane / f["genre"] / f["relatif"]
+            copie.parent.mkdir(parents=True, exist_ok=True)
+            sur(source)
+            shutil.copyfile(source, copie, follow_symlinks=False)
+            if digest(copie) != f["sha256"]:
+                raise ValueError("Fichier modifié pendant la copie ; refaire l'inventaire.")
+        _verifier_plan(plan)
+        for f in plan["fichiers"]:
+            copie = instantane / f["genre"] / f["relatif"]
+            if copie.suffix != ".sqlite3":
+                continue
+            with tempfile.TemporaryDirectory(prefix="sqlite-", dir=travail) as controle:
+                base = Path(controle) / copie.name
+                for suffixe in ("", "-wal", "-shm"):
+                    annexe = Path(str(copie) + suffixe)
+                    if annexe.is_file():
+                        shutil.copyfile(annexe, Path(str(base) + suffixe))
+                try:
+                    with closing(sqlite3.connect(base.as_uri() + "?mode=ro", uri=True)) as c:
+                        if c.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
+                            raise ValueError(f"Base SQLite à réparer avant suppression : {f['relatif']}")
+                except sqlite3.Error:
+                    raise ValueError(f"Contrôle SQLite impossible ; aucune suppression : {f['relatif']}") from None
+        with zipfile.ZipFile(destination, "x", compression=zipfile.ZIP_DEFLATED) as z:
+            z.writestr("INVENTAIRE.json", json.dumps(plan, ensure_ascii=False, indent=2))
+            for d in plan["repertoires"]:
+                z.writestr(d["genre"] + "/" + (d["relatif"] + "/" if d["relatif"] else ""), b"")
+            for f in plan["fichiers"]:
+                z.write(instantane / f["genre"] / f["relatif"], f["genre"] + "/" + f["relatif"])
     verifier_sauvegarde(plan, destination)
     _verifier_plan(plan)
     return destination
@@ -158,11 +187,17 @@ def verifier_sauvegarde(plan, archive):
     digest(Path(archive))  # refuse aussi les liens durs
     with zipfile.ZipFile(archive) as z:
         attendus = {"INVENTAIRE.json", *(f["genre"] + "/" + f["relatif"] for f in plan["fichiers"])}
+        repertoires = {d["genre"] + "/" + (d["relatif"] + "/" if d["relatif"] else "") for d in plan["repertoires"]}
+        attendus.update(repertoires)
         if len(z.namelist()) != len(attendus) or set(z.namelist()) != attendus:
             raise ValueError("Contenu d'archive inattendu ou dupliqué ; aucune suppression.")
         if json.loads(z.read("INVENTAIRE.json")) != plan:
             raise ValueError("L'archive ne correspond pas à l'inventaire approuvé.")
+        if any(z.getinfo(nom).file_size for nom in repertoires):
+            raise ValueError("Répertoire d'archive altéré ; aucune suppression.")
         for f in plan["fichiers"]:
+            if z.getinfo(f["genre"] + "/" + f["relatif"]).file_size != f["taille"]:
+                raise ValueError("Taille d'archive incohérente ; aucune suppression.")
             with z.open(f["genre"] + "/" + f["relatif"]) as entree:
                 h = hashlib.sha256()
                 for bloc in iter(lambda: entree.read(1024 * 1024), b""):
@@ -186,7 +221,7 @@ def effacer(plan, archive, *, confirmation=False):
     journal.flush()
     os.fsync(journal.fileno())
     resultat = {"supprimes": [], "erreurs": [], "conserves": plan["conserves"], "sauvegarde": str(archive)}
-    dossiers_attribues = set()
+    dossiers_attribues = {Path(plan["racines"][d["genre"]]) / d["relatif"] for d in plan["repertoires"]}
     for f in plan["fichiers"]:
         racine = Path(plan["racines"][f["genre"]])
         courant = (racine / f["relatif"]).parent

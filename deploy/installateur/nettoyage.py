@@ -34,7 +34,7 @@ def main(argv=None, _essai=False):
     fenetre.geometry("820x640")
     fenetre.minsize(620, 420)
     tk.Label(fenetre, text=f"Nettoyage contrôlé — {a.edition.capitalize()}", font=("Segoe UI", 14)).pack(pady=8)
-    texte = scrolledtext.ScrolledText(fenetre, wrap="word", font=("Segoe UI", 10))
+    texte = scrolledtext.ScrolledText(fenetre, wrap="word", height=10, font=("Segoe UI", 10))
     texte.pack(fill="both", expand=True, padx=12)
     approuve = tk.BooleanVar(value=False)
     plan = None
@@ -46,6 +46,8 @@ def main(argv=None, _essai=False):
         texte.insert("end", "Les données et sauvegardes ci-dessous seront effacées UNIQUEMENT après une nouvelle sauvegarde vérifiée et votre confirmation.\n\n")
         for f in plan["fichiers"]:
             texte.insert("end", f"À sauvegarder puis supprimer : {Path(plan['racines'][f['genre']]) / f['relatif']} ({f['taille']} octets)\n")
+        for d in plan["repertoires"]:
+            texte.insert("end", f"Dossier à retirer s'il est vide : {Path(plan['racines'][d['genre']]) / d['relatif']}\n")
         for f in plan["conserves"]:
             texte.insert("end", f"CONSERVÉ : {f['chemin']} — {f['raison']}\n")
         texte.insert("end", "\n" + "\n".join(plan["avertissements"]))
@@ -79,6 +81,13 @@ def main(argv=None, _essai=False):
             messagebox.showerror("Nettoyage arrêté", str(exc) + "\nLes éléments non traités sont conservés ; vérifiez le rapport éventuel à côté de la sauvegarde.")
 
     tk.Checkbutton(fenetre, text="J'ai examiné les fichiers à supprimer et les éléments conservés.", variable=approuve).pack(pady=6)
+    def rafraichir():
+        try:
+            approuve.set(False)
+            afficher()
+        except (ValueError, OSError) as exc:
+            messagebox.showerror("Inventaire impossible", str(exc))
+    tk.Button(fenetre, text="Rafraîchir l'inventaire", command=rafraichir).pack(pady=2)
     boutons = tk.Frame(fenetre)
     boutons.pack(fill="x", padx=12, pady=10)
     tk.Button(boutons, text="Fermer et conserver les données", command=fenetre.destroy).pack(side="left")

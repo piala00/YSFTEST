@@ -48,7 +48,14 @@ def nettoyer(programme, donnees, edition):
     temoin.write_text("Autre édition : préserver")
     plan = n.inventorier(programme, donnees, edition)
     archive = temporaire / f"NETTOYAGE-{edition}.zip"
-    n.sauvegarder(plan, archive)
+    try:
+        n.sauvegarder(plan, archive)
+    except (ValueError, OSError):
+        courant = n.inventorier(programme, donnees, edition)
+        rapport = {"avant": plan, "apres": courant}
+        (temporaire / f"NETTOYAGE-DIAGNOSTIC-{edition}.json").write_text(json.dumps(rapport, ensure_ascii=False, indent=2), encoding="utf-8")
+        print("Inventaire du runner modifié ; diagnostic sauvegardé, aucune suppression exécutée.")
+        raise
     resultat = n.effacer(plan, archive, confirmation=True)
     assert not resultat["erreurs"], resultat["erreurs"]
     assert not donnees.exists(), f"Résidus données : {list(donnees.rglob('*'))}"

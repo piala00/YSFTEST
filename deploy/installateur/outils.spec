@@ -11,7 +11,7 @@ verifier_distribution(CLES)  # Aucun installateur commercial dépourvu d'autorit
 
 modules = ["apps.licences." + n for n in ("licence", "cle_editeur", "format_cles", "installation", "nettoyage")]
 modules += ["base64", "hashlib", "hmac", "json", "datetime", "dataclasses", "uuid", "winreg", "secrets",
-            "sqlite3", "zipfile", "urllib.parse", "stat", "re", "os"]
+            "sqlite3", "zipfile", "urllib.parse", "stat", "re", "os", "contextlib", "shutil", "tempfile"]
 modules += collect_submodules("cryptography")
 for nom, source in (("ERP-Controle-Installation", "controle.py"), ("ERP-Nettoyage", "nettoyage.py")):
     a = Analysis([str(RACINE / "deploy/installateur" / source)], pathex=[str(RACINE)], hiddenimports=modules)

@@ -404,6 +404,7 @@ jobs:
             ${{ runner.temp }}/mise-a-jour.log
             ${{ runner.temp }}/NETTOYAGE-INTERFACE-*.json
             ${{ runner.temp }}/NETTOYAGE-INTERFACE-ERREUR.txt
+            ${{ runner.temp }}/NETTOYAGE-DIAGNOSTIC-*.json
           if-no-files-found: warn
           retention-days: 7
       - name: Outil d'émission des licences (propriétaire, jamais livré aux clients)

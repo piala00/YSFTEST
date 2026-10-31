@@ -4,6 +4,7 @@ from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
+import zipfile
 from unittest import mock
 
 from django.test import SimpleTestCase
@@ -40,6 +41,7 @@ class NettoyageTests(SimpleTestCase):
         self.assertTrue((self.donnees / "erp.sqlite3").exists())
 
     def test_effacement_cible_et_autre_edition_parent_partage_preserves(self):
+        (self.donnees / "dossiers-simulation").mkdir()
         plan = self.plan()
         fermees = []
         connexion = sqlite3.connect
@@ -57,6 +59,28 @@ class NettoyageTests(SimpleTestCase):
         self.assertEqual((self.autre / "erp.sqlite3").read_text(), "Autre édition préservée")
         n.verifier_sauvegarde(plan, self.archive)
         self.assertTrue(self.archive.with_suffix(".rapport.json").exists())
+
+    def test_sauvegarde_wal_ne_modifie_pas_la_source_et_restaure_les_donnees(self):
+        c = sqlite3.connect(self.donnees / "erp.sqlite3")
+        self.addCleanup(c.close)
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA wal_autocheckpoint=0")
+        c.execute("CREATE TABLE ligne_wal (valeur TEXT)")
+        c.execute("INSERT INTO ligne_wal VALUES ('Dernière donnée fictive dans le WAL')")
+        c.commit()
+        self.assertTrue((self.donnees / "erp.sqlite3-wal").is_file())
+        plan = self.plan()
+        n.sauvegarder(plan, self.archive)
+        self.assertEqual(self.plan(), plan, "Le contrôle et la sauvegarde doivent laisser tous les fichiers source intacts.")
+        restitution = self.racine / "restitution"
+        restitution.mkdir()
+        with zipfile.ZipFile(self.archive) as z:
+            for suffixe in ("", "-wal", "-shm"):
+                nom = "erp.sqlite3" + suffixe
+                if "donnees/" + nom in z.namelist():
+                    (restitution / nom).write_bytes(z.read("donnees/" + nom))
+        with closing(sqlite3.connect(restitution / "erp.sqlite3")) as copie:
+            self.assertEqual(copie.execute("SELECT valeur FROM ligne_wal").fetchone()[0], "Dernière donnée fictive dans le WAL")
 
     def test_fichier_inconnu_sql_externe_et_dossier_inconnu_preserves(self):
         (self.donnees / "notes-utilisateur.txt").write_text("préserver")
