@@ -103,6 +103,15 @@ SQLite ne ferme pas le fichier. Le contrôle de sauvegarde et la fixture GUI uti
 sockets de boucle locale sont interdites par le bac à sable ; le résultat de 556 tests précédent ne lui est
 pas réattribué. La CI du nouveau commit doit revalider la suite et les deux outils Windows avant succès.
 
+La CI41189566461 a ensuite réussi les suites Linux et SQL Server et les deux vraies fenêtres de nettoyage.
+La recette d'installation reste toutefois en attente depuis plus de dix minutes sur les deux éditions. Une
+validation d'assistant pouvait ouvrir un MsgBox lors d'un appel silencieux : le mode silencieux passe maintenant
+directement au contrôle obligatoire de PrepareToInstall, sans dialogue ; le contrôle n'est jamais désactivé.
+Un échec de marquage devient fatal au lieu d'ouvrir une boîte de dialogue. Les processus de recette ont une
+limite de quatre minutes avec journaux distincts ; le job Windows est borné à 35 minutes et conserve ses
+diagnostics même en échec. Une réinstallation autorisée est maintenant éprouvée après le refus sans autorisation.
+Ce nouveau parcours doit encore réussir en CI avant d'être présenté comme validé.
+
 
 ## Émission propriétaire et activation unifiée
 

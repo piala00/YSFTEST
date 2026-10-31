@@ -352,14 +352,15 @@ var
   MessageControle: String;
 begin
   Result := True;
-  if (CurPageID = PageAutorisation.ID) and not Controle('--verifier "' + FichierAutorisation() + '"', MessageControle) then
+  { Le mode silencieux valide toujours dans PrepareToInstall, sans ouvrir de dialogue bloquant. }
+  if not WizardSilent and (CurPageID = PageAutorisation.ID) and not Controle('--verifier "' + FichierAutorisation() + '"', MessageControle) then
   begin
     MsgBox(MessageControle, mbError, MB_OK);
     Result := False;
   end;
   if (CurPageID = PageServeur.ID) and (Pos('SERVEUR:', Uppercase(PageServeur.Values[0])) > 0) then
   begin
-    MsgBox('Remplacez SERVEUR par le nom ou l''adresse IP du serveur (ex. http://192.168.1.10:{#Port}).', mbError, MB_OK);
+    SuppressibleMsgBox('Remplacez SERVEUR par le nom ou l''adresse IP du serveur (ex. http://192.168.1.10:{#Port}).', mbError, MB_OK, IDOK);
     Result := False;
   end;
 end;
@@ -394,7 +395,7 @@ begin
   if (CurStep = ssPostInstall) and EstServeur() then
   begin
     if not Controle('--marquer-programme "' + ExpandConstant('{app}') + '" --marquer-donnees "' + Donnees() + '"', MessageControle) then
-      MsgBox(MessageControle + #13#10 + 'Les données restent conservées ; le nettoyage ne pourra pas supposer leur propriété.', mbError, MB_OK);
+      RaiseException(MessageControle + #13#10 + 'Les données restent conservées ; les dossiers doivent être identifiés avant installation.');
     { L'assistant du premier démarrage proposera ce rôle (et installera l'agence avec ce fichier) }
     ForceDirectories(Donnees());
     SaveStringToFile(Donnees() + '\role-installation.txt', Role(), False);

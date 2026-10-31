@@ -173,6 +173,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -327,13 +328,38 @@ jobs:
             }
             return $false
           }
+          function Executer-Installation($programmeInstalleur, $parametresInstalleur, $journalInstalleur) {
+            Write-Host "Exécution contrôlée : $journalInstalleur"
+            $p = Start-Process $programmeInstalleur -ArgumentList $parametresInstalleur -PassThru
+            if (-not $p.WaitForExit(240000)) {
+              taskkill.exe /F /T /PID $p.Id | Out-Null
+              Get-Content $journalInstalleur -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+              throw "Délai de quatre minutes dépassé : $journalInstalleur"
+            }
+            $p.WaitForExit()
+            return $p.ExitCode
+          }
           function Installer($journal) {
-            $i = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/BASE=sqlite", "/TASKS=parefeu,service", "/AUTORISATION=`"$autorisation`"", "/DIR=`"$dossier`"", "/LOG=`"$journal`"" -Wait -PassThru
-            if ($i.ExitCode -ne 0) { Get-Content $journal -Tail 40; throw "Installation en échec ($($i.ExitCode))" }
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/BASE=sqlite", "/TASKS=parefeu,service", "/AUTORISATION=`"$autorisation`"", "/DIR=`"$dossier`"", "/LOG=`"$journal`"")
+            $code = Executer-Installation $setup $parametres $journal
+            if ($code -ne 0) { Get-Content $journal -Tail 40; throw "Installation en échec ($code)" }
+          }
+          function Refuser-Sans-Autorisation($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/DIR=`"$dossier`"", "/LOG=`"$journal`"")
+            $code = Executer-Installation $setup $parametres $journal
+            if ($code -eq 0) { throw "Installation sans autorisation acceptée : $journal" }
+          }
+          function Desinstaller($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=`"$journal`"")
+            $code = Executer-Installation "$dossier\unins000.exe" $parametres $journal
+            if ($code -ne 0) { throw "Désinstallation en échec ($code)" }
+            for ($n = 0; $n -lt 60 -and (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe"); $n++) { Start-Sleep -Seconds 2 }
+            if (Get-Service $service -ErrorAction SilentlyContinue) { throw "Service toujours présent après désinstallation" }
+            if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme toujours présent après désinstallation" }
           }
           # Une installation initiale sans autorisation est refusée, avant de toucher au service ou aux données.
-          $refus = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/DIR=`"$dossier`"" -Wait -PassThru
-          if ($refus.ExitCode -eq 0) { throw "Installation initiale sans autorisation acceptée" }
+          Refuser-Sans-Autorisation "$env:RUNNER_TEMP\installateur-refus-initial.log"
+          if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme copié sans autorisation" }
           Installer "$env:RUNNER_TEMP\installation.log"
           if (-not (Attendre-Service)) { Diagnostic; Get-Content "$env:RUNNER_TEMP\installation.log" -Tail 30; throw "Service non démarré" }
           if ((Get-Service $service).StartType -notin @("Automatic", "AutomaticDelayedStart")) { throw "Service pas en démarrage automatique" }
@@ -355,20 +381,31 @@ jobs:
           if ((Get-Content "$donnees\configuration.env" -Raw) -ne $config) { throw "La mise à jour a modifié la configuration" }
 
           # Désinstallation : service retiré, données conservées
-          Start-Process "$dossier\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
-          for ($n = 0; $n -lt 60 -and (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe"); $n++) { Start-Sleep -Seconds 2 }
-          if (Get-Service $service -ErrorAction SilentlyContinue) { throw "Service toujours présent après désinstallation" }
-          if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme toujours présent après désinstallation" }
+          Desinstaller "$env:RUNNER_TEMP\installateur-desinstallation.log"
           if (-not (Test-Path "$donnees\erp.sqlite3")) { throw "La désinstallation a effacé les données" }
           # La conservation des anciennes données ne doit pas autoriser une nouvelle installation.
-          $refus = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/DIR=`"$dossier`"" -Wait -PassThru
-          if ($refus.ExitCode -eq 0) { throw "Réinstallation sans autorisation acceptée" }
+          Refuser-Sans-Autorisation "$env:RUNNER_TEMP\installateur-refus-reinstallation.log"
+          Installer "$env:RUNNER_TEMP\installateur-reinstallation.log"
+          if (-not (Attendre-Service) -or -not (Attendre-Serveur)) { Diagnostic; throw "Réinstallation autorisée non fonctionnelle" }
+          Desinstaller "$env:RUNNER_TEMP\installateur-seconde-desinstallation.log"
           python tests_navigateur/installateur_p0.py nettoyer "$dossier" "$donnees" "${{ matrix.edition }}"
           if ($LASTEXITCODE -ne 0) { throw "Nettoyage fictif en échec" }
           netsh advfirewall firewall show rule name="ERP OHADA (port ${{ matrix.port }})" | Out-Null
           if ($LASTEXITCODE -eq 0) { throw "Règle du pare-feu restée après désinstallation" }
           $global:LASTEXITCODE = 0
           Write-Output "Installateur ${{ matrix.nom }} : service Windows installé, relancé seul, mis à jour, désinstallé ; données conservées."
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ERP-Installateur-${{ matrix.nom }}-Diagnostics
+          path: |
+            ${{ runner.temp }}/installateur-*.log
+            ${{ runner.temp }}/installation.log
+            ${{ runner.temp }}/mise-a-jour.log
+            ${{ runner.temp }}/NETTOYAGE-INTERFACE-*.json
+            ${{ runner.temp }}/NETTOYAGE-INTERFACE-ERREUR.txt
+          if-no-files-found: warn
+          retention-days: 7
       - name: Outil d'émission des licences (propriétaire, jamais livré aux clients)
         if: matrix.edition == 'transport'
         shell: pwsh
