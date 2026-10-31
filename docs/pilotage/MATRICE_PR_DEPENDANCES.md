@@ -24,7 +24,8 @@ Relevé du 31 octobre 2026 ; sources : métadonnées GitHub. La branche commune 
 | [#21](https://github.com/piala00/YSFTEST/pull/21) | gpt/licences-deux-modules | gpt/simulation-metier-complete | Brouillon ouvert | 0af32c298f2300803ae0b68ecb3d68169430da5e |
 | [#22](https://github.com/piala00/YSFTEST/pull/22) | gpt/audit-ecritures-p0 | gpt/licences-deux-modules | Brouillon ouvert | fdb57a3f73a3d5c58edbf25eb769c8cdd44e92c8 |
 | [#23](https://github.com/piala00/YSFTEST/pull/23) | gpt/activation-licences-identite | gpt/audit-ecritures-p0 | Brouillon ouvert | 7b564387bb80b361c2f9fc86e58066cac86e7e19 |
-| [#25](https://github.com/piala00/YSFTEST/pull/25) | gpt/installation-desinstallation-p0 | gpt/activation-licences-identite | Brouillon ouvert | 3d371492434f4318e7ff7f16196d619fc3a5e2e1 |
+| [#25](https://github.com/piala00/YSFTEST/pull/25) | gpt/installation-desinstallation-p0 | gpt/activation-licences-identite | Brouillon ouvert | dea6c9161872b46d08c9756baad8bd2ad036e301 |
+| [#26](https://github.com/piala00/YSFTEST/pull/26) | gpt/pilotage-registre-demandes | gpt/installation-desinstallation-p0 | Brouillon ouvert, documentation seule | Voir le dernier commit de cette PR documentaire |
 
 Chaîne actuelle : #11 → #12 → #13 → #14 → #15 → #16 → #17 → #19 → #20 → #21 → #22 → #23 → #25. #8 et #9 sont des retours documentaires sur la branche commune. #10, #18 et #24 sont des **issues**, pas des PR.
 

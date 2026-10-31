@@ -3,8 +3,8 @@
 | ID | Fait / source | État | Critère de clôture |
 |---|---|---|---|
 | ANO-H-001 | Refus identité éditeur absente, #1 commentaire6536186700 | Correction de chaîne de compilation dans #23 ; vraie personnalisation non acquise | Identité autorisée intégrée, licence réelle vérifiée et recette PC cible, sans nouvelle paire |
-| ANO-H-002 | Réinstallation sans nouvelle autorisation, #1 commentaire6536201349 | Correctif .erpinst #25 en revue / CI | Refus à neuf et après retrait sur vrai Windows, malgré configuration résiduelle |
-| ANO-H-003 | Résidus Program Files/ProgramData, même source | Nettoyage ciblé #25 ; premier essaiWindowsWinError32, correctif fermetureSQLite3d37149 en CI | Inventaire/sauvegarde/confirmation, inspection réelle, chemins restants justifiés ; autre édition protégée |
+| ANO-H-002 | Réinstallation sans nouvelle autorisation, #1 commentaire6536201349 | Correctif .erpinst #25 en revue ; refus à neuf et après retrait vérifiés sous Windows au SHA dea6c916 | Recette acquise sur données fictives ; intégration et acceptation du propriétaire distinctes |
+| ANO-H-003 | Résidus Program Files/ProgramData, même source | Nettoyage ciblé #25 vérifié sous Windows au SHA dea6c916 : sauvegarde relue, dossiers programme/données absents dans les deux recettes, autre édition et parent préservés. Verrou SQLite, WAL/SHM, lecture seule, état du planificateur et attente Inno corrigés | Les fichiers inconnus restent conservés et signalés ; aucune garantie universelle d'absence de résidus ni recette PC propriétaire déduite |
 | ANO-D-001 | Validation/clôture sur objets périmés et publications non atomiques, audit #22 | Correctif testé SQLite/SQL ; PR non fusionnée | Conserver preuves/concurrence et revue ; ne pas compter 12 assertions comme 12 anomalies |
 | ANO-D-002 | Actions comptables échappant au profil lecture, #22 | Correctif testé, PR non fusionnée | Droits des routes et refus GET/403 conservés dans la recette |
 | ANO-G-001 | 250 départs testés à remplissage réduit, #20 | Limite connue, pas mesure d’un mois complet | Benchmark complet mesuré, sans extrapolation du petit essai |
