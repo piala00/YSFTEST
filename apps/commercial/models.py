@@ -708,12 +708,25 @@ class Document(models.Model):
             raise ValidationError(f"Validation refusée. {message}")
         return message
 
+    def _verrouiller_et_relire(self):
+        """Sous transaction, décider sur la pièce stockée et vider les relations mises en cache."""
+        # Les services commerciaux opèrent sur la base active ; une copie miroir ne doit pas modifier celle-ci.
+        if self._state.db not in (None, "default"):
+            raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+        if not self.pk:
+            raise ValidationError("Enregistrez le document avant cette opération.")
+        try:
+            self.refresh_from_db(from_queryset=type(self).objects.select_for_update())
+        except type(self).DoesNotExist:
+            raise ValidationError("Ce document n'existe plus. Actualisez la liste des documents.") from None
+
     @transaction.atomic
     def valider(self):
         from apps.comptabilite.services import comptabiliser_document
 
         from apps.core.synchronisation import verifier_saisie
 
+        self._verrouiller_et_relire()
         verifier_saisie("la validation des pièces")
         if self.statut != self.BROUILLON:
             raise ValidationError("Seul un document en brouillon peut être validé.")
@@ -884,6 +897,9 @@ class Document(models.Model):
 
     @transaction.atomic
     def annuler(self):
+        self._verrouiller_et_relire()
+        if self.statut == self.ANNULE:
+            return  # conserver l'auteur et la date de l'annulation initiale.
         if self.statut == self.BROUILLON:
             self._marquer_annule()
             return
