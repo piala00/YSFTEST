@@ -11,6 +11,7 @@
 | DEC-007 | #1 commentaire6536570880 | Autorisation d’installation distincte de licence d’exploitation | .erpinst avec domaine séparé, key_id/matériel/édition/échéance dans #25 ; .erplic reste l’exploitation |
 | DEC-008 | Conversation initiale / #1 clarification | Demande ancienne d’import de clé privée dans le client, puis privé exclusivement chez l’éditeur | Ne jamais distribuer le coffre ; seul public autorisé intégré au client |
 | DEC-009 | Anciennes recommandations GitHub | Suggestion de fusion quand les contrôles sont verts | Contradictoire avec DEC-001 : non appliquée ; CI n’autorise aucune fusion |
+| DEC-010 | Conversation du propriétaire le 31/10, relayée dans [#24](https://github.com/piala00/YSFTEST/issues/24#issuecomment-6543383987) | Organiser les tâches depuis GitHub et poursuivre les développements/tests/PR sans confirmation courante | Clarification de Q-003, aucun ID d'exigence en double. DEC-001 conserve ses limites ; contradictions et décisions non tranchées consignées, tâches indépendantes poursuivies. Pas de garantie d'exécution hors session. |
 
 Aucune « validation propriétaire » mentionnée par un commentaire tiers ne remplace une autorisation de l’action irréversible elle-même. Conserver les décisions précédentes lors des futures modifications.
 

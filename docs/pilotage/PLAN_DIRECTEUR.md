@@ -4,6 +4,11 @@ Pilotage : [issue #24](https://github.com/piala00/YSFTEST/issues/24). Coordinati
 
 Les urgences H-005/H-006/H-008/H-009 et Q-001 restent prioritaires. La réconciliation documentaire avance sans les interrompre. Les autres demandes restent conservées dans le registre ; une nouvelle demande non urgente ne remplace pas la tâche active.
 
+Consigne confirmée par le propriétaire le 31/10 : organiser les tâches depuis GitHub et poursuivre les développements,
+corrections, tests et PR sans confirmation courante (Q-003, DEC-010). Les limites de production restent celles de DEC-001.
+Après la qualification fictive des P0 #23/#25, la personnalisation réelle reste bloquée ; le lot indépendant Documents
+#27/#28 poursuit D-002/Q-001. Les résultats du tableau d'avancement fixent le prochain point de reprise.
+
 ## Sources et portée
 
 Sources consultées : conversation du propriétaire (dates individuelles non conservées), AGENTS.md, issues #1/#10/#18/#24, métadonnées des PR et rapports existants de docs/retour/. Le programme de travail du 30 octobre est réutilisé, pas remplacé. Ce registre initial n’est **pas encore un inventaire exhaustif prouvé** des demandes antérieures externes ni une réconciliation finale de toutes les transmissions antérieures. Toute omission identifiée doit recevoir un ID sans effacer l’historique.
