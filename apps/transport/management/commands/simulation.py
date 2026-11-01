@@ -58,6 +58,9 @@ class Command(BaseCommand):
         p.add_argument("--echelle", type=float, default=1.0, help="Fraction des voyageurs et colis (essai rapide : 0.1)")
         p.add_argument("--graine", type=int, default=2026)
         p.add_argument("--rapport", default="", help="Fichier Markdown du bilan")
+        p.add_argument("--exporter", default="", help="Fichier société portable (JSON) produit à la fin : la simulation "
+                       "s'importe alors dans le vrai logiciel via Fichier › Import/Export, comme une société restaurée "
+                       "(lancer la simulation sur une machine, importer le fichier sur une autre)")
         p.add_argument("--forcer", action="store_true", help="Lever les contrôles de dossier (tests automatiques seulement)")
 
     def handle(self, *a, **o):
@@ -115,6 +118,19 @@ class Command(BaseCommand):
         if o["rapport"]:
             with open(o["rapport"], "w", encoding="utf-8") as f:
                 f.write(texte)
+        if o["exporter"]:
+            from django.contrib.auth import get_user_model
+
+            from apps.core import sauvegarde
+
+            User = get_user_model()
+            if not User.objects.filter(is_superuser=True).exists():     # une société importée doit pouvoir s'ouvrir
+                User.objects.create_superuser("admin", "", "Simulation-2026")
+                self.stdout.write("Administrateur de démonstration « admin » (mot de passe : Simulation-2026) ajouté.")
+            with open(o["exporter"], "w", encoding="utf-8") as f:
+                f.write(sauvegarde.sauvegarder())
+            self.stdout.write(self.style.SUCCESS(
+                f"Société simulée exportée : {o['exporter']} — importez-la via Fichier › Import/Export (Restaurer)."))
         return None
 
     def exercices(self):

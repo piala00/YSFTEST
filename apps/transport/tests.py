@@ -1322,6 +1322,24 @@ class SimulationTests(TestCase):
         self.assertTrue(ArticleMagasin.objects.filter(quantite__gt=0).exists())
         self.assertIn("Bilan de la simulation", sortie.getvalue())
 
+    def test_export_societe_portable_importable(self):
+        import os
+        import tempfile
+
+        from apps.core import sauvegarde
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            chemin = f.name
+        try:
+            call_command("simulation", jours=1, vehicules=3, salaries=5, echelle=0.05, forcer=True,
+                         exporter=chemin, stdout=io.StringIO())
+            contenu = open(chemin, encoding="utf-8").read()
+        finally:
+            os.unlink(chemin)
+        self.assertIn("transport.", contenu)                       # le métier transport figure dans le fichier
+        entete, objets = sauvegarde.lire(contenu)                  # fichier société valide et importable (admin présent)
+        self.assertTrue(any(o["model"] == "transport.depart" for o in objets))
+
 
 class SimulationPlusieursMoisTests(TestCase):
     def test_deux_mois_a_cheval_sur_deux_annees(self):
