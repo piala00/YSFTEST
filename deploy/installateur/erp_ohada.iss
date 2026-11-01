@@ -286,7 +286,6 @@ begin
     exit;
   end;
   { WM_COPY sur un champ natif Windows : compatible avec Inno Setup 6. }
-  ChampCodeInstallation.SetFocus;
   SendMessage(ChampCodeInstallation.Handle, $00B1, 0, -1); { EM_SETSEL }
   SendMessage(ChampCodeInstallation.Handle, $0301, 0, 0);  { WM_COPY }
   BoutonCopierCode.Caption := 'Code copié !';
