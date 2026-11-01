@@ -14,13 +14,16 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--edition", required=True, choices=("transport", "commerce"))
     p.add_argument("--verifier", type=Path)
+    p.add_argument("--cle-installation")
     p.add_argument("--dossier-cible", type=Path)
     p.add_argument("--marquer-programme", type=Path)
     p.add_argument("--marquer-donnees", type=Path)
     p.add_argument("--rapport", required=True, type=Path)
     a = p.parse_args(argv)
     try:
-        if (a.marquer_programme or a.marquer_donnees) and (a.verifier or a.dossier_cible):
+        if a.verifier and a.cle_installation:
+            raise ValueError("Choisissez une seule méthode d’installation.")
+        if (a.marquer_programme or a.marquer_donnees) and (a.verifier or a.cle_installation or a.dossier_cible):
             raise ValueError("Le marquage et la vérification d'autorisation sont des actions distinctes.")
         if a.dossier_cible:
             cible = sur(a.dossier_cible)
@@ -37,7 +40,13 @@ def main(argv=None):
                     marquer(dossier, a.edition)
             a.rapport.write_text("Dossiers de cette édition identifiés ; fichiers inconnus toujours préservés.", encoding="utf-8")
             return 0
-        if a.verifier:
+        if a.cle_installation:
+            donnees, signe, signature = l.fc.installation_lire(a.cle_installation)
+            l.verifier_octets(signe, signature, "clé d’installation")
+            if a.edition not in (donnees["edition"],) and donnees["edition"] != "toutes":
+                raise l.LicenceInvalide("clé d’installation d’une autre édition")
+            message = "Clé d’installation signée vérifiée : " + donnees["numero"] + " (" + a.edition + ")."
+        elif a.verifier:
             with a.verifier.open("rb") as f:
                 resultat = autoriser(f.read(65537), a.edition)
             message = f"Autorisation vérifiée : {resultat['numero']} ({a.edition})."

@@ -173,6 +173,8 @@ var
   PageAgence: TInputFileWizardPage;
   PageServeur: TInputQueryWizardPage;
   PageAutorisation: TInputFileWizardPage;
+  PageMethodeInstallation: TInputOptionWizardPage;
+  PageCleInstallation: TInputQueryWizardPage;
   NettoyageVoulu: Boolean;
   OutilNettoyageTemp: String;
   CodeInstallation: String;
@@ -184,6 +186,28 @@ begin
   Result := ExpandConstant('{param:AUTORISATION|}');
   if (Result = '') and (PageAutorisation <> nil) then
     Result := PageAutorisation.Values[0];
+end;
+
+function MethodeCle(): Boolean;
+begin
+  Result := ExpandConstant('{param:CLEINSTALLATION|}') <> '';
+  if not Result and (PageMethodeInstallation <> nil) then
+    Result := PageMethodeInstallation.SelectedValueIndex = 1;
+end;
+
+function CleInstallation(): String;
+begin
+  Result := Trim(ExpandConstant('{param:CLEINSTALLATION|}'));
+  if (Result = '') and (PageCleInstallation <> nil) then
+    Result := Trim(PageCleInstallation.Values[0]);
+end;
+
+function ArgumentsAutorisation(): String;
+begin
+  if MethodeCle() then
+    Result := '--cle-installation "' + CleInstallation() + '"'
+  else
+    Result := '--verifier "' + FichierAutorisation() + '"';
 end;
 
 function Controle(Arguments: String; var MessageControle: String): Boolean;
@@ -309,7 +333,19 @@ begin
   PageRole.Add('Poste de travail : accès au serveur par le navigateur (rien d''autre n''est installé)');
   PageRole.SelectedValueIndex := 0;
 
-  PageAutorisation := CreateInputFilePage(PageRole.ID, 'Autorisation de cette installation',
+  PageMethodeInstallation := CreateInputOptionPage(PageRole.ID,
+    'Méthode d''installation', 'Comment souhaitez-vous autoriser cette installation ?',
+    'Les deux méthodes sont vérifiées hors ligne. La licence d''exploitation sera activée après installation.',
+    True, False);
+  PageMethodeInstallation.Add('Avec un fichier d''autorisation signé (.erpinst)');
+  PageMethodeInstallation.Add('Avec une clé d''installation signée');
+  PageMethodeInstallation.SelectedValueIndex := 0;
+  PageCleInstallation := CreateInputQueryPage(PageMethodeInstallation.ID,
+    'Clé d''installation', 'Saisissez la clé d''installation fournie par l''éditeur.',
+    'Cette clé signée autorise l''installation mais ne remplace pas la licence d''exploitation.');
+  PageCleInstallation.Add('Clé d''installation :', False);
+
+  PageAutorisation := CreateInputFilePage(PageMethodeInstallation.ID, 'Autorisation de cette installation',
     'Choisissez l’autorisation .erpinst signée remise pour ce serveur et cette édition.',
     'Code à communiquer à l''éditeur avant une première installation : ' + Identifiant + #13#10 +
     'Chaque installation, réinstallation, mise à jour et réparation vérifie cette autorisation hors ligne. ' +
@@ -368,8 +404,12 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
-  if PageID = PageAutorisation.ID then
+  if PageID = PageMethodeInstallation.ID then
     Result := Role() = 'poste';
+  if PageID = PageAutorisation.ID then
+    Result := (Role() = 'poste') or MethodeCle();
+  if PageID = PageCleInstallation.ID then
+    Result := (Role() = 'poste') or not MethodeCle();
   if PageID = PageAgence.ID then
     Result := Role() <> 'agence';
   if PageID = PageServeur.ID then
@@ -388,7 +428,9 @@ var
 begin
   Result := True;
   { Le mode silencieux valide toujours dans PrepareToInstall, sans ouvrir de dialogue bloquant. }
-  if not WizardSilent and (CurPageID = PageAutorisation.ID) and not Controle('--verifier "' + FichierAutorisation() + '"', MessageControle) then
+  if not WizardSilent and (((CurPageID = PageAutorisation.ID) and not MethodeCle()) or
+    ((CurPageID = PageCleInstallation.ID) and MethodeCle())) and
+    not Controle(ArgumentsAutorisation(), MessageControle) then
   begin
     MsgBox(MessageControle, mbError, MB_OK);
     Result := False;
@@ -445,14 +487,20 @@ var
   MessageControle: String;
 begin
   Result := '';
-  if EstServeur() and ((FichierAutorisation() = '') or (Pos('"', FichierAutorisation()) > 0) or
+  if EstServeur() and MethodeCle() and ((CleInstallation() = '') or (Pos('"', CleInstallation()) > 0) or
+    (Pos(#13, CleInstallation()) > 0) or (Pos(#10, CleInstallation()) > 0)) then
+  begin
+    Result := 'Saisissez une clé d''installation signée valide (/CLEINSTALLATION=clé en mode silencieux).';
+    exit;
+  end;
+  if EstServeur() and not MethodeCle() and ((FichierAutorisation() = '') or (Pos('"', FichierAutorisation()) > 0) or
     (Pos(#13, FichierAutorisation()) > 0) or (Pos(#10, FichierAutorisation()) > 0)) then
   begin
-    Result := 'Choisissez une autorisation .erpinst valide (/AUTORISATION=chemin pour une installation silencieuse).';
+    Result := 'Choisissez une autorisation .erpinst valide (/AUTORISATION=chemin en mode silencieux).';
     exit;
   end;
   { Toujours vérifié, même en mode silencieux et avec une base/clé résiduelle. Aucun service arrêté avant ce contrôle. }
-  if EstServeur() and (not Controle('--verifier "' + FichierAutorisation() + '" --dossier-cible "' + ExpandConstant('{app}') + '"', MessageControle)) then
+  if EstServeur() and (not Controle(ArgumentsAutorisation() + ' --dossier-cible "' + ExpandConstant('{app}') + '"', MessageControle)) then
   begin
     Result := MessageControle;
     exit;
