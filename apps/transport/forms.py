@@ -286,8 +286,8 @@ class ParametresTransportForm(BootstrapMixin, forms.ModelForm):
         model = ParametresTransport
         fields = ("compte_billets", "compte_colis", "compte_bagages", "compte_fret", "compte_contre_remboursement", "compte_billets_a_voyager",
                   "compte_colis_a_transporter", "compte_remboursements", "compte_proprietaires", "compte_carburant", "compte_pieces", "compte_main_oeuvre", "taxe_billets",
-                  "taxe_colis", "retenue_annulation", "sessions_caisse_obligatoires", "plafond_depense_sans_autorisation",
-                  "avance_depart_toleree")
+                  "taxe_colis", "retenue_annulation", "report_absent_automatique", "sessions_caisse_obligatoires",
+                  "plafond_depense_sans_autorisation", "avance_depart_toleree")
 
 
 
