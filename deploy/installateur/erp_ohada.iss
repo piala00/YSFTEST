@@ -175,6 +175,8 @@ var
   PageAutorisation: TInputFileWizardPage;
   NettoyageVoulu: Boolean;
   OutilNettoyageTemp: String;
+  CodeInstallation: String;
+  BoutonCopierCode: TNewButton;
 
 function FichierAutorisation(): String;
 begin
@@ -275,12 +277,25 @@ begin
     Result := 'http://' + Result;
 end;
 
+procedure CopierCodeInstallation(Sender: TObject);
+begin
+  if CodeInstallation = '' then
+  begin
+    MsgBox('Le code de ce serveur est indisponible. Relancez l''installateur ou contactez l''éditeur.', mbError, MB_OK);
+    exit;
+  end;
+  SetClipboardText(CodeInstallation);
+  BoutonCopierCode.Caption := 'Code copié !';
+end;
+
 procedure InitializeWizard();
 var
   Identifiant: String;
 begin
   ExtractTemporaryFile('ERP-Controle-Installation.exe');
-  Controle('', Identifiant);
+  if not Controle('', Identifiant) then
+    Identifiant := '';
+  CodeInstallation := Trim(Identifiant);
   PageRole := CreateInputOptionPage(wpWelcome, 'Rôle de cet ordinateur',
     'Comment cet ordinateur sera-t-il utilisé ?',
     'Le serveur garde les données ; les autres postes du réseau l''ouvrent simplement dans leur navigateur.',
@@ -297,6 +312,15 @@ begin
     'Chaque installation, réinstallation, mise à jour et réparation vérifie cette autorisation hors ligne. ' +
     'Un code court ou une ancienne configuration ne suffit pas. Cette autorisation ne remplace pas la licence d''exploitation.');
   PageAutorisation.Add('Autorisation signée (.erpinst) :', 'Autorisation ERP (*.erpinst)|*.erpinst', '.erpinst');
+  BoutonCopierCode := TNewButton.Create(PageAutorisation);
+  BoutonCopierCode.Parent := PageAutorisation.Surface;
+  BoutonCopierCode.Caption := 'Copier le code';
+  BoutonCopierCode.Width := ScaleX(132);
+  BoutonCopierCode.Height := ScaleY(25);
+  BoutonCopierCode.Left := PageAutorisation.SurfaceWidth - BoutonCopierCode.Width;
+  BoutonCopierCode.Top := PageAutorisation.SurfaceHeight - BoutonCopierCode.Height - ScaleY(6);
+  BoutonCopierCode.Enabled := CodeInstallation <> '';
+  BoutonCopierCode.OnClick := @CopierCodeInstallation;
 
   PageBase := CreateInputOptionPage(PageAutorisation.ID, 'Base de données',
     'Où le logiciel garde-t-il ses données ?',
