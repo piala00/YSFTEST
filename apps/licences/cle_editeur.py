@@ -12,5 +12,8 @@ production).
 La clé PRIVÉE, elle, ne figure jamais dans le dépôt, l'exécutable ni l'installateur.
 """
 CLES = [
-    # "Base64DeLaClePubliqueDuProprietaire=",
+    # Identité publique de l'éditeur (propriétaire du logiciel).
+    # Empreinte SHA-256 de la clé brute : DA36A89B5B432DD7CA7D03CB811F8AE806F4250A9CAA49FAEC62354488F8AD0B
+    # (à comparer avec le guide remis au client). La clé privée reste dans le coffre du propriétaire.
+    "L7JRWfjuNAWtOk/yEI+MZnp/NlHR02IhdFUpFCTxVrQ=",
 ]
