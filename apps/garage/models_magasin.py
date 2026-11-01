@@ -19,6 +19,8 @@ from django.utils import timezone
 
 from apps.core.models import Sequence
 
+from .validation import relire_piece
+
 ZERO = Decimal("0")
 
 
@@ -124,7 +126,8 @@ class AchatMagasin(models.Model):
         from apps.comptabilite.models import Journal
         from apps.comptabilite.services import creer_ecriture
 
-        if self.statut != self.BROUILLON:
+        relire_piece(self, "Cet achat", requis=True)
+        if self.statut != self.BROUILLON or self.ecriture_id:
             raise ValidationError("Cet achat est déjà validé.")
         lignes = list(self.lignes.select_related("article", "vehicule", "compte"))
         if not lignes:
