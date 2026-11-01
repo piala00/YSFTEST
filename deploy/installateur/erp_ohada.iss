@@ -175,6 +175,9 @@ var
   PageAutorisation: TInputFileWizardPage;
   NettoyageVoulu: Boolean;
   OutilNettoyageTemp: String;
+  CodeInstallation: String;
+  BoutonCopierCode: TNewButton;
+  ChampCodeInstallation: TNewEdit;
 
 function FichierAutorisation(): String;
 begin
@@ -275,12 +278,28 @@ begin
     Result := 'http://' + Result;
 end;
 
+procedure CopierCodeInstallation(Sender: TObject);
+begin
+  if CodeInstallation = '' then
+  begin
+    MsgBox('Le code de ce serveur est indisponible. Relancez l''installateur ou contactez l''éditeur.', mbError, MB_OK);
+    exit;
+  end;
+  { WM_COPY sur un champ natif Windows : compatible avec Inno Setup 6. }
+  ChampCodeInstallation.SetFocus;
+  SendMessage(ChampCodeInstallation.Handle, $00B1, 0, -1); { EM_SETSEL }
+  SendMessage(ChampCodeInstallation.Handle, $0301, 0, 0);  { WM_COPY }
+  BoutonCopierCode.Caption := 'Code copié !';
+end;
+
 procedure InitializeWizard();
 var
   Identifiant: String;
 begin
   ExtractTemporaryFile('ERP-Controle-Installation.exe');
-  Controle('', Identifiant);
+  if not Controle('', Identifiant) then
+    Identifiant := '';
+  CodeInstallation := Trim(Identifiant);
   PageRole := CreateInputOptionPage(wpWelcome, 'Rôle de cet ordinateur',
     'Comment cet ordinateur sera-t-il utilisé ?',
     'Le serveur garde les données ; les autres postes du réseau l''ouvrent simplement dans leur navigateur.',
@@ -297,6 +316,23 @@ begin
     'Chaque installation, réinstallation, mise à jour et réparation vérifie cette autorisation hors ligne. ' +
     'Un code court ou une ancienne configuration ne suffit pas. Cette autorisation ne remplace pas la licence d''exploitation.');
   PageAutorisation.Add('Autorisation signée (.erpinst) :', 'Autorisation ERP (*.erpinst)|*.erpinst', '.erpinst');
+  ChampCodeInstallation := TNewEdit.Create(PageAutorisation);
+  ChampCodeInstallation.Parent := PageAutorisation.Surface;
+  ChampCodeInstallation.Text := CodeInstallation;
+  ChampCodeInstallation.ReadOnly := True;
+  ChampCodeInstallation.Left := 0;
+  ChampCodeInstallation.Top := PageAutorisation.SurfaceHeight - ScaleY(34);
+  ChampCodeInstallation.Width := PageAutorisation.SurfaceWidth - ScaleX(146);
+  ChampCodeInstallation.Height := ScaleY(25);
+  BoutonCopierCode := TNewButton.Create(PageAutorisation);
+  BoutonCopierCode.Parent := PageAutorisation.Surface;
+  BoutonCopierCode.Caption := 'Copier le code';
+  BoutonCopierCode.Width := ScaleX(132);
+  BoutonCopierCode.Height := ScaleY(25);
+  BoutonCopierCode.Left := PageAutorisation.SurfaceWidth - BoutonCopierCode.Width;
+  BoutonCopierCode.Top := PageAutorisation.SurfaceHeight - BoutonCopierCode.Height - ScaleY(6);
+  BoutonCopierCode.Enabled := CodeInstallation <> '';
+  BoutonCopierCode.OnClick := @CopierCodeInstallation;
 
   PageBase := CreateInputOptionPage(PageAutorisation.ID, 'Base de données',
     'Où le logiciel garde-t-il ses données ?',

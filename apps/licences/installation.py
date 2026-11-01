@@ -21,6 +21,20 @@ def autoriser(contenu, edition, *, machine=None, jour=None):
     key_id = d.get("key_id")
     if not isinstance(key_id, str) or len(key_id) != 64 or any(c not in "0123456789ABCDEF" for c in key_id):
         raise l.LicenceInvalide("identifiant de clé publique absent ou invalide")
+    # L'identité intégrée à l'installateur doit correspondre à celle du coffre
+    # qui a signé l'autorisation. Aucun secours avec une clé remplaçable.
+    identites = l.empreintes_publiques()
+    if not identites:
+        raise l.LicenceInvalide(
+            "aucune identité d'éditeur intégrée à cet installateur d'essai ; "
+            "utilisez un installateur personnalisé avec la clé publique du propriétaire"
+        )
+    if key_id not in identites:
+        raise l.LicenceInvalide(
+            "identité de signature incompatible : l'autorisation provient d'un autre "
+            "coffre éditeur que celui intégré à cet installateur. "
+            "Utilisez le générateur et l'installateur compilé avec la même identité publique"
+        )
     l.verifier_octets(l.fc.DOMAINE_AUTORISATION + l.canonique(d), signature, "autorisation d'installation", key_id=key_id)
     if type(d.get("version")) is not int or d["version"] != 1:
         raise l.LicenceInvalide("version d'autorisation non prise en charge")
