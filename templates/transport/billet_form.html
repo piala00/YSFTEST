@@ -46,4 +46,43 @@
   });
 })();
 </script>
+<script>
+// Coordonnées des voyageurs déjà saisis : propositions pendant la frappe du nom ; le nom choisi complète
+// téléphone et pièce d'identité s'ils sont vides (on ne retape pas un client connu).
+(function () {
+  var nom = document.getElementById("id_voyageur");
+  if (!nom) return;
+  var tel = document.getElementById("id_telephone"), piece = document.getElementById("id_piece_identite");
+  var liste = document.createElement("datalist");
+  liste.id = "voyageurs-connus";
+  document.body.appendChild(liste);
+  nom.setAttribute("list", "voyageurs-connus");
+  nom.setAttribute("autocomplete", "off");
+  var connus = {}, minuteur = null;
+  function charger() {
+    var q = nom.value.trim();
+    if (q.length < 2) return;
+    fetch("{% url 'transport:voyageurs_connus' %}?q=" + encodeURIComponent(q))
+      .then(function (r) { return r.ok ? r.json() : {contacts: []}; })
+      .then(function (d) {
+        liste.innerHTML = "";
+        (d.contacts || []).forEach(function (c) {
+          connus[(c.voyageur || "").toLowerCase()] = c;
+          var o = document.createElement("option");
+          o.value = c.voyageur; o.label = c.telephone || "";
+          liste.appendChild(o);
+        });
+      }).catch(function () {});
+  }
+  nom.addEventListener("input", function () {
+    clearTimeout(minuteur);
+    minuteur = setTimeout(charger, 200);
+    var c = connus[nom.value.trim().toLowerCase()];
+    if (c) {
+      if (tel && !tel.value) tel.value = c.telephone || "";
+      if (piece && !piece.value) piece.value = c.piece_identite || "";
+    }
+  });
+})();
+</script>
 {% endblock %}

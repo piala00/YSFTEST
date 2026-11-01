@@ -264,6 +264,28 @@ def billets(request):
 
 
 @login_required
+def voyageurs_connus(request):
+    """Coordonnées des voyageurs déjà saisis (nom, téléphone, pièce), pour les retrouver à la vente sans les retaper.
+    Renvoie les plus récents qui correspondent au texte tapé (nom ou téléphone)."""
+    from django.http import JsonResponse
+
+    q = request.GET.get("q", "").strip()
+    qs = Billet.objects.exclude(voyageur="")
+    if q:
+        qs = qs.filter(Q(voyageur__icontains=q) | Q(telephone__icontains=q))
+    contacts, vus = [], set()
+    for b in qs.order_by("-id").values("voyageur", "telephone", "piece_identite")[:60]:
+        cle = (b["voyageur"].lower(), b["telephone"])
+        if cle in vus:
+            continue
+        vus.add(cle)
+        contacts.append(b)
+        if len(contacts) >= 8:
+            break
+    return JsonResponse({"contacts": contacts})
+
+
+@login_required
 def billet_vente(request):
     initial = {}
     if request.GET.get("depart"):

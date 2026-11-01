@@ -285,6 +285,23 @@ class EcransTransportTests(TestCase):
         self.assertEqual(self.client.get(reverse("garage:pleins")).status_code, 403)
         self.assertEqual(self.client.get(reverse("transport:rapport_journalier")).status_code, 403)
 
+    def test_voyageurs_connus_retrouve_les_coordonnees(self):
+        import json
+
+        from django.urls import reverse
+
+        depart = Depart.objects.filter(statut=Depart.PROGRAMME).first()
+        self.client.post(reverse("transport:billet_vente"), {
+            "depart": depart.pk, "voyageur": "Awono Jean", "telephone": "690112233",
+            "piece_identite": "CNI 123", "siege": 7, "paiement": "ESPECES"})
+        contacts = json.loads(self.client.get(reverse("transport:voyageurs_connus"), {"q": "Awono"}).content)["contacts"]
+        self.assertTrue(any(c["voyageur"] == "Awono Jean" and c["telephone"] == "690112233" for c in contacts))
+        # Recherche aussi par téléphone ; rien ne fuit sans correspondance
+        parTel = json.loads(self.client.get(reverse("transport:voyageurs_connus"), {"q": "6901122"}).content)["contacts"]
+        self.assertTrue(any(c["piece_identite"] == "CNI 123" for c in parTel))
+        self.assertEqual(json.loads(self.client.get(reverse("transport:voyageurs_connus"),
+                                                    {"q": "ZZINEXISTANT"}).content)["contacts"], [])
+
     def test_vente_au_guichet_puis_colis_livre(self):
         from django.urls import reverse
 

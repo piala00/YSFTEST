@@ -39,6 +39,7 @@ urlpatterns = [
     path("billetterie/departs/<int:pk>/manifeste/", views.manifeste, name="manifeste"),
     path("billetterie/billets/", views.billets, name="billets"),
     path("billetterie/billets/vendre/", views.billet_vente, name="billet_vente"),
+    path("billetterie/voyageurs-connus/", views.voyageurs_connus, name="voyageurs_connus"),
     path("billetterie/billets/<int:pk>/", views.billet_detail, name="billet_detail"),
     path("billetterie/billets/<int:pk>/imprimer/", views.billet_imprimer, name="billet_imprimer"),
     path("billetterie/recette/", views.recette_journaliere, {"service": "billetterie"}, name="recette_billetterie"),
