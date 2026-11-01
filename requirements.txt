@@ -10,3 +10,5 @@ psycopg[binary]>=3.1
 # mssql-django>=1.5
 # Chiffrement des lots de la boîte aux lettres (synchronisation des agences)
 cryptography>=42
+# Export des états de Reporting en classeurs Excel
+openpyxl>=3.1,<4

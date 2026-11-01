@@ -17,7 +17,8 @@
   <div><label class="form-label small mb-0" for="pa-au">Au</label><input type="date" id="pa-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
   <button class="btn btn-sm btn-primary" onclick="this.form.mois.value=''">Afficher</button>
   <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
-  {% if export_url %}<a class="btn btn-sm btn-outline-secondary" href="{{ export_url }}"><i class="bi bi-filetype-csv"></i> Exporter</a>{% endif %}
+  {% if export_url %}<a class="btn btn-sm btn-outline-secondary" href="{{ export_url }}"><i class="bi bi-filetype-csv"></i> Exporter CSV</a>{% endif %}
+  {% if excel_url %}<a class="btn btn-sm btn-outline-success" href="{{ excel_url }}"><i class="bi bi-file-earmark-spreadsheet"></i> Exporter Excel</a>{% endif %}
 </form>
 {% if erreur_periode %}<div class="alert alert-warning py-1 small">{{ erreur_periode }}</div>{% endif %}
 {% if provisoires %}<div class="alert alert-info py-1 small d-print-none">{{ provisoires }} écriture(s) de la période sont encore au brouillard :
