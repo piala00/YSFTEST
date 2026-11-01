@@ -20,10 +20,14 @@ def main(argv=None):
     p.add_argument("--marquer-donnees", type=Path)
     p.add_argument("--rapport", required=True, type=Path)
     a = p.parse_args(argv)
+    # Le drapeau --cle-installation peut être ABSENT (None : on renvoie l'empreinte machine) ou
+    # PRÉSENT MAIS VIDE (l'utilisateur n'a rien saisi) : ce dernier cas est une installation refusée,
+    # jamais un repli silencieux vers l'empreinte machine.
+    cle = a.cle_installation.strip() if a.cle_installation is not None else None
     try:
-        if a.verifier and a.cle_installation:
+        if a.verifier and a.cle_installation is not None:
             raise ValueError("Choisissez une seule méthode d’installation.")
-        if (a.marquer_programme or a.marquer_donnees) and (a.verifier or a.cle_installation or a.dossier_cible):
+        if (a.marquer_programme or a.marquer_donnees) and (a.verifier or a.cle_installation is not None or a.dossier_cible):
             raise ValueError("Le marquage et la vérification d'autorisation sont des actions distinctes.")
         if a.dossier_cible:
             cible = sur(a.dossier_cible)
@@ -40,8 +44,10 @@ def main(argv=None):
                     marquer(dossier, a.edition)
             a.rapport.write_text("Dossiers de cette édition identifiés ; fichiers inconnus toujours préservés.", encoding="utf-8")
             return 0
-        if a.cle_installation:
-            donnees, signe, signature = l.fc.installation_lire(a.cle_installation)
+        if a.cle_installation is not None:
+            if not cle:
+                raise ValueError("clé d’installation vide : saisissez la clé signée fournie par l’éditeur")
+            donnees, signe, signature = l.fc.installation_lire(cle)
             l.verifier_octets(signe, signature, "clé d’installation")
             if a.edition not in (donnees["edition"],) and donnees["edition"] != "toutes":
                 raise l.LicenceInvalide("clé d’installation d’une autre édition")

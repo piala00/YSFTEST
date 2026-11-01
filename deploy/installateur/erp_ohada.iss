@@ -427,6 +427,19 @@ var
   MessageControle: String;
 begin
   Result := True;
+  { Sans clé/fichier, on bloque TOUT DE SUITE à cette étape : on ne doit jamais pouvoir la franchir à vide. }
+  if not WizardSilent and (CurPageID = PageCleInstallation.ID) and MethodeCle() and (CleInstallation() = '') then
+  begin
+    MsgBox('Saisissez la clé d''installation signée fournie par l''éditeur pour continuer.', mbError, MB_OK);
+    Result := False;
+    exit;
+  end;
+  if not WizardSilent and (CurPageID = PageAutorisation.ID) and not MethodeCle() and (Trim(FichierAutorisation()) = '') then
+  begin
+    MsgBox('Choisissez le fichier d''autorisation .erpinst signé remis pour ce serveur.', mbError, MB_OK);
+    Result := False;
+    exit;
+  end;
   { Le mode silencieux valide toujours dans PrepareToInstall, sans ouvrir de dialogue bloquant. }
   if not WizardSilent and (((CurPageID = PageAutorisation.ID) and not MethodeCle()) or
     ((CurPageID = PageCleInstallation.ID) and MethodeCle())) and

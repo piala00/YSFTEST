@@ -84,6 +84,21 @@ class InstallationTests(SimpleTestCase):
             self.assertEqual(main(["--edition", "transport", "--rapport", str(rapport),
                                    "--cle-installation", cle, "--verifier", str(rapport)]), 2)
 
+    def test_cle_installation_vide_est_refusee_jamais_repli_sur_empreinte(self):
+        # Bug installateur : une clé VIDE (--cle-installation "") ne doit PAS être prise pour « aucune clé »
+        # et renvoyer l'empreinte machine avec succès ; sinon l'écran de saisie se franchit à vide.
+        with tempfile.TemporaryDirectory() as dossier:
+            rapport = Path(dossier) / "rapport.txt"
+            for valeur in ("", "   ", "\t"):
+                with self.subTest(cle=repr(valeur)):
+                    self.assertEqual(main(["--edition", "transport", "--rapport", str(rapport),
+                                           "--cle-installation", valeur]), 2)
+                    self.assertIn("refusée", rapport.read_text(encoding="utf-8"))
+                    self.assertNotIn("MACHINE-FICTIVE", rapport.read_text(encoding="utf-8"))
+            # Drapeau absent : repli légitime sur l'empreinte machine (inchangé).
+            self.assertEqual(main(["--edition", "transport", "--rapport", str(rapport)]), 0)
+            self.assertEqual(rapport.read_text(encoding="utf-8"), "T-MACHINE-FICTIVE")
+
     def test_absence_identite_ne_peut_autoriser_une_installation(self):
         with mock.patch.object(l, "cles_publiques", return_value=[]), self.assertRaises(l.LicenceInvalide):
             autoriser(self.fichier(), "transport")
