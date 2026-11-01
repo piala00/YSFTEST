@@ -17,7 +17,10 @@ Le CSV reste disponible. Les moteurs métier ne sont pas réécrits : les états
 d'utiliser la générale validée ; les états opérationnels billetterie/colis conservent leurs données
 métier existantes. Ce lot ne change aucun tarif, compte, écriture, stock ou paiement.
 
-Les nombres et dates sont typés. Les téléphones et libellés restent du texte, y compris un texte
+Les nombres et dates sont typés. Les valeurs qui dépassent la précision numérique d'Excel sont
+conservées en texte, avec une note dans Critères, sans arrondi de leur valeur d'origine.
+Le test complémentaire reproduit une perte de précision avec9999999999999999,99 avant correction,
+puis vérifie son maintien exact. Les téléphones et libellés restent du texte, y compris un texte
 commençant par `=`, `+`, `-` ou `@` : aucune formule, macro ou liaison externe n'est ajoutée.
 Le gel de l'en-tête et le filtre Excel sont disponibles. L'écriture du classeur utilise openpyxl
 en mode séquentiel ; les lignes du moteur existant restent matérialisées comme pour le CSV.
@@ -31,6 +34,8 @@ Cette recette Windows n'est annoncée acquise qu'après son exécution réussie.
 ## Vérifications exécutées
 
 - Huit nouveaux tests ciblés : OK,2,022s sur SQLite.
+- Après la vérification complémentaire de précision : neuf tests ciblés OK en2,866s, aucun ignoré.
+  La CI du premier SHA portait sur629 tests ; le nouveau SHA doit passer630 tests.
 - Toutes les régressions Reporting,33 tests : OK,236,567s sur SQLite, aucun ignoré.
 - Les fichiers des sept réponses HTTP sont ouverts et comparés cellule par cellule au CSV.
   Un produit validé de5000 est conservé, un brouillard de3000 est exclu de l'évolution.

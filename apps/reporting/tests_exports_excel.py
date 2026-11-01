@@ -25,6 +25,20 @@ ETATS = ("evolution", "comparaison", "matrice", "classement", "transport_billett
 
 
 class FichierExcelTests(SimpleTestCase):
+    def test_grands_montants_et_precisions_ne_sont_pas_arrondis(self):
+        valeurs = [Decimal("9999999999999999.99"), Decimal("12345678901234.56"),
+                   -1234567890123456, Decimal("1234567890123.45"), Decimal("0.10")]
+        r = exporter_excel("grands-montants-fictifs", ["Montant"], [[v] for v in valeurs], [])
+        wb = load_workbook(BytesIO(r.content))
+        for i, attendu in enumerate(valeurs[:3], 2):
+            self.assertEqual(wb["Données"][f"A{i}"].value, str(attendu))
+            self.assertEqual(wb["Données"][f"A{i}"].data_type, "s")
+        self.assertEqual(wb["Données"]["A5"].data_type, "n")
+        self.assertEqual(Decimal(str(wb["Données"]["A5"].value)), valeurs[3])
+        self.assertEqual(Decimal(str(wb["Données"]["A6"].value)), valeurs[4])
+        self.assertIn("Précision Excel", dict(list(wb["Critères"].values)[1:]))
+        wb.close()
+
     def test_types_texte_literal_et_criteres_sans_formules(self):
         r = exporter_excel("fictif", ["Nom", "Téléphone", "Montant", "Date", "Vide", "Actif"], [
             ['=HYPERLINK("https://example.invalid")', "00699887766", Decimal("123456789.25"),
