@@ -229,6 +229,16 @@ jobs:
             Where-Object { $_.Name -ne '__init__.py' -and $_.FullName -notmatch 'migrations' -and $_.FullName -notmatch 'tests' }
           if ($sources) { $sources | ForEach-Object { Write-Output $_.FullName }; throw "Du code source de l'ERP subsiste" }
           Write-Output "Code de l'ERP entièrement compilé en natif (.pyd)."
+      - name: Tester le garage et les exports avec les vrais modules natifs
+        if: matrix.edition == 'transport'
+        env:
+          DB_ENGINE: sqlite
+          DATABASE_URL: ""
+          MIROIR_DB_ENGINE: ""
+          ERP_ASSISTANT: "0"
+          ERP_LICENCE: "0"
+          RELAIS_ACTIF: "0"
+        run: python tests_navigateur/garage_natif.py
       - name: Compiler le programme
         run: python -m PyInstaller deploy/executable/erp_ohada.spec --noconfirm --workpath build --distpath dist
       - name: Démarrer le programme compilé et l'interroger
