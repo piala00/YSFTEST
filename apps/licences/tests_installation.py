@@ -69,6 +69,21 @@ class InstallationTests(SimpleTestCase):
         with self.assertRaisesRegex(l.LicenceInvalide, "identité de signature incompatible"):
             autoriser(fichier, "transport")
 
+    def test_controle_installateur_avec_cle_signee(self):
+        from apps.licences import format_cles as fc
+        cle = fc.installation_creer(self.privee, "INS-2026-0001", "Société Test", "transport")
+        with tempfile.TemporaryDirectory() as dossier:
+            rapport = Path(dossier) / "rapport.txt"
+            self.assertEqual(main(["--edition", "transport", "--rapport", str(rapport),
+                                   "--cle-installation", cle]), 0)
+            self.assertIn("signée vérifiée", rapport.read_text(encoding="utf-8"))
+            self.assertEqual(main(["--edition", "commerce", "--rapport", str(rapport),
+                                   "--cle-installation", cle]), 2)
+            self.assertEqual(main(["--edition", "transport", "--rapport", str(rapport),
+                                   "--cle-installation", cle[:-8] + "AAAAAAAA"]), 2)
+            self.assertEqual(main(["--edition", "transport", "--rapport", str(rapport),
+                                   "--cle-installation", cle, "--verifier", str(rapport)]), 2)
+
     def test_absence_identite_ne_peut_autoriser_une_installation(self):
         with mock.patch.object(l, "cles_publiques", return_value=[]), self.assertRaises(l.LicenceInvalide):
             autoriser(self.fichier(), "transport")
