@@ -36,6 +36,18 @@ class SauvegardeTests(TransactionTestCase):
         self.assertTrue(JournalEvenement.objects.filter(action="RESTAURATION").exists())
         self.assertLess(JournalEvenement.objects.count(), evenements_avant)
 
+    def test_sauvegarde_inclut_les_donnees_transport(self):
+        from apps.transport.models import Gare
+
+        Gare.objects.create(code="GSAUV", nom="Gare sauvegardée", ville="Bertoua")
+        contenu = sauvegarde.sauvegarder()
+        self.assertIn("transport.gare", contenu)                              # le métier transport est bien dans le fichier
+        Gare.objects.create(code="GAPRES", nom="Gare créée après", ville="Yaoundé")
+        Gare.objects.filter(code="GSAUV").delete()
+        sauvegarde.restaurer(contenu)
+        self.assertTrue(Gare.objects.filter(code="GSAUV").exists())           # la gare sauvegardée est restaurée
+        self.assertFalse(Gare.objects.filter(code="GAPRES").exists())         # ce qui a été créé après est écrasé
+
     def test_fichier_refuse_sans_rien_modifier(self):
         for contenu in (b"pas du json", b'[{"model": "core.societe"}]'):
             with self.assertRaises(ValueError):

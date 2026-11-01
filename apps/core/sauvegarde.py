@@ -1,7 +1,10 @@
 """Sauvegarde et restauration de toutes les données de l'ERP dans un fichier JSON.
 
-Le fichier contient la société, les exercices, les utilisateurs, profils et droits, la gestion commerciale et la
-comptabilité. La restauration remplace **toutes** les données actuelles par celles du fichier.
+Le fichier contient la société, les exercices, les utilisateurs, profils et droits, la gestion commerciale, la
+comptabilité et tout le métier Transport (gares, véhicules, départs, billets, colis, garage, personnel,
+propriétaires, échanges entre agences). La restauration remplace **toutes** les données actuelles par celles du
+fichier. La licence et l'activation ne sont PAS incluses : restaurer une société ne doit pas transporter ni écraser
+l'autorisation d'exploitation de la machine.
 """
 import io
 import json
@@ -11,7 +14,11 @@ from pathlib import Path
 from django.core.management import call_command
 from django.db import transaction
 
-CONTENU = ["auth.group", "auth.user", "authtoken", "core", "commercial", "comptabilite"]
+# Toutes les apps qui portent des données de la société. « licences » est volontairement exclu (activation liée à la
+# machine). « reporting » n'a pas de données propres (états calculés). Une app sans données dans l'édition courante
+# (ex. transport en édition Commerce) se sauvegarde simplement à vide.
+CONTENU = ["auth.group", "auth.user", "authtoken", "core", "commercial", "comptabilite",
+           "transport", "echanges", "garage", "personnel", "partenaires", "relais"]
 FORMAT = "erp-ohada-sauvegarde"
 
 
