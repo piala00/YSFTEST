@@ -13,5 +13,6 @@ def urls_communes(code, accueil=True):
         path("autorisations/", views.autorisations, {"module": code}, name="autorisations"),
         path("journal-evenements/", views.journal_evenements, {"module": code}, name="journal_evenements"),
         path("sauvegarde/", views.sauvegarde, {"module": code}, name="sauvegarde"),
+        path("import-export/", views.import_export, {"module": code}, name="import_export"),
         path("echanges/", echanges_views.echanges, {"module": code}, name="echanges"),
     ]
