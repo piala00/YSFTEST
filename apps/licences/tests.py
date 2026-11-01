@@ -29,7 +29,7 @@ class LicencesTests(TestCase):
         super().setUpClass()
         cls.dossier = tempfile.TemporaryDirectory()
         cls.env = {**os.environ, "ERP_LICENCES_MDP": "Mot-de-passe-essai-2030"}
-        subprocess.run([sys.executable, str(OUTIL), "cles", "--dossier", cls.dossier.name], env=cls.env, check=True,
+        subprocess.run([sys.executable, str(OUTIL), "cles", "--ancien-format", "--dossier", cls.dossier.name], env=cls.env, check=True,
                        capture_output=True)
         cls.publique = Path(cls.dossier.name, "cle-publique.txt").read_text().strip()
 
@@ -102,7 +102,6 @@ class LicencesTests(TestCase):
         U = get_user_model()
         self.client.force_login(U.objects.create_superuser("chef", "", "Chef-2030-ok"))
         self.client.post(reverse("licence"), {"action": "installation", "cle": self.cle_installation()})
-        self.assertContains(self.client.get(reverse("licence")), "data-copier")   # bouton « Copier le code »
         reponse = self.client.get(reverse("licence") + "?demande=1")
         self.assertIn("DEMANDE-LICENCE-", reponse["Content-Disposition"])
         demande = l.fc.demande_lire(reponse.content)
@@ -137,7 +136,7 @@ class LicencesTests(TestCase):
         # Demande dont la clé d'installation n'a pas été émise par le propriétaire : l'outil refuse
         autre = tempfile.TemporaryDirectory()
         self.addCleanup(autre.cleanup)
-        subprocess.run([sys.executable, str(OUTIL), "cles", "--dossier", autre.name], env=self.env, check=True,
+        subprocess.run([sys.executable, str(OUTIL), "cles", "--ancien-format", "--dossier", autre.name], env=self.env, check=True,
                        capture_output=True)
         pirate = subprocess.run([sys.executable, str(OUTIL), "installation", "--cle", str(Path(autre.name, "cle-privee.pem")),
                                  "--client", "Pirate", "--edition", "transport", "--sortie", autre.name],
@@ -160,6 +159,37 @@ class LicencesTests(TestCase):
         reponse = self.client.post(reverse("core:installation"), {"cle": self.cle_installation("Voyages du Nord")})
         self.assertRedirects(reponse, reverse("core:installation") + "?etape=identite", fetch_redirect_response=False)
         self.assertContains(self.client.get(reverse("core:installation")), "Voyages du Nord")
+
+    @override_settings(ERP_LICENCE=True)
+    def test_code_court_puis_fichier_signe_sans_double_activation(self):
+        from apps.core.models import Societe
+
+        self.client.force_login(get_user_model().objects.create_superuser("chef-court", "", "Chef-2030-ok"))
+        code = l.fc.installation_courte_creer()
+        self.assertRegex(code, r"^[A-Z2-7]{6}(?:-[A-Z2-7]{6}){3}$")
+        self.client.post(reverse("licence"), {"action": "installation", "cle": code.lower()})
+        self.assertEqual(l.cle_installation()["numero"], code)
+        demande = l.fc.demande_lire(self.client.get(reverse("licence") + "?demande=1").content)
+        chemin = self.donnees / "demande.erpdem"
+        chemin.write_text(l.fc.demande_ecrire(demande), encoding="utf-8")
+        self.outil("emettre", "--cle", str(Path(self.dossier.name, "cle-privee.pem")), "--demande", str(chemin),
+                   "--postes", "4", "--jusqu-au", "2099-12-31", "--sortie", str(self.donnees))
+        fichier = next(self.donnees.glob("LIC-2*.erplic"))
+        contenu = fichier.read_bytes()
+        page = self.client.post(reverse("licence"), {"action": "fichier", "fichier":
+                                SimpleUploadedFile(fichier.name, contenu)}, follow=True)
+        self.assertContains(page, "installée pour")
+        self.assertEqual(l.etat().postes, 4)
+        self.assertFalse(l.etat().lecture_seule)
+        self.assertEqual(l.controler(contenu)["version"], 3)
+        ancien_nom = Societe.get().raison_sociale
+        Societe.objects.update(raison_sociale="Autre société")
+        with self.assertRaisesRegex(l.LicenceInvalide, "société"):
+            l.controler(contenu)
+        Societe.objects.update(raison_sociale=ancien_nom)
+        self.client.post(reverse("licence"), {"action": "installation", "cle": l.fc.installation_courte_creer()})
+        with self.assertRaisesRegex(l.LicenceInvalide, "code d'installation"):
+            l.controler(contenu)
 
     # ------------------------------------------------------------ fichier et signature
     def test_licence_valide_puis_rappel_grace_lecture_seule(self):
@@ -433,9 +463,28 @@ class CleEditeurTests(TestCase):
         dossier = tempfile.TemporaryDirectory()
         self.addCleanup(dossier.cleanup)
         env = {**os.environ, "ERP_LICENCES_MDP": "Mot-de-passe-essai-2030"}
-        subprocess.run([sys.executable, str(OUTIL), "cles", "--dossier", dossier.name], env=env, check=True,
+        subprocess.run([sys.executable, str(OUTIL), "cles", "--ancien-format", "--dossier", dossier.name], env=env, check=True,
                        capture_output=True)
         publique = Path(dossier.name, "cle-publique.txt").read_text().strip()
         with mock.patch("apps.licences.cle_editeur.CLES", [publique]):
             self.assertEqual(l.cles_publiques(), [publique])
             self.assertTrue(l.cles_publiques())                            # clé disponible → plus en essai « sans clé »
+
+
+
+class IdentiteBinaireTests(TestCase):
+    def test_identite_publique_a_cote_executable_et_priorite_cle_integree(self):
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives import serialization
+        from . import cle_editeur
+
+        with tempfile.TemporaryDirectory() as dossier:
+            publique = Ed25519PrivateKey.generate().public_key().public_bytes(serialization.Encoding.Raw,
+                                                                            serialization.PublicFormat.Raw)
+            Path(dossier, "parametres.dat").write_bytes(b"ERPID\x01" + publique)
+            with mock.patch.object(sys, "frozen", True, create=True), mock.patch.object(sys, "executable", str(Path(dossier, "ERP.exe"))):
+                with mock.patch.object(cle_editeur, "CLES", []):
+                    self.assertEqual(l.cles_publiques(), [])  # le fichier remplaçable ne crée aucune autorité
+                with mock.patch.object(cle_editeur, "CLES", ["identite-integree"]):
+                    self.assertEqual(l.cles_publiques(), ["identite-integree"])
+

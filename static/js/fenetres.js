@@ -4,6 +4,13 @@
    Les boîtes de dialogue (fenêtre de sélection d'un état) gardent la taille de leur contenu, sans
    redimensionnement. */
 (function () {
+  function dimensionsSaisieRapide(largeur, hauteur, surface) {
+    const l = Number(largeur), h = Number(hauteur);
+    if (!Number.isFinite(l) || l < 280 || !Number.isFinite(h) || h < 160) return null;
+    return {l: Math.min(l, surface.l), h: Math.min(h, surface.h)};
+  }
+  if (typeof module !== 'undefined' && module.exports) module.exports = {dimensionsSaisieRapide};
+  if (typeof window === 'undefined') return;
   const mdi = window.ERP_MDI, zone = document.getElementById('fenetres-mdi'), barreReduites = document.getElementById('fenetres-reduites');
   const espace = document.querySelector('main.mdi');
   if (!mdi || !zone || !espace) return;
@@ -54,7 +61,7 @@
     if (f.etat === 'agrandie') {
       Object.assign(el.style, { left: '0px', top: '0px', width: s.l + 'px', height: s.h + 'px' });
     } else {
-      f.l = Math.max(MIN_L, Math.min(f.l, s.l)); f.h = Math.max(MIN_H, Math.min(f.h, s.h));
+      f.l = Math.min(s.l, Math.max(MIN_L, f.l)); f.h = Math.min(s.h, Math.max(MIN_H, f.h));
       f.x = Math.max(0, Math.min(f.x, s.l - 80)); f.y = Math.max(0, Math.min(f.y, s.h - TITRE));
       Object.assign(el.style, { left: f.x + 'px', top: f.y + 'px', width: f.l + 'px', height: f.h + 'px' });
     }
@@ -197,6 +204,17 @@
       f.dialogue = false;
       if (!f.ajustee) Object.assign(f, positionDefaut());
     }
+    const saisie = doc.querySelector('.saisie-rapide');
+    if (saisie && !f.dialogue && !f.ajustee && f.etat === 'normale') {
+      const style = f.iframe.contentWindow.getComputedStyle(saisie), s = surface();
+      const taille = dimensionsSaisieRapide(style.getPropertyValue('--erp-largeur-fenetre'),
+                                           style.getPropertyValue('--erp-hauteur-fenetre'), s);
+      if (taille) {
+        Object.assign(f, taille);
+        f.x = Math.max(0, Math.min(f.x, s.l - f.l));
+        f.y = Math.max(0, Math.min(f.y, s.h - f.h));
+      }
+    }
     placer(f); activer(f); enregistrer();
   }
 
@@ -272,3 +290,4 @@
   } catch (e) {}
   afficherReduites();
 })();
+

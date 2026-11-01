@@ -116,8 +116,8 @@ class AdministrationPosteTests(TestCase):
                    "demarrage_auto_basculer": lambda: appels.append("auto") or "ok"}
         with mock.patch.dict(poste.ACTIONS, actions):
             page = self.client.get(self.url)
-            for texte in ("Sauvegarder maintenant", "Créer la simulation", "Démarrer le logiciel à l'ouverture de session"):
-                self.assertContains(page, texte)
+            self.assertContains(page, "Démarrer le logiciel à l'ouverture de session")
+            self.assertContains(self.client.get(self.url + "&onglet=simulation"), "Créer la simulation")
             self.client.post(self.url, {"action": "sauvegarder"})
             self.client.post(self.url, {"action": "restaurer", "fichier": "erp-20261027-100000.sqlite3", "confirmation": "non"})
             self.client.post(self.url, {"action": "restaurer", "fichier": "erp-20261027-100000.sqlite3", "confirmation": "RESTAURER"})
@@ -126,7 +126,8 @@ class AdministrationPosteTests(TestCase):
             self.client.post(self.url, {"action": "simulation_supprimer", "confirmation": "SUPPRIMER"})
             self.client.post(self.url, {"action": "demarrage_auto"})
             etat["simulation"] = {"etat": "prete", "port": 8101, "journal": ""}
-            self.assertContains(self.client.get(self.url), "http://testserver:8101/")
+            self.assertNotContains(self.client.get(self.url + "&onglet=simulation"), "http://testserver:8101/")
+            self.assertContains(self.client.get(self.url + "&onglet=simulation"), "Importer comme dossier séparé")
         self.assertEqual(appels, ["sauvegarder", ("restaurer", "erp-20261027-100000.sqlite3"),
                                   ("simulation", "2026-01", "aujourdhui"), "supprimer", "auto"])
 
@@ -142,7 +143,9 @@ def arreter_programmes(donnees):
     for _ in range(3):
         for environ in Path("/proc").glob("[0-9]*/environ"):
             try:
-                if f"ERP_DONNEES={donnees}\0".encode() in environ.read_bytes():
+                contenu = environ.read_bytes()
+                if (f"ERP_DONNEES={donnees}\0".encode() in contenu
+                        or f"ERP_PARENT_DONNEES={donnees}\0".encode() in contenu):
                     os.kill(int(environ.parent.name), 9)
             except (OSError, ValueError):
                 pass
@@ -202,20 +205,20 @@ class ProgrammeLanceTests(SimpleTestCase):
                 # à l'écran (les sauvegardes automatiques au démarrage, elles, continuent côté serveur).
                 _, page = nav.post("/poste/?seul=1", {"action": "sauvegarder"})
                 self.assertIn("réservée à la version sous licence", page)
-                self.assertIn("Créer la simulation", page)                 # la simulation, elle, reste disponible
+                self.assertIn("Créer la simulation", nav.get("/poste/?onglet=simulation")[1])  # toujours disponible
                 _, base = nav.get("/poste/base/")
                 self.assertIn("ne sont pas disponibles en version", base)
 
                 _, page = nav.post("/poste/?seul=1", {"action": "simulation_creer", "debut": "2026-09", "duree": "1"})
                 self.assertIn("en préparation", page)
                 for _ in range(60):                                       # le journal de la simulation se remplit
-                    if Path(donnees, "simulation.sqlite3").exists():
+                    if list(Path(donnees, "dossiers-simulation").glob("*/simulation.sqlite3")):
                         break
                     time.sleep(1)
-                self.assertTrue(Path(donnees, "simulation.sqlite3").exists())
+                self.assertTrue(list(Path(donnees, "dossiers-simulation").glob("*/simulation.sqlite3")))
                 _, page = nav.post("/poste/?seul=1", {"action": "simulation_supprimer", "confirmation": "SUPPRIMER"})
                 self.assertIn("Simulation supprimée", page)
-                self.assertFalse(Path(donnees, "simulation.sqlite3").exists())
+                self.assertFalse(list(Path(donnees, "dossiers-simulation").glob("*/simulation.sqlite3")))
                 self.assertIn("Créer la simulation", page)
                 # La vérification, la sauvegarde, le changement de moteur et le redémarrage depuis l'écran Base de
                 # données sont couverts, hors blocage d'essai, par apps/core/tests_base_donnees.py.

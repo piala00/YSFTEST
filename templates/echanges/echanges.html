@@ -2,6 +2,7 @@
 {% block title %}{{ titre }}{% endblock %}
 {% block content %}
 <div class="page-title"><h1>{{ titre }}</h1></div>
+{% if administration_poste %}{% include "core/_onglets_poste.html" %}{% endif %}
 <div class="alert alert-info small py-2">Chaque agence travaille seule, même sans Internet ni courant réseau. Elle prépare un <strong>fichier .erpx</strong>
   qu'on envoie au siège par <strong>WhatsApp, Telegram</strong>, courriel ou clé USB ; le siège l'importe, consolide la comptabilité
   et renvoie à chaque agence ce qui la concerne (lignes, tarifs, colis à remettre…). Un fichier peut être importé deux fois sans risque ;

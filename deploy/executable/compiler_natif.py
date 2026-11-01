@@ -52,10 +52,20 @@ def main(argv):
     p.add_argument("racine")
     p.add_argument("--supprimer-sources", action="store_true")
     p.add_argument("--taches", type=int, default=os.cpu_count() or 2)
+    p.add_argument("--version-essai", action="store_true", help="Autoriser explicitement une version sans identité éditeur.")
     a = p.parse_args(argv)
     racine = Path(a.racine).resolve()
     if a.supprimer_sources and (racine / ".git").exists() and not os.environ.get("GITHUB_ACTIONS"):
         raise SystemExit("Refusé : ce dossier est un dépôt de développement. Compilez une copie.")
+    sys.path.insert(0, str(racine))
+    from apps.licences.cle_editeur import CLES
+    from apps.licences.identite import verifier_distribution
+
+    try:
+        identite = verifier_distribution(CLES, version_essai=a.version_essai)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
+    print(f"Distribution : {identite['mode']} ; empreintes : {', '.join(identite['empreintes_sha256']) or 'aucune'}")
     fichiers = a_compiler(racine)
     compiler(racine, fichiers, a.taches)
     natifs = 0

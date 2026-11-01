@@ -67,12 +67,17 @@ class ContratPartenaire(models.Model):
     numero = models.CharField(max_length=30, blank=True, help_text="Même numéro pour toutes les versions du contrat")
     version = models.PositiveIntegerField(default=1)
     partenaire = models.ForeignKey("commercial.Tiers", on_delete=models.PROTECT, related_name="contrats_partenaire",
-                                   help_text="Le propriétaire (fiche fournisseur : son compte reçoit ce qui lui est dû)")
+                                   help_text="Tiers propriétaire de véhicule, sans participation au capital ; compte auxiliaire propriétaire séparé")
     vehicule = models.ForeignKey("transport.Vehicule", on_delete=models.PROTECT, related_name="contrats_partenaire")
     modele = models.CharField("Modèle", max_length=16, choices=MODELES, default=COMMISSION)
     debut = models.DateField("En vigueur du")
     fin = models.DateField("Au", null=True, blank=True)
-    taux_commission = models.DecimalField("Pourcentage de la société sur les recettes (%)", max_digits=5, decimal_places=2,
+    RECETTES, MARGE, A_CONFIRMER = "RECETTES", "MARGE", "A_CONFIRMER"
+    ASSIETTES = [(A_CONFIRMER, "À confirmer avec le propriétaire du véhicule"), (RECETTES, "Recettes du véhicule"),
+                 (MARGE, "Résultat : recettes moins dépenses contractuelles (signé)")]
+    assiette_commission = models.CharField("Base du pourcentage société", max_length=12, choices=ASSIETTES, default=RECETTES,
+        help_text="Les contrats historiques conservent leur calcul. Pour un nouveau contrat, confirmer explicitement la base.")
+    taux_commission = models.DecimalField("Pourcentage de la société (%)", max_digits=5, decimal_places=2,
                                           default=ZERO)
     montant_location = models.DecimalField("Montant fixe (fixe mensuel, location, fixe garanti ou avance)", max_digits=14,
                                            decimal_places=0, default=ZERO,
@@ -123,6 +128,8 @@ class ContratPartenaire(models.Model):
         if self.statut != self.BROUILLON:
             raise ValidationError("Ce contrat n'est plus en préparation.")
         self.full_clean()
+        if self.modele == self.COMMISSION and self.assiette_commission == self.A_CONFIRMER:
+            raise ValidationError("Confirmez la base du pourcentage société avant d'activer ce contrat.")
         autres = self.chevauchements()
         if autres:
             raise ValidationError(f"Le véhicule a déjà un contrat sur cette période : {autres[0]} (faites un avenant).")
@@ -237,7 +244,10 @@ class Decompte(models.Model):
         marge = recettes - depenses
         if contrat.modele == ContratPartenaire.COMMISSION:
             # Compte du véhicule : recettes − dépenses à sa charge − pourcentage de la société, plus le fixe mensuel éventuel
-            commission = _arrondi(recettes * contrat.taux_commission / 100)
+            if contrat.assiette_commission == ContratPartenaire.A_CONFIRMER:
+                raise ValidationError("La base du pourcentage société n'est pas confirmée.")
+            base_commission = marge if contrat.assiette_commission == ContratPartenaire.MARGE else recettes
+            commission = _arrondi(base_commission * contrat.taux_commission / 100)
             variable = recettes - commission - depenses
             fixe = prorata_fixe() if contrat.montant_location > 0 else ZERO
             du = fixe + variable
@@ -256,7 +266,8 @@ class Decompte(models.Model):
         return {"debut": d, "fin": f, "recettes": recettes, "commission": commission, "depenses": depenses,
                 "location": location, "fixe": fixe, "variable": variable, "montant_du": du,
                 "detail": {"contrat": contrat.numero, "version": contrat.version, "modele": contrat.modele,
-                           "taux_commission": str(contrat.taux_commission), "montant_location": str(contrat.montant_location),
+                           "taux_commission": str(contrat.taux_commission), "assiette_commission": contrat.assiette_commission,
+                           "montant_location": str(contrat.montant_location),
                            "periodicite": contrat.periodicite, "a_sa_charge": sorted(a_sa_charge),
                            "taux_proprietaire": str(contrat.taux_proprietaire), "plancher_zero": contrat.plancher_zero,
                            "marge": str(marge), "avance_periodique": str(contrat.montant_location)
@@ -348,6 +359,8 @@ class ReglementPartenaire(models.Model):
             raise ValidationError("Le montant doit être positif.")
         if self.decompte_id and self.decompte.statut != Decompte.APPROUVE:
             raise ValidationError("Le décompte n'est pas encore approuvé.")
+        if self.decompte_id and self.decompte.contrat.partenaire_id != self.partenaire_id:
+            raise ValidationError("Ce décompte appartient à un autre propriétaire.")
         if not self.caisse.compte_tresorerie_id:
             raise ValidationError("Cette caisse ou banque n'a pas de compte de trésorerie.")
         self.numero = self.numero or Sequence.piece("RGP", self.date.year)
@@ -444,11 +457,17 @@ class DemandeRetrait(models.Model):
 
     @transaction.atomic
     def payer(self, caisse, utilisateur=None):
+        type(self).objects.select_for_update().get(pk=self.pk)
+        self.refresh_from_db()
+        from apps.commercial.models import Tiers
+        Tiers.objects.select_for_update().get(pk=self.partenaire_id)
         if self.statut != self.AUTORISE:
             raise ValidationError("Le retrait doit être autorisé avant d'être payé.")
+        self._controler()
         r = ReglementPartenaire(partenaire=self.partenaire, montant=self.montant, caisse=caisse, nature=ReglementPartenaire.RETRAIT,
                                 reference=self.numero)
         r.enregistrer(utilisateur)
         self.reglement, self.statut = r, self.PAYE
         self.save(update_fields=["reglement", "statut"])
         return self
+

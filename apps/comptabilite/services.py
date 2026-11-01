@@ -31,6 +31,10 @@ def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", val
     Les lignes de même compte / tiers / sens sont regroupées.
     """
     exercice = Exercice.pour_date(date)
+    exercice = Exercice.objects.select_for_update().get(pk=exercice.pk)
+    if exercice.cloture:
+        raise ValidationError("L'exercice est clôturé.")
+    journal = Journal.objects.select_for_update().get(pk=journal.pk)
     journal.verifier_periode(date)
     regroupees = OrderedDict()
     for ligne in lignes:
@@ -502,6 +506,8 @@ def cloturer_exercice(exercice):
     (classes 1 à 5, détaillés par tiers), affecte le résultat (classes 6 à 8) en 131 bénéfice
     ou 139 perte, puis clôture l'exercice : ses écritures ne sont plus modifiables.
     """
+    instance_appelante=exercice
+    exercice=Exercice.objects.select_for_update().get(pk=exercice.pk)
     erreurs = controles_cloture(exercice)
     if erreurs:
         raise ValidationError(erreurs)
@@ -534,6 +540,7 @@ def cloturer_exercice(exercice):
                                   lignes, reference=f"AN {exercice.code}", origine=f"Clôture {exercice.code}")
     exercice.cloture = True
     exercice.save(update_fields=["cloture"])
+    instance_appelante.cloture=True
     return {"exercice_suivant": suivant, "ecriture": ecriture, "resultat": resultat}
 
 

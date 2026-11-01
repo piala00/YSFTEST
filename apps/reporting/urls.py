@@ -13,7 +13,6 @@ urlpatterns = [
     path("autorisations/", core_views.autorisations, {"module": "reporting"}, name="autorisations"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "reporting"}, name="journal_evenements"),
     path("sauvegarde/", core_views.sauvegarde, {"module": "reporting"}, name="sauvegarde"),
-    path("import-export/", core_views.import_export, {"module": "reporting"}, name="import_export"),
     path("", views.dashboard, name="dashboard"),
     path("etats/", views_analyses.catalogue, name="catalogue"),
     path("evolution/", views_analyses.evolution, name="evolution"),

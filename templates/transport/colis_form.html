@@ -1,46 +1,26 @@
-{% extends "base.html" %}
-{% block title %}{{ titre }}{% endblock %}
+{% extends "base.html" %}{% load static %}
+{% block title %}Enregistrer un colis{% endblock %}
 {% block content %}
-<div class="page-title"><h1>{{ titre }}</h1></div>
-{# Saisie rapide en portrait, une seule page : champs empilés, Entrée passe au champ suivant, Entrée sur le dernier enregistre. #}
-<div class="saisie-rapide mx-auto" style="max-width:460px">
-<div class="card"><div class="card-body">
-  <form method="post" data-saisie-rapide>{% csrf_token %}
-  {% if form.non_field_errors %}<div class="alert alert-danger py-2 small">{{ form.non_field_errors }}</div>{% endif %}
-  {% for field in form %}<div class="mb-2">
-    <label class="form-label small mb-0" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
-    {{ field }}
-    {% if field.help_text %}<div class="form-text small">{{ field.help_text }}</div>{% endif %}
-    {% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>{% endfor %}
-  <div class="mt-3 d-flex gap-2">
-    <button class="btn btn-primary flex-fill" data-enchaine><i class="bi bi-check-lg"></i> Enregistrer <span class="small">(Entrée)</span></button>
-    <a href="javascript:history.back()" class="btn btn-outline-secondary">Annuler</a></div>
-  </form>
-</div></div>
+<div class="page-title"><h1>Enregistrer un colis</h1></div>
+{% include "transport/_style_rapide.html" %}
+<div class="saisie-rapide mx-auto card"><div class="card-body">
+<form method="post" data-saisie-rapide data-contacts-url="{% url 'transport:contacts_colis' %}">{% csrf_token %}
+<input type="hidden" name="interface_rapide" value="1">
+{% for hidden in form.hidden_fields %}{{ hidden }}{% for e in hidden.errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}{% endfor %}
+{% if form.non_field_errors %}<div class="alert alert-danger small">{{ form.non_field_errors }}</div>{% endif %}
+<div class="fw-semibold small">Expéditeur</div>
+{% include "transport/_contact_rapide.html" with telephone="tel_expediteur" nom="expediteur" selection="personne_expediteur" telephone_field=form.tel_expediteur nom_field=form.expediteur %}
+<div class="fw-semibold small mt-1">Destinataire</div>
+{% include "transport/_contact_rapide.html" with telephone="tel_destinataire" nom="destinataire" selection="personne_destinataire" telephone_field=form.tel_destinataire nom_field=form.destinataire %}
+{% for field in form.champs_rapides %}{% include "transport/_champ_rapide.html" %}{% endfor %}
+<details class="mb-2" data-complements {% if form.complements_ouverts %}open{% endif %}><summary class="small">Poids, quantité, valeur déclarée, contre-remboursement ou client en compte</summary>
+{% for field in form.champs_complementaires %}{% include "transport/_champ_rapide.html" %}{% endfor %}</details>
+<div class="d-grid gap-1 mt-2">
+<button type="submit" name="imprimer" value="1" class="btn btn-primary" data-enchaine>Enregistrer, imprimer et colis suivant</button>
+<button type="submit" name="suivant" value="1" class="btn btn-outline-primary btn-sm">Enregistrer sans imprimer et continuer</button>
+<button type="submit" class="btn btn-outline-secondary btn-sm">Enregistrer et ouvrir le bordereau</button>
 </div>
-<script>
-(function () {
-  var form = document.querySelector("form[data-saisie-rapide]");
-  if (!form) return;
-  function champs() {
-    return [].filter.call(form.querySelectorAll("input, select, textarea"),
-      function (e) { return !e.disabled && e.type !== "hidden" && e.offsetParent !== null; });
-  }
-  var premier = champs()[0];
-  if (premier) premier.focus();
-  form.addEventListener("keydown", function (ev) {
-    if (ev.key !== "Enter" || ev.shiftKey) return;
-    var e = ev.target;
-    if (e.tagName === "TEXTAREA") return;
-    ev.preventDefault();
-    var liste = champs(), i = liste.indexOf(e);
-    if (i > -1 && i < liste.length - 1) {
-      liste[i + 1].focus();
-      if (liste[i + 1].select) liste[i + 1].select();
-    } else {
-      (form.querySelector("[data-enchaine]") || form.querySelector("button")).click();
-    }
-  });
-})();
-</script>
+<div class="small text-muted mt-2">Tab ou Entrée : champ suivant. Quantité par défaut : 1 pièce ; poids à renseigner si nécessaire.</div>
+</form></div></div>
 {% endblock %}
+{% block scripts %}<script src="{% static 'js/saisie_rapide.js' %}"></script>{% endblock %}

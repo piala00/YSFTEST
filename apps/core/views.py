@@ -298,66 +298,28 @@ def sauvegarde(request, module):
             messages.error(request, "Choisissez le fichier et tapez RESTAURER pour confirmer.")
         else:
             try:
-                entete = s.restaurer(fichier.read().decode("utf-8"))
+                contenu = fichier.read().decode("utf-8")
+                s.lire(contenu)  # Refuser les anciens exports partiels avant toute opération.
+                from . import poste
+
+                if poste.disponible():
+                    poste.appeler("sauvegarder")  # Une erreur empêche le remplacement.
+                entete = s.restaurer(contenu)
             except (ValueError, UnicodeDecodeError) as exc:
                 messages.error(request, str(exc))
             except Exception as exc:          # fichier incohérent : la transaction a tout annulé
                 messages.error(request, f"Restauration impossible, aucune donnée modifiée : {exc}")
             else:
-                journal.enregistrer("RESTAURATION", libelle=f"sauvegarde du {entete.get('date', '')[:16]}")
+                from django.contrib.auth import logout
+
+                auteur = request.user.get_username()
+                logout(request)  # Le compte courant peut ne pas exister dans la sauvegarde restaurée.
+                journal.enregistrer("RESTAURATION", libelle=f"sauvegarde du {entete.get('date', '')[:16]}",
+                                    details={"auteur_avant_restauration": auteur})
                 messages.success(request, f"Données restaurées ({entete['objets']} enregistrements). "
                                           "Reconnectez-vous si besoin.")
         return redirect(request.path)
     return render(request, "core/sauvegarde.html", {"pro_ok": pro_ok, "pro_message": pro_message})
-
-
-def import_export(request, module):
-    """Fichier › Import / Export (façon Sage) : exporter la société dans un fichier portable, la restaurer
-    (remplacement complet), ou recevoir un envoi d'agence (fusion sans écraser) via l'écran Échanges.
-    Réutilise le même moteur que « Sauvegarde et restauration » ; un export sert aussi à transporter une
-    simulation ou à envoyer la société du jour à la direction."""
-    from django.http import HttpResponse
-    from django.shortcuts import redirect
-    from django.utils import timezone
-
-    from . import droits as d, journal
-    from . import sauvegarde as s
-
-    if not request.user.is_superuser:
-        return render(request, "core/acces_refuse.html", {
-            "chemin": "Fichier › Import / Export", "operation": "importer ou exporter la société",
-            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
-    from apps.licences.licence import fonctions_pro_disponibles
-
-    pro_ok, pro_message = fonctions_pro_disponibles()
-    if request.method == "POST" and not pro_ok:
-        messages.error(request, pro_message)
-        return redirect(request.path)
-    if request.method == "POST" and request.POST.get("action") == "exporter":
-        contenu = s.sauvegarder()
-        journal.enregistrer("EXPORT", libelle=f"{len(contenu) // 1024} Ko")
-        reponse = HttpResponse(contenu, content_type="application/json; charset=utf-8")
-        reponse["Content-Disposition"] = f'attachment; filename="erp-societe-{timezone.localtime():%Y%m%d-%H%M}.json"'
-        return reponse
-    if request.method == "POST" and request.POST.get("action") == "restaurer":
-        fichier = request.FILES.get("fichier")
-        if not fichier or request.POST.get("confirmation") != "RESTAURER":
-            messages.error(request, "Choisissez le fichier et tapez RESTAURER pour confirmer.")
-        else:
-            try:
-                entete = s.restaurer(fichier.read().decode("utf-8"))
-            except (ValueError, UnicodeDecodeError) as exc:
-                messages.error(request, str(exc))
-            except Exception as exc:          # fichier incohérent : la transaction a tout annulé
-                messages.error(request, f"Import impossible, aucune donnée modifiée : {exc}")
-            else:
-                journal.enregistrer("IMPORT", libelle=f"société du {entete.get('date', '')[:16]}")
-                messages.success(request, f"Société importée ({entete['objets']} enregistrements). "
-                                          "Reconnectez-vous si besoin.")
-        return redirect(request.path)
-    return render(request, "core/import_export.html", {
-        "pro_ok": pro_ok, "pro_message": pro_message,
-        "recevoir_url": f"{module}:echanges" if module in ("commercial", "transport") else ""})
 
 
 def reprise_dossier(request, module):

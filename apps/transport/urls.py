@@ -31,6 +31,8 @@ urlpatterns = [
     path("colis/caisse/", views.ma_caisse, {"service": "COLIS"}, name="ma_caisse_colis"),
     path("colis/cloture/", views.cloture_journee, {"perimetre": "COLIS"}, name="cloture_colis"),
     path("garage/cloture/", views.cloture_journee, {"perimetre": "GARAGE"}, name="cloture_garage"),
+    path("billetterie/contacts/rechercher/", views.contacts_rechercher, {"service": "billetterie"}, name="contacts_billetterie"),
+    path("colis/contacts/rechercher/", views.contacts_rechercher, {"service": "colis"}, name="contacts_colis"),
     # Billetterie
     path("billetterie/departs/", views.departs, name="departs"),
     path("billetterie/departs/nouveau/", views.depart_form, name="depart_create"),
@@ -39,7 +41,8 @@ urlpatterns = [
     path("billetterie/departs/<int:pk>/manifeste/", views.manifeste, name="manifeste"),
     path("billetterie/billets/", views.billets, name="billets"),
     path("billetterie/billets/vendre/", views.billet_vente, name="billet_vente"),
-    path("billetterie/voyageurs-connus/", views.voyageurs_connus, name="voyageurs_connus"),
+    path("billetterie/transit/", views.billets_transit, name="billets_transit"),
+    path("billetterie/transvasement/", views.transvasement, name="transvasement"),
     path("billetterie/billets/<int:pk>/", views.billet_detail, name="billet_detail"),
     path("billetterie/billets/<int:pk>/imprimer/", views.billet_imprimer, name="billet_imprimer"),
     path("billetterie/recette/", views.recette_journaliere, {"service": "billetterie"}, name="recette_billetterie"),
@@ -57,3 +60,5 @@ urlpatterns = [
     path("garage/depenses/", views.depenses, name="depenses"),
     path("garage/depenses/nouvelle/", views.depense_form, name="depense_create"),
 ]
+
+

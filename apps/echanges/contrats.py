@@ -107,6 +107,36 @@ def serialiser(o):
                          "contre_remboursement": _d(o.contre_remboursement), "depart": _uid(o.depart), "statut": o.statut,
                          "code_retrait": o.code_retrait, "livre_le": _date(o.livre_le), "retire_par": o.retire_par,
                          "livre_site": o.livre_site, "cr_reverse_le": _date(o.cr_reverse_le)}, o.date, o.cree_par or ""
+    from apps.transport.models_suivi_colis import IncidentColis
+
+    if isinstance(o, IncidentColis):
+        auteurs = {champ: str(getattr(o, champ) or "") for champ in
+                   ("declare_par", "resolu_par", "autorise_par", "paye_par")}
+        auteurs_ids = {champ: getattr(o, champ + "_id") for champ in auteurs}
+        return "incident_colis", {"v": VERSION, "uid": str(o.uid), "colis": _uid(o.colis),
+                                  "nature": o.nature, "lieu": o.lieu, "description": o.description,
+                                  "declare_le": _date(o.declare_le), "resolu": o.resolu,
+                                  "resolution": o.resolution, "resolu_le": _date(o.resolu_le),
+                                  "montant_autorise": _d(o.montant_autorise), "auteurs": auteurs, "auteurs_ids": auteurs_ids,
+                                  "compte": ({"numero": o.compte_indemnite.numero, "intitule": o.compte_indemnite.intitule}
+                                             if o.compte_indemnite_id else None),
+                                  "ecriture": _uid(o.ecriture),
+                                  "numero_ecriture": o.ecriture.numero if o.ecriture_id else ""}, o.colis.date, auteurs["declare_par"]
+    from apps.transport.models_incidents import Incident
+
+    if isinstance(o, Incident):
+        return "incident_voyage", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "depart": _uid(o.depart),
+                                   "type_incident": o.type_incident, "date": _date(o.date), "lieu": o.lieu,
+                                   "description": o.description, "vehicule_secours": _uid(o.vehicule_secours),
+                                   "part_restante": _d(o.part_restante), "cree_le": _date(o.cree_le),
+                                   "auteur": str(o.cree_par or ""), "auteur_id": o.cree_par_id,
+                                   "ecriture": _uid(o.ecriture), "numero_ecriture": o.ecriture.numero if o.ecriture_id else "",
+                                   "frais": [{"id": f.pk, "nature": f.nature, "libelle": f.libelle, "montant": _d(f.montant),
+                                              "paiement": f.paiement, "vehicule": _uid(f.vehicule),
+                                              "compte": f.compte.numero if f.compte_id else None,
+                                              "fournisseur": str(f.fournisseur or ""), "ecriture": _uid(f.ecriture),
+                                              "numero_ecriture": f.ecriture.numero if f.ecriture_id else ""}
+                                             for f in o.frais.select_related("compte", "vehicule", "fournisseur", "ecriture").order_by("pk")]}, o.date, str(o.cree_par or "")
     if isinstance(o, DepenseVehicule):
         return "depense", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "date": _date(o.date),
                            "vehicule": _uid(o.vehicule), "depart": _uid(o.depart), "nature": o.nature, "libelle": o.libelle,
@@ -613,20 +643,148 @@ def _correction_suivi(p, origine, local):
     d.save()
 
 
+def _incident_colis(p, origine, local, *, revision):
+    """Copie de suivi : aucun appel aux services de déclaration, autorisation ou paiement."""
+    from apps.comptabilite.models import Compte, Ecriture
+    from apps.transport.models import Colis
+    from apps.transport.models_suivi_colis import IncidentColis
+    from django.utils import timezone
+
+    colis = _par_uid(Colis, p["colis"], "colis")
+    # Sérialiser aussi la première réception, avant qu'une ligne de suivi existe.
+    colis = Colis.objects.select_for_update().get(pk=colis.pk)
+    if colis.site_origine != origine.code:
+        raise Conflit("Le suivi doit provenir du site propriétaire du colis.")
+    if not _concerne(local, colis.gare_depart, colis.gare_arrivee):
+        raise SansObjet("suivi d'un envoi d'une autre agence")
+    o = _copie(IncidentColis, p["uid"], origine)
+    if o.site_origine != origine.code:
+        raise Conflit("Le suivi appartient à un autre site.")
+    if type(revision) is not int or revision <= 0:
+        raise Conflit("Révision du suivi invalide.")
+    if revision <= o.trace_origine.get("revision", 0):
+        raise SansObjet("version du suivi déjà reçue ou plus récente")
+    montant = Decimal(p.get("montant_autorise") or "0")
+    if not montant.is_finite() or montant < 0 or montant >= 10**14 or montant != montant.quantize(Decimal("1")):
+        raise Conflit("Montant d'indemnisation invalide.")
+    declare_le = parse_datetime(p["declare_le"])
+    resolu_le = parse_datetime(p["resolu_le"]) if p.get("resolu_le") else None
+    if (p["nature"] not in dict(IncidentColis.NATURES) or not p["lieu"].strip() or len(p["lieu"]) > 120
+            or not p["description"].strip() or len(p["description"]) > 250 or declare_le is None
+            or timezone.is_naive(declare_le) or (resolu_le is not None and timezone.is_naive(resolu_le))
+            or not isinstance(p.get("resolu"), bool) or len(p.get("resolution", "")) > 250
+            or (p["resolu"] and (not p.get("resolution", "").strip() or resolu_le is None))):
+        raise Conflit("Constat ou résolution du suivi invalide.")
+    auteurs = p.get("auteurs") or {}
+    if not isinstance(auteurs, dict) or any(not isinstance(v, str) or len(v) > 150 for v in auteurs.values()):
+        raise Conflit("Auteurs du suivi invalides.")
+    auteurs_ids = p.get("auteurs_ids") or {}
+    if not isinstance(auteurs_ids, dict) or any(v is not None and (type(v) is not int or v <= 0) for v in auteurs_ids.values()):
+        raise Conflit("Identifiants d'auteurs du suivi invalides.")
+    compte = p.get("compte")
+    if montant and (not compte or not compte["numero"].startswith("6") or not auteurs.get("autorise_par")):
+        raise Conflit("L'autorisation d'indemnisation doit conserver son auteur et son compte de charge.")
+    ecriture = None
+    if p.get("ecriture"):
+        if not montant or not auteurs.get("paye_par"):
+            raise Conflit("Le paiement doit conserver son autorisation et son auteur.")
+        # Les écritures sont consolidées au siège ; une autre agence ne reçoit que la référence du paiement.
+        if local.role == local.SIEGE:
+            ecriture = _par_uid(Ecriture, p["ecriture"], "écriture d'indemnisation")
+            if ecriture.site_origine != origine.code:
+                raise Conflit("L'écriture d'indemnisation appartient à un autre site.")
+    o.colis, o.nature, o.lieu, o.description = colis, p["nature"], p["lieu"], p["description"]
+    o.resolu, o.resolution, o.resolu_le = p["resolu"], p.get("resolution", ""), resolu_le
+    o.montant_autorise, o.ecriture = montant, ecriture
+    o.compte_indemnite = Compte.objects.get_or_create(numero=compte["numero"], defaults={"intitule": compte["intitule"]})[0] if compte else None
+    o.trace_origine = {"revision": revision, "auteurs": auteurs, "auteurs_ids": auteurs_ids, "ecriture": p.get("ecriture"),
+                      "numero_ecriture": p.get("numero_ecriture", "")}
+    # Ne jamais rattacher un auteur distant à un compte utilisateur local homonyme.
+    o.declare_par = o.resolu_par = o.autorise_par = o.paye_par = None
+    _enregistrer(o, "Suivi colis", p["uid"])
+    # auto_now_add ne doit pas remplacer la date du constat d'origine lors de la première réception.
+    IncidentColis.objects.filter(pk=o.pk).update(declare_le=declare_le)
+
+
+def _incident_voyage(p, origine, local, *, revision):
+    """Suivi distant et liens GL ; aucun appel au transbordement ni à l'enregistrement des frais."""
+    from django.utils import timezone
+    from apps.comptabilite.models import Ecriture
+    from apps.transport.models import Depart, Vehicule
+    from apps.transport.models_incidents import Incident, FraisIncident
+
+    depart = _par_uid(Depart, p["depart"], "départ")
+    depart = Depart.objects.select_for_update().get(pk=depart.pk)
+    if depart.site_origine != origine.code:
+        raise Conflit("L'imprévu doit provenir du propriétaire du départ.")
+    if not _concerne(local, depart.ligne.gare_depart, depart.ligne.gare_arrivee):
+        raise SansObjet("imprévu d'un départ d'une autre agence")
+    o = _copie(Incident, p["uid"], origine)
+    if o.site_origine != origine.code:
+        raise Conflit("L'imprévu appartient à un autre site.")
+    if type(revision) is not int or revision <= 0:
+        raise Conflit("Révision d'imprévu invalide.")
+    if revision <= o.trace_origine.get("revision", 0):
+        raise SansObjet("version de l'imprévu déjà reçue ou plus récente")
+    part = Decimal(p.get("part_restante") or "0")
+    cree_le = parse_datetime(p["cree_le"])
+    if (not part.is_finite() or not 0 <= part <= 100 or p["type_incident"] not in dict(Incident.TYPES)
+            or (p["type_incident"] == Incident.TRANSBORDEMENT and not part)
+            or not p.get("numero") or len(p["numero"]) > 30 or len(p.get("lieu", "")) > 120
+            or len(p.get("description", "")) > 250 or cree_le is None or timezone.is_naive(cree_le)
+            or not isinstance(p.get("auteur", ""), str) or len(p.get("auteur", "")) > 150):
+        raise Conflit("Données de l'imprévu invalides.")
+    auteur_id = p.get("auteur_id")
+    if auteur_id is not None and (type(auteur_id) is not int or auteur_id <= 0):
+        raise Conflit("Identifiant d'auteur invalide.")
+    def ecriture_recue(ref):
+        if not ref or local.role != local.SIEGE:
+            return None
+        e = _par_uid(Ecriture, ref, "écriture d'imprévu")
+        if e.site_origine != origine.code:
+            raise Conflit("L'écriture d'imprévu appartient à un autre site.")
+        return e
+    ecriture = ecriture_recue(p.get("ecriture"))
+    frais = p.get("frais", [])
+    if not isinstance(frais, list):
+        raise Conflit("Liste des frais invalide.")
+    ids, copies = set(), []
+    for f in frais:
+        montant = Decimal(f["montant"])
+        if (type(f.get("id")) is not int or f["id"] <= 0 or f["id"] in ids
+                or f["nature"] not in dict(FraisIncident.NATURES) or f["paiement"] not in dict(FraisIncident.PAIEMENTS)
+                or not montant.is_finite() or not 0 < montant < 10**14 or montant != montant.quantize(Decimal("1"))
+                or len(f["libelle"]) > 150):
+            raise Conflit("Frais d'imprévu invalides.")
+        ids.add(f["id"])
+        ecriture_recue(f.get("ecriture"))
+        copies.append({**f, "nature_libelle": dict(FraisIncident.NATURES)[f["nature"]],
+                       "paiement_libelle": dict(FraisIncident.PAIEMENTS)[f["paiement"]]})
+    o.depart, o.numero, o.type_incident = depart, p["numero"], p["type_incident"]
+    o.date, o.lieu, o.description = datetime.date.fromisoformat(p["date"]), p.get("lieu", ""), p.get("description", "")
+    o.vehicule_secours = _par_uid(Vehicule, p["vehicule_secours"], "véhicule de secours") if p.get("vehicule_secours") else None
+    o.part_restante, o.ecriture, o.cree_par = part, ecriture, None
+    o.trace_origine = {"revision": revision, "auteur": p.get("auteur", ""), "auteur_id": auteur_id,
+                      "ecriture": p.get("ecriture"), "numero_ecriture": p.get("numero_ecriture", ""), "frais": copies}
+    _enregistrer(o, "N° d'imprévu", p["numero"])
+    Incident.objects.filter(pk=o.pk).update(cree_le=cree_le)
+
+
 INTEGRATIONS = {"agence": _agence, "gare": _gare, "ligne": _ligne, "vehicule": _vehicule, "chauffeur": _chauffeur,
                 "depart": _depart, "billet": _billet, "colis": _colis, "colis_livraison": _colis_livraison,
                 "depart_arrivee": _depart_arrivee, "depense": _depense, "ecriture": _ecriture,
                 "troncon_affecte": _troncon_affecte, "troncon_effectue": _troncon_effectue,
                 "plein": _plein, "reparation": _reparation, "depense_demande": _depense_demande,
                 "depense_decision": _depense_decision, "depense_payee": _depense_payee,
-                "correction_demande": _correction_demande, "correction_suivi": _correction_suivi}
+                "correction_demande": _correction_demande, "correction_suivi": _correction_suivi,
+                "incident_colis": _incident_colis, "incident_voyage": _incident_voyage}
 
 # Ordre d'intégration d'un même lot : les référentiels avant les faits qui les utilisent
 PRIORITE = {"agence": 0, "gare": 1, "vehicule": 1, "chauffeur": 1, "ligne": 2, "depart": 3, "billet": 4, "colis": 4,
             "depense": 4, "plein": 4, "reparation": 4, "colis_livraison": 5, "depart_arrivee": 5, "troncon_affecte": 5, "troncon_effectue": 5,
             "ecriture": 6, "depense_demande": 4, "depense_decision": 5, "depense_payee": 5,
-            "correction_demande": 7, "correction_suivi": 7}
+            "correction_demande": 7, "correction_suivi": 7, "incident_colis": 7, "incident_voyage": 7}
 
 # Faits qu'une agence doit connaître quand ils viennent d'une autre agence (relais par le siège)
 RELAYES = {"agence", "gare", "ligne", "vehicule", "chauffeur", "depart", "colis", "colis_livraison", "depart_arrivee",
-           "billet", "troncon_affecte", "troncon_effectue", "depense_payee"}
+           "billet", "troncon_affecte", "troncon_effectue", "depense_payee", "incident_colis", "incident_voyage"}

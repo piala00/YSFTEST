@@ -18,7 +18,7 @@ def _fichier(nom, octets):
 
 
 @login_required
-def echanges(request, module):
+def echanges(request, module, administration=False):
     local = site_local()
     if request.method == "POST":
         action = request.POST.get("action")
@@ -74,6 +74,7 @@ def echanges(request, module):
 
     boite = boite_configuree()
     return render(request, "echanges/echanges.html", {
+        "administration_poste": administration, "onglet_poste": "echanges",
         "titre": "Échanges entre agences", "local": local, "sites": sites, "boite": str(boite) if boite else "",
         "a_envoyer": Evenement.objects.filter(sequence__gt=_dernier_envoye()).count() if local else 0,
         "lots_recus": LotRecu.objects.select_related("source")[:15], "lots_emis": LotEmis.objects.select_related("destination")[:15],

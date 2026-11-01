@@ -32,8 +32,8 @@ def licence(request):
         try:
             if action == "installation":
                 d = l.enregistrer_cle_installation(request.POST.get("cle", ""))
-                journal.enregistrer("LICENCE", libelle=f"Clé d'installation {d['numero']} — {d['societe']}")
-                messages.success(request, f"Clé d'installation {d['numero']} enregistrée pour {d['societe']}.")
+                journal.enregistrer("LICENCE", libelle=f"Installation enregistrée — {d['societe']}")
+                messages.success(request, f"Clé d'installation enregistrée pour {d['societe']}.")
             elif action == "activation":
                 _, donnees = l.activer(request.POST.get("cle", ""), request.user)
                 journal.enregistrer("LICENCE", libelle=f"{donnees.get('numero', '')} — {donnees.get('client', '')}")
@@ -42,14 +42,24 @@ def licence(request):
                 fichier = request.FILES.get("fichier")
                 if fichier is None or fichier.size > 64 * 1024:
                     raise l.LicenceInvalide("choisissez le fichier de licence (.erplic) envoyé par l'éditeur")
-                _, donnees = l.deposer(fichier.read(), request.user)
+                publique = request.FILES.get("verification")
+                if publique is not None:
+                    if publique.size > 8192:
+                        raise l.LicenceInvalide("fichier de vérification trop volumineux")
+                    l.verifier_fichier_public(publique.read())
+                _, donnees = l.deposer(fichier.read(), request.user, activation_nouvelle=True)
                 journal.enregistrer("LICENCE", libelle=f"{donnees.get('numero', '')} — {donnees.get('client', '')}")
                 messages.success(request, f"Licence {donnees.get('numero', '')} installée pour {donnees.get('client', '')}.")
+                if publique is not None:
+                    messages.success(request, "Clé publique reconnue : elle correspond à l'éditeur autorisé du logiciel.")
         except l.LicenceInvalide as exc:
             messages.error(request, f"Refusé : {exc}")
         return redirect(request.path)
     return render(request, "licences/licence.html", {
+        "onglet_poste": "licence",
         "titre": "Licence", "etat": l.etat(), "demande": l.demande(), "installation": l.cle_installation(),
         "installation_requise": l.cle_installation_requise(), "actifs": l.comptes_actifs(), "roles": l.ROLES,
         "essai_ouvertures": l.ESSAI_OUVERTURES,
-        "historique": LicenceDeposee.objects.select_related("deposee_par")[:20], "cles": bool(l.cles_publiques())})
+        "historique": LicenceDeposee.objects.select_related("deposee_par")[:20], "cles": bool(l.cles_publiques()),
+        "empreintes_publiques": l.empreintes_publiques()})
+

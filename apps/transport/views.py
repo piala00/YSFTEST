@@ -5,6 +5,8 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -12,6 +14,8 @@ from django.utils import timezone
 
 from apps.commercial.models import Tiers
 
+from .guichet_views import billets_transit, transvasement, _droit_operation, _mode_suite
+from . import contacts
 from .forms import (BilletForm, ChauffeurForm, ColisForm, DepartForm, DepenseVehiculeForm, GareForm, LigneForm,
                     ParametresTransportForm, VehiculeForm)
 from .models import Billet, Chauffeur, Colis, Depart, DepenseVehicule, Gare, Ligne, ParametresTransport, Vehicule
@@ -166,6 +170,7 @@ def depart_detail(request, pk):
                 depart.pointer_embarquement(request.POST.getlist("embarques"), request.user)
                 messages.success(request, "Liste d'embarquement enregistrée.")
             elif action == "affecter":
+                _droit_operation(request, "billetterie.transit")
                 from .models import Troncon
 
                 troncon = get_object_or_404(Troncon, pk=request.POST.get("troncon"))
@@ -199,8 +204,14 @@ def depart_detail(request, pk):
 def _imprevu(request, depart, action):
     """Imprévus du voyage (docs/IMPREVUS_VOYAGE.md) depuis la fiche du départ."""
     from apps.comptabilite.models import Journal
+    from apps.core.synchronisation import verifier_saisie
+    from .models import _proprietaire
+
+    verifier_saisie("la saisie des imprévus de voyage")
+    _proprietaire(depart, f"Le départ {depart.numero}")
 
     if action == "transborder":
+        _droit_operation(request, "billetterie.transvasement")
         secours = Vehicule.objects.filter(pk=request.POST.get("vehicule_secours") or None).first()
         i = Incident.transborder(depart, request.POST.get("part_restante") or 0, secours, request.POST.get("lieu", ""),
                                  request.POST.get("description", ""), request.user)
@@ -264,47 +275,39 @@ def billets(request):
 
 
 @login_required
-def voyageurs_connus(request):
-    """Coordonnées des voyageurs déjà saisis (nom, téléphone, pièce), pour les retrouver à la vente sans les retaper.
-    Renvoie les plus récents qui correspondent au texte tapé (nom ou téléphone)."""
-    from django.http import JsonResponse
-
-    q = request.GET.get("q", "").strip()
-    qs = Billet.objects.exclude(voyageur="")
-    if q:
-        qs = qs.filter(Q(voyageur__icontains=q) | Q(telephone__icontains=q))
-    contacts, vus = [], set()
-    for b in qs.order_by("-id").values("voyageur", "telephone", "piece_identite")[:60]:
-        cle = (b["voyageur"].lower(), b["telephone"])
-        if cle in vus:
-            continue
-        vus.add(cle)
-        contacts.append(b)
-        if len(contacts) >= 8:
-            break
-    return JsonResponse({"contacts": contacts})
-
-
-@login_required
 def billet_vente(request):
-    initial = {}
+    mode = request.GET.get("mode", "direct")
+    if mode not in ("direct", "transit", "correspondance"):
+        mode = "direct"
+    initial = {"cle_saisie": contacts.nouveau_jeton(request.user, "billet"), "mode": mode}
     if request.GET.get("depart"):
-        depart = Depart.objects.filter(pk=request.GET["depart"]).first()
+        try:
+            depart = Depart.objects.filter(pk=int(request.GET["depart"])).first()
+        except (ValueError, TypeError):
+            depart = None
         if depart:
-            initial = {"depart": depart, "siege": request.GET.get("siege")}         # prix : tarif du trajet choisi
+            initial.update(depart=depart, siege=request.GET.get("siege"))
     form = BilletForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
-        billet = form.save(commit=False)
         try:
-            billet.vendre(request.user, depart_correspondance=form.cleaned_data.get("depart_correspondance"),
-                          siege_correspondance=form.cleaned_data.get("siege_correspondance"))
+            def enregistrer():
+                billet = form.save(commit=False)
+                billet.vendre(request.user, depart_correspondance=form.cleaned_data.get("depart_correspondance"),
+                              siege_correspondance=form.cleaned_data.get("siege_correspondance"))
+                contacts.memoriser(billet.voyageur, billet.telephone, billet.piece_identite, request.user,
+                                   form.cleaned_data.get("personne"))
+                return billet
+            billet = contacts.enregistrer_une_fois(request, "billet", enregistrer)
             messages.success(request, f"Billet {billet.numero} vendu ({billet.prix:,.0f} FCFA).".replace(",", " "))
+            if request.POST.get("imprimer"):
+                return redirect(reverse("transport:billet_imprimer", args=[billet.pk]) + "?suivant=1" + _mode_suite(form.mode_vente))
             if request.POST.get("suivant"):
-                return redirect(f"{reverse('transport:billet_vente')}?depart={billet.depart_id}")
+                return redirect(f"{reverse('transport:billet_vente')}?depart={billet.depart_id}" + _mode_suite(form.mode_vente))
             return redirect("transport:billet_detail", billet.pk)
         except ValidationError as exc:
             _erreur(request, exc)
-    return render(request, "transport/billet_form.html", {"form": form, "titre": "Vendre un billet"})
+    return render(request, "transport/billet_form.html", {"form": form, "titre": {"transit": "Billet en transit — montée intermédiaire",
+        "correspondance": "Billet avec correspondance"}.get(form.mode_vente, "Vendre un billet") })
 
 
 @login_required
@@ -348,13 +351,19 @@ def billet_detail(request, pk):
 
 @login_required
 def billet_imprimer(request, pk):
-    return render(request, "transport/billet_print.html", {"billet": get_object_or_404(Billet, pk=pk)})
+    billet = get_object_or_404(Billet, pk=pk)
+    suivant = f"{reverse('transport:billet_vente')}?depart={billet.depart_id}" + _mode_suite(request.GET.get("mode")) if request.GET.get("suivant") == "1" else ""
+    transit = request.GET.get("transit")
+    if transit and transit.isdecimal() and billet.troncons.filter(depart_id=int(transit)).exists():
+        suivant = f"{reverse('transport:billets_transit')}?depart={int(transit)}"
+    return render(request, "transport/billet_print.html", {"billet": billet, "suivant_url": suivant,
+        "troncons": billet.troncons.select_related("gare_depart", "gare_arrivee", "depart__vehicule").order_by("ordre")})
 
 
 # ---------------------------------------------------------------- Colis et courrier
 @login_required
 def colis_liste(request):
-    qs = Colis.objects.select_related("gare_depart", "gare_arrivee", "depart")
+    qs = Colis.objects.select_related("gare_depart", "gare_arrivee", "depart").prefetch_related("incidents_suivi")
     statut, gare = request.GET.get("statut", ""), request.GET.get("gare", "")
     if request.GET.get("q"):
         q = request.GET["q"]
@@ -373,12 +382,25 @@ def colis_liste(request):
 
 @login_required
 def colis_form(request):
-    form = ColisForm(request.POST or None, initial={"nature": request.GET.get("nature", Colis.COLIS)})
+    initial = {"nature": request.GET.get("nature", Colis.COLIS),
+               "cle_saisie": contacts.nouveau_jeton(request.user, "colis")}
+    form = ColisForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
-        colis = form.save(commit=False)
         try:
-            colis.enregistrer(request.user)
+            def enregistrer():
+                colis = form.save(commit=False)
+                colis.enregistrer(request.user)
+                contacts.memoriser(colis.expediteur, colis.tel_expediteur, utilisateur=request.user,
+                                   personne=form.cleaned_data.get("personne_expediteur"))
+                contacts.memoriser(colis.destinataire, colis.tel_destinataire, utilisateur=request.user,
+                                   personne=form.cleaned_data.get("personne_destinataire"))
+                return colis
+            colis = contacts.enregistrer_une_fois(request, "colis", enregistrer)
             messages.success(request, f"{colis.get_nature_display()} {colis.numero} enregistré — code de retrait {colis.code_retrait}.")
+            if request.POST.get("imprimer"):
+                return redirect(reverse("transport:colis_imprimer", args=[colis.pk]) + "?suivant=1")
+            if request.POST.get("suivant"):
+                return redirect(reverse("transport:colis_create") + "?nature=" + colis.nature)
             return redirect("transport:colis_detail", colis.pk)
         except ValidationError as exc:
             _erreur(request, exc)
@@ -391,7 +413,24 @@ def colis_detail(request, pk):
     if request.method == "POST":
         action = request.POST.get("action")
         try:
-            if action == "livrer":
+            if action in ("incident_colis", "resoudre_incident", "autoriser_indemnite", "payer_indemnite"):
+                from .models_suivi_colis import IncidentColis
+                from apps.comptabilite.models import Compte, Journal
+                contacts.verifier_droit(request.user, "colis")
+                if action == "incident_colis":
+                    IncidentColis.declarer(colis, request.POST.get("nature", ""), request.POST.get("lieu", ""),
+                                          request.POST.get("description", ""), request.user)
+                else:
+                    incident = get_object_or_404(IncidentColis, pk=request.POST.get("incident"), colis=colis)
+                    if action == "resoudre_incident":
+                        incident.resoudre(request.POST.get("resolution", ""), request.user)
+                    elif action == "autoriser_indemnite":
+                        incident.autoriser(request.POST.get("montant") or 0,
+                            get_object_or_404(Compte, pk=request.POST.get("compte")), request.user)
+                    else:
+                        incident.payer(get_object_or_404(Journal, pk=request.POST.get("caisse")), request.user)
+                messages.success(request, "Suivi du colis enregistré ; les mouvements comptables restent distincts du signalement.")
+            elif action == "livrer":
                 colis.livrer(request.POST.get("code"), request.POST.get("retire_par"), utilisateur=request.user)
                 messages.success(request, "Envoi remis au destinataire" + (
                     f" : {colis.a_encaisser:,.0f} FCFA encaissés.".replace(",", " ") if colis.a_encaisser else "."))
@@ -404,17 +443,24 @@ def colis_detail(request, pk):
             elif action == "charger":
                 colis.charger(get_object_or_404(Depart, pk=request.POST.get("depart")))
                 messages.success(request, "Envoi chargé.")
-        except ValidationError as exc:
+        except (ValidationError, ArithmeticError, ValueError) as exc:
             _erreur(request, exc)
         return redirect("transport:colis_detail", colis.pk)
     departs = Depart.objects.filter(statut=Depart.PROGRAMME, ligne__gare_depart=colis.gare_depart,
                                     ligne__gare_arrivee=colis.gare_arrivee).order_by("date", "heure")
-    return render(request, "transport/colis_detail.html", {"colis": colis, "departs": departs})
+    from apps.comptabilite.models import Compte, Journal
+    from .models_suivi_colis import IncidentColis
+    return render(request, "transport/colis_detail.html", {"colis": colis, "departs": departs,
+        "incidents_suivi": colis.incidents_suivi.select_related("ecriture", "autorise_par"), "natures_incident": IncidentColis.NATURES,
+        "comptes_indemnite": Compte.objects.filter(numero__startswith="6"),
+        "caisses_indemnite": Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE)})
 
 
 @login_required
 def colis_imprimer(request, pk):
-    return render(request, "transport/colis_print.html", {"colis": get_object_or_404(Colis, pk=pk)})
+    colis = get_object_or_404(Colis, pk=pk)
+    suivant = reverse("transport:colis_create") + "?nature=" + colis.nature if request.GET.get("suivant") == "1" else ""
+    return render(request, "transport/colis_print.html", {"colis": colis, "suivant_url": suivant})
 
 
 # ---------------------------------------------------------------- Flotte
@@ -787,3 +833,18 @@ def comparaisons(request):
     return render(request, "transport/comparaisons.html", {
         "axes": reporting.AXES, "axe": axe, "gammes": GAMMES, "gamme": gamme, "a_du": a_debut, "a_au": a_fin,
         "b_du": b_debut, "b_au": b_fin, **reporting.comparer(axe, (a_debut, a_fin), (b_debut, b_fin), gamme)})
+
+
+
+@login_required
+@require_POST
+def contacts_rechercher(request, service):
+    contacts.verifier_droit(request.user, service, request.POST.get("nature", "COLIS"))
+    resultat = contacts.rechercher(request.POST.get("telephone", "")[:60], request.POST.get("nom", "")[:120],
+                                   avec_piece=service == "billetterie")
+    reponse = JsonResponse(resultat)
+    reponse["Cache-Control"] = "private, no-store"
+    reponse["X-Content-Type-Options"] = "nosniff"
+    return reponse
+
+

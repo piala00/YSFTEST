@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Sum
 
 ZERO = Decimal("0")
@@ -267,21 +267,37 @@ class Ecriture(models.Model):
 
     def valider(self):
         from apps.core.synchronisation import verifier_saisie
+        from apps.core.models import Exercice
 
-        if self.statut == self.STATUT_VALIDEE:
-            return
-        verifier_saisie("la saisie des écritures")
-        if not self.equilibree:
-            debit, credit = self.totaux()
-            raise ValidationError(f"Écriture déséquilibrée : débit {debit} ≠ crédit {credit}.")
-        if self.exercice.cloture:
-            raise ValidationError("L'exercice est clôturé.")
-        self.journal.verifier_periode(self.date)
-        self.statut = self.STATUT_VALIDEE
-        self.save(update_fields=["statut"])
-        from apps.echanges.publication import publier_ecriture
+        alias=self._state.db or 'default'
+        # Même ordre que la clôture : exercice, puis pièce. L'instance du navigateur peut être périmée.
+        exercice_id=type(self).objects.using(alias).values_list('exercice_id',flat=True).get(pk=self.pk)
+        with transaction.atomic(using=alias):
+            exercice=Exercice.objects.using(alias).select_for_update().get(pk=exercice_id)
+            courante=type(self).objects.using(alias).select_for_update().get(pk=self.pk)
+            if courante.statut==self.STATUT_VALIDEE:
+                self.statut=courante.statut
+                return
+            if courante.exercice_id!=exercice.pk:
+                raise ValidationError("La pièce a changé d'exercice : rechargez-la avant validation.")
+            verifier_saisie("la saisie des écritures")
+            if exercice.cloture:
+                raise ValidationError("L'exercice est clôturé.")
+            if not exercice.date_debut<=courante.date<=exercice.date_fin:
+                raise ValidationError("La date de l'écriture est hors des bornes de son exercice.")
+            journal=Journal.objects.using(alias).select_for_update().get(pk=courante.journal_id)
+            journal.verifier_periode(courante.date)
+            for ligne in courante.lignes.all():
+                ligne.clean()
+            if not courante.equilibree:
+                debit,credit=courante.totaux()
+                raise ValidationError(f"Écriture déséquilibrée : débit {debit} ≠ crédit {credit}.")
+            courante.statut=self.STATUT_VALIDEE
+            courante.save(using=alias,update_fields=['statut'])
+            from apps.echanges.publication import publier_ecriture
 
-        publier_ecriture(self)
+            publier_ecriture(courante)
+        self.statut=courante.statut
 
 
 class LigneEcritureQuerySet(CompteQuerySet):

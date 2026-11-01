@@ -203,6 +203,7 @@ def element_de_la_page(request, module, element_actif=None):
         codes = {"taxes": "structure.taux_taxes", "banques": "structure.banques", "sections": "structure.plan_analytique"}
         return codes.get(kwargs["structure"])
     equivalents = {"delettrage": "lettrage", "stock_comptabiliser": "stock", "journal_create": "journaux",
+                   "ecriture_valider": "ecritures", "ecriture_supprimer": "ecritures",
                    "journal_update": "journaux", "article_parametres": "articles",
                    "reglements": "reglement_create", "reglement_detail": "reglement_create",
                    "reglement_rattacher": "reglement_create", "reglement_factures": "reglement_create"}

@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import json
 import os
+import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -47,6 +48,20 @@ def cles_publiques():
         gravees = []
     if gravees:
         return gravees
+    if getattr(sys, "frozen", False):
+        # Une clé remplaçable ne peut pas établir l'autorité d'un programme client.
+        # Sans identité intégrée, le binaire reste en essai jusqu'à sa recompilation.
+        return []
+    # Repli quand aucune identité n'est intégrée : fichier binaire public, jamais le coffre privé.
+    dossiers = [Path(__file__).parent]
+    if getattr(sys, "frozen", False):
+        dossiers.append(Path(sys.executable).parent)
+    for dossier_identite in dict.fromkeys(dossiers):
+        fichier = dossier_identite / "parametres.dat"
+        if fichier.is_file():
+            brut = fichier.read_bytes()
+            if len(brut) == 38 and brut.startswith(b"ERPID\x01"):
+                return [base64.b64encode(brut[6:]).decode()]
     cles, dossier = [], Path(__file__).parent        # les deux orthographes du fichier sont acceptées (tiret ou tiret bas)
     for nom in ("cle_publique.txt", "cle-publique.txt"):
         fichier = dossier / nom
@@ -84,13 +99,16 @@ def verifier_signature(donnees, signature):
     return verifier_octets(canonique(donnees), signature)
 
 
-def verifier_octets(message, signature, quoi="fichier"):
+def verifier_octets(message, signature, quoi="fichier", *, key_id=None):
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
     for cle in cles_publiques():
         try:
-            Ed25519PublicKey.from_public_bytes(base64.b64decode(cle)).verify(signature, message)
+            brut = base64.b64decode(cle)
+            if key_id is not None and hashlib.sha256(brut).hexdigest().upper() != key_id:
+                continue
+            Ed25519PublicKey.from_public_bytes(brut).verify(signature, message)
             return True
         except (InvalidSignature, ValueError):
             continue
@@ -101,7 +119,7 @@ def verifier_octets(message, signature, quoi="fichier"):
 
 # ---------------------------------------------------------------- Empreinte du serveur
 def _identifiant_machine():
-    if os.environ.get("ERP_MACHINE_ID"):                          # essais automatiques
+    if os.environ.get("ERP_MACHINE_ID") and not getattr(sys, "frozen", False):  # essais automatiques hors binaire
         return os.environ["ERP_MACHINE_ID"]
     if os.name == "nt":
         try:
@@ -157,6 +175,13 @@ def cle_installation_requise():
 
 def lire_cle_installation(texte):
     """Clé d'installation vérifiée (signature de l'éditeur, édition de ce logiciel) → ses données."""
+    if fc.est_installation_courte(texte):
+        from apps.core.models import Societe
+
+        code = fc.installation_courte_normaliser(texte)
+        # Une référence courte identifie l'essai. Elle ne prouve aucun droit de licence.
+        return {"numero": code, "societe": Societe.get().raison_sociale,
+                "edition": edition_logiciel(), "emise_le": "", "courte": True}
     try:
         donnees, signe, signature = fc.installation_lire(texte)
     except fc.CleInvalide as exc:
@@ -175,9 +200,75 @@ def cle_installation():
     if etat is None or not etat.cle_installation:
         return None
     try:
-        return {**lire_cle_installation(etat.cle_installation), "texte": etat.cle_installation}
-    except LicenceInvalide:
+        texte = ouvrir_stockage(etat.cle_installation)
+        donnees = lire_cle_installation(texte)
+        reference = hashlib.sha256(donnees["numero"].encode()).hexdigest()[:10].upper()
+        return {**donnees, "texte": texte, "reference": reference}
+    except (LicenceInvalide, ValueError):
         return None
+
+
+def proteger_stockage(texte):
+    from django.conf import settings
+    from .stockage import sceller
+
+    return sceller(texte, settings.SECRET_KEY, _identifiant_machine())
+
+
+def ouvrir_stockage(texte):
+    from django.conf import settings
+    from .stockage import PREFIXE, ouvrir
+
+    # Lecture des anciennes installations, converties au démarrage du programme.
+    return ouvrir(texte, settings.SECRET_KEY, _identifiant_machine()) if texte.startswith(PREFIXE) else texte
+
+
+def proteger_ancienne_installation(dossier):
+    """Retire le fichier clair des anciens installateurs ; n'efface rien avant stockage protégé réussi."""
+    from .models import EtatLicence
+    from .stockage import PREFIXE
+
+    for etat in EtatLicence.objects.exclude(cle_installation=""):
+        if not etat.cle_installation.startswith(PREFIXE):
+            EtatLicence.objects.filter(pk=etat.pk).update(cle_installation=proteger_stockage(etat.cle_installation))
+    clair, protege = Path(dossier) / "cle-installation.txt", Path(dossier) / "installation.dat"
+    if clair.is_file():
+        if clair.stat().st_size > 64 * 1024:
+            raise ValueError("Ancien fichier d'installation trop volumineux : intervention de l'éditeur nécessaire.")
+        texte = clair.read_text(encoding="utf-8-sig").strip()
+        temporaire = protege.with_suffix(".tmp")
+        temporaire.write_text(proteger_stockage(texte), encoding="ascii")
+        temporaire.replace(protege)
+        clair.unlink()
+
+
+def verifier_fichier_public(contenu):
+    """Sélection facultative d'une clé publique déjà autorisée, jamais import d'une nouvelle autorité."""
+    from .identite import lire_publique
+
+    try:
+        candidate = base64.b64encode(lire_publique(contenu)).decode()
+    except ValueError:
+        raise LicenceInvalide("choisissez uniquement le fichier public de vérification ; le coffre privé reste chez l'éditeur") from None
+    autorisees = cles_publiques()
+    if not autorisees:
+        raise LicenceInvalide("l'identité de votre éditeur doit être intégrée à ce programme : demandez la version personnalisée")
+    if candidate not in autorisees:
+        raise LicenceInvalide("ce fichier public n'appartient pas à l'éditeur de ce programme")
+    return candidate
+
+
+def empreintes_publiques():
+    """Repère visuel des seules identités déjà autorisées, comparable au guide propriétaire."""
+    empreintes=[]
+    for cle in cles_publiques():
+        try:
+            brut=base64.b64decode(cle,validate=True)
+            if len(brut)==32:
+                empreintes.append(hashlib.sha256(brut).hexdigest().upper())
+        except (ValueError,TypeError):
+            continue
+    return empreintes
 
 
 def enregistrer_cle_installation(texte):
@@ -189,7 +280,9 @@ def enregistrer_cle_installation(texte):
 
     donnees = lire_cle_installation(texte)
     memoire(datetime.date.today())                                 # crée la mémoire de l'essai si besoin
-    EtatLicence.objects.update(cle_installation=fc.en_texte(fc.depuis_texte(texte)))
+    normalisee = (fc.installation_courte_normaliser(texte) if donnees.get("courte")
+                  else fc.en_texte(fc.depuis_texte(texte)))
+    EtatLicence.objects.update(cle_installation=proteger_stockage(normalisee))
     societe = Societe.get()
     if fc.nom_simple(societe.raison_sociale) != fc.nom_simple(donnees["societe"]):
         Societe.objects.filter(pk=societe.pk).update(raison_sociale=donnees["societe"][:150])
@@ -236,7 +329,17 @@ def controler(contenu):
         raise LicenceInvalide("licence faite pour un autre serveur : envoyez le code d'activation de celui-ci")
     if Societe.get().activite not in EDITIONS.get(donnees.get("edition", ""), set()):
         raise LicenceInvalide(f"licence de l'édition « {donnees.get('edition')} » : ne couvre pas ce logiciel")
+    if donnees.get("version") == 3:
+        installation = cle_installation()
+        if installation is None or donnees.get("installation") != installation["numero"]:
+            raise LicenceInvalide("ce fichier ne correspond pas au code d'installation de ce serveur")
+        if fc.nom_simple(donnees.get("client", "")) != fc.nom_simple(Societe.get().raison_sociale):
+            raise LicenceInvalide("ce fichier ne correspond pas à la société de ce serveur")
     local = site_local()
+    if donnees.get("version") == 3:
+        role = {"SIEGE": "siege", "AGENCE": "agence"}.get(getattr(local, "role", ""), "seul")
+        if donnees.get("role") != role or donnees.get("site", "") != (local.code if local and role == "agence" else ""):
+            raise LicenceInvalide("ce fichier ne correspond pas au rôle ou au site de ce serveur")
     if donnees.get("site") and local is not None and local.code != donnees["site"]:
         raise LicenceInvalide(f"licence du site {donnees['site']} : ce serveur est {local.code}")
     if not isinstance(donnees.get("postes"), int) or donnees["postes"] < 1:
@@ -246,13 +349,17 @@ def controler(contenu):
     return donnees
 
 
-def deposer(contenu, utilisateur=None):
+def deposer(contenu, utilisateur=None, *, activation_nouvelle=False):
     """Écran Licence : le fichier est gardé dans l'historique même refusé (avec le motif)."""
     texte = contenu.decode("utf-8-sig", errors="replace") if isinstance(contenu, bytes) else contenu
     from .models import LicenceDeposee
 
     try:
         donnees = controler(texte)
+        if activation_nouvelle:
+            fin = _date(donnees.get("valable_jusqu_au"))
+            if fin is not None and fin < datetime.date.today():
+                raise LicenceInvalide("licence déjà expirée : demandez son renouvellement ; l'historique existant est conservé")
     except LicenceInvalide as exc:
         LicenceDeposee.objects.create(contenu=texte[:20000], valide=False, motif=str(exc)[:200], deposee_par=utilisateur)
         raise
@@ -288,7 +395,7 @@ def activer(texte, utilisateur=None):
     except LicenceInvalide as exc:
         LicenceDeposee.objects.create(contenu=texte[:2000], valide=False, motif=str(exc)[:200], deposee_par=utilisateur)
         raise
-    return deposer(licence_texte, utilisateur)
+    return deposer(licence_texte, utilisateur, activation_nouvelle=True)
 
 
 # ---------------------------------------------------------------- Mémoire de l'essai
@@ -520,3 +627,4 @@ def peut_activer_un_compte():
         return False, (f"{e.postes} poste(s) prévus par la {source} "
                        f"et {comptes_actifs()} compte(s) actif(s) : désactivez un compte ou étendez la licence.")
     return True, ""
+

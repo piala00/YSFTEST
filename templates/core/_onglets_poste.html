@@ -1,0 +1,8 @@
+<nav class="nav nav-tabs flex-wrap mb-3" aria-label="Administration du poste">
+  <a class="nav-link {% if onglet_poste == 'poste' %}active{% endif %}" {% if onglet_poste == 'poste' %}aria-current="page"{% endif %} href="{% url 'core:poste' %}?onglet=poste">Ce poste</a>
+  <a class="nav-link {% if onglet_poste == 'licence' %}active{% endif %}" {% if onglet_poste == 'licence' %}aria-current="page"{% endif %} href="{% url 'licence' %}">Licence</a>
+  <a class="nav-link {% if onglet_poste == 'base' %}active{% endif %}" {% if onglet_poste == 'base' %}aria-current="page"{% endif %} href="{% url 'core:base_donnees' %}">Base de données</a>
+  <a class="nav-link {% if onglet_poste == 'sauvegardes' %}active{% endif %}" {% if onglet_poste == 'sauvegardes' %}aria-current="page"{% endif %} href="{% url 'core:base_donnees' %}?onglet=sauvegardes">Sauvegarde et restauration</a>
+  <a class="nav-link {% if onglet_poste == 'echanges' %}active{% endif %}" {% if onglet_poste == 'echanges' %}aria-current="page"{% endif %} href="{% url 'core:echanges_poste' %}">Import et export agences</a>
+  <a class="nav-link {% if onglet_poste == 'simulation' %}active{% endif %}" {% if onglet_poste == 'simulation' %}aria-current="page"{% endif %} href="{% url 'core:poste' %}?onglet=simulation">Simulation</a>
+</nav>

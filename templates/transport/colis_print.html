@@ -13,4 +13,6 @@
 </table>
 <p class="small">Le colis est remis au destinataire sur présentation du <strong>code de retrait</strong> communiqué par l'expéditeur et d'une pièce d'identité.</p>
 <div class="d-flex justify-content-between mt-4 small"><div>Signature de l'expéditeur</div><div>L'agent ({{ colis.cree_par|default:"" }})</div></div>
+{% include "transport/_retour_impression.html" with suivant_libelle="Colis suivant" %}
 </body></html>
+

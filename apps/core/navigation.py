@@ -185,7 +185,8 @@ def menu_fichier(module, societe_url, fermer=True):
              preuve="AJOUT-ERP")] if module in ("commercial", "comptabilite") else []),
         SEP(),
         E("fichier.imprimer", "Imprimer…", icone="bi-printer", action="imprimer"),
-        E("fichier.import_export", "Import / Export", f"{module}:import_export", icone="bi-arrow-down-up", preuve="AJOUT-ERP"),
+        E("fichier.import", "Import", icone="bi-box-arrow-in-down"),
+        E("fichier.export", "Export", icone="bi-box-arrow-up"),
         SEP(),
         *([E("fichier.fermer", "Fermer", icone="bi-x-square", action="fermer")] if fermer else []),
         E("fichier.quitter", "Quitter", icone="bi-power", action="quitter"),
@@ -907,6 +908,8 @@ BILLETTERIE = _module_service(
         E("billetterie.departs", "Départs du jour", "transport:departs", icone="bi-bus-front"),
         E("billetterie.programmer", "Programmer un départ", "transport:depart_create", icone="bi-calendar-plus"),
         E("billetterie.vendre", "Vendre un billet", "transport:billet_vente", icone="bi-ticket-perforated"),
+        E("billetterie.transit", "Billets en transit / correspondances", "transport:billets_transit", icone="bi-signpost-split"),
+        E("billetterie.transvasement", "Transvasement (changement de car)", "transport:transvasement", icone="bi-arrow-left-right"),
         E("billetterie.billets", "Billets vendus (annulation, report)", "transport:billets", icone="bi-list-ul"),
         E("billetterie.remboursements", "Remboursements à payer", "transport:billets", icone="bi-arrow-counterclockwise",
           remboursement="AUTORISE"),
@@ -1243,3 +1246,4 @@ def serialiser_module(module):
     onglets, _ = structure_module(module)
     return {"code": module.code, "titre": module.titre, "description": module.description,
             "icone": module.icone, "couleur": module.couleur, "accueil": reverse(module.accueil), "onglets": onglets}
+

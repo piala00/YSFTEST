@@ -17,7 +17,6 @@ urlpatterns = [
     path("autorisations/", core_views.autorisations, {"module": "analytique"}, name="autorisations"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "analytique"}, name="journal_evenements"),
     path("sauvegarde/", core_views.sauvegarde, {"module": "analytique"}, name="sauvegarde"),
-    path("import-export/", core_views.import_export, {"module": "analytique"}, name="import_export"),
     path("sections/", views.structure_liste, {"structure": "sections"}, name="sections"),
     # Plan analytique : axes → éléments → états détaillés
     path("plan/", views_analytique.plan, name="plan"),

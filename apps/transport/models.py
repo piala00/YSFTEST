@@ -86,11 +86,6 @@ class ParametresTransport(models.Model):
     retenue_annulation = models.DecimalField(
         "Retenue sur billet annulé (%)", max_digits=5, decimal_places=2, default=ZERO,
         help_text="Part du prix gardée par l'agence quand un voyageur annule (modifiable à chaque annulation)")
-    report_absent_automatique = models.BooleanField(
-        "Reporter automatiquement les voyageurs non partis sur le prochain départ de la même ligne", default=False,
-        help_text="Au départ du car, un voyageur pointé absent dont la place reste à voyager est replacé sur le prochain "
-                  "départ programmé de la même ligne, s'il en existe un et qu'il reste de la place. Sinon, son billet "
-                  "reste « à reporter ou à rembourser » (choix manuel). Décoché : tout se fait à la main.")
 
     class Meta:
         verbose_name = "Paramètres transport"
@@ -602,15 +597,7 @@ class Depart(models.Model):
         self.statut, self.parti_le = self.PARTI, timezone.now()
         self.save(update_fields=["statut", "parti_le"])
         if self.embarquement_valide_le:                # liste pointée : les non-cochés ne sont pas partis
-            report_auto = ParametresTransport.get().report_absent_automatique
-            prochain = self.prochain_pour_report() if report_auto else None
             for t in self.troncons.filter(statut=Troncon.A_VOYAGER, embarque=False).select_related("billet"):
-                if prochain is not None and not t.billet.site_origine:    # report automatique vers le prochain départ
-                    try:
-                        t.affecter(prochain)                              # trace REPORT, sans écriture
-                        continue
-                    except ValidationError:
-                        prochain = None                                   # complet ou refusé : le reste se fait à la main
                 t.depart_manque, t.depart, t.siege = self, None, None
                 t.save(update_fields=["depart_manque", "depart", "siege"])
                 if not t.billet.site_origine:
@@ -695,14 +682,7 @@ class Depart(models.Model):
         self.save(update_fields=["km_arrivee", "observations", "statut", "cloture_le", "cloture_par"])
         return self
 
-    def prochain_pour_report(self):
-        """Prochain départ programmé de la même ligne, géré ici (local), pour y reporter un voyageur non parti.
-        Le plus proche dans le temps après celui-ci ; None s'il n'y en a pas."""
-        return (Depart.objects.filter(statut=self.PROGRAMME, ligne_id=self.ligne_id, site_origine="")
-                .exclude(pk=self.pk)
-                .filter(models.Q(date__gt=self.date) | models.Q(date=self.date, heure__gte=self.heure))
-                .order_by("date", "heure", "pk").first())
-
+    @transaction.atomic
     @transaction.atomic
     def annuler_par_la_compagnie(self, motif, nouveau_depart=None, utilisateur=None):
         """Imprévu avant le départ : chaque voyageur est reporté sur `nouveau_depart` (sans frais) ou, à défaut,
@@ -1105,6 +1085,8 @@ class Troncon(models.Model):
         if self.depart_id != depart.pk:
             if depart.places and depart.places_libres_entre(self.gare_depart, self.gare_arrivee) <= 0:
                 raise ValidationError(f"Le départ {depart.numero} est complet.")
+        if siege is not None and (siege < 1 or (depart.places and siege > depart.places)):
+            raise ValidationError(f"Siège {siege} inexistant sur le départ {depart.numero} (1 à {depart.places}).")
         occupes = depart.sieges_occupes(self.gare_depart, self.gare_arrivee)
         if siege is not None and siege in occupes - ({self.siege} if self.depart_id == depart.pk else set()):
             raise ValidationError(f"Le siège {siege} est déjà vendu sur ce départ.")
@@ -1245,7 +1227,11 @@ class Colis(models.Model):
 
     @transaction.atomic
     def charger(self, depart):
+        Colis.objects.select_for_update().get(pk=self.pk)
+        self.refresh_from_db()
         _proprietaire(self, f"L'envoi {self.numero}")
+        if self.incidents_suivi.filter(resolu=False).exists():
+            raise ValidationError("Un incident est encore en cours sur ce colis : chargement bloqué.")
         if self.statut != self.ENREGISTRE:
             raise ValidationError(f"Le colis {self.numero} est {self.get_statut_display().lower()} : chargement impossible.")
         if depart.statut != Depart.PROGRAMME:
@@ -1265,6 +1251,10 @@ class Colis(models.Model):
         """Remise au destinataire contre le code de retrait ; encaisse le port dû et le contre-remboursement."""
         from apps.comptabilite.services import creer_ecriture
 
+        Colis.objects.select_for_update().get(pk=self.pk)
+        self.refresh_from_db()
+        if self.incidents_suivi.filter(resolu=False).exists():
+            raise ValidationError("Un incident est encore en cours sur ce colis : livraison bloquée jusqu'à sa résolution.")
         if self.statut != self.ARRIVE:
             raise ValidationError(f"Le colis {self.numero} n'est pas arrivé en gare ({self.get_statut_display().lower()}).")
         if (code or "").strip() != self.code_retrait:
@@ -1280,8 +1270,15 @@ class Colis(models.Model):
             lignes = [{"compte": caisse.compte_tresorerie, "debit": self.a_encaisser}]
             if self.port == self.DU and self.prix:            # recette du véhicule qui l'a transporté
                 vehicule = self.depart.vehicule if self.depart_id else None
-                lignes += [{**l, "section": self.gare_arrivee.section, "vehicule": vehicule}
-                           for l in _ventiler(self.prix, self.compte_produit(parametres), parametres.taxe_colis)]
+                from .models_incidents import Incident
+                transfert = (Incident.objects.filter(depart=self.depart, type_incident=Incident.TRANSBORDEMENT,
+                    vehicule_secours__isnull=False).select_related("vehicule_secours").first() if self.depart_id else None)
+                for l in _ventiler(self.prix, self.compte_produit(parametres), parametres.taxe_colis):
+                    suite = _arrondi(l["credit"] * transfert.part_restante / 100) if transfert else ZERO
+                    if l["credit"] - suite:
+                        lignes.append({**l, "credit": l["credit"] - suite, "section": self.gare_arrivee.section, "vehicule": vehicule})
+                    if suite:
+                        lignes.append({**l, "credit": suite, "section": self.gare_arrivee.section, "vehicule": transfert.vehicule_secours})
             if self.contre_remboursement:
                 # Envoi d'une autre agence : la somme est due à cette agence (qui la reverse à l'expéditeur)
                 compte_cr = _compte_liaison(self.site_origine) if self.site_origine else parametres.compte_contre_remboursement
@@ -1419,3 +1416,10 @@ from .models_caisse import ClotureJournee, SessionCaisse, TransfertFonds  # noqa
 from .models_exploitation import AvanceMission, JustificatifMission  # noqa
 from .models_depenses import DemandeDepense  # noqa
 from .models_incidents import FraisIncident, Incident  # noqa: E402,F401
+
+
+from .models_contacts import PersonneGuichet, SaisieGuichet  # noqa: E402,F401
+
+
+
+from .models_suivi_colis import IncidentColis  # noqa: E402,F401

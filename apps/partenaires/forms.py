@@ -8,13 +8,16 @@ from .models import ContratPartenaire
 class ContratForm(forms.ModelForm):
     class Meta:
         model = ContratPartenaire
-        fields = ["vehicule", "partenaire", "modele", "debut", "fin", "taux_commission", "montant_location", "periodicite",
+        fields = ["vehicule", "partenaire", "modele", "debut", "fin", "taux_commission", "assiette_commission", "montant_location", "periodicite",
                   "taux_proprietaire", "plancher_zero",
                   "charge_carburant", "charge_reparations", "charge_equipage", "charge_route", "charge_autres", "notes"]
         widgets = {"debut": forms.DateInput(attrs={"type": "date"}), "fin": forms.DateInput(attrs={"type": "date"})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.initial["assiette_commission"] = ContratPartenaire.A_CONFIRMER
+        self.fields["assiette_commission"].required = False
         self.fields["partenaire"].queryset = Tiers.objects.filter(actif=True).order_by("nom")     # son compte propriétaire est à part
         self.fields["partenaire"].help_text = ("Le propriétaire : ses droits et paiements vont sur le compte des propriétaires "
                                                "(467), séparé de son éventuel compte fournisseur")
@@ -36,3 +39,7 @@ class ContratForm(forms.ModelForm):
 
     def clean_taux_commission(self):
         return self._zero("taux_commission")
+
+
+    def clean_assiette_commission(self):
+        return self.cleaned_data.get("assiette_commission") or ContratPartenaire.A_CONFIRMER

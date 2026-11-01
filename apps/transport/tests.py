@@ -285,23 +285,6 @@ class EcransTransportTests(TestCase):
         self.assertEqual(self.client.get(reverse("garage:pleins")).status_code, 403)
         self.assertEqual(self.client.get(reverse("transport:rapport_journalier")).status_code, 403)
 
-    def test_voyageurs_connus_retrouve_les_coordonnees(self):
-        import json
-
-        from django.urls import reverse
-
-        depart = Depart.objects.filter(statut=Depart.PROGRAMME).first()
-        self.client.post(reverse("transport:billet_vente"), {
-            "depart": depart.pk, "voyageur": "Awono Jean", "telephone": "690112233",
-            "piece_identite": "CNI 123", "siege": 7, "paiement": "ESPECES"})
-        contacts = json.loads(self.client.get(reverse("transport:voyageurs_connus"), {"q": "Awono"}).content)["contacts"]
-        self.assertTrue(any(c["voyageur"] == "Awono Jean" and c["telephone"] == "690112233" for c in contacts))
-        # Recherche aussi par téléphone ; rien ne fuit sans correspondance
-        parTel = json.loads(self.client.get(reverse("transport:voyageurs_connus"), {"q": "6901122"}).content)["contacts"]
-        self.assertTrue(any(c["piece_identite"] == "CNI 123" for c in parTel))
-        self.assertEqual(json.loads(self.client.get(reverse("transport:voyageurs_connus"),
-                                                    {"q": "ZZINEXISTANT"}).content)["contacts"], [])
-
     def test_vente_au_guichet_puis_colis_livre(self):
         from django.urls import reverse
 
@@ -649,25 +632,6 @@ class BilletterieAvanceeTests(TestCase):
         evenements = list(absent.historique.values_list("evenement", flat=True))
         self.assertEqual(evenements, ["VENTE", "ABSENT", "REPORT"])
         self.assertIn("PARTI", present.historique.values_list("evenement", flat=True))
-
-    def test_report_automatique_des_absents_si_option_activee(self):
-        from .models import ParametresTransport
-
-        p = ParametresTransport.get()
-        p.report_absent_automatique = True
-        p.save(update_fields=["report_absent_automatique"])
-        suivant = self.depart(heure=15)                                       # prochain départ de la même ligne
-        d = self.depart()
-        present = Billet(depart=d, voyageur="Présent", siege=1).vendre()
-        absent = Billet(depart=d, voyageur="Reporté d'office", siege=2).vendre()
-        d.pointer_embarquement([present.troncons.get().pk])
-        d.refresh_from_db()
-        d.partir()
-        self.assertEqual(solde("70611"), -6000)                               # seul le présent est une recette du car
-        self.assertEqual(solde("41911"), -6000)                               # l'absent reste dû, mais sur le prochain départ
-        t = absent.troncons.get()
-        self.assertEqual((t.depart, t.depart_manque, t.statut), (suivant, None, "A_VOYAGER"))
-        self.assertEqual(list(absent.historique.values_list("evenement", flat=True)), ["VENTE", "REPORT"])
 
     def test_remboursement_autorise_puis_paye(self):
         b = Billet(depart=self.depart(), voyageur="Annule").vendre()
@@ -1338,24 +1302,6 @@ class SimulationTests(TestCase):
                          {datetime.date(2026, 9, 1), datetime.date(2026, 9, 2)})
         self.assertTrue(ArticleMagasin.objects.filter(quantite__gt=0).exists())
         self.assertIn("Bilan de la simulation", sortie.getvalue())
-
-    def test_export_societe_portable_importable(self):
-        import os
-        import tempfile
-
-        from apps.core import sauvegarde
-
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-            chemin = f.name
-        try:
-            call_command("simulation", jours=1, vehicules=3, salaries=5, echelle=0.05, forcer=True,
-                         exporter=chemin, stdout=io.StringIO())
-            contenu = open(chemin, encoding="utf-8").read()
-        finally:
-            os.unlink(chemin)
-        self.assertIn("transport.", contenu)                       # le métier transport figure dans le fichier
-        entete, objets = sauvegarde.lire(contenu)                  # fichier société valide et importable (admin présent)
-        self.assertTrue(any(o["model"] == "transport.depart" for o in objets))
 
 
 class SimulationPlusieursMoisTests(TestCase):

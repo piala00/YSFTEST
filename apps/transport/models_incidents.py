@@ -3,7 +3,7 @@
 Comptes proposés, modifiables sur chaque frais : à valider par l'expert-comptable.
 """
 import uuid
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -21,6 +21,22 @@ def _compte(numero, intitule):
     return Compte.objects.get_or_create(numero=numero, defaults={"intitule": intitule})[0]
 
 
+def _depart_de_saisie(depart):
+    """Sous transaction : refuser les copies et décider sur le départ réellement stocké."""
+    from apps.core.synchronisation import verifier_saisie
+    from .models import Depart, _proprietaire
+
+    if depart._state.db not in (None, "default"):
+        raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+    verifier_saisie("la saisie des imprévus de voyage")
+    try:
+        depart = Depart.objects.select_for_update().get(pk=depart.pk)
+    except Depart.DoesNotExist:
+        raise ValidationError("Ce départ n'existe plus. Actualisez la liste des départs.") from None
+    _proprietaire(depart, f"Le départ {depart.numero}")
+    return depart
+
+
 class Incident(models.Model):
     PANNE, TRANSBORDEMENT, REMPLACEMENT, DECLASSEMENT, RETARD, ACCIDENT, PERTE, AMENDE, VENTE_A_BORD, ANNULATION, AUTRE = (
         "PANNE", "TRANSBORDEMENT", "REMPLACEMENT", "DECLASSEMENT", "RETARD", "ACCIDENT", "PERTE", "AMENDE", "VENTE_A_BORD",
@@ -32,6 +48,8 @@ class Incident(models.Model):
              (ANNULATION, "Départ annulé par la compagnie"), (AUTRE, "Autre imprévu")]
 
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField("Site d'origine", max_length=10, blank=True, editable=False)
+    trace_origine = models.JSONField(default=dict, blank=True, editable=False)
     numero = models.CharField(max_length=30, unique=True, blank=True)
     depart = models.ForeignKey("transport.Depart", on_delete=models.PROTECT, related_name="incidents")
     type_incident = models.CharField("Imprévu", max_length=15, choices=TYPES)
@@ -53,8 +71,12 @@ class Incident(models.Model):
         return f"{self.numero} {self.get_type_incident_display()} ({self.depart.numero})"
 
     def save(self, *args, **kwargs):
-        self.numero = self.numero or Sequence.piece("INC", self.date.year)
-        super().save(*args, **kwargs)
+        using = kwargs.get("using") or self._state.db or "default"
+        with transaction.atomic(using=using):
+            if not self.numero and using != "default":
+                raise ValidationError("La référence métier doit être conservée dans cette copie.")
+            self.numero = self.numero or Sequence.piece("INC", self.date.year)
+            super().save(*args, **kwargs)
 
     @classmethod
     @transaction.atomic
@@ -67,18 +89,27 @@ class Incident(models.Model):
 
         from .models import Depart, ParametresTransport
 
+        depart = _depart_de_saisie(depart)
         if depart.statut not in (Depart.PARTI, Depart.ARRIVE):
             raise ValidationError("Le transbordement concerne un car parti.")
         part = Decimal(part_restante)
-        if not ZERO < part <= 100:
+        if not part.is_finite() or not ZERO < part <= 100:
             raise ValidationError("La part du trajet restant est un pourcentage entre 0 et 100.")
         if vehicule_secours is not None and vehicule_secours.pk == depart.vehicule_id:
             raise ValidationError("Le car de secours doit être un autre véhicule.")
+        if vehicule_secours is not None and not vehicule_secours.actif:
+            raise ValidationError("Le véhicule de secours est inactif.")
+        precedent = cls.objects.filter(depart=depart, type_incident=cls.TRANSBORDEMENT).first()
+        if precedent is not None:
+            if (precedent.part_restante == part and precedent.vehicule_secours_id == getattr(vehicule_secours, "pk", None)
+                    and precedent.lieu == lieu and precedent.description == description):
+                return precedent  # même opération réémise : aucune seconde écriture
+            raise ValidationError("Un transvasement est déjà enregistré pour ce départ. Consultez son historique avant tout nouveau changement.")
         incident = cls.objects.create(depart=depart, type_incident=cls.TRANSBORDEMENT, part_restante=part, lieu=lieu,
                                       description=description, vehicule_secours=vehicule_secours, cree_par=utilisateur)
         if vehicule_secours is not None and depart.ecriture_recettes_id:
             p = ParametresTransport.get()
-            produits = {c.pk for c in (p.compte_billets, p.compte_bagages) if c is not None}
+            produits = {c.pk for c in (p.compte_billets, p.compte_bagages, p.compte_colis, p.compte_fret) if c is not None}
             lignes = []
             for l in depart.ecriture_recettes.lignes.filter(compte_id__in=produits, vehicule_id=depart.vehicule_id):
                 montant = (Decimal(l.credit - l.debit) * part / 100).quantize(Decimal("1"))
@@ -101,10 +132,11 @@ class Incident(models.Model):
 
         from .models import Depart, ParametresTransport, _ventiler
 
+        depart = _depart_de_saisie(depart)
         if depart.statut not in (Depart.PARTI, Depart.ARRIVE, Depart.CLOTURE):
             raise ValidationError("La recette à bord concerne un car parti.")
         montant = Decimal(montant)
-        if montant <= 0:
+        if not montant.is_finite() or montant <= 0:
             raise ValidationError("Le montant doit être positif.")
         p = ParametresTransport.get()
         incident = cls.objects.create(depart=depart, type_incident=cls.VENTE_A_BORD, lieu=lieu, cree_par=utilisateur,
@@ -153,14 +185,37 @@ class FraisIncident(models.Model):
     class Meta:
         verbose_name = "Frais d'imprévu"
 
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or self._state.db or "default"
+        with transaction.atomic(using=using):
+            super().save(*args, **kwargs)
+
     @transaction.atomic
     def enregistrer(self):
         from apps.comptabilite.models import Journal
         from apps.comptabilite.services import creer_ecriture
 
-        if self.montant is None or self.montant <= 0:
-            raise ValidationError("Le montant doit être positif.")
-        depart = self.incident.depart
+        if self._state.db not in (None, "default"):
+            raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+        if self.pk:
+            try:
+                self.refresh_from_db(from_queryset=type(self).objects.select_for_update())
+            except type(self).DoesNotExist:
+                raise ValidationError("Ce frais n'existe plus. Actualisez la liste des imprévus.") from None
+        if self.ecriture_id:
+            raise ValidationError("Ce frais est déjà comptabilisé. Aucun nouveau décaissement n'est enregistré.")
+        if self.incident._state.db not in (None, "default"):
+            raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+        # Ordre partagé avec le transbordement : départ avant la lecture de l'imprévu.
+        depart = _depart_de_saisie(self.incident.depart)
+        self.incident = Incident.objects.get(pk=self.incident_id)
+        try:
+            self.montant = Decimal(self.montant)
+        except (InvalidOperation, TypeError, ValueError):
+            raise ValidationError("Indiquez un montant entier positif.") from None
+        if (not self.montant.is_finite() or self.montant <= 0 or self.montant >= 10**14
+                or self.montant != self.montant.quantize(Decimal("1"))):
+            raise ValidationError("Indiquez un montant entier positif compatible avec le champ de saisie.")
         vehicule = self.vehicule or depart.vehicule
         compte = self.compte or _compte(*self.COMPTES[self.nature])
         if self.paiement == self.FOURNISSEUR:
@@ -186,3 +241,5 @@ class FraisIncident(models.Model):
             reference=self.incident.numero, origine=depart.numero)
         self.save(update_fields=["ecriture"])
         return self
+
+

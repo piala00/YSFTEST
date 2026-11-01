@@ -11,7 +11,9 @@ P="$TRAVAIL/ERP-OHADA"
 mkdir -p "$P/logiciel" "$P/paquets" "$P/python" "$P/outils" "$SORTIE"
 
 git -C "$DEPOT" archive HEAD | tar -x -C "$P/logiciel"
-rm -rf "$P/logiciel/docs/"*.zip "$P/logiciel/.github"
+rm -rf "$P/logiciel/docs" "$P/logiciel/.github" "$P/logiciel/deploy/licences"
+mkdir -p "$P/logiciel/docs"
+cp "$DEPOT/deploy/executable/GUIDE-CLIENT.txt" "$P/logiciel/docs/"
 # Documentation de travail (skills) : seule la procédure d'essai sur le poste est utile au logiciel installé
 find "$P/logiciel/.claude/skills" -mindepth 1 -maxdepth 1 ! -name essai-synchronisation-dossier-local -exec rm -rf {} +
 cp "$DEPOT"/deploy/windows/*.bat "$DEPOT/deploy/windows/LISEZ-MOI.txt" "$P/"

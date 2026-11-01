@@ -29,7 +29,6 @@ urlpatterns = [
     path("analytique/proprietaires/releves/<int:pk>/", partenaires_views.releve, name="analytique_releve"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "comptabilite"}, name="journal_evenements"),
     path("sauvegarde/", core_views.sauvegarde, {"module": "comptabilite"}, name="sauvegarde"),
-    path("import-export/", core_views.import_export, {"module": "comptabilite"}, name="import_export"),
     path("reprise-dossier/", core_views.reprise_dossier, {"module": "comptabilite"}, name="reprise_dossier"),
     path("", core_views.accueil_module, {"module": "comptabilite"}, name="accueil"),
     path("societe/", core_views.SocieteUpdateView.as_view(), name="societe"),

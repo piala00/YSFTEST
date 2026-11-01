@@ -15,6 +15,8 @@ from django.utils import timezone
 
 from apps.core.models import Sequence
 
+from .validation import relire_piece
+
 ZERO = Decimal("0")
 ESPECES, COMPTE = "ESPECES", "COMPTE"
 PAIEMENTS = [(ESPECES, "Payé en caisse"), (COMPTE, "En compte fournisseur (à payer)")]
@@ -81,6 +83,9 @@ class PleinCarburant(models.Model):
         from apps.comptabilite.services import creer_ecriture
         from apps.transport.models import ParametresTransport
 
+        relire_piece(self, "Ce plein")
+        if self.ecriture_id:
+            raise ValidationError("Ce plein est déjà comptabilisé.")
         if self.litres is None or self.litres <= 0 or self.prix_litre is None or self.prix_litre < 0:
             raise ValidationError("Indiquez les litres et le prix du litre.")
         if self.montant is None:
@@ -155,7 +160,8 @@ class OrdreReparation(models.Model):
         from apps.comptabilite.services import creer_ecriture
         from apps.transport.models import ParametresTransport
 
-        if self.statut != self.OUVERT:
+        relire_piece(self, "Cet ordre de réparation", requis=True)
+        if self.statut != self.OUVERT or self.ecriture_id:
             raise ValidationError("Cet ordre de réparation n'est plus en cours.")
         lignes_or = list(self.lignes.select_related("fournisseur"))
         if not lignes_or:

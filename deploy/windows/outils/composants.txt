@@ -7,3 +7,4 @@ mssql-django>=2.0
 # Pilote SQL Server fourni avec le programme (aucun pilote ODBC à installer)
 mssql-python>=0.13
 cryptography>=42
+openpyxl>=3.1,<4
