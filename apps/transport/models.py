@@ -86,6 +86,11 @@ class ParametresTransport(models.Model):
     retenue_annulation = models.DecimalField(
         "Retenue sur billet annulé (%)", max_digits=5, decimal_places=2, default=ZERO,
         help_text="Part du prix gardée par l'agence quand un voyageur annule (modifiable à chaque annulation)")
+    report_absent_automatique = models.BooleanField(
+        "Reporter automatiquement les voyageurs non partis sur le prochain départ de la même ligne", default=False,
+        help_text="Au départ du car, un voyageur pointé absent dont la place reste à voyager est replacé sur le prochain "
+                  "départ programmé de la même ligne, s'il en existe un et qu'il reste de la place. Sinon, son billet "
+                  "reste « à reporter ou à rembourser » (choix manuel). Décoché : tout se fait à la main.")
 
     class Meta:
         verbose_name = "Paramètres transport"
@@ -597,7 +602,15 @@ class Depart(models.Model):
         self.statut, self.parti_le = self.PARTI, timezone.now()
         self.save(update_fields=["statut", "parti_le"])
         if self.embarquement_valide_le:                # liste pointée : les non-cochés ne sont pas partis
+            report_auto = ParametresTransport.get().report_absent_automatique
+            prochain = self.prochain_pour_report() if report_auto else None
             for t in self.troncons.filter(statut=Troncon.A_VOYAGER, embarque=False).select_related("billet"):
+                if prochain is not None and not t.billet.site_origine:    # report automatique vers le prochain départ
+                    try:
+                        t.affecter(prochain)                              # trace REPORT, sans écriture
+                        continue
+                    except ValidationError:
+                        prochain = None                                   # complet ou refusé : le reste se fait à la main
                 t.depart_manque, t.depart, t.siege = self, None, None
                 t.save(update_fields=["depart_manque", "depart", "siege"])
                 if not t.billet.site_origine:
@@ -682,7 +695,14 @@ class Depart(models.Model):
         self.save(update_fields=["km_arrivee", "observations", "statut", "cloture_le", "cloture_par"])
         return self
 
-    @transaction.atomic
+    def prochain_pour_report(self):
+        """Prochain départ programmé de la même ligne, géré ici (local), pour y reporter un voyageur non parti.
+        Le plus proche dans le temps après celui-ci ; None s'il n'y en a pas."""
+        return (Depart.objects.filter(statut=self.PROGRAMME, ligne_id=self.ligne_id, site_origine="")
+                .exclude(pk=self.pk)
+                .filter(models.Q(date__gt=self.date) | models.Q(date=self.date, heure__gte=self.heure))
+                .order_by("date", "heure", "pk").first())
+
     @transaction.atomic
     def annuler_par_la_compagnie(self, motif, nouveau_depart=None, utilisateur=None):
         """Imprévu avant le départ : chaque voyageur est reporté sur `nouveau_depart` (sans frais) ou, à défaut,
