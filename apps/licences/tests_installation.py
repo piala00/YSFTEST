@@ -55,6 +55,20 @@ class InstallationTests(SimpleTestCase):
         with self.assertRaisesRegex(l.LicenceInvalide, "licence d'exploitation"):
             autoriser(l.ecrire(d, self.privee.sign(l.canonique(d))).encode(), "transport")
 
+    def test_identite_du_generateur_differente_de_celle_de_l_installateur(self):
+        # Une autorisation correctement signée par un autre éditeur reste refusée.
+        autre = Ed25519PrivateKey.generate()
+        publique = autre.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        donnees = {"version": 1, "reference": "AAAAAA-AAAAAA-AAAAAA-AAAAAA",
+                   "edition": "transport", "machine": "MACHINE-FICTIVE",
+                   "key_id": hashlib.sha256(publique).hexdigest().upper(),
+                   "valable_jusqu_au": None}
+        fichier = l.fc.autorisation_texte(
+            donnees, autre.sign(l.fc.DOMAINE_AUTORISATION + l.canonique(donnees))
+        ).encode()
+        with self.assertRaisesRegex(l.LicenceInvalide, "identité de signature incompatible"):
+            autoriser(fichier, "transport")
+
     def test_absence_identite_ne_peut_autoriser_une_installation(self):
         with mock.patch.object(l, "cles_publiques", return_value=[]), self.assertRaises(l.LicenceInvalide):
             autoriser(self.fichier(), "transport")
