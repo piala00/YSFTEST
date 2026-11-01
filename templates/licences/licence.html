@@ -42,7 +42,9 @@
     <table class="table table-sm small mb-2"><tbody>
       <tr><th>Société</th><td>{{ demande.societe }}</td></tr>
       <tr><th>Nom de la machine</th><td>{{ demande.machine_nom }}</td></tr>
-      <tr><th>Identifiant matériel</th><td class="font-monospace">{{ demande.materiel }}</td></tr>
+      <tr><th>Identifiant matériel</th><td class="font-monospace"><span id="code-materiel">{{ demande.materiel }}</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary py-0 ms-1" data-copier="#code-materiel"
+                title="Copier le code"><i class="bi bi-clipboard"></i> Copier</button></td></tr>
       <tr><th>Clé d'installation</th><td>{{ demande.installation|default:"—" }}</td></tr>
       <tr><th>Rôle du serveur</th><td>{% for k, v in roles.items %}{% if k == demande.role %}{{ v }}{% endif %}{% endfor %}{% if demande.site %} ({{ demande.site }}){% endif %}</td></tr>
     </tbody></table>
@@ -72,4 +74,24 @@
       <td>{% if h.valide %}<span class="text-success">acceptée</span>{% else %}<span class="text-danger">refusée</span> : {{ h.motif }}{% endif %}</td></tr>{% endfor %}
     </tbody></table></div></div>{% endif %}
 </div>
+<script>
+// Bouton « Copier » : copie le texte de l'élément visé dans le presse-papiers, avec confirmation visible.
+document.addEventListener("click", function (ev) {
+  var bouton = ev.target.closest("[data-copier]");
+  if (!bouton) return;
+  var cible = document.querySelector(bouton.getAttribute("data-copier"));
+  if (!cible) return;
+  var texte = (cible.innerText || cible.textContent || "").trim();
+  function confirme() {
+    var avant = bouton.innerHTML;
+    bouton.innerHTML = '<i class="bi bi-check-lg"></i> Copié';
+    setTimeout(function () { bouton.innerHTML = avant; }, 1500);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texte).then(confirme, function () { window.prompt("Copier le code :", texte); });
+  } else {
+    window.prompt("Copier le code :", texte);              // navigateurs anciens / hors HTTPS
+  }
+});
+</script>
 {% endblock %}

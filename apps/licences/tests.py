@@ -102,6 +102,7 @@ class LicencesTests(TestCase):
         U = get_user_model()
         self.client.force_login(U.objects.create_superuser("chef", "", "Chef-2030-ok"))
         self.client.post(reverse("licence"), {"action": "installation", "cle": self.cle_installation()})
+        self.assertContains(self.client.get(reverse("licence")), "data-copier")   # bouton « Copier le code »
         reponse = self.client.get(reverse("licence") + "?demande=1")
         self.assertIn("DEMANDE-LICENCE-", reponse["Content-Disposition"])
         demande = l.fc.demande_lire(reponse.content)

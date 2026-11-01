@@ -46,8 +46,8 @@ def mot_de_passe(confirmer=False):
         mdp = getpass.getpass("Mot de passe de la clé privée : ")
         if not confirmer:
             return mdp.encode()
-        if len(mdp) < 10:
-            print("10 caractères au moins.")
+        if len(mdp) < 6:
+            print("6 caractères au moins.")
         elif mdp == getpass.getpass("Confirmez : "):
             return mdp.encode()
         else:
@@ -470,8 +470,8 @@ def interface(essai=False):
         if (dossier / "cle-privee.pem").exists():
             messagebox.showinfo("Licences", "La paire de clés existe déjà dans ce dossier.")
             return
-        mdp = simpledialog.askstring("Licences", "Mot de passe de la nouvelle clé (10 caractères ou plus) :", show="*", parent=fen)
-        if not mdp or len(mdp) < 10 or mdp != simpledialog.askstring("Licences", "Confirmez :", show="*", parent=fen):
+        mdp = simpledialog.askstring("Licences", "Mot de passe de la nouvelle clé (6 caractères ou plus) :", show="*", parent=fen)
+        if not mdp or len(mdp) < 6 or mdp != simpledialog.askstring("Licences", "Confirmez :", show="*", parent=fen):
             messagebox.showerror("Licences", "Mot de passe absent, trop court ou différent.")
             return
         os.environ["ERP_LICENCES_MDP"] = mdp
