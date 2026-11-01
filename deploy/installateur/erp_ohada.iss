@@ -177,6 +177,7 @@ var
   OutilNettoyageTemp: String;
   CodeInstallation: String;
   BoutonCopierCode: TNewButton;
+  ChampCodeInstallation: TNewEdit;
 
 function FichierAutorisation(): String;
 begin
@@ -284,7 +285,10 @@ begin
     MsgBox('Le code de ce serveur est indisponible. Relancez l''installateur ou contactez l''éditeur.', mbError, MB_OK);
     exit;
   end;
-  SetClipboardText(CodeInstallation);
+  { WM_COPY sur un champ natif Windows : compatible avec Inno Setup 6. }
+  ChampCodeInstallation.SetFocus;
+  SendMessage(ChampCodeInstallation.Handle, $00B1, 0, -1); { EM_SETSEL }
+  SendMessage(ChampCodeInstallation.Handle, $0301, 0, 0);  { WM_COPY }
   BoutonCopierCode.Caption := 'Code copié !';
 end;
 
@@ -312,6 +316,14 @@ begin
     'Chaque installation, réinstallation, mise à jour et réparation vérifie cette autorisation hors ligne. ' +
     'Un code court ou une ancienne configuration ne suffit pas. Cette autorisation ne remplace pas la licence d''exploitation.');
   PageAutorisation.Add('Autorisation signée (.erpinst) :', 'Autorisation ERP (*.erpinst)|*.erpinst', '.erpinst');
+  ChampCodeInstallation := TNewEdit.Create(PageAutorisation);
+  ChampCodeInstallation.Parent := PageAutorisation.Surface;
+  ChampCodeInstallation.Text := CodeInstallation;
+  ChampCodeInstallation.ReadOnly := True;
+  ChampCodeInstallation.Left := 0;
+  ChampCodeInstallation.Top := PageAutorisation.SurfaceHeight - ScaleY(34);
+  ChampCodeInstallation.Width := PageAutorisation.SurfaceWidth - ScaleX(146);
+  ChampCodeInstallation.Height := ScaleY(25);
   BoutonCopierCode := TNewButton.Create(PageAutorisation);
   BoutonCopierCode.Parent := PageAutorisation.Surface;
   BoutonCopierCode.Caption := 'Copier le code';
