@@ -167,6 +167,7 @@ jobs:
           name: ERP-Activation-Compilee-Preuves-Fictives
           path: |
             ${{ runner.temp }}/activation-fictive/RESULTATS-*.json
+            ${{ runner.temp }}/activation-fictive/EXPORT-*.xlsx
             ${{ runner.temp }}/activation-fictive/*/serveur-*.log
           retention-days: 7
       # Aucun exécutable ancré sur cette identité fictive ni aucune clé privée n'est publié.

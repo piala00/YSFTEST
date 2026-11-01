@@ -44,9 +44,10 @@ class Navigateur:
         self.cookies = http.cookiejar.CookieJar()
         self.client = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPCookieProcessor(self.cookies))
 
-    def get(self, chemin):
+    def get(self, chemin, binaire=False):
         with self.client.open(self.base + chemin, timeout=10) as r:
-            return r.read().decode("utf-8")
+            contenu = r.read()
+            return contenu if binaire else contenu.decode("utf-8")
 
     def post(self, chemin, champs=None, fichier=None):
         csrf = next(c.value for c in self.cookies if c.name.endswith("csrftoken"))
@@ -117,6 +118,7 @@ def verifier(exe, edition):
                     verifier_texte(page, "LIC-2026-0001")
                     verifier_texte(page, "licence définitive")
                     resultats.append("licence conservée après arrêt et nouveau processus")
+                    verifier_excel(navigateur, edition, tour, resultats)
                     continue
                 navigateur.post("/licence/", {"action": "installation", "cle": fc.installation_courte_creer()})
                 demande = fc.demande_lire(navigateur.get("/licence/?demande=1"))
@@ -140,6 +142,7 @@ def verifier(exe, edition):
                 verifier_texte(navigateur.post("/licence/", {"action": "activation", "cle": cle_texte}), "activée pour")
                 verifier_texte(navigateur.get("/licence/"), "LIC-2026-0001")
                 resultats.append("activation réelle par clé texte signée, mêmes conditions et même serveur")
+                verifier_excel(navigateur, edition, tour, resultats)
             finally:
                 if os.name == "nt":
                     subprocess.run(["taskkill", "/F", "/T", "/PID", str(serveur.pid)], capture_output=True, check=False)
@@ -150,6 +153,23 @@ def verifier(exe, edition):
                "limite": "Identité et base fictives. HTTP local sans service distant ; ne prouve pas un essai sur le PC du propriétaire ni sous Windows 10/11."}
     (DOSSIER / f"RESULTATS-{edition}.json").write_text(json.dumps(rapport, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(rapport, ensure_ascii=False))
+
+
+def verifier_excel(navigateur, edition, tour, resultats):
+    """Le vrai EXE doit charger sa dépendance et renvoyer un classeur ouvrable."""
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    contenu = navigateur.get("/reporting/evolution/?export=xlsx&du=2026-09-01&au=2026-09-30", binaire=True)
+    wb = load_workbook(BytesIO(contenu))
+    assert wb.sheetnames == ["Données", "Critères"]
+    assert wb["Données"]["A1"].value == "Mois"
+    criteres = dict(list(wb["Critères"].values)[1:])
+    assert criteres["du"] == "2026-09-01" and criteres["au"] == "2026-09-30"
+    assert not any(c.data_type == "f" for p in wb for row in p for c in row)
+    wb.close()
+    (DOSSIER / f"EXPORT-{edition}-{tour}.xlsx").write_bytes(contenu)
+    resultats.append(f"export Excel réel depuis EXE {edition}, démarrage {tour}, fichier relu et critères conservés")
 
 
 if __name__ == "__main__":
