@@ -657,14 +657,20 @@ def sessions_caisse(request):
     if request.method == "POST":
         s = get_object_or_404(SessionCaisse, pk=request.POST.get("session"))
         try:
-            s.approuver(request.user, request.POST.get("justification", ""), request.POST.get("imputation") or SessionCaisse.CHARGE)
-            messages.success(request, f"Caisse {s.numero} approuvée.")
+            s.approuver(request.user, request.POST.get("justification", ""), request.POST.get("imputation") or SessionCaisse.CHARGE,
+                        reverser_vers=request.POST.get("reverser_vers") or None)
+            msg = f"Caisse {s.numero} approuvée."
+            if s.transfert_reversement_id:
+                msg += (f" Recette de {s.montant_compte:,.0f} FCFA reversée vers {s.transfert_reversement.destination.intitule} "
+                        f"(en transit jusqu'à réception).".replace(",", " "))
+            messages.success(request, msg)
         except ValidationError as exc:
             _erreur(request, exc)
         return redirect(f"{request.path}?date={jour.isoformat()}")
     sessions = SessionCaisse.objects.filter(ouverte_le__date=jour).select_related("agent", "caisse", "gare")
     return render(request, "transport/sessions_caisse.html", {
-        "jour": jour, "sessions": [(s, s.detail()) for s in sessions], "imputations": SessionCaisse.IMPUTATIONS})
+        "jour": jour, "sessions": [(s, s.detail(), SessionCaisse.caisses_ouvertes(sauf_pk=s.caisse_id, jour=jour)) for s in sessions],
+        "imputations": SessionCaisse.IMPUTATIONS})
 
 
 @login_required

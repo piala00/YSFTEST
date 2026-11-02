@@ -54,6 +54,8 @@ class SessionCaisse(models.Model):
     approuvee_le = models.DateTimeField(null=True, blank=True)
     imputation_ecart = models.CharField(max_length=10, choices=IMPUTATIONS, blank=True)
     ecriture_ecart = models.OneToOneField("comptabilite.Ecriture", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    transfert_reversement = models.OneToOneField("transport.TransfertFonds", null=True, blank=True, on_delete=models.SET_NULL,
+                                                 related_name="+", verbose_name="Reversement de la recette")
 
     class Meta:
         ordering = ["-ouverte_le"]
@@ -68,6 +70,19 @@ class SessionCaisse(models.Model):
         if utilisateur is None or not getattr(utilisateur, "pk", None):
             return None
         return cls.objects.filter(agent=utilisateur, statut=cls.OUVERTE).first()
+
+    @classmethod
+    def caisses_ouvertes(cls, sauf_pk=None, jour=None):
+        """Caisses (points de vente) encore ouvertes aujourd'hui : destinations possibles
+        pour reverser la recette quand ce point de vente ferme plus tôt."""
+        from apps.comptabilite.models import Journal
+
+        jour = jour or timezone.localdate()
+        ids = cls.objects.filter(statut=cls.OUVERTE, ouverte_le__date=jour).values_list("caisse_id", flat=True)
+        journaux = Journal.objects.filter(pk__in=list(ids), type_journal=Journal.TYPE_TRESORERIE)
+        if sauf_pk:
+            journaux = journaux.exclude(pk=sauf_pk)
+        return journaux
 
     @classmethod
     @transaction.atomic
@@ -114,8 +129,11 @@ class SessionCaisse(models.Model):
         return self
 
     @transaction.atomic
-    def approuver(self, utilisateur, justification="", imputation=CHARGE):
-        """Le chef de gare contrôle et approuve ; l'écart éventuel est comptabilisé."""
+    def approuver(self, utilisateur, justification="", imputation=CHARGE, reverser_vers=None):
+        """Le chef de gare contrôle et approuve ; l'écart éventuel est comptabilisé.
+        Il peut reverser la recette comptée vers une caisse encore ouverte (point de vente
+        qui reste ouvert) : l'écart étant comptabilisé d'abord, le solde du livre correspond
+        alors au montant compté, et le reversement part en transit (compte 585)."""
         from apps.comptabilite.models import Journal
         from apps.comptabilite.services import creer_ecriture
 
@@ -127,6 +145,13 @@ class SessionCaisse(models.Model):
             self.justification = justification.strip()
         if self.ecart and not self.justification:
             raise ValidationError("Justifiez l'écart de caisse avant de l'approuver.")
+        if reverser_vers is not None and not isinstance(reverser_vers, Journal):
+            reverser_vers = Journal.objects.get(pk=reverser_vers)
+        if reverser_vers is not None:
+            if reverser_vers.pk == self.caisse_id:
+                raise ValidationError("La caisse de destination doit être différente.")
+            if reverser_vers.type_journal != Journal.TYPE_TRESORERIE:
+                raise ValidationError("Le reversement doit viser une caisse de trésorerie.")
         if self.ecart:
             caisse = self.caisse.compte_tresorerie
             if self.ecart < 0:
@@ -142,6 +167,12 @@ class SessionCaisse(models.Model):
             self.imputation_ecart = imputation if self.ecart < 0 else ""
         self.statut, self.approuvee_par, self.approuvee_le = self.APPROUVEE, utilisateur, timezone.now()
         self.save()
+        if reverser_vers is not None and self.montant_compte and self.montant_compte > 0:
+            transfert = TransfertFonds(origine=self.caisse, destination=reverser_vers, montant=self.montant_compte,
+                                       porteur=f"Reversement recette caisse {self.numero} ({self.agent})"[:150])
+            transfert.envoyer(utilisateur)
+            self.transfert_reversement = transfert
+            self.save(update_fields=["transfert_reversement"])
         return self
 
 
