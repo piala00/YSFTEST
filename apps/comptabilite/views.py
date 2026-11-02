@@ -190,7 +190,16 @@ def _ecriture_form(request, ecriture):
     else:
         form = EcritureForm(instance=ecriture)
         formset = LigneEcritureFormSet(instance=ecriture)
-    return render(request, "comptabilite/ecriture_form.html", {"form": form, "formset": formset, "ecriture": ecriture})
+    # Journaux de trésorerie : compte de caisse/banque à créditer automatiquement en contrepartie (comme Sage).
+    import json as _json
+    journaux_tresorerie = {
+        str(j.pk): j.compte_tresorerie_id
+        for j in Journal.objects.filter(type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie__isnull=False)
+    }
+    return render(request, "comptabilite/ecriture_form.html", {
+        "form": form, "formset": formset, "ecriture": ecriture,
+        "journaux_tresorerie": _json.dumps(journaux_tresorerie),
+    })
 
 
 @login_required

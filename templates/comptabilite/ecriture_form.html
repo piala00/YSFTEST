@@ -1,5 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Saisie d'écriture{% endblock %}
+{% block head %}
+<style>
+/* Grille de saisie façon Sage : des cellules plates, sans cadre individuel.
+   Les champs remplissent toute la cellule ; seuls de fins filets séparent les
+   colonnes et les lignes. La cellule en cours d'édition est surlignée. */
+#lignes{border-collapse:collapse}
+#lignes thead th{background:#f4f6f8;border-bottom:1px solid #c9d1d8;font-weight:600;padding:.3rem .5rem}
+#lignes tbody td{border-right:1px solid #e9edf0;border-bottom:1px solid #eef1f4;padding:0;vertical-align:middle}
+#lignes tbody td:last-child{border-right:0}
+#lignes tbody td .form-control,
+#lignes tbody td .form-select{border:0;border-radius:0;background:transparent;box-shadow:none;height:auto;min-height:30px;padding:.25rem .5rem;width:100%}
+#lignes tbody td .form-control:focus,
+#lignes tbody td .form-select:focus{background:#fff8dd;outline:2px solid #86b7fe;outline-offset:-2px;box-shadow:none;position:relative;z-index:1}
+#lignes tbody tr:hover td{background:#f8fafc}
+#lignes tbody tr:hover td .form-control,
+#lignes tbody tr:hover td .form-select{background:transparent}
+#lignes tfoot td{border-top:2px solid #c9d1d8;padding:.3rem .5rem}
+</style>
+{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Saisie d'écriture {% if ecriture.pk %}<small class="text-muted fs-6">{{ ecriture.numero }}</small>{% endif %}</h1></div>
 <form method="post">{% csrf_token %}
@@ -67,11 +86,41 @@ function equilibrer(tr) {
   if (ecart > 0) c.value = ecart; else if (ecart < 0) d.value = -ecart;
   recalc();
 }
+// Journaux de caisse / trésorerie : le compte de caisse est crédité (ou débité)
+// automatiquement en contrepartie, et le libellé de la ligne est repris (comme Sage).
+const TRESO = JSON.parse('{{ journaux_tresorerie|escapejs }}' || '{}');
+function compteTresorerie() {
+  const j = document.getElementById('id_journal');
+  return j && TRESO[j.value] ? String(TRESO[j.value]) : null;
+}
+// Après avoir saisi une ligne de dépense/recette (compte + montant) dans un journal
+// de trésorerie, on crée la contrepartie sur le compte de caisse et on reprend le libellé.
+function contrepartieTresorerie(tr) {
+  const compteCaisse = compteTresorerie();
+  if (!compteCaisse) return;
+  const compte = tr.querySelector('.ligne-compte');
+  if (!compte || !(compte.value || '').trim() || compte.value === compteCaisse) return;
+  const d = n(tr.querySelector('.ligne-debit')), c = n(tr.querySelector('.ligne-credit'));
+  if (!d && !c) return;
+  if (tr !== derniereLigne()) return;
+  const suiv = ajouterLigne();
+  // Contrepartie : si la ligne était au débit, on crédite la caisse, et inversement.
+  const dS = suiv.querySelector('.ligne-debit'), cS = suiv.querySelector('.ligne-credit');
+  if (d) cS.value = d; else dS.value = c;
+  const libS = suiv.querySelector('[name$="-libelle"]'), lib = tr.querySelector('[name$="-libelle"]');
+  if (libS && lib && lib.value) libS.value = lib.value;
+  const compteSuiv = suiv.querySelector('.ligne-compte');
+  if (compteSuiv) { compteSuiv.value = compteCaisse; compteSuiv.dispatchEvent(new Event('change', {bubbles: true})); }
+  recalc();
+}
 document.addEventListener('input', e => {
   if (e.target.matches('.ligne-debit, .ligne-credit')) recalc();
   if (e.target.matches('.ligne-compte')) compteRempli(e.target);
 });
-document.addEventListener('change', e => { if (e.target.matches('.ligne-compte')) compteRempli(e.target); });
+document.addEventListener('change', e => {
+  if (e.target.matches('.ligne-compte')) compteRempli(e.target);
+  if (e.target.matches('.ligne-debit, .ligne-credit')) contrepartieTresorerie(e.target.closest('tr.ligne'));
+});
 // Entrée = champ suivant (jamais d'envoi involontaire du formulaire depuis une cellule).
 document.getElementById('lignes').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
