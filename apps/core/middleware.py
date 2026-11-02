@@ -94,32 +94,3 @@ class PremiereConfigurationMiddleware:
             return redirect("core:installation")
         return None
 
-
-class EditionMiddleware:
-    """Transport et Gestion commerciale sont deux logiciels distincts : dans le programme livré,
-    on ne doit jamais atteindre les écrans de l'autre métier, même par une URL directe.
-
-    La séparation suit l'activité de la société (Transport, Commerce ou Mixte). Elle n'est active
-    que dans le programme compilé (ERP_LICENCE) ; en développement et dans les tests, tout reste
-    accessible pour ne pas gêner l'outillage.
-    """
-
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        from django.conf import settings
-
-        if settings.ERP_LICENCE:
-            from django.contrib import messages
-            from django.shortcuts import redirect
-
-            from .models import Societe
-            from .navigation import modules_bloques
-
-            module = module_pour_chemin(request.path)
-            if module is not None and module.code in modules_bloques(Societe.get()):
-                messages.info(request, f"« {module.titre} » appartient à un autre logiciel, "
-                                       "non disponible dans cette édition.")
-                return redirect("core:portail")
-        return self.get_response(request)

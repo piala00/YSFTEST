@@ -86,7 +86,6 @@ MIDDLEWARE = [
     "apps.core.middleware.PremiereConfigurationMiddleware",  # premier démarrage du programme compilé
     "apps.licences.middleware.LicenceMiddleware",        # lecture seule après expiration, postes
     "apps.core.middleware.AutorisationsMiddleware",      # Fichier › Autorisations d'accès
-    "apps.core.middleware.EditionMiddleware",            # Transport et Commerce = deux logiciels distincts
     "apps.core.journal.RequeteCouranteMiddleware",       # utilisateur du journal des événements
     "apps.core.selection.SelectionMiddleware",           # fenêtre de sélection avant les états
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

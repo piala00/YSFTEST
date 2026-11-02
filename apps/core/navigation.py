@@ -1049,19 +1049,6 @@ def modules_proposes(societe):
     return modules
 
 
-def modules_bloques(societe):
-    """Codes des logiciels d'un AUTRE métier, à rendre inaccessibles dans cette édition.
-
-    Le Transport et la Gestion commerciale sont deux logiciels distincts : on ne doit jamais
-    retrouver l'un dans l'autre. En activité Transport, toute la Gestion commerciale est bloquée ;
-    en activité Commerce, les services de transport le sont. En activité Mixte, rien n'est bloqué.
-    """
-    if societe.activite == societe.ACTIVITE_TRANSPORT:
-        return {"commercial"}
-    if societe.activite == societe.ACTIVITE_COMMERCE:
-        return set(SERVICES_TRANSPORT)
-    return set()
-
 
 # ---------------------------------------------------------------------------
 # Résolution de l'élément actif
