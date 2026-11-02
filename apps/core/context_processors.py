@@ -21,8 +21,13 @@ def societe(request):
     from .droits import AUCUN, acces_de
 
     proposes = [m for m in modules_proposes(fiche) if request.user.is_superuser or acces_de(request.user, m.code) != AUCUN]
+    from django.conf import settings
+
     contexte = {"societe": fiche, "exercice_courant": Exercice.courant(), "modules": proposes,
-                "selection": resume(request), "erp_actualiser": request.session.pop("erp_actualiser", None)}
+                "selection": resume(request), "erp_actualiser": request.session.pop("erp_actualiser", None),
+                # Logiciel livré : masque les actions propres à l'autre métier dans les écrans communs.
+                "edition_transport": settings.ERP_EDITION == "transport",
+                "edition_commerce": settings.ERP_EDITION == "commerce"}
     if fiche.source_mode == Societe.SYNCHRO_MIROIR:
         from .models import LotSynchronisation
 

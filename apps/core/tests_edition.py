@@ -37,3 +37,51 @@ class CompositionParEditionTests(TestCase):
         codes = self.codes()
         self.assertIn("commercial", codes)
         self.assertIn("transport", codes)
+
+
+from django.contrib.auth import get_user_model
+
+
+class FumeeEditionTransportTests(TestCase):
+    """Rendu réel en édition transport : aucune page atteignable ne doit casser sur une route de
+    commerce pur démontée. (À lancer avec ERP_EDITION=transport pour charger l'URLconf transport.)"""
+
+    def setUp(self):
+        self.client.force_login(get_user_model().objects.create_superuser("chef", "", "Chef-2026-ok"))
+
+    def test_pages_transport_se_rendent_sans_route_commerce(self):
+        from django.urls import reverse
+        for nom in ("reporting:dashboard", "comptabilite:accueil", "comptabilite:ecritures",
+                    "comptabilite:clients", "comptabilite:operations_caisse", "transport:accueil",
+                    "billetterie:accueil", "colis:accueil", "garage:accueil"):
+            with self.subTest(page=nom):
+                self.assertEqual(self.client.get(reverse(nom)).status_code, 200)
+
+    def test_aucun_lien_de_menu_du_transport_ne_casse(self):
+        """Parcourt tous les liens de menu atteignables en édition transport : aucun ne doit renvoyer
+        une erreur serveur (500), notamment sur une route de commerce pur démontée."""
+        from django.urls import NoReverseMatch, reverse
+        from apps.core import navigation as nav
+
+        vus = set()
+
+        def visiter(elements):
+            for e in nav.selon_metier(elements, {"transport"}):
+                url = str(e.url) if e.url else ""
+                if url and ":" in url and url not in vus and not e.args:
+                    vus.add(url)
+                    try:
+                        chemin = reverse(url)
+                    except NoReverseMatch:
+                        continue                       # lien paramétré (détail) : pas de cible sans argument
+                    code = self.client.get(chemin).status_code
+                    self.assertNotEqual(code, 500, f"{url} ({chemin}) a renvoyé 500")
+                if e.enfants:
+                    visiter(e.enfants)
+
+        for m in nav.MODULES:
+            if m.code in nav.modules_hors_edition():
+                continue
+            for onglet in m.onglets:
+                visiter(onglet.elements)
+        self.assertGreater(len(vus), 30)               # on a bien parcouru les menus

@@ -10,9 +10,13 @@ from . import services
 
 @login_required
 def dashboard(request):
+    from django.conf import settings
     from apps.core.models import Societe
 
-    if Societe.get().activite == Societe.ACTIVITE_TRANSPORT:          # accueil du reporting : celui du métier
+    # Accueil du reporting = celui du métier. Dans le logiciel Transport (édition transport, ou
+    # société en activité transport), on sert le tableau de bord transport : jamais le dashboard
+    # commercial (qui référence des écrans de commerce absents du logiciel Transport).
+    if settings.ERP_EDITION == "transport" or Societe.get().activite == Societe.ACTIVITE_TRANSPORT:
         from .views_analyses import transport_tableau_de_bord
 
         return transport_tableau_de_bord(request)
