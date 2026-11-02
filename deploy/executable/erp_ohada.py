@@ -132,6 +132,7 @@ def preparer_environnement(base="erp.sqlite3"):
             os.environ.setdefault(cle.strip(), valeur.strip())
     os.environ.setdefault("SQLITE_FICHIER", str(donnees / base))   # chemin absolu, dans le dossier des données
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "erp.settings")
+    os.environ.setdefault("ERP_EDITION", edition())              # le logiciel livré ne présente que son métier
     os.environ.setdefault("ERP_DOSSIER_DONNEES", str(donnees))    # mémoire de l'essai hors de la base
     os.environ["ERP_DOSSIER_RACINE"] = str(donnees)
     if base == "erp.sqlite3":

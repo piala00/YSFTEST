@@ -195,6 +195,9 @@ ERP_DOSSIER_SIMULATION = env("ERP_DOSSIER_SIMULATION", "")
 SESSION_COOKIE_NAME = env("ERP_SESSION_COOKIE", "sessionid")
 # Programme compilé : licence contrôlée (essai, échéance, lecture seule, nombre de postes)
 ERP_LICENCE = env_bool("ERP_LICENCE", False)
+# Édition du logiciel livré : "transport" ou "commerce" composent un logiciel distinct (le métier de
+# l'autre n'est pas présenté) ; vide (dév/tests) = tous les modules. Posée par le lanceur (edition.txt).
+ERP_EDITION = env("ERP_EDITION", "").strip().lower()
 RELAIS_ACTIF = env_bool("RELAIS_ACTIF", False)
 RELAIS_DOSSIER = Path(env("RELAIS_DOSSIER", str(BASE_DIR / "relais-stockage")))
 

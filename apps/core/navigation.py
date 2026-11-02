@@ -1038,9 +1038,31 @@ SERVICES_TRANSPORT = {"transport", "billetterie", "colis", "garage"}
 MODULES_PAR_CODE = {m.code: m for m in MODULES}
 
 
+def modules_hors_edition():
+    """Codes des modules d'un AUTRE métier, absents du logiciel livré.
+
+    Le Transport et la Gestion commerciale sont deux logiciels distincts : le logiciel livré ne
+    présente QUE son métier. L'édition est fixée à la compilation (settings.ERP_EDITION, depuis
+    edition.txt) ; vide (développement et tests) = tous les modules présents.
+    """
+    from django.conf import settings
+    edition = (getattr(settings, "ERP_EDITION", "") or "").lower()
+    if edition == "transport":
+        return {"commercial"}
+    if edition == "commerce":
+        return set(SERVICES_TRANSPORT)
+    return set()
+
+
 def modules_proposes(societe):
-    """Logiciels proposés selon l'activité de la société (ceux du métier en premier)."""
+    """Logiciels proposés. Quand l'édition du logiciel livré est fixée (Transport ou Commerce), elle
+    décide SEULE de la composition : on ne présente QUE les modules de ce métier, quelle que soit
+    l'activité enregistrée. Sans édition fixée (développement), c'est l'activité de la société qui
+    met en avant son métier."""
     ordre = ["transport", "billetterie", "colis", "garage", "personnel", "commercial", "comptabilite", "analytique", "reporting"]
+    hors = modules_hors_edition()
+    if hors:
+        return [m for m in sorted(MODULES, key=lambda m: ordre.index(m.code)) if m.code not in hors]
     if societe.activite == societe.ACTIVITE_COMMERCE:
         return [m for m in MODULES if m.code not in SERVICES_TRANSPORT]
     modules = sorted(MODULES, key=lambda m: ordre.index(m.code))
