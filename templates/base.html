@@ -57,6 +57,7 @@
         {% include "core/_menu.html" with noeuds=o.elements %}
       </div>
     {% endfor %}
+    <button type="button" id="bascule-outils" class="bascule-outils" title="Afficher ou masquer la barre d'outils (plus d'espace)"><i class="bi bi-tools"></i></button>
   </nav>
   <div class="barre-outils d-print-none" role="toolbar" aria-label="Barre d'outils">
     <button type="button" data-action="ajouter" title="Ajouter"><i class="bi bi-plus-square"></i></button>
@@ -133,6 +134,16 @@
 {% else %}
   {% block public %}{% endblock %}
 {% endif %}
+<script>
+(function () {
+  try { if (localStorage.getItem('erp-outils-caches') === '1') document.body.classList.add('outils-caches'); } catch (e) {}
+  var b = document.getElementById('bascule-outils');
+  if (b) b.addEventListener('click', function () {
+    var cache = document.body.classList.toggle('outils-caches');
+    try { localStorage.setItem('erp-outils-caches', cache ? '1' : '0'); } catch (e) {}
+  });
+})();
+</script>
 <script src="{% static 'vendor/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'js/menus.js' %}"></script>
 <script src="{% static 'js/graphiques.js' %}" data-chart="{% static 'vendor/chart.umd.min.js' %}"></script>
