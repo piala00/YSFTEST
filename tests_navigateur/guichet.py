@@ -58,10 +58,13 @@ def main():
                     page.wait_for_function("Boolean(window.erpFenetres)")
                     url = reverse("transport:billet_vente") + f"?depart={depart.pk}"
                     page.evaluate("url => { window.erpFenetres.ouvrir(url); }", url)
-                    page.wait_for_function("document.querySelector('.fenetre-mdi')?.getBoundingClientRect().width === 380")
+                    page.wait_for_function("document.querySelector('.fenetre-mdi')?.getBoundingClientRect().width === 740")
                     cadre = page.locator(".fenetre-mdi iframe").last.element_handle().content_frame()
                     cadre.wait_for_selector('[name="telephone"]')
-                    assert cadre.locator('[name="gare_montee"]').is_hidden()
+                    # Saisie sur deux colonnes, sections dépliées : les champs simples sont tous visibles
+                    # (gare_montee apparaît dans « Autres réglages », demande du propriétaire : rien de caché).
+                    assert cadre.locator('[name="gare_montee"]').is_visible()
+                    # depart_correspondance garde son propre champ de recherche : le select natif reste masqué.
                     assert cadre.locator('[name="depart_correspondance"]').is_hidden()
                     assert cadre.evaluate("document.documentElement.scrollWidth <= innerWidth"), "Débordement horizontal"
                     # Le choix du véhicule reste saisissable au clavier, sans liste native à parcourir.
@@ -87,7 +90,7 @@ def main():
                     page.screenshot(path=str(dossier / "01-vente-portrait.png"))
                     # Une seconde voiture s'ouvre sans fermer ni écraser la saisie de la première.
                     page.evaluate("url => { window.erpFenetres.ouvrir(url); }", url + "&mode=correspondance")
-                    page.wait_for_function("document.querySelectorAll('.fenetre-mdi').length === 2 && [...document.querySelectorAll('.fenetre-mdi')].every(e=>e.getBoundingClientRect().width === 380)")
+                    page.wait_for_function("document.querySelectorAll('.fenetre-mdi').length === 2 && [...document.querySelectorAll('.fenetre-mdi')].every(e=>e.getBoundingClientRect().width === 740)")
                     second = page.locator(".fenetre-mdi iframe").last.element_handle().content_frame()
                     second.wait_for_selector('#id_depart_correspondance-recherche', state="visible")
                     assert cadre.locator('[name="voyageur"]').input_value() == "Alice Fictive"
@@ -111,7 +114,7 @@ def main():
                     assert mobile.evaluate("document.documentElement.scrollWidth <= innerWidth"), "Débordement sur petit écran"
                     mobile.screenshot(path=str(dossier / "05-petit-ecran.png"))
                     (dossier / "resultat.json").write_text(json.dumps({"resultat": "OK", "navigateur": browser.version,
-                        "largeur_initiale": 380, "controles": ["vrai bureau MDI", "champs courants", "clavier Entrée",
+                        "largeur_initiale": 740, "controles": ["vrai bureau MDI", "champs courants", "clavier Entrée",
                         "correspondance visible", "deux fenêtres et saisie conservée", "redimensionnement conservé",
                         "transit", "transvasement", "petit écran 320px sans débordement"]}, ensure_ascii=False, indent=2))
                     print("Chromium : guichet portrait, clavier, fenêtres, transit, transvasement, mobile OK")
