@@ -1,25 +1,5 @@
 {% extends "base.html" %}{% load erp %}
-{% block title %}Départ {{ depart.numero }}<div class="card mt-3"><div class="card-header bg-white fw-semibold small">Avances de mission de l'équipage</div>
-<div class="card-body small">
-{% for a in avances %}<div class="border rounded p-2 mb-2"><strong>{{ a.numero }}</strong> · {{ a.beneficiaire }} · remis {{ a.montant|montant }} · {{ a.get_statut_display }}
-  {% if a.statut == "JUSTIFIEE" %} · dépenses {{ a.depenses|montant }}{% if a.restitue %} · rendu {{ a.restitue|montant }}{% endif %}{% if a.complement %} · complément payé {{ a.complement|montant }}{% endif %}{% endif %}
-  <ul class="mb-1">{% for j in a.justificatifs.all %}<li>{{ j.get_nature_display }} {{ j.libelle }} : {{ j.montant|montant }}</li>{% endfor %}</ul>
-  {% if a.statut == "REMISE" %}<form method="post" class="d-flex flex-wrap gap-1 mb-1">{% csrf_token %}<input type="hidden" name="avance" value="{{ a.pk }}">
-    <select name="nature" class="form-select form-select-sm" style="width:12rem" aria-label="Nature">{% for c, l in natures_justificatif %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select>
-    <input name="libelle" class="form-control form-control-sm" style="width:12rem" placeholder="pièce, lieu" aria-label="Libellé">
-    <input name="montant" type="number" min="1" class="form-control form-control-sm" style="width:8rem" placeholder="montant" aria-label="Montant">
-    <button class="btn btn-sm btn-outline-primary py-0" name="action" value="justificatif">Ajouter la pièce</button></form>
-  <form method="post" class="d-flex flex-wrap gap-1">{% csrf_token %}<input type="hidden" name="avance" value="{{ a.pk }}">
-    <input name="restitue" type="number" min="0" class="form-control form-control-sm" style="width:9rem" placeholder="reliquat rendu" aria-label="Reliquat rendu">
-    <button class="btn btn-sm btn-success py-0" name="action" value="justifier">Justifier l'avance</button></form>{% endif %}</div>
-{% empty %}<div class="text-muted">Aucune avance.</div>{% endfor %}
-{% if not depart.site_origine and depart.statut != "ANNULE" and depart.statut != "CLOTURE" %}<form method="post" class="d-flex flex-wrap gap-1 mt-2">{% csrf_token %}
-  <input name="beneficiaire" class="form-control form-control-sm" style="width:12rem" placeholder="{{ depart.chauffeur|default:'chauffeur' }}" aria-label="Bénéficiaire">
-  <input name="montant" type="number" min="1" class="form-control form-control-sm" style="width:8rem" placeholder="montant" aria-label="Montant">
-  <select name="caisse" class="form-select form-select-sm" style="width:12rem" aria-label="Caisse">{% for c in caisses %}<option value="{{ c.pk }}" {% if c.code == "CA" %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
-  <button class="btn btn-sm btn-outline-secondary py-0" name="action" value="avance">Remettre une avance de mission</button></form>{% endif %}
-</div></div>
-{% endblock %}
+{% block title %}Départ {{ depart.numero }}{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Départ {{ depart.numero }} <span class="badge text-bg-{% if depart.statut == 'PROGRAMME' %}primary{% elif depart.statut == 'PARTI' %}warning{% elif depart.statut == 'ARRIVE' or depart.statut == 'CLOTURE' %}success{% else %}secondary{% endif %} fs-6">{{ depart.get_statut_display }}</span></h1>
   <div class="d-flex gap-2">

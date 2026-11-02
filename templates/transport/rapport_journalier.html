@@ -1,10 +1,5 @@
 {% extends "base.html" %}{% load erp %}
-{% block title %}Rapport journalier de l'agence
-<h2 class="h6 mt-3">7. Points ouverts</h2>
-<div class="card"><div class="card-body small">{% for b in bloquants %}<div class="text-danger">{{ b }}</div>{% endfor %}{% for a in signales %}<div class="text-warning-emphasis">{{ a }}</div>{% endfor %}
-  {% if not bloquants and not signales %}<span class="text-success">Aucun.</span>{% endif %}
-  {% if cloture %}<div class="text-muted mt-1">Journée clôturée par {{ cloture.cloture_par }} le {{ cloture.cloture_le|date:"d/m/Y H:i" }}{% if cloture.commentaire %} — {{ cloture.commentaire }}{% endif %}</div>{% endif %}</div></div>
-{% endblock %}
+{% block title %}Rapport journalier de l'agence{% endblock %}
 {% block content %}
 <div class="page-title"><h1>Rapport de la journée du {{ jour|date:"l d/m/Y" }}
   {% if cloture %}<span class="badge text-bg-success fs-6">Clôturé</span>{% else %}<span class="badge text-bg-warning fs-6">Provisoire</span>{% endif %}</h1></div>
