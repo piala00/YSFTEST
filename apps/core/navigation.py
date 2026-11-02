@@ -589,7 +589,7 @@ COMPTABILITE = Module(
                 E("structure.plan_tiers.clients", "Clients", "commercial:clients", edition="commerce"),
                 E("structure.plan_tiers.partenaires", "Partenaires (propriétaires de véhicules)", "partenaires:proprietaires",
                   preuve="AJOUT-ERP", edition="transport"),
-                E("structure.plan_tiers.fournisseurs", "Fournisseurs", "commercial:fournisseurs"),
+                E("structure.plan_tiers.fournisseurs", "Fournisseurs", "comptabilite:fournisseurs"),
                 E("structure.plan_tiers.personnel", "Personnel (salariés)", "personnel:employes", preuve="AJOUT-ERP",
                   edition="transport"),
             ]),
@@ -630,7 +630,7 @@ COMPTABILITE = Module(
             E("traitement.rapprochement", "Rapprochement bancaire manuel", "comptabilite:rapprochement", icone="bi-check2-square"),
             E("traitement.rapprochement_auto", "Rapprochement bancaire automatique", preuve="INDICATIF"),
             E("traitement.extraits", "Gestion des extraits", preuve="INDICATIF"),
-            E("traitement.reglement_tiers", "Règlement tiers", "commercial:reglement_create"),
+            E("traitement.reglement_tiers", "Règlement tiers", "comptabilite:reglement_create"),
             E("traitement.relance", "Rappel / relance clients", "comptabilite:balance_agee", type="CLIENT", vue="relance"),
             SEP(),
             E("traitement.tva", "Déclaration de taxes", "comptabilite:tva", icone="bi-percent"),
@@ -905,7 +905,7 @@ def _module_service(code, titre, description, icone, couleur, prefixe, structure
 BILLETTERIE = _module_service(
     "billetterie", "Billetterie", "Départs, vente des billets, correspondances, annulations, encaissements du guichet",
     "bi-ticket-perforated", "#e65100", "/transport/billetterie/",
-    structure=[E("structure.clients", "Clients en compte", "commercial:clients", icone="bi-people")],
+    structure=[E("structure.clients", "Clients en compte", "comptabilite:clients", icone="bi-people")],
     traitement=[
         E("billetterie.departs", "Départs du jour", "transport:departs", icone="bi-bus-front"),
         E("billetterie.programmer", "Programmer un départ", "transport:depart_create", icone="bi-calendar-plus"),
@@ -917,7 +917,7 @@ BILLETTERIE = _module_service(
           remboursement="AUTORISE"),
         SEP(),
         E("billetterie.ma_caisse", "Ma caisse (ouverture, fermeture)", "transport:ma_caisse_billetterie", icone="bi-safe"),
-        E("billetterie.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
+        E("billetterie.caisse", "Opérations de caisse", "comptabilite:operations_caisse", icone="bi-cash-coin"),
         E("billetterie.cloture", "Clôturer la journée de la billetterie", "transport:cloture_billetterie", icone="bi-lock"),
     ],
     etat=[E("billetterie.recette", "Recette de la billetterie", "transport:recette_billetterie", icone="bi-cash-stack")])
@@ -992,7 +992,7 @@ TRANSPORT = Module(
             E("structure.vehicules", "Véhicules", "transport:vehicules", icone="bi-bus-front"),
             E("structure.chauffeurs", "Chauffeurs", "transport:fiches", "chauffeurs", icone="bi-person-badge"),
             SEP(),
-            E("structure.clients", "Clients en compte", "commercial:clients", icone="bi-people"),
+            E("structure.clients", "Clients en compte", "comptabilite:clients", icone="bi-people"),
             E("structure.parametres", "Paramètres transport (comptes et taxes)", "transport:parametres", icone="bi-sliders"),
         ]),
         Onglet("traitement", "Traitement", "bi-gear", [
@@ -1010,8 +1010,8 @@ TRANSPORT = Module(
                 E("traitement.partenaires.releves", "Relevés et règlements", "partenaires:releves"),
             ]),
             SEP(),
-            E("traitement.caisse", "Opérations de caisse", "commercial:operations_caisse", icone="bi-cash-coin"),
-            E("traitement.reglement", "Règlement d'un client en compte", "commercial:reglement_create", icone="bi-wallet2"),
+            E("traitement.caisse", "Opérations de caisse", "comptabilite:operations_caisse", icone="bi-cash-coin"),
+            E("traitement.reglement", "Règlement d'un client en compte", "comptabilite:reglement_create", icone="bi-wallet2"),
         ]),
         Onglet("etat", "Etat", "bi-printer", [
             E("etat.rapport", "Rapport journalier de l'agence", "transport:rapport_journalier", icone="bi-clipboard-data"),

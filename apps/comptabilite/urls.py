@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.commercial import views as commercial_views
 from apps.core import views as core_views
 from apps.echanges import views as echanges_views
 from apps.partenaires import views as partenaires_views
@@ -62,6 +63,12 @@ urlpatterns = [
     path("rapprochement/", views.rapprochement_view, name="rapprochement"),
     path("tiers/justificatif-solde/", views.justificatif_solde_view, name="justificatif_solde"),
     path("tiers/statistiques/", views.statistiques_tiers_view, name="statistiques_tiers"),
+    # Écrans comptables communs aux deux métiers (tiers, règlements, caisse) : rendus dans le shell
+    # Comptabilité, jamais « Gestion commerciale ». Les vues restent partagées avec l'app commerciale.
+    path("tiers/clients/", commercial_views.TiersListView.as_view(), {"type_tiers": "CLIENT"}, name="clients"),
+    path("tiers/fournisseurs/", commercial_views.TiersListView.as_view(), {"type_tiers": "FOURNISSEUR"}, name="fournisseurs"),
+    path("reglements/nouveau/", commercial_views.reglement_create, name="reglement_create"),
+    path("caisse/operations/", commercial_views.operations_caisse, name="operations_caisse"),
     path("controles/liaison-commerciale/", views.controle_liaison_view, name="controle_liaison"),
     path("cloture/exercice/", views.cloture_exercice_view, name="cloture_exercice"),
     path("cloture/journaux/", views.cloture_journaux_view, name="cloture_journaux"),
