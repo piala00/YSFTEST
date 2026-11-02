@@ -88,7 +88,8 @@ class GuichetTransitTests(TestCase):
             parser.feed(page.content.decode())
             for nom in page.context["form"].fields:
                 self.assertEqual(parser.noms.count(nom), 1, (mode, nom))
-            self.assertContains(page, "--erp-largeur-fenetre:380")
+            # Saisie sur deux colonnes : la fenêtre est élargie pour tout afficher.
+            self.assertContains(page, "--erp-largeur-fenetre:740")
             if mode == "direct":
                 self.assertEqual(parser.visibles, ["depart", "telephone", "voyageur", "piece_identite", "siege", "prix", "paiement"])
             elif mode == "transit":

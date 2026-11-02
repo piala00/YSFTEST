@@ -348,3 +348,20 @@ html.dans-fenetre .piece-fenetre { min-height: 100vh; }
 .bandeau-auteurs { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 5px 10px; background: #f6f8fa; border: 1px solid #e1e6eb;
   border-radius: 4px; color: #4a5561; margin-bottom: 10px; }
 .piece-fenetre .bandeau-auteurs { margin: 0; border-width: 0 0 1px; border-radius: 0; }
+
+/* Filtrage progressif des champs liste (combobox façon Sage) */
+.combo { position: relative; display: block; }
+.combo-select-cache { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.combo-input { width: 100%; }
+.combo-menu { position: absolute; z-index: 1200; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 2px;
+  list-style: none; background: #fff; border: 1px solid #adb5bd; border-radius: 4px; max-height: 260px; overflow: auto;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.combo-item { padding: 4px 8px; font-size: .9rem; cursor: pointer; border-radius: 3px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.combo-item:hover, .combo-item.actif { background: #e7f1ff; }
+.combo-item[aria-selected="true"] { font-weight: 600; }
+.combo-vide { padding: 4px 8px; font-size: .85rem; color: #888; }
+/* Dans la grille de saisie d'écriture, le champ de recherche reste plat */
+#lignes .combo-input { border: 0; border-radius: 0; background: transparent; box-shadow: none; min-height: 30px;
+  padding: .25rem .5rem; }
+#lignes .combo-input:focus { background: #fff8dd; outline: 2px solid #86b7fe; outline-offset: -2px; }

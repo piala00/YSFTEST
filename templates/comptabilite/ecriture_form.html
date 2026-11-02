@@ -62,11 +62,16 @@ function recalc() {
 function ajouterLigne() {
   const total = document.getElementById('id_lignes-TOTAL_FORMS'), idx = parseInt(total.value);
   const tr = document.querySelector('#lignes tr.ligne:last-child').cloneNode(true);
+  // On retire l'habillage « champ recherchable » du clone : il sera reconstruit à neuf.
+  tr.querySelectorAll('.combo').forEach(c => c.remove());
+  tr.querySelectorAll('select.combo-select-cache').forEach(s => { s.classList.remove('combo-select-cache'); delete s.dataset.combo; });
   tr.querySelectorAll('input, select').forEach(el => {
-    el.name = el.name.replace(/lignes-\d+-/, `lignes-${idx}-`); el.id = el.id.replace(/lignes-\d+-/, `lignes-${idx}-`);
+    if (el.name) el.name = el.name.replace(/lignes-\d+-/, `lignes-${idx}-`);
+    if (el.id) el.id = el.id.replace(/lignes-\d+-/, `lignes-${idx}-`);
     if (el.type === 'checkbox') el.checked = false; else if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
   });
   document.querySelector('#lignes tbody').appendChild(tr); total.value = idx + 1;
+  if (window.ERP_filtrage_liste) window.ERP_filtrage_liste(tr);
   return tr;
 }
 function derniereLigne() { return document.querySelector('#lignes tr.ligne:last-child'); }
@@ -93,8 +98,16 @@ function compteTresorerie() {
   const j = document.getElementById('id_journal');
   return j && TRESO[j.value] ? String(TRESO[j.value]) : null;
 }
+function ligneVide(sauf) {
+  return Array.from(document.querySelectorAll('#lignes tr.ligne')).find(r => {
+    if (r === sauf) return false;
+    const c = r.querySelector('.ligne-compte');
+    return c && !(c.value || '').trim() && !n(r.querySelector('.ligne-debit')) && !n(r.querySelector('.ligne-credit'));
+  });
+}
 // Après avoir saisi une ligne de dépense/recette (compte + montant) dans un journal
-// de trésorerie, on crée la contrepartie sur le compte de caisse et on reprend le libellé.
+// de trésorerie, on porte la contrepartie sur le compte de caisse et on reprend le
+// libellé. La contrepartie d'une même ligne est mise à jour, pas dupliquée.
 function contrepartieTresorerie(tr) {
   const compteCaisse = compteTresorerie();
   if (!compteCaisse) return;
@@ -102,15 +115,15 @@ function contrepartieTresorerie(tr) {
   if (!compte || !(compte.value || '').trim() || compte.value === compteCaisse) return;
   const d = n(tr.querySelector('.ligne-debit')), c = n(tr.querySelector('.ligne-credit'));
   if (!d && !c) return;
-  if (tr !== derniereLigne()) return;
-  const suiv = ajouterLigne();
+  let cible = (tr._caisse && document.body.contains(tr._caisse)) ? tr._caisse : null;
+  if (!cible) { cible = ligneVide(tr) || ajouterLigne(); tr._caisse = cible; }
   // Contrepartie : si la ligne était au débit, on crédite la caisse, et inversement.
-  const dS = suiv.querySelector('.ligne-debit'), cS = suiv.querySelector('.ligne-credit');
-  if (d) cS.value = d; else dS.value = c;
-  const libS = suiv.querySelector('[name$="-libelle"]'), lib = tr.querySelector('[name$="-libelle"]');
-  if (libS && lib && lib.value) libS.value = lib.value;
-  const compteSuiv = suiv.querySelector('.ligne-compte');
-  if (compteSuiv) { compteSuiv.value = compteCaisse; compteSuiv.dispatchEvent(new Event('change', {bubbles: true})); }
+  const dS = cible.querySelector('.ligne-debit'), cS = cible.querySelector('.ligne-credit');
+  if (d) { cS.value = d; dS.value = ''; } else { dS.value = c; cS.value = ''; }
+  const libS = cible.querySelector('[name$="-libelle"]'), lib = tr.querySelector('[name$="-libelle"]');
+  if (libS && lib && lib.value && !libS.value) libS.value = lib.value;
+  const compteSuiv = cible.querySelector('.ligne-compte');
+  if (compteSuiv && compteSuiv.value !== compteCaisse) { compteSuiv.value = compteCaisse; compteSuiv.dispatchEvent(new Event('change', {bubbles: true})); }
   recalc();
 }
 document.addEventListener('input', e => {
