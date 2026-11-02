@@ -7,5 +7,21 @@ html.dans-fenetre .fenetre-contenu:has(.saisie-rapide){padding:.4rem}
 html.dans-fenetre .fenetre-contenu:has(.saisie-rapide)>.page-title{margin-bottom:.3rem}
 html.dans-fenetre .fenetre-contenu:has(.saisie-rapide)>.page-title h1{font-size:1rem}
 .depart-recherche{position:relative;min-width:0}.depart-filtres{display:flex;gap:1rem;font-size:.75rem;margin:.2rem 0}.depart-propositions{max-height:220px;overflow:auto;border:1px solid #adb5bd;border-radius:.25rem;background:white;padding:0;margin:.2rem 0;list-style:none}.depart-propositions li{font-size:.8rem;padding:.3rem;cursor:pointer;overflow-wrap:anywhere}.depart-propositions li[aria-selected=true]{background:#e7f1ff}.depart-compteur{font-size:.7rem;color:#666}
+/* Deux colonnes quand il y a de la place (pleine page) ; une seule dans les fenêtres étroites côte à côte. */
+@media (min-width:560px){
+  html:not(.dans-fenetre) .saisie-rapide{max-width:700px}
+  html:not(.dans-fenetre) .saisie-rapide form[data-saisie-rapide],
+  html:not(.dans-fenetre) .saisie-rapide [data-contact]{display:grid;grid-template-columns:1fr 1fr;column-gap:.7rem;align-items:start}
+  html:not(.dans-fenetre) .saisie-rapide form[data-saisie-rapide] > .alert,
+  html:not(.dans-fenetre) .saisie-rapide form[data-saisie-rapide] > p,
+  html:not(.dans-fenetre) .saisie-rapide form[data-saisie-rapide] > details,
+  html:not(.dans-fenetre) .saisie-rapide form[data-saisie-rapide] > .d-grid,
+  html:not(.dans-fenetre) .saisie-rapide form[data-saisie-rapide] > div.text-muted,
+  html:not(.dans-fenetre) .saisie-rapide form[data-saisie-rapide] > [data-contact],
+  html:not(.dans-fenetre) .saisie-rapide form[data-saisie-rapide] > .mb-2:has(.depart-recherche),
+  html:not(.dans-fenetre) .saisie-rapide [data-contact] > .d-flex,
+  html:not(.dans-fenetre) .saisie-rapide [data-contact] > div.text-muted,
+  html:not(.dans-fenetre) .saisie-rapide [data-contact] > [data-contact-choix-label]{grid-column:1 / -1}
+}
 </style>
 
