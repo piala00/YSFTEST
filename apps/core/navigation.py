@@ -238,7 +238,9 @@ def menu_fenetre(module):
         SEP(),
         E("fenetre.accueil", "Page d'accueil", MODULES_ACCUEIL[module], icone="bi-house", preuve="AJOUT-ERP"),
         E("fenetre.portail", "Portail ERP OHADA", "core:portail", icone="bi-grid-3x3-gap", preuve="AJOUT-ERP"),
-        *[E(f"fenetre.{code}", titre, accueil, icone=icone, preuve="AJOUT-ERP")
+        *[E(f"fenetre.{code}", titre, accueil, icone=icone, preuve="AJOUT-ERP",
+            edition=("commerce" if code == "commercial"
+                     else "transport" if code in ("transport", "billetterie", "colis", "garage") else ""))
           for code, titre, accueil, icone in AUTRES_LOGICIELS if code != module],
     ])
 
@@ -1226,9 +1228,16 @@ def premier_lien(noeuds):
 
 
 def _metier():
-    """Métiers affichés : transport, commerce, ou les deux (activité mixte)."""
+    """Métiers affichés dans les menus. L'édition du logiciel livré décide SEULE quand elle est
+    fixée (le Transport n'affiche que des entrées transport, le Commerce que des entrées commerce) ;
+    sinon (développement) c'est l'activité de la société, ou les deux en activité mixte."""
     from .models import Societe
 
+    hors = modules_hors_edition()
+    if "commercial" in hors:
+        return {"transport"}
+    if hors:
+        return {"commerce"}
     activite = Societe.get().activite
     return {"transport"} if activite == Societe.ACTIVITE_TRANSPORT else (
         {"commerce"} if activite == Societe.ACTIVITE_COMMERCE else {"transport", "commerce"})
