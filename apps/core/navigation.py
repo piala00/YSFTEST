@@ -731,7 +731,7 @@ ANALYTIQUE = Module(
     prefixe="/comptabilite/analytique/",
     accueil="analytique:accueil",
     onglets=[
-        menu_fichier("analytique", "commercial:societe"),
+        menu_fichier("analytique", "comptabilite:societe"),
         menu_edition(),
         Onglet("structure", "Structure", "bi-diagram-3", [
             E("structure.plan_transport", "Plan analytique du transport", icone="bi-diagram-3",
@@ -803,7 +803,7 @@ REPORTING = Module(
     prefixe="/reporting/",
     accueil="reporting:dashboard",
     onglets=[
-        menu_fichier("reporting", "commercial:societe"),
+        menu_fichier("reporting", "comptabilite:societe"),
         menu_edition(),
         Onglet("etat", "Etat", "bi-printer", [
             E("synthese.catalogue", "Catalogue de tous les états", "reporting:catalogue", icone="bi-collection", preuve="AJOUT-ERP"),
@@ -891,7 +891,7 @@ def _module_service(code, titre, description, icone, couleur, prefixe, structure
     """Logiciel d'un service (billetterie, colis, garage, personnel) : même barre de menus que les autres."""
     return Module(code=code, titre=titre, description=description, icone=icone, couleur=couleur, prefixe=prefixe,
                   accueil=accueil or f"{code}:accueil", onglets=[
-                      menu_fichier(code, "commercial:societe"), menu_edition(),
+                      menu_fichier(code, "comptabilite:societe"), menu_edition(),
                       *([Onglet("structure", "Structure", "bi-diagram-3", structure)] if structure else []),
                       Onglet("traitement", "Traitement", "bi-gear", traitement),
                       Onglet("etat", "Etat", "bi-printer", etat),
@@ -982,7 +982,7 @@ TRANSPORT = Module(
     prefixe="/transport/",
     accueil="transport:accueil",
     onglets=[
-        menu_fichier("transport", "commercial:societe"),
+        menu_fichier("transport", "comptabilite:societe"),
         menu_edition(),
         Onglet("structure", "Structure", "bi-diagram-3", [
             E("structure.gares", "Gares", "transport:fiches", "gares", icone="bi-geo-alt"),
@@ -1047,6 +1047,20 @@ def modules_proposes(societe):
     if societe.activite == societe.ACTIVITE_TRANSPORT:
         return [m for m in modules if m.code != "commercial"]
     return modules
+
+
+def modules_bloques(societe):
+    """Codes des logiciels d'un AUTRE métier, à rendre inaccessibles dans cette édition.
+
+    Le Transport et la Gestion commerciale sont deux logiciels distincts : on ne doit jamais
+    retrouver l'un dans l'autre. En activité Transport, toute la Gestion commerciale est bloquée ;
+    en activité Commerce, les services de transport le sont. En activité Mixte, rien n'est bloqué.
+    """
+    if societe.activite == societe.ACTIVITE_TRANSPORT:
+        return {"commercial"}
+    if societe.activite == societe.ACTIVITE_COMMERCE:
+        return set(SERVICES_TRANSPORT)
+    return set()
 
 
 # ---------------------------------------------------------------------------
