@@ -84,6 +84,10 @@ class DossierPartage:
         dossier = self.racine / code
         return sorted(f.name for f in dossier.glob("*.erpx.chiffre")) if dossier.exists() else []
 
+    def lister_sauvegardes(self, code):
+        dossier = self.racine / code
+        return sorted(f.name for f in dossier.glob("*.sauvegarde.chiffre")) if dossier.exists() else []
+
     def lire(self, code, nom):
         return (self.racine / code / nom).read_bytes()
 
@@ -126,6 +130,9 @@ class RelaisHTTP:
 
     def lister(self, code):
         return json.loads(self._appel("GET", f"boites/{code}/"))["lots"]
+
+    def lister_sauvegardes(self, code):
+        return [n for n in self.lister(code) if n.endswith(".sauvegarde.chiffre")]
 
     def lire(self, code, nom):
         return self._appel("GET", f"boites/{code}/{urllib.parse.quote(nom)}")

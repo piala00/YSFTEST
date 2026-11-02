@@ -88,6 +88,41 @@ def _dernier_envoye():
     return LotEmis.objects.aggregate(m=Max("sequence_a"))["m"] or 0
 
 
+@login_required
+def sauvegarde_journee(request, module):
+    """Sauvegarde de fin de journée de l'agence, remise à la direction (Import/Export)."""
+    from . import sauvegarde_journee as svc
+    from .models import SauvegardeJournaliere
+
+    if not request.user.is_superuser:
+        messages.error(request, "Réservé à l'administrateur.")
+        return redirect("core:portail")
+    local = site_local()
+    if request.method == "POST":
+        action = request.POST.get("action")
+        try:
+            if action == "remettre":
+                enreg, texte, nom = svc.remettre(request.user)
+                if enreg.moyen == SauvegardeJournaliere.BOITE:
+                    messages.success(request, f"Sauvegarde du {enreg.date:%d/%m/%Y} déposée pour la direction "
+                                              f"({enreg.destination_code}) : {enreg.taille // 1024} Ko.")
+                    return redirect(request.path)
+                messages.info(request, "Aucune boîte aux lettres : la sauvegarde est téléchargée, transmettez-la à la "
+                                       "direction par votre canal habituel (clé USB, WhatsApp…).")
+                return _fichier(nom, texte.encode("utf-8"))
+            if action == "recuperer":
+                texte, nom = svc.recuperer(request.POST["nom"], request.user)
+                return _fichier(nom, texte.encode("utf-8"))
+        except (ValueError, lots.LotInvalide, FileExistsError, KeyError) as exc:
+            messages.error(request, f"Opération impossible : {exc}")
+        return redirect(request.path)
+    return render(request, "echanges/sauvegarde_journee.html", {
+        "local": local,
+        "est_siege": local is not None and local.role == Agence.SIEGE,
+        "historique": SauvegardeJournaliere.objects.all()[:30],
+        "recues": svc.recues()})
+
+
 # ---------------------------------------------------------------- Demandes de correction (direction → agence)
 @login_required
 def corrections(request):

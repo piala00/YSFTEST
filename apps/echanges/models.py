@@ -160,3 +160,31 @@ class DemandeCorrection(models.Model):
         import datetime
 
         return self.ouverte and self.echeance is not None and self.echeance < datetime.date.today()
+
+
+class SauvegardeJournaliere(models.Model):
+    """Trace d'une sauvegarde complète de fin de journée produite par une agence et
+    remise à la direction (siège) pour archivage de sécurité. La remise passe par
+    l'Import/Export : dépôt automatique dans la boîte aux lettres (dossier partagé)
+    quand elle est configurée, sinon téléchargement du fichier à transmettre."""
+
+    BOITE, TELECHARGEMENT = "BOITE", "TELECHARGEMENT"
+    MOYENS = [(BOITE, "Déposée dans la boîte de la direction"),
+              (TELECHARGEMENT, "Téléchargée, à transmettre à la direction")]
+
+    date = models.DateField("Journée", db_index=True)
+    site_code = models.CharField("Agence", max_length=10)
+    destination_code = models.CharField("Direction", max_length=10, blank=True)
+    taille = models.PositiveIntegerField("Taille (octets)", default=0)
+    nom_fichier = models.CharField(max_length=160, blank=True)
+    moyen = models.CharField(max_length=15, choices=MOYENS, default=TELECHARGEMENT)
+    auteur = models.CharField(max_length=150, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-cree_le"]
+        verbose_name = "sauvegarde de fin de journée"
+        verbose_name_plural = "sauvegardes de fin de journée"
+
+    def __str__(self):
+        return f"Sauvegarde {self.site_code} du {self.date:%d/%m/%Y}"

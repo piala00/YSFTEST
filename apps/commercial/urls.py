@@ -12,6 +12,7 @@ app_name = "commercial"
 # agences). Ils restent présents quelle que soit l'édition : le Transport s'en sert aussi.
 communs = [
     path("echanges/", echanges_views.echanges, {"module": "commercial"}, name="echanges"),
+    path("sauvegarde-journee/", echanges_views.sauvegarde_journee, {"module": "commercial"}, name="sauvegarde_journee"),
     path("a-propos/", core_views.a_propos, name="a_propos"),
     path("autorisations/", core_views.autorisations, {"module": "commercial"}, name="autorisations"),
     path("journal-evenements/", core_views.journal_evenements, {"module": "commercial"}, name="journal_evenements"),

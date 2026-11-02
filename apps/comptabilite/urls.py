@@ -15,6 +15,7 @@ urlpatterns = [
     path("a-propos/", core_views.a_propos, name="a_propos"),
     path("autorisations/", core_views.autorisations, {"module": "comptabilite"}, name="autorisations"),
     path("echanges/", echanges_views.echanges, {"module": "comptabilite"}, name="echanges"),
+    path("sauvegarde-journee/", echanges_views.sauvegarde_journee, {"module": "comptabilite"}, name="sauvegarde_journee"),
     path("corrections/", echanges_views.corrections, name="corrections"),
     path("tresorerie-projetee/", views_tresorerie.tresorerie_projetee, name="tresorerie_projetee"),
     path("controles-cloture/", views_tresorerie.controles_cloture, name="controles_cloture"),

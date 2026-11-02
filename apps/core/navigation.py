@@ -178,6 +178,8 @@ def menu_fichier(module, societe_url, fermer=True):
         E("fichier.autorisations", "Autorisations d'accès", f"{module}:autorisations", icone="bi-shield-lock"),
         E("fichier.journal_evenements", "Journal des événements", f"{module}:journal_evenements", icone="bi-clock-history", preuve="AJOUT-ERP"),
         E("fichier.sauvegarde", "Sauvegarde et restauration", f"{module}:sauvegarde", icone="bi-hdd", preuve="AJOUT-ERP"),
+        *([E("fichier.sauvegarde_journee", "Sauvegarde de fin de journée", f"{module}:sauvegarde_journee",
+             icone="bi-hdd-stack", preuve="AJOUT-ERP")] if module in ("commercial", "transport", "comptabilite") else []),
         E("fichier.poste", "Administration du poste", "core:poste", icone="bi-pc-display", preuve="AJOUT-ERP"),
         *([E("fichier.echanges", "Échanges entre agences", f"{module}:echanges", icone="bi-arrow-left-right",
              preuve="AJOUT-ERP")] if module in ("commercial", "transport") else []),
