@@ -13,8 +13,8 @@
 <div class="fw-semibold small mt-1">Destinataire</div>
 {% include "transport/_contact_rapide.html" with telephone="tel_destinataire" nom="destinataire" selection="personne_destinataire" telephone_field=form.tel_destinataire nom_field=form.destinataire %}
 {% for field in form.champs_rapides %}{% include "transport/_champ_rapide.html" %}{% endfor %}
-<details class="mb-2" data-complements {% if form.complements_ouverts %}open{% endif %}><summary class="small">Poids, quantité, valeur déclarée, contre-remboursement ou client en compte</summary>
-{% for field in form.champs_complementaires %}{% include "transport/_champ_rapide.html" %}{% endfor %}</details>
+<details class="mb-2" data-complements open><summary class="small">Poids, quantité, valeur déclarée, contre-remboursement ou client en compte</summary>
+<div class="grille-2">{% for field in form.champs_complementaires %}{% include "transport/_champ_rapide.html" %}{% endfor %}</div></details>
 <div class="d-grid gap-1 mt-2">
 <button type="submit" name="imprimer" value="1" class="btn btn-primary" data-enchaine>Enregistrer, imprimer et colis suivant</button>
 <button type="submit" name="suivant" value="1" class="btn btn-outline-primary btn-sm">Enregistrer sans imprimer et continuer</button>

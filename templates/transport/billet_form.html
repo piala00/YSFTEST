@@ -16,9 +16,9 @@
 {% include "transport/_contact_rapide.html" with telephone="telephone" nom="voyageur" piece="piece_identite" selection="personne" telephone_field=form.telephone nom_field=form.voyageur piece_field=form.piece_identite %}
 {% for field in form.champs_rapides %}{% if field.name != "telephone" and field.name != "voyageur" and field.name != "piece_identite" %}{% include "transport/_champ_rapide.html" %}{% endif %}{% endfor %}
 <details class="mb-2" open><summary class="small">Bagages du passager</summary>
-{% for field in form.champs_bagages %}{% include "transport/_champ_rapide.html" %}{% endfor %}</details>
+<div class="grille-2">{% for field in form.champs_bagages %}{% include "transport/_champ_rapide.html" %}{% endfor %}</div></details>
 <details class="mb-2" data-complements open><summary class="small">Autres réglages (trajet, caisse, client)</summary>
-{% for field in form.champs_complementaires %}{% include "transport/_champ_rapide.html" %}{% endfor %}</details>
+<div class="grille-2">{% for field in form.champs_complementaires %}{% include "transport/_champ_rapide.html" %}{% endfor %}</div></details>
 <div class="d-grid gap-1 mt-2">
 <button type="submit" name="imprimer" value="1" class="btn btn-primary" data-enchaine>Vendre et imprimer · suivant</button>
 <button type="submit" name="suivant" value="1" class="btn btn-outline-primary btn-sm">Vendre sans imprimer et continuer</button>
