@@ -58,6 +58,8 @@ class LigneEcritureForm(BootstrapMixin, forms.ModelForm):
         from apps.transport.models import Vehicule
 
         self.fields["vehicule"].queryset = Vehicule.objects.filter(actif=True)
+        self.fields["compte"].widget.attrs["class"] = (
+            self.fields["compte"].widget.attrs.get("class", "") + " ligne-compte").strip()
         for name in ("debit", "credit"):
             self.fields[name].widget.attrs["class"] += f" ligne-{name} text-end"
             self.fields[name].required = False

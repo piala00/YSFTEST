@@ -23,19 +23,24 @@
 {% endblock %}
 {% block scripts %}
 <script>
-const n = el => parseFloat((el.value || '0').replace(',', '.')) || 0;
-function recalc() {
+// Saisie des écritures façon Sage : totaux et écart en direct, ligne ajoutée toute seule,
+// contrepartie (montant d'équilibre) proposée automatiquement, et déplacement au clavier (Entrée).
+const n = el => parseFloat(((el && el.value) || '0').replace(',', '.')) || 0;
+function totaux() {
   let d = 0, c = 0;
   document.querySelectorAll('.ligne-debit').forEach(e => d += n(e));
   document.querySelectorAll('.ligne-credit').forEach(e => c += n(e));
+  return {d, c};
+}
+function recalc() {
+  const {d, c} = totaux();
   document.getElementById('tot-d').textContent = d.toLocaleString('fr-FR');
   document.getElementById('tot-c').textContent = c.toLocaleString('fr-FR');
   const ecart = document.getElementById('ecart');
   ecart.textContent = (d - c).toLocaleString('fr-FR');
   ecart.className = 'text-center fw-bold ' + (d === c && d > 0 ? 'text-success' : 'text-danger');
 }
-document.addEventListener('input', e => { if (e.target.matches('.ligne-debit, .ligne-credit')) recalc(); });
-document.getElementById('ajout-ligne').addEventListener('click', () => {
+function ajouterLigne() {
   const total = document.getElementById('id_lignes-TOTAL_FORMS'), idx = parseInt(total.value);
   const tr = document.querySelector('#lignes tr.ligne:last-child').cloneNode(true);
   tr.querySelectorAll('input, select').forEach(el => {
@@ -43,7 +48,40 @@ document.getElementById('ajout-ligne').addEventListener('click', () => {
     if (el.type === 'checkbox') el.checked = false; else if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
   });
   document.querySelector('#lignes tbody').appendChild(tr); total.value = idx + 1;
+  return tr;
+}
+function derniereLigne() { return document.querySelector('#lignes tr.ligne:last-child'); }
+// Dès qu'on remplit le compte de la dernière ligne, on prépare la ligne suivante (comme Sage).
+function compteRempli(el) {
+  const tr = el.closest('tr.ligne');
+  if (tr && tr === derniereLigne() && (el.value || '').trim()) {
+    equilibrer(tr);
+    ajouterLigne();
+  }
+}
+// Propose le montant qui équilibre l'écriture dans la ligne encore vide (contrepartie Sage).
+function equilibrer(tr) {
+  const d = tr.querySelector('.ligne-debit'), c = tr.querySelector('.ligne-credit');
+  if (!d || !c || n(d) || n(c)) return;
+  const t = totaux(), ecart = t.d - t.c;
+  if (ecart > 0) c.value = ecart; else if (ecart < 0) d.value = -ecart;
+  recalc();
+}
+document.addEventListener('input', e => {
+  if (e.target.matches('.ligne-debit, .ligne-credit')) recalc();
+  if (e.target.matches('.ligne-compte')) compteRempli(e.target);
 });
+document.addEventListener('change', e => { if (e.target.matches('.ligne-compte')) compteRempli(e.target); });
+// Entrée = champ suivant (jamais d'envoi involontaire du formulaire depuis une cellule).
+document.getElementById('lignes').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const champs = Array.from(document.querySelectorAll('#lignes input:not([type=hidden]):not([type=checkbox]), #lignes select'))
+    .filter(el => el.offsetParent !== null);
+  const i = champs.indexOf(e.target);
+  if (i > -1 && i + 1 < champs.length) champs[i + 1].focus();
+});
+document.getElementById('ajout-ligne').addEventListener('click', () => ajouterLigne());
 recalc();
 </script>
 {% endblock %}
