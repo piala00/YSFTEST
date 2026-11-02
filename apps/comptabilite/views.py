@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count as models_Count, Q, Sum
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
 from django.urls import reverse, reverse_lazy
@@ -227,6 +227,53 @@ def ecriture_valider(request, pk):
         for msg in exc.messages:
             messages.error(request, msg)
     return redirect("comptabilite:ecriture_detail", pk=pk)
+
+
+@login_required
+def comptabilisation(request):
+    """Mise à jour comptable façon Sage : on passe en une fois toutes les écritures
+    du brouillard en définitif, avec une barre de progression."""
+    qs = Ecriture.objects.filter(statut=Ecriture.STATUT_BROUILLARD).select_related("journal")
+    journal = request.GET.get("journal") or ""
+    du, au = request.GET.get("du") or "", request.GET.get("au") or ""
+    if journal:
+        qs = qs.filter(journal__code=journal)
+    if du:
+        qs = qs.filter(date__gte=du)
+    if au:
+        qs = qs.filter(date__lte=au)
+    qs = qs.order_by("date", "numero")
+    apercu = list(qs.values("pk", "numero", "date", "libelle", "journal__code")[:200])
+    ids = list(qs.values_list("pk", flat=True))
+    repartition = (qs.values("journal__code", "journal__intitule")
+                     .annotate(nb=models_Count("pk")).order_by("journal__code"))
+    return render(request, "comptabilite/comptabilisation.html", {
+        "journaux": Journal.objects.all(),
+        "journal": journal, "du": du, "au": au,
+        "total": len(ids), "ids": ids, "apercu": apercu, "repartition": repartition,
+    })
+
+
+@login_required
+@require_POST
+def comptabiliser_lot(request):
+    """Valide un petit lot d'écritures et rend l'avancement (appelé en boucle par la page)."""
+    ids = request.POST.getlist("ids[]") or request.POST.getlist("ids")
+    faits, erreurs = [], []
+    for pk in ids[:25]:
+        try:
+            ecriture = Ecriture.objects.get(pk=pk)
+        except (Ecriture.DoesNotExist, ValueError):
+            continue
+        if ecriture.statut == Ecriture.STATUT_VALIDEE:
+            faits.append(int(pk))
+            continue
+        try:
+            ecriture.valider()
+            faits.append(int(pk))
+        except ValidationError as exc:
+            erreurs.append({"numero": ecriture.numero or f"#{pk}", "message": " ".join(exc.messages)})
+    return JsonResponse({"faits": faits, "erreurs": erreurs})
 
 
 @login_required

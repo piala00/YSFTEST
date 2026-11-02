@@ -623,6 +623,7 @@ COMPTABILITE = Module(
             E("traitement.saisie_lot", "Saisie par lot", preuve="INDICATIF"),
             E("traitement.saisie_analytique", "Saisie des écritures analytiques", "comptabilite:ventilation", icone="bi-diagram-2"),
             E("traitement.brouillard", "Écritures au brouillard", "comptabilite:ecritures", icone="bi-hourglass", statut="BROUILLARD"),
+            E("traitement.comptabilisation", "Comptabilisation (mise à jour)", "comptabilite:comptabilisation", icone="bi-check2-all"),
             SEP(),
             E("traitement.lettrage", "Interrogation et lettrage", "comptabilite:lettrage", icone="bi-link-45deg"),
             E("traitement.lettrage_auto", "Lettrage automatique", "comptabilite:lettrage_auto", icone="bi-magic"),

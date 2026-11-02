@@ -50,6 +50,8 @@ urlpatterns = [
     path("ecritures/<int:pk>/modifier/", views.ecriture_update, name="ecriture_update"),
     path("ecritures/<int:pk>/valider/", views.ecriture_valider, name="ecriture_valider"),
     path("ecritures/<int:pk>/supprimer/", views.ecriture_supprimer, name="ecriture_supprimer"),
+    path("comptabilisation/", views.comptabilisation, name="comptabilisation"),
+    path("comptabilisation/lot/", views.comptabiliser_lot, name="comptabiliser_lot"),
 
     path("journal/", views.journal_view, name="journal"),
     path("grand-livre/", views.grand_livre_view, name="grand_livre"),
