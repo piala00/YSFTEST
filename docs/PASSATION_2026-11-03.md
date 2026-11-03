@@ -73,10 +73,18 @@ de contexte pleine). À coller en entier à l'IA qui reprend.
    validation Windows par lui. **Ne rien changer au .iss avant son idée.**
    NB : D6 logiciel a mis `cle_installation_requise()`=False ; si son idée réexige la clé à
    l'installation, réactiver au niveau installateur et régler le logiciel en conséquence.
-2. **Bug « rien ne fonctionne » sur SON installation Windows** (séparé de la refonte). Le code
-   marche (vérifié en DEBUG=0 : menus, fenêtres, vente d'un billet OK). Cause probable : cache
-   navigateur ou service non redémarré après mise à jour. Il doit envoyer **une photo de l'écran
-   ou F12 → Console** pour trancher. Toujours ouvert.
+2. **Bug « rien ne fonctionne » — DIAGNOSTIQUÉ ET CORRIGÉ (2026-11-03).** Le propriétaire a
+   précisé : le bug est **spécifique à Windows 10** (Windows Server et Windows 11 fonctionnent),
+   et il survient **même avec les anciennes versions** du logiciel sur son Win10 réinstallé →
+   donc environnemental, pas notre code. Cause : le lanceur ouvrait l'UI dans le **navigateur
+   par défaut** (`webbrowser.open`) ; sur un Win10 peu à jour ce défaut est l'ancien Edge
+   (EdgeHTML)/IE, qui n'exécute pas le JS moderne → page affichée mais clics morts.
+   **Correctif (commit 1810519)** : `deploy/executable/erp_ohada.py` → nouvelles fonctions
+   `_navigateur_chromium()` + `ouvrir_interface()` : sur Windows on repère Edge/Chrome et on
+   ouvre en **mode application** (`--app=`, profil dédié `ERP-OHADA-Navigateur`), quel que soit
+   le navigateur par défaut ; repli sur `webbrowser.open` si aucun Chromium. Tests :
+   `apps/core/tests_executable.py::OuvertureInterfaceTests`. Guide client mis à jour.
+   À confirmer par le propriétaire sur son Win10 avec le prochain build.
 
 ## Backlog restant (non prioritaire)
 - G-SIM-04/05 : cadrer le simulateur autonome (terrain réel).
