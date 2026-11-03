@@ -4,6 +4,13 @@ Le programme est installé dans Program Files\ERP-OHADA\<Édition>.
 Les données de la société sont conservées séparément dans ProgramData\ERP-OHADA\<Édition>.
 Remplacer le programme ne doit pas effacer les données.
 
+Navigateur : l'interface s'ouvre dans un navigateur. Le programme ouvre de lui-même
+Microsoft Edge ou Google Chrome (en mode application) quand ils sont présents, pour que
+l'interface fonctionne de la même manière sur Windows 10, Windows 11 et Windows Server.
+Si, sur un Windows 10 peu à jour, les menus semblent ne pas réagir aux clics, c'est que
+le navigateur par défaut est trop ancien : installez les mises à jour Windows (Microsoft
+Edge récent) ou Google Chrome, puis relancez le logiciel.
+
 Licence : Administration du poste > Licence. Sélectionnez le fichier .erplic
 remis pour ce serveur. L’identité publique de vérification est intégrée
 au programme : aucun fichier public à sélectionner.

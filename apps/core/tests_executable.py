@@ -88,3 +88,30 @@ class ProgrammeCompileTests(SimpleTestCase):
         self.assertNotEqual(premiere, seconde)
         self.assertTrue(premiere.exists() and seconde.exists())
         self.assertEqual(seconde.name, "erp-20261027-075105-2.sqlite3")
+
+
+class OuvertureInterfaceTests(SimpleTestCase):
+    """L'interface doit s'ouvrir de la même manière quel que soit le navigateur par défaut
+    du poste (Windows 10, 11, Server) : sur Windows on force un Chromium récent en mode
+    application, sinon on retombe sur le navigateur par défaut du système."""
+
+    def test_hors_windows_pas_de_chromium_force(self):
+        with mock.patch.object(lanceur.os, "name", "posix"):
+            self.assertIsNone(lanceur._navigateur_chromium())
+
+    def test_ouvre_chromium_en_mode_application(self):
+        edge = Path("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")
+        with mock.patch.object(lanceur, "_navigateur_chromium", return_value=edge), \
+             mock.patch.object(lanceur.subprocess, "Popen") as popen, \
+             mock.patch.object(lanceur.webbrowser, "open") as defaut:
+            lanceur.ouvrir_interface("http://127.0.0.1:8100")
+        self.assertFalse(defaut.called)                       # jamais le navigateur par défaut quand un Chromium existe
+        arguments = popen.call_args[0][0]
+        self.assertEqual(arguments[0], str(edge))
+        self.assertIn("--app=http://127.0.0.1:8100", arguments)
+
+    def test_windows_sans_chromium_retombe_sur_le_defaut(self):
+        with mock.patch.object(lanceur, "_navigateur_chromium", return_value=None), \
+             mock.patch.object(lanceur.webbrowser, "open") as defaut:
+            lanceur.ouvrir_interface("http://127.0.0.1:8100")
+        defaut.assert_called_once_with("http://127.0.0.1:8100")

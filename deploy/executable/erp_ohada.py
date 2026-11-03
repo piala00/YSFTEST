@@ -632,6 +632,52 @@ def initialiser(edition_, donnees, demander_compte=True):
         print("  puis renseigner la société et le rôle de ce serveur (direction, agence ou site unique).")
 
 
+def _navigateur_chromium():
+    """Chemin d'un navigateur Chromium récent (Edge puis Chrome) sur Windows, sinon None.
+
+    Sur un Windows 10 fraîchement installé et pas entièrement à jour, le navigateur par
+    défaut peut être l'ancien Edge (EdgeHTML) ou Internet Explorer, qui n'exécutent pas le
+    JavaScript moderne : l'interface s'affiche mais « rien ne réagit aux clics ». Windows
+    Server et Windows 11 ont d'office un Edge Chromium, d'où la différence de comportement.
+    On repère donc un moteur récent plutôt que de dépendre du navigateur par défaut du poste."""
+    if os.name != "nt":
+        return None
+    for var in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        base = os.environ.get(var)
+        if not base:
+            continue
+        for chemin in (Path(base) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+                       Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe"):
+            try:
+                if chemin.is_file():
+                    return chemin
+            except OSError:
+                continue
+    return None
+
+
+def ouvrir_interface(adresse):
+    """Ouvre l'interface de l'ERP de façon identique sur Windows 10, 11 et Windows Server.
+
+    Quand un Chromium récent (Edge ou Chrome) est présent, on l'ouvre en mode application,
+    avec un profil dédié à l'ERP : l'interface fonctionne alors quel que soit le navigateur
+    par défaut du poste. À défaut, on retombe sur le navigateur par défaut du système."""
+    chromium = _navigateur_chromium()
+    if chromium is not None:
+        try:
+            profil = Path(os.environ.get("LOCALAPPDATA") or dossier_donnees()) / "ERP-OHADA-Navigateur"
+            subprocess.Popen([str(chromium), f"--app={adresse}", f"--user-data-dir={profil}",
+                              "--no-first-run", "--no-default-browser-check"],
+                             stdin=subprocess.DEVNULL)
+            return
+        except OSError:
+            pass
+    try:
+        webbrowser.open(adresse)
+    except Exception:
+        print(f"  Ouvrez un navigateur récent (Microsoft Edge ou Google Chrome à jour) sur : {adresse}")
+
+
 def servir(port, reseau=False, ouvrir=True, resume=()):
     from waitress import serve
 
@@ -648,7 +694,7 @@ def servir(port, reseau=False, ouvrir=True, resume=()):
         print(f"  {ligne}")
     print("  Gardez cette fenêtre ouverte ; fermez-la pour tout arrêter.\n")
     if ouvrir and not os.environ.get("ERP_SANS_NAVIGATEUR"):
-        threading.Thread(target=lambda: (time.sleep(2), webbrowser.open(adresse)), daemon=True).start()
+        threading.Thread(target=lambda: (time.sleep(2), ouvrir_interface(adresse)), daemon=True).start()
     serve(application, host=hote, port=port, threads=16 if reseau else 8)
 
 
@@ -760,7 +806,7 @@ def main(argv):
     if action == "ouvrir":                                        # le serveur tourne en service : ouvrir le navigateur
         for _ in range(240):
             if deja_demarre(port):
-                webbrowser.open(f"http://127.0.0.1:{port}")
+                ouvrir_interface(f"http://127.0.0.1:{port}")
                 return 0
             time.sleep(0.5)
         print(f"Le serveur ne répond pas sur le port {port} : vérifiez le service « ERP OHADA {edition_.capitalize()} ».")
@@ -862,7 +908,7 @@ def main(argv):
     if deja_demarre(port):
         print(f"Le logiciel est déjà démarré sur ce poste : http://127.0.0.1:{port}")
         if not os.environ.get("ERP_SANS_NAVIGATEUR"):
-            webbrowser.open(f"http://127.0.0.1:{port}")
+            ouvrir_interface(f"http://127.0.0.1:{port}")
         return 0
     prevue = restauration_prevue(donnees)
     if prevue:                                                    # demandée à l'écran Administration du poste
