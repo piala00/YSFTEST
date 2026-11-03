@@ -79,4 +79,15 @@ Transport (puis Commerce). Ce document fait foi ; toute implémentation s'y réf
   (crée le rang/compte de liaison 185NN et la clé d'échange de l'agence) puis
   `fichier_installation` (exporte le fichier) ; l'agence l'importe au rôle « agence »
   de l'assistant. Le fichier sort toujours du siège et est synchronisable avec le central.
-- D6 ⏳ Retrait de la clé d'installation + recompilation (validation Windows par le propriétaire).
+- D6 ⏳ Installation d'essai sans clé (en cours).
+  - Côté logiciel ✅ : `licence.cle_installation_requise()` = False (essai sans clé, 29 ouvertures).
+  - Côté installateur ✅ (à valider sous Windows par la CI/propriétaire) : l'installateur
+    `erp_ohada.iss` propose une 3ᵉ méthode « Installation d'essai (sans clé) », **par défaut en
+    mode interactif**. Elle installe sans autorisation `.erpinst` ni clé signée ; le logiciel
+    démarre en version d'essai. Les méthodes `.erpinst` et clé signée restent disponibles ; en
+    mode silencieux, une installation sans `/AUTORISATION`, `/CLEINSTALLATION` ni `/ESSAI=1`
+    reste refusée (protection anti-copie inchangée). Test CI ajouté : `Installer-Essai`.
+  - Décisions propriétaire 2026-11-03 : clé d'installation définitive **réutilisable** (liée au
+    client, pas à l'empreinte machine) ; **un seul fichier** pour le client payant (la licence
+    `.erplic` autorise aussi l'installation). Reste à implémenter côté émission + vérification
+    installateur (Q1/Q2), puis le choix du mode de signature du coffre (poste unique vs cloud).

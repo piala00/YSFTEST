@@ -362,6 +362,11 @@ jobs:
             $code = Executer-Installation $setup $parametres $journal
             if ($code -eq 0) { throw "Installation sans autorisation acceptée : $journal" }
           }
+          function Installer-Essai($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/BASE=sqlite", "/TASKS=parefeu,service", "/ESSAI=1", "/DIR=`"$dossier`"", "/LOG=`"$journal`"")
+            $code = Executer-Installation $setup $parametres $journal
+            if ($code -ne 0) { Get-Content $journal -Tail 40; throw "Installation d'essai (sans clé) refusée ($code) : $journal" }
+          }
           function Desinstaller($journal) {
             $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=`"$journal`"")
             $code = Executer-Installation "$dossier\unins000.exe" $parametres $journal
@@ -408,6 +413,10 @@ jobs:
           Installer "$env:RUNNER_TEMP\installateur-reinstallation.log"
           if (-not (Attendre-Service) -or -not (Attendre-Serveur)) { Diagnostic; throw "Réinstallation autorisée non fonctionnelle" }
           Desinstaller "$env:RUNNER_TEMP\installateur-seconde-desinstallation.log"
+          # Essai : une installation SANS clé ni autorisation est permise ; le logiciel démarre en version d'essai.
+          Installer-Essai "$env:RUNNER_TEMP\installateur-essai.log"
+          if (-not (Attendre-Service) -or -not (Attendre-Serveur)) { Diagnostic; throw "Installation d'essai (sans clé) non fonctionnelle" }
+          Desinstaller "$env:RUNNER_TEMP\installateur-essai-desinstallation.log"
           python tests_navigateur/installateur_p0.py nettoyer "$dossier" "$donnees" "${{ matrix.edition }}"
           if ($LASTEXITCODE -ne 0) { throw "Nettoyage fictif en échec" }
           netsh advfirewall firewall show rule name="ERP OHADA (port ${{ matrix.port }})" | Out-Null
