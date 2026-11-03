@@ -39,38 +39,26 @@ def restaurer_societe(request):
 
 
 def installation_compte(request):
-    """Aucun administrateur : on le crée ici, depuis le serveur lui-même seulement (jamais depuis un autre poste)."""
-    U = get_user_model()
-    if U.objects.filter(is_superuser=True).exists():
-        return redirect("core:installation")
-    if not poste.local(request):
+    """Compat : le compte administrateur se crée désormais à la FIN de la création de société
+    (étape « compte » de l'assistant). On renvoie vers l'assistant."""
+    if not poste.local(request) and not get_user_model().objects.filter(is_superuser=True).exists():
         return render(request, "core/installation_compte.html", {"distant": True}, status=403)
-    erreurs, identifiant = [], request.POST.get("identifiant", "admin").strip() or "admin"
-    if request.method == "POST":
-        mot_de_passe = request.POST.get("mot_de_passe", "")
-        if mot_de_passe != request.POST.get("confirmation", ""):
-            erreurs.append("Les deux mots de passe sont différents.")
-        else:
-            try:
-                validate_password(mot_de_passe, U(username=identifiant))
-            except ValidationError as exc:
-                erreurs.extend(exc.messages)
-        if not erreurs:
-            u = U.objects.filter(username=identifiant).first() or U(username=identifiant)
-            u.is_superuser = u.is_staff = u.is_active = True
-            u.set_password(mot_de_passe)
-            u.save()
-            login(request, u, backend="django.contrib.auth.backends.ModelBackend")
-            return redirect("core:installation")
-    return render(request, "core/installation_compte.html", {"erreurs": erreurs, "identifiant": identifiant})
+    return redirect("core:installation")
 
 
-@login_required
 def installation(request):
-    """Assistant : 1. identité de la société, 2. rôle de ce serveur (un seul site, direction ou agence),
-    3. base de données (SQLite, SQL Server, ou SQLite avec copie miroir vers SQL Server ; programme compilé)."""
-    if not request.user.is_superuser:
-        return redirect("core:portail")
+    """Assistant de création d'une société (façon Sage). Ordre : 1. identité de la société,
+    2. rôle du serveur, 3. base de données (programme compilé), 4. compte administrateur À LA FIN.
+    C'est à l'étape 4, quand l'administrateur est créé, que la base de la société est créée.
+    Accessible sans connexion depuis le serveur lui-même tant qu'aucun administrateur n'existe."""
+    U = get_user_model()
+    admin_existe = U.objects.filter(is_superuser=True).exists()
+    if admin_existe:
+        if not (request.user.is_authenticated and request.user.is_superuser):
+            return redirect("core:portail")
+    elif not poste.local(request):
+        return render(request, "core/installation_compte.html", {"distant": True}, status=403)
+
     from apps.echanges import lots
     from apps.echanges.publication import site_local
 
@@ -79,6 +67,7 @@ def installation(request):
     societe = Societe.get()
     etape = request.GET.get("etape") or "identite"
     prevue = poste.appeler("installation_prevue") if "installation_prevue" in poste.ACTIONS else {}
+    compile = "configurer" in poste.ACTIONS                        # programme compilé : étape base disponible
     if lic.cle_installation_requise() and lic.cle_installation() is None:
         etape = "cle"                                             # rien d'autre sans la clé remise par l'éditeur
         texte = request.POST.get("cle", "") if request.method == "POST" else prevue.get("cle_installation", "")
@@ -108,10 +97,10 @@ def installation(request):
             elif role == "agence":
                 fichier = request.FILES.get("fichier")
                 if fichier is not None:
-                    lots.installer_agence(fichier.read(), fichier.name, request.user)
+                    lots.installer_agence(fichier.read(), fichier.name)
                 elif request.POST.get("fichier_prevu") and prevue.get("fichier_agence"):
                     chemin = prevue["fichier_agence"]
-                    lots.installer_agence(chemin.read_bytes(), chemin.name, request.user)
+                    lots.installer_agence(chemin.read_bytes(), chemin.name)
                 else:
                     raise lots.LotInvalide("choisissez le fichier d'installation remis par la direction")
             elif role != "seul":
@@ -119,46 +108,95 @@ def installation(request):
         except lots.LotInvalide as exc:
             messages.error(request, f"Impossible : {exc}")
             return redirect(f"{request.path}?etape=role")
-        if "configurer" in poste.ACTIONS:                          # programme compilé : choix de la base ensuite
-            return redirect(f"{request.path}?etape=base")
-        return _terminer(request)
+        return redirect(f"{request.path}?etape={'base' if compile else 'compte'}")
     elif request.method == "POST" and etape == "base":
         from . import base_donnees as bd
 
         action = request.POST.get("action")
         try:
-            if action == "sqlite":
-                return _terminer(request)
             if action == "tester":
                 messages.info(request, bd.tester_sqlserver(_reglage_formulaire(request.POST)))
+            elif action == "sqlite":
+                request.session["base_choix"] = {"action": "sqlite"}
+                return redirect(f"{request.path}?etape=compte")
             elif action in ("sqlserver", "miroir"):
                 cible = _reglage_formulaire(request.POST)
-                messages.info(request, bd.tester_sqlserver(cible))
-                Societe.objects.filter(pk=societe.pk).update(assistant_termine=True)   # copié avec le reste
-                if action == "miroir":
-                    poste.appeler("configurer", {
-                        "MIROIR_DB_ENGINE": "mssql", "MIROIR_DB_HOST": cible["HOST"], "MIROIR_DB_NAME": cible["NAME"],
-                        "MIROIR_DB_USER": cible["USER"] or None, "MIROIR_DB_PASSWORD": cible["PASSWORD"] or None,
-                        "MIROIR_DB_PYTHON_DRIVER": "mssql_python"})
-                    poste.appeler("redemarrer")
-                    return render(request, "core/redemarrage.html", {"titre": "Redémarrage"})
-                bd.lancer_changement(cible, apres=lambda: poste.appeler("configurer", _configuration_sqlserver(cible)))
-            elif action == "redemarrer":
-                poste.appeler("redemarrer")
-                return render(request, "core/redemarrage.html", {"titre": "Redémarrage"})
+                messages.info(request, bd.tester_sqlserver(cible))         # valide la connexion avant d'avancer
+                request.session["base_choix"] = {"action": action, "cible": cible}
+                return redirect(f"{request.path}?etape=compte")
         except (ValueError, RuntimeError) as exc:
             messages.error(request, f"Impossible : {exc}")
         except Exception as exc:
             messages.error(request, f"Le serveur SQL a répondu : {str(exc)[:300]}")
         return redirect(f"{request.path}?etape=base")
+    elif etape == "compte":
+        return _etape_compte(request)
     from . import base_donnees as bd
 
     return render(request, "core/installation.html", {
         "etape": etape, "form": form, "local": site_local(), "edition": societe.activite,
-        "role_prevu": prevue.get("role", ""), "fichier_prevu": prevue.get("fichier_agence"),
+        "role_prevu": prevue.get("role", ""), "fichier_prevu": prevue.get("fichier_agence"), "compile": compile,
         "changement": bd.ETAT_CHANGEMENT,
         "base_actuelle": bd.info() if etape == "base" else None,
         "erreur_base": poste.appeler("erreur_base") if "erreur_base" in poste.ACTIONS else ""})
+
+
+def _etape_compte(request):
+    """Dernière étape : création du compte administrateur ; c'est à ce moment que la société est
+    finalisée (installation d'agence différée, application de la base choisie, puis fin)."""
+    U = get_user_model()
+    erreurs, identifiant = [], request.POST.get("identifiant", "admin").strip() or "admin"
+    if request.method == "POST":
+        mot_de_passe = request.POST.get("mot_de_passe", "")
+        if mot_de_passe != request.POST.get("confirmation", ""):
+            erreurs.append("Les deux mots de passe sont différents.")
+        else:
+            try:
+                validate_password(mot_de_passe, U(username=identifiant))
+            except ValidationError as exc:
+                erreurs.extend(exc.messages)
+        if not erreurs and U.objects.filter(is_superuser=True).exclude(username=identifiant).exists() \
+                and not (request.user.is_authenticated and request.user.is_superuser):
+            erreurs.append("Un administrateur existe déjà : connectez-vous.")
+        if not erreurs:
+            from django.contrib.auth import login
+
+            u = U.objects.filter(username=identifiant).first() or U(username=identifiant)
+            u.is_superuser = u.is_staff = u.is_active = True
+            u.set_password(mot_de_passe)
+            u.save()
+            login(request, u, backend="django.contrib.auth.backends.ModelBackend")
+            return _appliquer_base_et_terminer(request, request.session.pop("base_choix", {"action": "sqlite"}))
+    return render(request, "core/installation.html", {"etape": "compte", "erreurs": erreurs, "identifiant": identifiant})
+
+
+def _appliquer_base_et_terminer(request, choix):
+    """Crée/active la base choisie (la société existe déjà sur SQLite ; SQL Server la reçoit en copie),
+    puis termine. L'administrateur vient d'être créé : il est copié avec le reste."""
+    from . import base_donnees as bd
+
+    action = choix.get("action", "sqlite")
+    if action == "sqlite":
+        return _terminer(request)
+    cible = choix["cible"]
+    try:
+        Societe.objects.filter(pk=Societe.get().pk).update(assistant_termine=True)   # copié avec le reste
+        if action == "miroir":
+            poste.appeler("configurer", {
+                "MIROIR_DB_ENGINE": "mssql", "MIROIR_DB_HOST": cible["HOST"], "MIROIR_DB_NAME": cible["NAME"],
+                "MIROIR_DB_USER": cible["USER"] or None, "MIROIR_DB_PASSWORD": cible["PASSWORD"] or None,
+                "MIROIR_DB_PYTHON_DRIVER": "mssql_python"})
+            poste.appeler("redemarrer")
+            return render(request, "core/redemarrage.html", {"titre": "Redémarrage"})
+        bd.lancer_changement(cible, apres=lambda: poste.appeler("configurer", _configuration_sqlserver(cible)))
+    except (ValueError, RuntimeError) as exc:
+        messages.error(request, f"Base : {exc}. La société fonctionne sur SQLite ; réglez SQL Server dans "
+                                "Administration du poste › Base de données.")
+        return _terminer(request)
+    except Exception as exc:
+        messages.error(request, f"Le serveur SQL a répondu : {str(exc)[:300]}")
+        return _terminer(request)
+    return _terminer(request)
 
 
 def _terminer(request):

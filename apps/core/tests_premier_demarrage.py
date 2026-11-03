@@ -31,56 +31,65 @@ class AssistantTests(TestCase):
         call_command("init_erp", "--activite", "transport", verbosity=0)
         Societe.objects.update(assistant_termine=False)
 
-    def test_compte_puis_societe_puis_role(self):
+    def test_societe_role_puis_compte_a_la_fin(self):
         # Logiciel vide : toute page mène à l'accueil « créer / restaurer une société ».
         self.assertRedirects(self.client.get("/"), reverse("core:demarrage"), fetch_redirect_response=False)
         self.assertRedirects(self.client.get("/connexion/"), reverse("core:demarrage"), fetch_redirect_response=False)
         self.assertContains(self.client.get(reverse("core:demarrage")), "Créer une société")
-        url = reverse("core:installation_compte")
-        # Depuis un autre poste du réseau : refusé
-        self.assertEqual(self.client.get(url, REMOTE_ADDR="192.168.1.20").status_code, 403)
-        self.client.post(url, {"identifiant": "chef", "mot_de_passe": "court", "confirmation": "court"})
-        self.assertFalse(get_user_model().objects.exists())
-        reponse = self.client.post(url, {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok", "confirmation": "Chef-2026-ok"})
-        self.assertRedirects(reponse, reverse("core:installation"), fetch_redirect_response=False)
-        self.assertTrue(get_user_model().objects.get(username="chef").is_superuser)
-        # Tant que l'assistant n'est pas fini, l'administrateur y revient
-        self.assertRedirects(self.client.get("/"), reverse("core:installation"), fetch_redirect_response=False)
-        page = self.client.post(reverse("core:installation"), {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"})
-        self.assertRedirects(page, reverse("core:installation") + "?etape=role", fetch_redirect_response=False)
-        self.assertContains(self.client.get(reverse("core:installation") + "?etape=role"), "Direction (siège)")
-        self.client.post(reverse("core:installation") + "?etape=role", {"role": "siege", "code": "si ege"})   # code refusé
+        inst = reverse("core:installation")
+        # L'assistant est accessible sans connexion depuis le serveur ; refusé depuis un autre poste.
+        self.assertEqual(self.client.get(inst, REMOTE_ADDR="192.168.1.20").status_code, 403)
+        # 1. identité — aucun administrateur encore
+        self.assertRedirects(self.client.post(inst, {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"}),
+                             inst + "?etape=role", fetch_redirect_response=False)
+        self.assertFalse(get_user_model().objects.filter(is_superuser=True).exists())
+        # 2. rôle
+        self.assertContains(self.client.get(inst + "?etape=role"), "Direction (siège)")
+        self.client.post(inst + "?etape=role", {"role": "siege", "code": "si ege"})   # code refusé
         self.assertFalse(Societe.get().assistant_termine)
-        self.client.post(reverse("core:installation") + "?etape=role", {"role": "siege", "code": "SIEGE", "nom": "Direction"})
+        self.assertRedirects(self.client.post(inst + "?etape=role", {"role": "siege", "code": "SIEGE", "nom": "Direction"}),
+                             inst + "?etape=compte", fetch_redirect_response=False)
+        self.assertFalse(Societe.get().assistant_termine)                 # toujours pas terminé : l'admin vient à la fin
+        # 3. compte administrateur À LA FIN → crée l'admin + la base + termine
+        self.assertContains(self.client.get(inst + "?etape=compte"), "administrateur")
+        self.client.post(inst + "?etape=compte", {"identifiant": "chef", "mot_de_passe": "court", "confirmation": "court"})
+        self.assertFalse(get_user_model().objects.filter(is_superuser=True).exists())   # mot de passe trop court
+        reponse = self.client.post(inst + "?etape=compte",
+                                   {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok", "confirmation": "Chef-2026-ok"})
+        self.assertRedirects(reponse, reverse("core:portail"), fetch_redirect_response=False)
         societe = Societe.get()
         self.assertTrue(societe.assistant_termine)
         self.assertEqual(societe.raison_sociale, "Transports Essai SA")
+        self.assertTrue(get_user_model().objects.get(username="chef").is_superuser)
         from apps.echanges.publication import site_local
 
         self.assertEqual(site_local().code, "SIEGE")
         self.assertContains(self.client.get("/"), "Administration du poste")
 
     def test_un_seul_site(self):
-        get_user_model().objects.create_superuser("chef", "", "Chef-2026-ok")
-        self.client.login(username="chef", password="Chef-2026-ok")
-        self.client.post(reverse("core:installation") + "?etape=role", {"role": "seul"})
+        inst = reverse("core:installation")
+        self.client.post(inst, {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"})
+        self.assertRedirects(self.client.post(inst + "?etape=role", {"role": "seul"}),
+                             inst + "?etape=compte", fetch_redirect_response=False)
+        self.assertFalse(Societe.get().assistant_termine)
+        self.client.post(inst + "?etape=compte", {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok", "confirmation": "Chef-2026-ok"})
         self.assertTrue(Societe.get().assistant_termine)
         self.assertEqual(self.client.get("/").status_code, 200)
 
     def test_role_choisi_dans_l_installateur(self):
-        get_user_model().objects.create_superuser("chef", "", "Chef-2026-ok")
-        self.client.login(username="chef", password="Chef-2026-ok")
+        inst = reverse("core:installation")
+        self.client.post(inst, {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"})
         with tempfile.TemporaryDirectory() as dossier:
             fichier = Path(dossier, "installation-agence.erpx")
             fichier.write_bytes(b"pas un vrai fichier")
             with mock.patch.dict(poste.ACTIONS, {"installation_prevue": lambda: {"role": "agence", "fichier_agence": fichier}}):
-                page = self.client.get(reverse("core:installation") + "?etape=role")
+                page = self.client.get(inst + "?etape=role")
                 self.assertContains(page, "Choisi à l'installation : <strong>Agence</strong>")
                 self.assertContains(page, "installation-agence.erpx")
-                page = self.client.post(reverse("core:installation") + "?etape=role", {"role": "agence", "fichier_prevu": "1"},
-                                        follow=True)
+                page = self.client.post(inst + "?etape=role", {"role": "agence", "fichier_prevu": "1"}, follow=True)
                 self.assertContains(page, "Impossible")                  # le fichier préparé a bien été lu (et refusé)
         self.assertFalse(Societe.get().assistant_termine)
+        self.assertFalse(get_user_model().objects.filter(is_superuser=True).exists())
 
     @override_settings(ERP_ASSISTANT=False)
     def test_hors_programme_compile_rien_ne_change(self):
@@ -192,14 +201,15 @@ class ProgrammeLanceTests(SimpleTestCase):
                         self.assertIsNone(serveur.poll(), serveur.stdout.read() if serveur.poll() is not None else "")
                         time.sleep(0.5)
                 self.assertTrue(adresse.endswith("/demarrage/"))
-                adresse, _ = nav.post("/installation/compte/", {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok",
-                                                                "confirmation": "Chef-2026-ok"})
-                self.assertTrue(adresse.endswith("/installation/"))
+                # Création de société : identité → rôle → base → compte administrateur (à la fin).
                 nav.post("/installation/", {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"})
                 adresse, page = nav.post("/installation/?etape=role", {"role": "seul"})
                 self.assertTrue(adresse.endswith("/installation/?etape=base"), adresse)
                 self.assertIn("SQL Server", page)
-                adresse, page = nav.post("/installation/?etape=base", {"action": "sqlite"})
+                adresse, _ = nav.post("/installation/?etape=base", {"action": "sqlite"})
+                self.assertTrue(adresse.endswith("/installation/?etape=compte"), adresse)
+                adresse, page = nav.post("/installation/?etape=compte", {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok",
+                                                                         "confirmation": "Chef-2026-ok"})
                 self.assertTrue(adresse.endswith(f":{port}/"), adresse)
                 self.assertIn("Configuration terminée", page)
 

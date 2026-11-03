@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Première configuration{% endblock %}
-{% block content %}
+{% block title %}Nouvelle société{% endblock %}
+{% block public %}
 <div class="container" style="max-width:820px">
-  <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-rocket-takeoff"></i> Première configuration</h1>
-    <div class="text-muted">{% if etape == "cle" %}Clé d'installation{% elif etape == "base" %}Étape 4 sur 4 : la base de données{% elif etape == "role" %}Étape 3 sur 4 : le rôle de ce serveur{% else %}Étape 2 sur 4 : la société{% endif %}</div></div>
+  <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-building-add"></i> Nouvelle société</h1>
+    <div class="text-muted">{% if etape == "cle" %}Clé d'installation{% elif etape == "compte" %}Dernière étape : le compte administrateur{% elif etape == "base" %}La base de données{% elif etape == "role" %}Le rôle de ce serveur{% else %}Étape 1 : la société{% endif %}</div></div>
+  {% include "core/_messages.html" %}
   {% if etape == "cle" %}
   <div class="card card-body">
     <p class="small">Saisissez la <strong>clé d'installation</strong> remise par l'éditeur avec le logiciel. Elle indique votre société
@@ -49,6 +50,21 @@
       </div></form></div>
   </div>
   <div class="mt-3"><a href="?etape=role" class="small">← Revenir au rôle du serveur</a></div>
+  {% elif etape == "compte" %}
+  <div class="card card-body mx-auto" style="max-width:560px">
+    <p class="small text-muted">Dernier pas : créez le <strong>compte administrateur</strong> de cette société. C'est à cette
+      étape que la base de données de la société est créée. Choisissez un mot de passe solide et notez-le en lieu sûr.</p>
+    {% for e in erreurs %}<div class="alert alert-danger py-1 small">{{ e }}</div>{% endfor %}
+    <form method="post">{% csrf_token %}
+      <label class="form-label small" for="c-id">Identifiant</label>
+      <input id="c-id" name="identifiant" class="form-control mb-2" value="{{ identifiant|default:'admin' }}" required autocomplete="username">
+      <label class="form-label small" for="c-mdp">Mot de passe (8 caractères ou plus)</label>
+      <input id="c-mdp" name="mot_de_passe" type="password" class="form-control mb-2" required minlength="8" autocomplete="new-password">
+      <label class="form-label small" for="c-conf">Confirmez le mot de passe</label>
+      <input id="c-conf" name="confirmation" type="password" class="form-control mb-3" required minlength="8" autocomplete="new-password">
+      <button class="btn btn-primary w-100"><i class="bi bi-check2-circle"></i> Créer l'administrateur et ouvrir la société</button>
+    </form>
+  </div>
   {% elif etape == "role" %}
   {% if local %}<div class="alert alert-info small">Ce serveur est déjà installé : <strong>{{ local.code }} — {{ local.get_role_display }}</strong>.
     Choisissez le même rôle pour terminer.</div>{% endif %}
