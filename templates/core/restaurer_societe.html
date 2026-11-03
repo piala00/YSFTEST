@@ -1,23 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Restaurer une société{% endblock %}
 {% block public %}
-<div class="container" style="max-width:640px">
-  <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-arrow-counterclockwise"></i> Restaurer une société</h1></div>
-  {% if pro_ok %}
-  <div class="card card-body">
-    <p class="small text-muted">Choisissez votre fichier de sauvegarde pour restaurer votre société telle qu'elle était.</p>
-    <div class="alert alert-info small">La restauration depuis cet écran de premier démarrage sera disponible à l'étape suivante
-      de la refonte (D4). En attendant, créez l'administrateur puis restaurez depuis
-      Fichier › Administration du poste.</div>
-    <a class="btn btn-outline-secondary" href="{% url 'core:demarrage' %}">← Retour</a>
+<div class="container" style="max-width:680px">
+  <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-arrow-counterclockwise"></i> Restaurer une société</h1>
+    <div class="text-muted">Activez la licence, puis restaurez votre sauvegarde — sans recréer de société.</div></div>
+  {% include "core/_messages.html" %}
+
+  {% if not pro_ok %}
+  <div class="card card-body mb-3">
+    <h2 class="h6"><i class="bi bi-key"></i> 1. Activer la licence</h2>
+    <div class="alert alert-secondary small py-2">{{ pro_message }} La restauration est réservée à la version sous licence
+      (en essai : {{ essai_ouvertures }} ouvertures, sans sauvegarde ni restauration).</div>
+    <form method="post" class="mb-3">{% csrf_token %}
+      <label class="form-label small" for="l-code">Code d'activation</label>
+      <div class="d-flex gap-2"><input id="l-code" name="cle" class="form-control form-control-sm font-monospace" placeholder="XXXX-XXXX-XXXX-XXXX" required>
+        <button class="btn btn-sm btn-primary" name="action" value="activation">Activer</button></div>
+    </form>
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}
+      <label class="form-label small" for="l-fichier">…ou fichier de licence (.erplic)</label>
+      <div class="d-flex gap-2"><input id="l-fichier" type="file" name="fichier" accept=".erplic" class="form-control form-control-sm" required>
+        <button class="btn btn-sm btn-outline-primary" name="action" value="fichier_licence">Installer</button></div>
+    </form>
   </div>
+  <div class="card card-body text-muted"><h2 class="h6"><i class="bi bi-upload"></i> 2. Restaurer la sauvegarde</h2>
+    <p class="small mb-0">Disponible une fois la licence activée.</p></div>
   {% else %}
   <div class="card card-body">
-    <div class="alert alert-warning small">{{ pro_message }}</div>
-    <p class="small text-muted">La <strong>restauration</strong> et la <strong>sauvegarde</strong> sont réservées à la version
-      sous licence. Activez d'abord votre licence, puis revenez restaurer votre société — sans avoir à en créer une nouvelle.</p>
-    <a class="btn btn-outline-secondary" href="{% url 'core:demarrage' %}">← Retour</a>
+    <h2 class="h6"><i class="bi bi-upload"></i> Restaurer votre sauvegarde</h2>
+    <p class="small text-muted">Choisissez votre fichier de sauvegarde (.json). Toutes les données actuelles seront
+      remplacées par celles de votre société. Vous vous reconnecterez ensuite avec vos identifiants.</p>
+    <form method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center">{% csrf_token %}
+      <input type="file" name="fichier" accept=".json" class="form-control form-control-sm" style="max-width:360px" required aria-label="Fichier de sauvegarde">
+      <button class="btn btn-primary" name="action" value="restaurer"
+              onclick="return confirm('Restaurer cette société ? Les données actuelles seront remplacées.')">
+        <i class="bi bi-arrow-counterclockwise"></i> Restaurer la société</button>
+    </form>
   </div>
   {% endif %}
+  <div class="mt-3"><a href="{% url 'core:demarrage' %}" class="small">← Retour</a></div>
 </div>
 {% endblock %}

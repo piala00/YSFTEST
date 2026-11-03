@@ -28,14 +28,53 @@ def demarrage(request):
 
 
 def restaurer_societe(request):
-    """Premier démarrage : restaurer une société existante depuis une sauvegarde. La restauration
-    est réservée à la version sous licence (on active d'abord la licence, puis on restaure)."""
+    """Premier démarrage : restaurer une société existante depuis une sauvegarde. On active d'abord
+    la licence (code ou fichier .erplic), puis on restaure — sans avoir à créer une nouvelle société.
+    Accessible sans connexion depuis le serveur lui-même tant qu'aucun administrateur n'existe."""
     if not poste.local(request) and not (request.user.is_authenticated and request.user.is_superuser):
         return render(request, "core/installation_compte.html", {"distant": True}, status=403)
-    from apps.licences.licence import fonctions_pro_disponibles
+    from apps.licences import licence as lic
 
-    pro_ok, pro_message = fonctions_pro_disponibles()
-    return render(request, "core/restaurer_societe.html", {"pro_ok": pro_ok, "pro_message": pro_message})
+    utilisateur = request.user if request.user.is_authenticated else None
+    if request.method == "POST":
+        action = request.POST.get("action")
+        try:
+            if action == "activation":
+                _, d = lic.activer(request.POST.get("cle", ""), utilisateur)
+                messages.success(request, f"Licence {d.get('numero', '')} activée pour {d.get('client', '')}. "
+                                          "Vous pouvez maintenant restaurer votre société.")
+            elif action == "fichier_licence":
+                fichier = request.FILES.get("fichier")
+                if fichier is None or fichier.size > 64 * 1024:
+                    raise lic.LicenceInvalide("choisissez le fichier de licence (.erplic) envoyé par l'éditeur")
+                _, d = lic.deposer(fichier.read(), utilisateur, activation_nouvelle=True)
+                messages.success(request, f"Licence {d.get('numero', '')} installée pour {d.get('client', '')}. "
+                                          "Vous pouvez maintenant restaurer votre société.")
+            elif action == "restaurer":
+                pro_ok, pro_message = lic.fonctions_pro_disponibles()
+                if not pro_ok:
+                    raise ValueError(pro_message or "activez d'abord la licence pour restaurer votre société")
+                fichier = request.FILES.get("fichier")
+                if fichier is None or fichier.size > 256 * 1024 * 1024:
+                    raise ValueError("choisissez votre fichier de sauvegarde de la société")
+                from django.contrib.auth import logout
+
+                from apps.core import sauvegarde as sv
+
+                contenu = fichier.read().decode("utf-8")
+                sv.lire(contenu)                                   # valide le format avant toute modification
+                entete = sv.restaurer(contenu)
+                logout(request)
+                return render(request, "core/restauration_ok.html", {"objets": entete.get("objets"), "date": entete.get("date", "")[:16]})
+        except (lic.LicenceInvalide, ValueError, UnicodeDecodeError) as exc:
+            messages.error(request, f"Refusé : {exc}")
+        except Exception as exc:                                   # fichier incohérent : transaction annulée
+            messages.error(request, f"Restauration impossible, aucune donnée modifiée : {exc}")
+        return redirect(request.path)
+    pro_ok, pro_message = lic.fonctions_pro_disponibles()
+    return render(request, "core/restaurer_societe.html", {
+        "pro_ok": pro_ok, "pro_message": pro_message, "etat": lic.etat(),
+        "essai_ouvertures": lic.ESSAI_OUVERTURES})
 
 
 def installation_compte(request):

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Société restaurée{% endblock %}
+{% block public %}
+<div class="container" style="max-width:560px">
+  <div class="text-center my-5">
+    <div class="display-6 text-success mb-2"><i class="bi bi-check2-circle"></i></div>
+    <h1 class="h4 mb-2">Société restaurée</h1>
+    <p class="text-muted">{% if objets %}{{ objets }} enregistrements restaurés{% if date %} (sauvegarde du {{ date }}){% endif %}.{% endif %}
+      Connectez-vous avec vos identifiants habituels.</p>
+    <a class="btn btn-primary mt-2" href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right"></i> Se connecter</a>
+  </div>
+</div>
+{% endblock %}

@@ -152,6 +152,27 @@ class AdministrationPosteTests(TestCase):
             commande.assert_called_once_with("flush", "--no-input")
 
 
+class RestaurationPremierDemarrageTests(TestCase):
+    """D4 : restaurer une société existante dès le premier démarrage (sans en créer une)."""
+
+    def test_restaurer_une_societe(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from apps.core import sauvegarde as sv
+
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+        Societe.objects.update(raison_sociale="Société Restaurée SA", assistant_termine=True)
+        get_user_model().objects.create_superuser("chefresto", "", "Chef-2026-ok")
+        contenu = sv.sauvegarder()
+        Societe.objects.update(raison_sociale="Autre chose")      # on modifie pour prouver la restauration
+        fichier = SimpleUploadedFile("sauvegarde.json", contenu.encode("utf-8"), content_type="application/json")
+        reponse = self.client.post(reverse("core:restaurer_societe"), {"action": "restaurer", "fichier": fichier})
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, "restaurée")
+        self.assertEqual(Societe.get().raison_sociale, "Société Restaurée SA")
+        self.assertTrue(get_user_model().objects.filter(username="chefresto").exists())
+
+
 def _port_libre():
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
