@@ -708,7 +708,7 @@ COMPTABILITE = Module(
             E("etats.controles", "Analyse et contrôles", icone="bi-clipboard-check", preuve="INDICATIF", enfants=[
                 E("etats.controles.cloture", "Contrôles de clôture", "comptabilite:controles_cloture", preuve="AJOUT-ERP"),
                 E("etats.controles.liaison", "Contrôle de la liaison commerciale", "comptabilite:controle_liaison",
-                  preuve="AJOUT-ERP"),
+                  preuve="AJOUT-ERP", edition="commerce"),
             ]),
         ]),
         menu_fenetre("comptabilite"),
@@ -908,7 +908,7 @@ def _module_service(code, titre, description, icone, couleur, prefixe, structure
 BILLETTERIE = _module_service(
     "billetterie", "Billetterie", "Départs, vente des billets, correspondances, annulations, encaissements du guichet",
     "bi-ticket-perforated", "#e65100", "/transport/billetterie/",
-    structure=[E("structure.clients", "Clients en compte", "comptabilite:clients", icone="bi-people")],
+    structure=None,
     traitement=[
         E("billetterie.departs", "Départs du jour", "transport:departs", icone="bi-bus-front"),
         E("billetterie.programmer", "Programmer un départ", "transport:depart_create", icone="bi-calendar-plus"),
@@ -927,7 +927,8 @@ BILLETTERIE = _module_service(
 
 COLIS = _module_service(
     "colis", "Colis et expéditions", "Enregistrement, chargement, arrivée, remise, contre-remboursements",
-    "bi-box-seam", "#6d4c41", "/transport/colis/", structure=None,
+    "bi-box-seam", "#6d4c41", "/transport/colis/",
+    structure=[E("structure.clients", "Clients en compte", "comptabilite:clients", icone="bi-people")],
     traitement=[
         E("colis.enregistrer", "Enregistrer un colis", "transport:colis_create", icone="bi-box-seam", nature="COLIS"),
         E("colis.courrier", "Enregistrer un courrier", "transport:colis_create", icone="bi-envelope", nature="COURRIER"),
