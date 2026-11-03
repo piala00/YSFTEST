@@ -169,12 +169,17 @@ def demande_lire(texte):
 # ---------------------------------------------------------------- Licence (fichier .erplic et clé d'activation)
 def licence_donnees(demande, conditions):
     """Données signées de la licence : identité tirée de la demande, conditions choisies par l'éditeur.
-    conditions : numero, edition, role, postes, emise_le, valable_jusqu_au (None = définitive), maj_jusqu_au."""
-    return {"version": 3 if est_installation_courte(demande.get("cle_installation", "")) else 2, "numero": conditions["numero"], "client": demande["societe"], "niu": demande.get("niu", ""),
-            "edition": conditions["edition"], "role": conditions["role"], "site": demande.get("site", ""),
-            "postes": conditions["postes"], "machine": demande["materiel"], "machine_nom": demande.get("machine_nom", ""),
-            "installation": demande.get("installation", ""), "emise_le": conditions["emise_le"],
-            "valable_jusqu_au": conditions["valable_jusqu_au"], "maj_jusqu_au": conditions["maj_jusqu_au"]}
+    conditions : numero, edition, role, postes, emise_le, valable_jusqu_au (None = définitive), maj_jusqu_au.
+    conditions["developpeur"] (optionnel) : licence de l'éditeur pour ses propres essais, valable sur
+    toutes ses machines et toutes les éditions (voir apps/licences/licence.controler)."""
+    donnees = {"version": 3 if est_installation_courte(demande.get("cle_installation", "")) else 2, "numero": conditions["numero"], "client": demande["societe"], "niu": demande.get("niu", ""),
+               "edition": conditions["edition"], "role": conditions["role"], "site": demande.get("site", ""),
+               "postes": conditions["postes"], "machine": demande["materiel"], "machine_nom": demande.get("machine_nom", ""),
+               "installation": demande.get("installation", ""), "emise_le": conditions["emise_le"],
+               "valable_jusqu_au": conditions["valable_jusqu_au"], "maj_jusqu_au": conditions["maj_jusqu_au"]}
+    if conditions.get("developpeur"):
+        donnees["developpeur"] = True                             # n'apparaît que sur les licences développeur
+    return donnees
 
 
 def _iso(jours):

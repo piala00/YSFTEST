@@ -325,22 +325,26 @@ def controler(contenu):
 
     donnees, signature = lire(contenu)
     verifier_signature(donnees, signature)
-    if donnees.get("machine") != empreinte_machine():
+    # Licence développeur de l'éditeur (signée par sa clé, donc impossible à forger) : elle sert à ses propres
+    # essais sur toutes ses machines et toutes les éditions. Un build de production ne fait confiance qu'à sa
+    # clé publique : une licence développeur signée par une autre identité y est refusée dès la signature.
+    developpeur = bool(donnees.get("developpeur"))
+    if not developpeur and donnees.get("machine") != empreinte_machine():
         raise LicenceInvalide("licence faite pour un autre serveur : envoyez le code d'activation de celui-ci")
-    if Societe.get().activite not in EDITIONS.get(donnees.get("edition", ""), set()):
+    if not developpeur and Societe.get().activite not in EDITIONS.get(donnees.get("edition", ""), set()):
         raise LicenceInvalide(f"licence de l'édition « {donnees.get('edition')} » : ne couvre pas ce logiciel")
-    if donnees.get("version") == 3:
+    if not developpeur and donnees.get("version") == 3:
         installation = cle_installation()
         if installation is None or donnees.get("installation") != installation["numero"]:
             raise LicenceInvalide("ce fichier ne correspond pas au code d'installation de ce serveur")
         if fc.nom_simple(donnees.get("client", "")) != fc.nom_simple(Societe.get().raison_sociale):
             raise LicenceInvalide("ce fichier ne correspond pas à la société de ce serveur")
     local = site_local()
-    if donnees.get("version") == 3:
+    if not developpeur and donnees.get("version") == 3:
         role = {"SIEGE": "siege", "AGENCE": "agence"}.get(getattr(local, "role", ""), "seul")
         if donnees.get("role") != role or donnees.get("site", "") != (local.code if local and role == "agence" else ""):
             raise LicenceInvalide("ce fichier ne correspond pas au rôle ou au site de ce serveur")
-    if donnees.get("site") and local is not None and local.code != donnees["site"]:
+    if not developpeur and donnees.get("site") and local is not None and local.code != donnees["site"]:
         raise LicenceInvalide(f"licence du site {donnees['site']} : ce serveur est {local.code}")
     if not isinstance(donnees.get("postes"), int) or donnees["postes"] < 1:
         raise LicenceInvalide("nombre de postes absent de la licence")

@@ -4,6 +4,7 @@
     ERP-OHADA-Licences.exe installation --dossier D  code 4×6 sans société ni coffre
     ERP-OHADA-Licences.exe cles --dossier D          coffre.dat chiffré + parametres.dat binaire
     ERP-OHADA-Licences.exe emettre --cle D\\coffre.dat --demande DEMANDE.erpdem --postes 5
+    ERP-OHADA-Licences.exe developpeur --cle D\\coffre-dev.dat   licence éditeur : toutes options, toutes ses machines
     ERP-OHADA-Licences.exe verifier fichier.erplic --publique D\\parametres.dat
 
 Le format historique reste lisible ; « cles --ancien-format » est réservé à sa compatibilité.
@@ -446,6 +447,42 @@ def emettre(a, mdp=None, cle_deverrouillee=None):
         "Ne jamais copier le coffre de l'éditeur dans l'installation client.\n\n"
         + (f"Activation alternative (facultative) :\n{activation}\n" if activation else ""), encoding="utf-8")
     a.activation = activation
+    return sortie
+
+
+def emettre_developpeur(a, mdp=None, cle_deverrouillee=None):
+    """Licence DÉVELOPPEUR de l'éditeur : toutes options, toutes éditions, toutes ses machines.
+
+    À signer avec une identité de DÉVELOPPEMENT dédiée (jamais l'identité de production) et à garder
+    pour soi. Comme chaque build ne fait confiance qu'à sa clé publique intégrée, un build de production
+    refuse cette licence (signée par la clé DEV) : il n'y a donc rien à retirer avant la sortie."""
+    cle_chemin = Path(a.cle)
+    cle_privee = cle_deverrouillee or charger_cle(cle_chemin, mdp)
+    registre = cle_chemin.with_name("registre-licences.csv")
+    jusqu_au = None if getattr(a, "definitive", False) else date_ou_rien(getattr(a, "jusqu_au", None)) or dans_mois(120)
+    demande = {"societe": "DEVELOPPEUR", "niu": "", "materiel": "", "site": "", "machine_nom": "",
+               "installation": "", "cle_installation": ""}
+    conditions = {"numero": prochain_numero(registre, "DEV"), "edition": "toutes", "role": "seul",
+                  "postes": 65000, "emise_le": datetime.date.today().isoformat(),
+                  "valable_jusqu_au": jusqu_au, "maj_jusqu_au": jusqu_au, "developpeur": True}
+    donnees = fc.licence_donnees(demande, conditions)
+    signature = cle_privee.sign(canonique(donnees))
+    if getattr(a, "fichier", None):
+        sortie = Path(a.fichier)
+        if sortie.suffix.lower() != ".erplic":
+            sortie = sortie.with_name(sortie.name + ".erplic")
+    else:
+        sortie = Path(getattr(a, "sortie", None) or cle_chemin.parent) / f"LICENCE-DEVELOPPEUR-{donnees['numero']}.erplic"
+    sortie.parent.mkdir(parents=True, exist_ok=True)
+    ecrire_identite(cle_privee, sortie.parent)
+    sortie.write_text(fc.licence_texte(donnees, signature), encoding="utf-8")
+    ajouter_registre(registre, {"numero": donnees["numero"], "client": "DEVELOPPEUR", "niu": "", "edition": "toutes",
+                                "role": "seul", "site": "", "postes": 65000, "machine": "", "emise_le": donnees["emise_le"],
+                                "valable_jusqu_au": jusqu_au or "", "maj_jusqu_au": jusqu_au or "", "fichier": str(sortie),
+                                "machine_nom": "DEVELOPPEUR", "installation": "", "cle_activation": ""})
+    print(f"Licence développeur {donnees['numero']} : {sortie}")
+    print(f"  toutes éditions · toutes vos machines · {'définitive' if jusqu_au is None else 'jusqu au ' + jusqu_au}")
+    print("  À signer avec une identité de DÉVELOPPEMENT dédiée et à garder pour vous ; un build de production la refuse.")
     return sortie
 
 
@@ -1205,6 +1242,12 @@ def main(argv):
     e.add_argument("--maj-jusqu-au", dest="maj_jusqu_au")
     e.add_argument("--sortie")
     e.add_argument("--fichier", help="chemin exact du fichier .erplic à créer")
+    d = s.add_parser("developpeur", help="licence de l'éditeur pour ses propres essais (toutes options, toutes ses machines)")
+    d.add_argument("--cle", required=True, help="coffre d'une identité de DÉVELOPPEMENT dédiée (jamais la production)")
+    d.add_argument("--fichier", help="chemin exact du fichier .erplic à créer")
+    d.add_argument("--sortie", help="dossier de sortie (à défaut, celui du coffre)")
+    d.add_argument("--jusqu-au", dest="jusqu_au", help="date d'expiration ISO ; par défaut 10 ans")
+    d.add_argument("--definitive", "--permanente", dest="definitive", action="store_true", help="sans expiration")
     ai = s.add_parser("autoriser-installation")
     for nom in ("--cle", "--code", "--jusqu-au", "--sortie"):
         ai.add_argument(nom, required=True)
@@ -1219,6 +1262,8 @@ def main(argv):
         emettre_installation(a)
     elif a.commande == "emettre":
         emettre(a)
+    elif a.commande == "developpeur":
+        emettre_developpeur(a)
     elif a.commande == "autoriser-installation":
         print(creer_autorisation_installation(charger_cle(a.cle), a.code, a.reference, a.jusqu_au, a.sortie))
     else:

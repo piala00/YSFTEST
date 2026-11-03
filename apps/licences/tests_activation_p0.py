@@ -150,3 +150,60 @@ class ActivationDeuxEditionsTests(TestCase):
         self.assertEqual(LicenceDeposee.objects.filter(valide=True).count(), 1)
         self.assertEqual(LicenceDeposee.objects.filter(valide=False).count(), 1)
         self.assertFalse(l.etat().lecture_seule)
+
+
+class LicenceDeveloppeurTests(TestCase):
+    """Licence développeur de l'éditeur : signée par SA clé, valable sur toutes ses machines et toutes
+    les éditions, sans clé d'installation. Un build ne faisant pas confiance à cette clé la refuse."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+
+    def setUp(self):
+        self.privee = Ed25519PrivateKey.generate()
+        brut = self.privee.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        for p in (mock.patch("apps.licences.cle_editeur.CLES", [base64.b64encode(brut).decode()]),
+                  mock.patch.object(sys, "frozen", True, create=True)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def _signer(self, donnees):
+        return l.ecrire(donnees, self.privee.sign(l.canonique(donnees)))
+
+    def licence_developpeur(self):
+        demande = {"societe": "DEVELOPPEUR", "niu": "", "materiel": "", "site": "", "machine_nom": "",
+                   "installation": "", "cle_installation": ""}
+        conditions = {"numero": "DEV-2026-0001", "edition": "toutes", "role": "seul", "postes": 65000,
+                      "emise_le": datetime.date.today().isoformat(), "valable_jusqu_au": None,
+                      "maj_jusqu_au": None, "developpeur": True}
+        return self._signer(l.fc.licence_donnees(demande, conditions))
+
+    def test_valable_sur_toute_machine_et_toute_edition(self):
+        texte = self.licence_developpeur()
+        for machine in ("MACHINE-BUREAU", "MACHINE-MAISON", "MACHINE-PORTABLE"):
+            with mock.patch.object(l, "empreinte_machine", return_value=machine):
+                self.assertTrue(l.controler(texte)["developpeur"])
+        for activite in ("TRANSPORT", "COMMERCE"):
+            Societe.objects.update(activite=activite)
+            with mock.patch.object(l, "empreinte_machine", return_value="MACHINE-AUTRE"):
+                self.assertTrue(l.controler(texte)["developpeur"])
+
+    def test_sans_indicateur_le_verrou_machine_revient(self):
+        demande = {"societe": "X", "niu": "", "materiel": l.empreinte_machine(), "site": "", "machine_nom": "",
+                   "installation": "", "cle_installation": ""}
+        conditions = {"numero": "LIC-2026-0009", "edition": "transport", "role": "seul", "postes": 5,
+                      "emise_le": datetime.date.today().isoformat(), "valable_jusqu_au": None, "maj_jusqu_au": None}
+        texte = self._signer(l.fc.licence_donnees(demande, conditions))
+        with mock.patch.object(l, "empreinte_machine", return_value="UNE-AUTRE-MACHINE"):
+            with self.assertRaises(l.LicenceInvalide):
+                l.controler(texte)
+
+    def test_une_autre_identite_est_refusee_des_la_signature(self):
+        # Un build qui ne connaît pas la clé DEV (autre identité intégrée) refuse la licence développeur.
+        texte = self.licence_developpeur()
+        autre = Ed25519PrivateKey.generate().public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        with mock.patch("apps.licences.cle_editeur.CLES", [base64.b64encode(autre).decode()]):
+            with mock.patch.object(l, "empreinte_machine", return_value="MACHINE-BUREAU"):
+                with self.assertRaises(l.LicenceInvalide):
+                    l.controler(texte)

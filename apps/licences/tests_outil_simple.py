@@ -127,6 +127,20 @@ class OutilSimpleTests(unittest.TestCase):
         self.assertFalse((sortie / "coffre.dat").exists())
         self.assertFalse((sortie / "cle-privee.pem").exists())
 
+    def test_licence_developpeur_signee_toutes_machines(self):
+        cle = outil.charger_cle(self.chemin, self.mdp)
+        sortie = self.dossier / "dev"
+        a = SimpleNamespace(cle=str(self.chemin), fichier=None, sortie=str(sortie), jusqu_au=None, definitive=True)
+        with contextlib.redirect_stdout(io.StringIO()):
+            licence = outil.emettre_developpeur(a, cle_deverrouillee=cle)
+            outil.verifier(licence, sortie / "parametres.dat")
+        donnees = json.loads(base64.b64decode(licence.read_text().splitlines()[1]))
+        self.assertTrue(donnees["developpeur"])
+        self.assertEqual(donnees["edition"], "toutes")
+        self.assertEqual(donnees["machine"], "")
+        self.assertIsNone(donnees["valable_jusqu_au"])
+        self.assertFalse((sortie / "coffre.dat").exists())
+
     def test_identite_autre_editeur_non_ecrasee(self):
         client = self.dossier / "client"
         cle = outil.charger_cle(self.chemin, self.mdp)
