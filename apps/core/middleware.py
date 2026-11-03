@@ -64,7 +64,7 @@ class AutorisationsMiddleware:
 class PremiereConfigurationMiddleware:
     """Programme compilé seulement (ERP_ASSISTANT) : tant qu'il n'y a pas d'administrateur, toute page mène à sa
     création ; ensuite l'administrateur passe par l'assistant (société, rôle du serveur) jusqu'à ce qu'il soit terminé."""
-    LIBRES = ("/static/", "/installation/", "/deconnexion/", "/relais/", "/api/")
+    LIBRES = ("/static/", "/demarrage/", "/restaurer-societe/", "/installation/", "/deconnexion/", "/relais/", "/api/")
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -86,7 +86,7 @@ class PremiereConfigurationMiddleware:
         from .models import Societe
 
         if not get_user_model().objects.filter(is_superuser=True).exists():
-            return redirect("core:installation_compte")
+            return redirect("core:demarrage")                     # logiciel vide : créer ou restaurer une société
         if Societe.get().assistant_termine:
             self.termine = True                                   # plus aucune requête à la base ensuite
             return None

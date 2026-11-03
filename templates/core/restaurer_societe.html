@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Restaurer une société{% endblock %}
+{% block public %}
+<div class="container" style="max-width:640px">
+  <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-arrow-counterclockwise"></i> Restaurer une société</h1></div>
+  {% if pro_ok %}
+  <div class="card card-body">
+    <p class="small text-muted">Choisissez votre fichier de sauvegarde pour restaurer votre société telle qu'elle était.</p>
+    <div class="alert alert-info small">La restauration depuis cet écran de premier démarrage sera disponible à l'étape suivante
+      de la refonte (D4). En attendant, créez l'administrateur puis restaurez depuis
+      Fichier › Administration du poste.</div>
+    <a class="btn btn-outline-secondary" href="{% url 'core:demarrage' %}">← Retour</a>
+  </div>
+  {% else %}
+  <div class="card card-body">
+    <div class="alert alert-warning small">{{ pro_message }}</div>
+    <p class="small text-muted">La <strong>restauration</strong> et la <strong>sauvegarde</strong> sont réservées à la version
+      sous licence. Activez d'abord votre licence, puis revenez restaurer votre société — sans avoir à en créer une nouvelle.</p>
+    <a class="btn btn-outline-secondary" href="{% url 'core:demarrage' %}">← Retour</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

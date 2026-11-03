@@ -13,6 +13,31 @@ from .forms import IdentiteSocieteForm
 from .models import Societe
 
 
+def demarrage(request):
+    """Premier démarrage (aucun administrateur) : le logiciel s'ouvre « vide » et propose de
+    CRÉER une nouvelle société ou de RESTAURER une société existante. Accessible sans connexion,
+    depuis le serveur lui-même seulement (jamais depuis un autre poste du réseau)."""
+    if get_user_model().objects.filter(is_superuser=True).exists():
+        return redirect("core:installation")
+    if not poste.local(request):
+        return render(request, "core/installation_compte.html", {"distant": True}, status=403)
+    from apps.licences.licence import fonctions_pro_disponibles
+
+    pro_ok, pro_message = fonctions_pro_disponibles()
+    return render(request, "core/demarrage.html", {"pro_ok": pro_ok, "pro_message": pro_message})
+
+
+def restaurer_societe(request):
+    """Premier démarrage : restaurer une société existante depuis une sauvegarde. La restauration
+    est réservée à la version sous licence (on active d'abord la licence, puis on restaure)."""
+    if not poste.local(request) and not (request.user.is_authenticated and request.user.is_superuser):
+        return render(request, "core/installation_compte.html", {"distant": True}, status=403)
+    from apps.licences.licence import fonctions_pro_disponibles
+
+    pro_ok, pro_message = fonctions_pro_disponibles()
+    return render(request, "core/restaurer_societe.html", {"pro_ok": pro_ok, "pro_message": pro_message})
+
+
 def installation_compte(request):
     """Aucun administrateur : on le crée ici, depuis le serveur lui-même seulement (jamais depuis un autre poste)."""
     U = get_user_model()

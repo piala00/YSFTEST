@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Premier démarrage{% endblock %}
+{% block public %}
+<div class="container" style="max-width:720px">
+  <div class="text-center my-4"><h1 class="h3 mb-1"><i class="bi bi-rocket-takeoff"></i> Bienvenue</h1>
+    <div class="text-muted">Le logiciel est installé mais encore vide. Que souhaitez-vous faire ?</div></div>
+  <div class="row g-3">
+    <div class="col-md-6"><div class="card card-body h-100">
+      <h2 class="h6"><i class="bi bi-building-add"></i> Créer une nouvelle société</h2>
+      <p class="small text-muted flex-grow-1">Renseignez l'identité de la société, le rôle de ce serveur et la base de données ;
+        le compte administrateur se crée à la fin. Sans licence, vous disposez d'un essai de 29 ouvertures.</p>
+      <a class="btn btn-primary" href="{% url 'core:installation_compte' %}"><i class="bi bi-arrow-right"></i> Créer une société</a>
+    </div></div>
+    <div class="col-md-6"><div class="card card-body h-100">
+      <h2 class="h6"><i class="bi bi-arrow-counterclockwise"></i> Restaurer une société</h2>
+      <p class="small text-muted flex-grow-1">Vous avez déjà une société et une sauvegarde ? Restaurez-la directement, sans en
+        recréer une. La restauration nécessite d'<strong>activer d'abord la licence</strong>.</p>
+      {% if pro_ok %}
+      <a class="btn btn-outline-primary" href="{% url 'core:restaurer_societe' %}"><i class="bi bi-arrow-right"></i> Restaurer une société</a>
+      {% else %}
+      <div class="alert alert-secondary small py-2 mb-2">{{ pro_message }} Activez la licence, puis revenez restaurer.</div>
+      <a class="btn btn-outline-secondary" href="{% url 'core:restaurer_societe' %}"><i class="bi bi-key"></i> Activer la licence et restaurer</a>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

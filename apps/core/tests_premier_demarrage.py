@@ -32,8 +32,10 @@ class AssistantTests(TestCase):
         Societe.objects.update(assistant_termine=False)
 
     def test_compte_puis_societe_puis_role(self):
-        self.assertRedirects(self.client.get("/"), reverse("core:installation_compte"), fetch_redirect_response=False)
-        self.assertRedirects(self.client.get("/connexion/"), reverse("core:installation_compte"), fetch_redirect_response=False)
+        # Logiciel vide : toute page mène à l'accueil « créer / restaurer une société ».
+        self.assertRedirects(self.client.get("/"), reverse("core:demarrage"), fetch_redirect_response=False)
+        self.assertRedirects(self.client.get("/connexion/"), reverse("core:demarrage"), fetch_redirect_response=False)
+        self.assertContains(self.client.get(reverse("core:demarrage")), "Créer une société")
         url = reverse("core:installation_compte")
         # Depuis un autre poste du réseau : refusé
         self.assertEqual(self.client.get(url, REMOTE_ADDR="192.168.1.20").status_code, 403)
@@ -189,7 +191,7 @@ class ProgrammeLanceTests(SimpleTestCase):
                     except (urllib.error.URLError, OSError):
                         self.assertIsNone(serveur.poll(), serveur.stdout.read() if serveur.poll() is not None else "")
                         time.sleep(0.5)
-                self.assertTrue(adresse.endswith("/installation/compte/"))
+                self.assertTrue(adresse.endswith("/demarrage/"))
                 adresse, _ = nav.post("/installation/compte/", {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok",
                                                                 "confirmation": "Chef-2026-ok"})
                 self.assertTrue(adresse.endswith("/installation/"))
