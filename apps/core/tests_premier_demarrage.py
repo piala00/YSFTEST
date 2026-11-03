@@ -142,6 +142,15 @@ class AdministrationPosteTests(TestCase):
         self.assertEqual(appels, ["sauvegarder", ("restaurer", "erp-20261027-100000.sqlite3"),
                                   ("simulation", "2026-01", "aujourdhui"), "supprimer", "auto"])
 
+    def test_effacer_societe(self):
+        with mock.patch.dict(poste.ACTIONS, {"etat": lambda: {}}, clear=False), \
+             mock.patch("django.core.management.call_command") as commande:
+            self.client.post(self.url, {"action": "effacer_societe", "confirmation": "non"})
+            commande.assert_not_called()                           # sans confirmation : rien n'est effacé
+            reponse = self.client.post(self.url, {"action": "effacer_societe", "confirmation": "EFFACER"})
+            self.assertRedirects(reponse, reverse("core:demarrage"), fetch_redirect_response=False)
+            commande.assert_called_once_with("flush", "--no-input")
+
 
 def _port_libre():
     with socket.socket() as s:

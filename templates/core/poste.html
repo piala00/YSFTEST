@@ -31,6 +31,18 @@
     <div class="form-text">Le programme peut être remplacé par une nouvelle version : les données ne sont pas dans son dossier.</div>
   </div></div>
 
+  <div class="col-12"><div class="card card-body h-100 border-danger">
+    <h2 class="h6 text-danger"><i class="bi bi-exclamation-octagon"></i> Repartir à zéro</h2>
+    <p class="small text-muted mb-2">Efface <strong>toute la société</strong> (données et comptes) et revient au premier
+      démarrage, pour créer ou restaurer une autre société. {% if not pro_ok %}Utile en fin d'essai si vous ne prenez pas
+      la licence.{% else %}Sauvegardez d'abord si vous voulez garder ces données.{% endif %} Action irréversible.</p>
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-center">{% csrf_token %}
+      <input name="confirmation" class="form-control form-control-sm" style="max-width:220px" placeholder="tapez EFFACER" aria-label="Confirmation">
+      <button class="btn btn-sm btn-outline-danger" name="action" value="effacer_societe"
+              onclick="return confirm('Effacer définitivement toute la société et repartir à zéro ?')">Effacer la société</button>
+    </form>
+  </div></div>
+
 {% endif %}
   {% if onglet_poste == "simulation" and etat.edition == "transport" %}
   <div class="col-12">{% include "core/_dossiers_simulation.html" %}</div>

@@ -294,6 +294,17 @@ def administration_poste(request):
                 return render(request, "core/redemarrage.html", {"titre": "Ouverture du dossier"})
             elif action == "demarrage_auto":
                 messages.success(request, poste.appeler("demarrage_auto_basculer"))
+            elif action == "effacer_societe":
+                # Repartir à zéro (ex. fin d'essai sans achat de licence) : tout est effacé, on revient
+                # au premier démarrage. Sur le serveur seulement, avec confirmation.
+                if not poste.local(request) or request.POST.get("confirmation") != "EFFACER":
+                    raise ValueError("sur le serveur, tapez EFFACER pour tout effacer et repartir à zéro")
+                from django.contrib.auth import logout
+                from django.core.management import call_command
+
+                call_command("flush", "--no-input")
+                logout(request)
+                return redirect("core:demarrage")
         except (ValueError, RuntimeError, OSError) as exc:
             messages.error(request, f"Impossible : {exc}")
         retour = request.GET.copy()
