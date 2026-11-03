@@ -167,10 +167,10 @@ def code_activation():
 
 # ---------------------------------------------------------------- Clé d'installation
 def cle_installation_requise():
-    """Programme compilé contenant la clé publique de l'éditeur : la clé d'installation est exigée."""
-    from django.conf import settings
-
-    return bool(getattr(settings, "ERP_LICENCE", False) and cles_publiques())
+    """Politique (propriétaire, 2026-11-03) : la clé d'installation n'est plus exigée. Le contrôle se fait
+    uniquement par la licence (essai de 30 ouvertures, puis sauvegarde/restauration réservées à la
+    version sous licence). La clé d'installation reste saisissable mais ne bloque plus rien."""
+    return False
 
 
 def lire_cle_installation(texte):

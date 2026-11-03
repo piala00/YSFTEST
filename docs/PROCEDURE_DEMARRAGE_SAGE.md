@@ -69,3 +69,14 @@ Transport (puis Commerce). Ce document fait foi ; toute implémentation s'y réf
    l'agence installe + importe ce fichier (synchronisable avec le central).
 6. Clé d'installation retirée de l'installateur + du lanceur compilé.
 7. Tests réécrits + recompilation → validation Windows par le propriétaire.
+
+## Suivi de l'implémentation
+- D1 ✅ Premier démarrage vide, sans connexion (accueil Créer / Restaurer).
+- D2 ✅ Création réordonnée : identité → rôle → base → compte administrateur à la fin.
+- D3 ✅ Essai : sauvegarde/restauration verrouillées sans licence + « Repartir à zéro ».
+- D4 ✅ Restaurer une société au premier démarrage (activer la licence, puis restaurer).
+- D5 ✅ Multi-agences : déjà couvert par le module Échanges — le siège `ajouter_agence`
+  (crée le rang/compte de liaison 185NN et la clé d'échange de l'agence) puis
+  `fichier_installation` (exporte le fichier) ; l'agence l'importe au rôle « agence »
+  de l'assistant. Le fichier sort toujours du siège et est synchronisable avec le central.
+- D6 ⏳ Retrait de la clé d'installation + recompilation (validation Windows par le propriétaire).

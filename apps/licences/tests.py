@@ -150,15 +150,13 @@ class LicencesTests(TestCase):
         self.assertIn("pas été émise par vous", refus.stdout + refus.stderr)
 
     @override_settings(ERP_LICENCE=True)
-    def test_premier_demarrage_demande_la_cle(self):
-        U = get_user_model()
-        self.client.force_login(U.objects.create_superuser("chef", "", "Chef-2030-ok"))
-        self.assertContains(self.client.get(reverse("core:installation") + "?etape=role"), "clé d'installation")
-        page = self.client.post(reverse("core:installation"), {"cle": "FAUSSE-CLE22"}, follow=True)
-        self.assertContains(page, "refusée : clé incomplète")
-        reponse = self.client.post(reverse("core:installation"), {"cle": self.cle_installation("Voyages du Nord")})
-        self.assertRedirects(reponse, reverse("core:installation") + "?etape=identite", fetch_redirect_response=False)
-        self.assertContains(self.client.get(reverse("core:installation")), "Voyages du Nord")
+    def test_premier_demarrage_ne_demande_plus_la_cle(self):
+        # Politique (propriétaire) : la clé d'installation n'est plus exigée ; l'assistant mène
+        # directement à la société, le contrôle se fait par la licence.
+        self.assertFalse(l.cle_installation_requise())
+        page = self.client.get(reverse("core:installation") + "?etape=role")
+        self.assertNotContains(page, "Clé d'installation")
+        self.assertContains(page, "rôle de ce serveur")
 
     @override_settings(ERP_LICENCE=True)
     def test_code_court_puis_fichier_signe_sans_double_activation(self):
@@ -381,11 +379,8 @@ class LicencesTests(TestCase):
         U = get_user_model()
         admin = U.objects.create_superuser("chef", "", "Chef-2030-ok")
         self.client.force_login(admin)
-        self.assertTrue(l.etat().sans_cle)                     # clé d'installation exigée : lecture seule sans elle
-        self.assertTrue(l.etat().lecture_seule)
-        page = self.client.post(reverse("licence"), {"action": "installation", "cle": self.cle_installation()}, follow=True)
-        self.assertContains(page, "enregistrée pour Transports Essai SA")
-        self.assertFalse(l.etat().lecture_seule)
+        self.assertFalse(l.etat().sans_cle)                    # la clé d'installation n'est plus exigée
+        self.assertFalse(l.etat().lecture_seule)               # l'essai reste utilisable (contrôle par la licence)
         autorisations = reverse("comptabilite:autorisations")
         for nom in ("a1", "a2", "a3"):
             self.client.post(autorisations, {"action": "utilisateur", "nom_utilisateur": nom, "mot_de_passe": "Essai-2030-ok"})
