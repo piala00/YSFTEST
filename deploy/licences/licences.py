@@ -1102,10 +1102,30 @@ def interface(essai=False):
         except (OSError,ValueError,SystemExit) as exc:
             erreur(exc)
 
+    def generer_developpeur():
+        try:
+            dossier=Path(v['dossier'].get())
+            if not chemin_coffre(dossier).exists():
+                raise ValueError('Créez d’abord une identité de DÉVELOPPEMENT (coffre dédié) dans ce dossier, jamais le coffre de production.')
+            cle=ouvrir_coffre()
+            if cle is None:
+                return
+            a=argparse.Namespace(cle=str(chemin_coffre(dossier)),definitive=v['duree'].get()=='definitive',
+                jusqu_au=v['jusqu_au'].get(),sortie=str(dossier),fichier=None)
+            fichier=emettre_developpeur(a,cle_deverrouillee=cle)
+            derniere_licence[0]=fichier
+            memoriser();rafraichir()
+            etat.set(f'Licence développeur {fichier.name} créée. Signée par CE coffre : utilisez une identité DÉVELOPPEMENT dédiée '
+                     '(jamais la production). Toutes options, toutes vos machines ; un build de production la refuse.')
+        except (OSError,ValueError,SystemExit) as exc:
+            erreur(exc)
+
     boutons=ttk.Frame(licence_onglet,padding=6)
     boutons.grid(row=1,column=0,columnspan=2,sticky='ew')
     generer_licence_btn=ttk.Button(boutons,text='Générer la licence',command=generer)
     generer_licence_btn.pack(side='left',padx=4)
+    developpeur_btn=ttk.Button(boutons,text='Licence développeur',command=generer_developpeur)
+    developpeur_btn.pack(side='left',padx=4)
     exporter_btn=ttk.Button(boutons,text='Exporter au client',command=exporter)
     exporter_btn.pack(side='left')
     supprimer_btn=ttk.Button(boutons,text='Supprimer la licence',command=supprimer)
@@ -1158,9 +1178,14 @@ def interface(essai=False):
             supprimer_btn.invoke()
             assert not premiere.exists() and seconde.exists() and len(registre_lignes(dossier))==1
             assert journal_suppressions(dossier)[-1]['etat']=='supprimee'
+            # Bouton « Licence développeur » : licence signée, toutes machines (indicateur developpeur, sans empreinte).
+            developpeur_btn.invoke()
+            licence_dev=derniere_licence[0]
+            donnees_dev=json.loads(base64.b64decode(licence_dev.read_text().splitlines()[1]))
+            assert donnees_dev.get('developpeur') is True and donnees_dev['machine']=='' and donnees_dev['edition']=='toutes'
             for largeur,hauteur in ((760,640),(600,440)):
                 fen.geometry(f'{largeur}x{hauteur}');fen.update()
-                for bouton in (generer_licence_btn,exporter_btn,supprimer_btn):
+                for bouton in (generer_licence_btn,developpeur_btn,exporter_btn,supprimer_btn):
                     assert bouton.winfo_ismapped()
                     assert bouton.winfo_rootx()+bouton.winfo_width()<=fen.winfo_rootx()+fen.winfo_width()
                     assert bouton.winfo_rooty()+bouton.winfo_height()<=fen.winfo_rooty()+fen.winfo_height()
