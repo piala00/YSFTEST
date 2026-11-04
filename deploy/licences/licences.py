@@ -679,7 +679,12 @@ def preparer_suppression(dossier, numero):
         raise ValueError('Sélectionnez une seule licence active, sans doublon de numéro.')
     ligne=lignes[0]
     fichier=Path(ligne.get('fichier',''))
-    if fichier.is_symlink() or fichier.suffix.lower()!='.erplic' or fichier.resolve().parent!=dossier or not fichier.is_file():
+    parent=fichier.parent
+    # Licences historiques dans Clients/ ou licences actuelles dans Clients/<Societe>/.
+    # Refuser les liens symboliques et toute sortie de l'arborescence propriétaire.
+    if (fichier.is_symlink() or parent.is_symlink() or fichier.suffix.lower()!='.erplic'
+            or not fichier.is_file() or parent.resolve().parent not in (dossier, dossier.parent)
+            or (parent.resolve()!=dossier and parent.resolve().parent!=dossier)):
         raise ValueError('La licence sélectionnée doit être un fichier du dossier propriétaire courant.')
     if fichier.stat().st_nlink!=1:
         raise ValueError('La licence ne doit pas être liée à un autre fichier.')
