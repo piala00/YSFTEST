@@ -38,3 +38,22 @@ class ChoixSocieteTests(TestCase):
                 self.assertContains(self.client.get(self.url + "?clotures=1"), "2025")
                 self.assertContains(self.client.get(self.url + "?q=yaound"), "Transports Alpha")
                 self.assertContains(self.client.get(self.url + "?q=2025"), "Aucun exercice")
+
+    def test_ouverture_refusee_hors_serveur_et_sans_confirmation(self):
+        self.client.force_login(self.admin)
+        with tempfile.TemporaryDirectory() as dossier:
+            chemin = Path(dossier) / "catalogue.json"
+            chemin.write_text(json.dumps({"version": 1, "bases": [
+                {"id": "a", "societe": "Alpha", "agence": "Centre", "exercice": "2026",
+                 "moteur": "sqlite", "base": "/tmp/inexistante.sqlite3"}
+            ]}), encoding="utf-8")
+            with mock.patch.dict("os.environ", {"ERP_CATALOGUE_SOCIETES": str(chemin)}):
+                with mock.patch("apps.core.views_societes.poste.disponible", return_value=True):
+                    self.assertEqual(self.client.post(self.url, {"base_id": "a", "confirmation": "OUVRIR"},
+                                                      REMOTE_ADDR="192.0.2.10").status_code, 403)
+                    self.assertEqual(self.client.post(self.url, {"base_id": "a"}, REMOTE_ADDR="127.0.0.1").status_code, 403)
+                    self.assertEqual(self.client.post(self.url, {"base_id": "inconnue", "confirmation": "OUVRIR"},
+                                                      REMOTE_ADDR="127.0.0.1").status_code, 403)
+                    page = self.client.post(self.url, {"base_id": "a", "confirmation": "OUVRIR"},
+                                            REMOTE_ADDR="127.0.0.1")
+                    self.assertContains(page, "Ouverture refusée")
