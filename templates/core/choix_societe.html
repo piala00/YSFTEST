@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choix de la société — ERP OHADA</title>
+<style>
+body{font:16px system-ui,sans-serif;background:#f3f5f8;color:#19304c;margin:0}
+main{max-width:920px;margin:48px auto;padding:0 20px}
+h1{color:#153f70}form,.societe{background:white;padding:20px;margin:16px 0;border-radius:10px;box-shadow:0 2px 8px #1232}
+input[type=search]{padding:10px;width:min(380px,100%)}button{padding:10px;background:#164b7b;color:white;border:0;border-radius:5px}
+.agence{border-top:1px solid #ddd;padding:8px 0}.exercice{padding:7px 14px}
+small{color:#667}.alerte{padding:14px;background:#fff3d7}
+</style></head><body><main>
+<h1>Choix de la société</h1>
+<p>Sélectionnez une société, une agence et un exercice. L'ouverture de la base sera disponible après raccordement sécurisé au redémarrage.</p>
+<form method="get"><label for="q">Rechercher une société, une agence ou une année</label><br>
+<input id="q" type="search" name="q" value="{{ recherche }}" placeholder="Nom ou année">
+<label><input type="checkbox" name="clotures" value="1" {% if afficher_clotures %}checked{% endif %}> Afficher les exercices clôturés</label>
+<button type="submit">Rechercher</button></form>
+{% if erreur %}<p class="alerte" role="alert">{{ erreur }}</p>{% endif %}
+{% for groupe in groupes %}
+<section class="societe"><h2>{{ groupe.societe }}</h2>
+{% for agence in groupe.agences %}<div class="agence"><h3>{{ agence.agence }}</h3>
+{% for exercice in agence.exercices %}<div class="exercice">{{ exercice.exercice }}
+{% if exercice.cloture %}<small>— clôturé (consultation seule)</small>{% else %}<small>— ouvert</small>{% endif %}
+</div>{% endfor %}</div>{% endfor %}</section>
+{% empty %}<p>Aucun exercice correspondant.</p>{% endfor %}
+<p><a href="/">Retour à l'accueil</a></p></main></body></html>
