@@ -1,0 +1,41 @@
+"""Catalogue des bases par société, agence et exercice, sans connexion implicite."""
+import json
+from pathlib import Path
+
+
+def lire_catalogue(fichier):
+    chemin = Path(fichier)
+    if not chemin.is_file():
+        return []
+    donnees = json.loads(chemin.read_text(encoding="utf-8"))
+    if not isinstance(donnees, dict) or donnees.get("version") != 1 or not isinstance(donnees.get("bases"), list):
+        raise ValueError("Catalogue multi-sociétés invalide")
+    identifiants = set()
+    bases = []
+    for entree in donnees["bases"]:
+        champs = ("id", "societe", "agence", "exercice", "moteur", "base")
+        if not isinstance(entree, dict) or any(not isinstance(entree.get(k), str) or not entree[k].strip() for k in champs):
+            raise ValueError("Métadonnées de société incomplètes")
+        if entree["id"] in identifiants:
+            raise ValueError("Identifiant de base dupliqué")
+        if entree["moteur"] not in ("sqlite", "mssql") or not isinstance(entree.get("cloture", False), bool):
+            raise ValueError("Moteur ou clôture invalide")
+        identifiants.add(entree["id"])
+        bases.append({**entree, "cloture": entree.get("cloture", False)})
+    return bases
+
+
+def regrouper(bases, recherche="", afficher_clotures=False):
+    """Filtre puis regroupe Société → Agence → exercices (récents d'abord)."""
+    terme = recherche.strip().casefold()
+    groupes = {}
+    for base in bases:
+        if base["cloture"] and not afficher_clotures:
+            continue
+        if terme and terme not in " ".join(str(base[k]) for k in ("societe", "agence", "exercice")).casefold():
+            continue
+        groupes.setdefault(base["societe"], {}).setdefault(base["agence"], []).append(base)
+    return [{"societe": nom, "agences": [
+        {"agence": agence, "exercices": sorted(exercices, key=lambda b: (b["exercice"], b["id"]), reverse=True)}
+        for agence, exercices in sorted(agences.items(), key=lambda x: x[0].casefold())]}
+        for nom, agences in sorted(groupes.items(), key=lambda x: x[0].casefold())]
