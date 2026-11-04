@@ -23,6 +23,8 @@ def lire_catalogue(fichier):
         if entree["moteur"] not in ("sqlite", "mssql") or not isinstance(entree.get("cloture", False), bool):
             raise ValueError("Moteur ou clôture invalide")
         localisation = (entree["moteur"], entree["base"].casefold() if entree["moteur"] == "mssql" else entree["base"])
+        if len(entree["exercice"]) != 4 or not entree["exercice"].isascii() or not entree["exercice"].isdigit() or int(entree["exercice"]) < 1 or int(entree["exercice"]) >= 9999:
+            raise ValueError("Année d’exercice invalide (AAAA attendu)")
         exercice = (entree["societe"].casefold(), entree["agence"].casefold(), entree["exercice"])
         if localisation in localisations:
             raise ValueError("Base physique dupliquée dans le catalogue")
@@ -115,6 +117,8 @@ def enregistrer_exercice_suivant(fichier, identifiant_precedent, nouvelle_base, 
         raise ValueError("identifiant du nouvel exercice requis")
     if not isinstance(nouvelle_base, str) or not nouvelle_base.strip():
         raise ValueError("base du nouvel exercice requise")
+    if int(precedente["exercice"]) >= 9998:
+        raise ValueError("Année suivante hors limites")
     annee = str(int(precedente["exercice"]) + 1)
     if any(b["id"] == nouvel_identifiant or
            (b["societe"].casefold() == precedente["societe"].casefold() and
