@@ -24,7 +24,7 @@ small{color:#667}.alerte{padding:14px;background:#fff3d7}
 <form method="post" style="display:inline;padding:0;margin:0;box-shadow:none">
 {% csrf_token %}<input type="hidden" name="base_id" value="{{ exercice.id }}">
 <input type="hidden" name="confirmation" value="OUVRIR">
-<button type="submit" {% if exercice.moteur != "sqlite" %}disabled title="SQL Server : raccordement à venir"{% endif %}>Ouvrir</button>
+<button type="submit" >Ouvrir</button>
 </form>
 </div>{% endfor %}</div>{% endfor %}</section>
 {% empty %}<p>Aucun exercice correspondant.</p>{% endfor %}
