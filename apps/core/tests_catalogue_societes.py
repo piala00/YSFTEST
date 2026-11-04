@@ -178,3 +178,20 @@ class CatalogueSocietesTests(SimpleTestCase):
             self.assertEqual(suivante["exercice"], "2027")
             self.assertEqual(suivante["base"], str(cible.resolve()))
             self.assertTrue(lire_catalogue(catalogue)[0]["cloture"])
+
+    def test_publication_refuse_meme_base_physique_par_alias(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = Path(dossier)
+            source = racine / "source.sqlite3"
+            with sqlite3.connect(source) as connexion:
+                for table in ("django_migrations", "auth_user", "core_societe"):
+                    connexion.execute(f"CREATE TABLE {table} (id INTEGER)")
+            catalogue = racine / "societes.json"
+            entree = {**self.bases[0], "base": str(source)}
+            catalogue.write_text(json.dumps({"version": 1, "bases": [entree]}), encoding="utf-8")
+            avant = catalogue.read_bytes()
+            alias = str(racine / "sous-dossier" / ".." / "source.sqlite3")
+            (racine / "sous-dossier").mkdir()
+            with self.assertRaisesRegex(ValueError, "base physique déjà enregistrée"):
+                publier_exercice_sqlite_valide(catalogue, "a", alias, "a-2027")
+            self.assertEqual(catalogue.read_bytes(), avant)
