@@ -73,3 +73,26 @@ class CatalogueSocietesTests(SimpleTestCase):
                     fichier.write_text(json.dumps({"version": 1, "bases": self.bases + [changement]}), encoding="utf-8")
                     with self.assertRaisesRegex(ValueError, message):
                         lire_catalogue(fichier)
+
+    def test_publication_refuse_base_sqlserver_meme_nom_casse_differente(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier) / "societes.json"
+            fichier.write_text(json.dumps({"version": 1, "bases": self.bases}), encoding="utf-8")
+            avant = fichier.read_bytes()
+            with self.assertRaisesRegex(ValueError, "base déjà enregistrée"):
+                enregistrer_exercice_suivant(fichier, "c", "erp_b", "c-2027")
+            self.assertEqual(fichier.read_bytes(), avant)
+
+    def test_publication_refuse_exercice_meme_agence_casse_differente(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier) / "societes.json"
+            bases = self.bases + [{
+                "id": "futur", "societe": "transport a", "agence": "YAOUNDÉ",
+                "exercice": "2027", "moteur": "sqlite", "base": "futur.sqlite3",
+                "cloture": False,
+            }]
+            fichier.write_text(json.dumps({"version": 1, "bases": bases}), encoding="utf-8")
+            avant = fichier.read_bytes()
+            with self.assertRaisesRegex(ValueError, "exercice suivant déjà enregistré"):
+                enregistrer_exercice_suivant(fichier, "a", "nouveau.sqlite3", "a-2027")
+            self.assertEqual(fichier.read_bytes(), avant)
