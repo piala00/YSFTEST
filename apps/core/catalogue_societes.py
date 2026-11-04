@@ -61,3 +61,67 @@ def verifier_base_sqlite(nom):
     except sqlite3.DatabaseError as exc:
         raise ValueError("base SQLite illisible") from exc
     return str(chemin.resolve())
+
+
+def enregistrer_exercice_suivant(fichier, identifiant_precedent, nouvelle_base, nouvel_identifiant):
+    """Publie le lien N → N+1 après création et validation de la nouvelle base.
+
+    Ne crée ni ne clôture les bases : l'appelant doit achever la clôture,
+    les reports et la vérification de la nouvelle base AVANT cette publication.
+    Un fichier existant n'est jamais écrasé et l'écriture est atomique.
+    """
+    import os
+    import tempfile
+
+    chemin = Path(fichier)
+    if not chemin.is_file():
+        raise ValueError("catalogue multi-sociétés absent")
+    bases = lire_catalogue(chemin)
+    precedentes = [b for b in bases if b["id"] == identifiant_precedent]
+    if len(precedentes) != 1:
+        raise ValueError("exercice précédent introuvable")
+    precedente = precedentes[0]
+    if precedente["cloture"]:
+        raise ValueError("exercice précédent déjà clôturé")
+    if not precedente["exercice"].isdigit() or len(precedente["exercice"]) != 4:
+        raise ValueError("année précédente invalide")
+    if not isinstance(nouvel_identifiant, str) or not nouvel_identifiant.strip():
+        raise ValueError("identifiant du nouvel exercice requis")
+    if not isinstance(nouvelle_base, str) or not nouvelle_base.strip():
+        raise ValueError("base du nouvel exercice requise")
+    annee = str(int(precedente["exercice"]) + 1)
+    if any(b["id"] == nouvel_identifiant or
+           (b["societe"] == precedente["societe"] and
+            b["agence"] == precedente["agence"] and b["exercice"] == annee)
+           for b in bases):
+        raise ValueError("exercice suivant déjà enregistré")
+    if any(b["moteur"] == precedente["moteur"] and b["base"] == nouvelle_base for b in bases):
+        raise ValueError("base déjà enregistrée")
+    suivante = {
+        "id": nouvel_identifiant, "societe": precedente["societe"],
+        "agence": precedente["agence"], "exercice": annee,
+        "moteur": precedente["moteur"], "base": nouvelle_base,
+        "cloture": False, "exercice_precedent": precedente["id"],
+    }
+    nouvelle_liste = [
+        {**b, "cloture": True} if b["id"] == identifiant_precedent else b
+        for b in bases
+    ] + [suivante]
+    # Contrôle intégral avant publication : aucune entrée existante perdue.
+    temporaire = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=chemin.parent,
+            prefix=".societes-", suffix=".tmp", delete=False,
+        ) as flux:
+            temporaire = Path(flux.name)
+            json.dump({"version": 1, "bases": nouvelle_liste}, flux, ensure_ascii=False, indent=2)
+            flux.write("\n")
+            flux.flush()
+            os.fsync(flux.fileno())
+        lire_catalogue(temporaire)
+        os.replace(temporaire, chemin)
+    finally:
+        if temporaire is not None:
+            temporaire.unlink(missing_ok=True)
+    return suivante
