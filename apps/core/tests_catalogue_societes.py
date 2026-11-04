@@ -60,3 +60,16 @@ class CatalogueSocietesTests(SimpleTestCase):
                     with self.assertRaises(ValueError):
                         enregistrer_exercice_suivant(fichier, "a", base, identifiant)
                     self.assertEqual(fichier.read_bytes(), avant)
+
+    def test_refus_doublons_physiques_et_exercices(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier) / "societes.json"
+            for changement, message in (
+                ({"id": "d", "societe": "Autre", "agence": "Nord", "exercice": "2028", "moteur": "sqlite", "base": "a.sqlite3"}, "physique"),
+                ({"id": "d", "societe": "transport a", "agence": "YAOUNDÉ", "exercice": "2026", "moteur": "sqlite", "base": "nouvelle.sqlite3"}, "Exercice"),
+                ({"id": "d", "societe": "Autre", "agence": "Nord", "exercice": "2028", "moteur": "mssql", "base": "erp_b"}, "physique"),
+            ):
+                with self.subTest(changement=changement):
+                    fichier.write_text(json.dumps({"version": 1, "bases": self.bases + [changement]}), encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, message):
+                        lire_catalogue(fichier)
