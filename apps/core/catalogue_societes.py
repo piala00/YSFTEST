@@ -172,7 +172,12 @@ def publier_exercice_sqlite_valide(fichier, identifiant_precedent, nouvelle_base
         raise ValueError("exercice précédent introuvable")
     if precedente["moteur"] != "sqlite":
         raise ValueError("publication SQLite réservée aux bases SQLite")
+    # Une autre orthographe du même chemin (.., lien symbolique) ne doit
+    # jamais faire publier la base de l'exercice N comme celle de N+1.
     base_verifiee = verifier_base_sqlite(nouvelle_base)
+    for entree in bases:
+        if entree["moteur"] == "sqlite" and Path(entree["base"]).resolve() == Path(base_verifiee):
+            raise ValueError("base physique déjà enregistrée")
     return enregistrer_exercice_suivant(
         fichier, identifiant_precedent, base_verifiee, nouvel_identifiant,
     )
