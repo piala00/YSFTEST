@@ -1263,9 +1263,9 @@ def menu_fichier_global():
     Les commandes non encore implémentées restent indisponibles, sans fausse URL.
     """
     return Onglet("fichier", "Fichier", "bi-folder2", [
-        E("fichier.nouvelle_societe", "Nouvelle société", "core:installation", icone="bi-file-earmark-plus", preuve="AJOUT-ERP"),
+        E("fichier.nouvelle_societe", "Nouvelle société", icone="bi-file-earmark-plus", preuve="AJOUT-ERP"),
         E("fichier.ouvrir_societe", "Ouvrir une société…", "core:choix_societe", icone="bi-folder2-open", preuve="AJOUT-ERP"),
-        E("fichier.fermer_societe", "Fermer la société", "core:choix_societe", icone="bi-x-square", preuve="AJOUT-ERP"),
+        E("fichier.fermer_societe", "Fermer la société", icone="bi-x-square", preuve="AJOUT-ERP"),
         E("fichier.restaurer_societe", "Restaurer une société", "core:restaurer_societe", preuve="AJOUT-ERP"),
         SEP(),
         E("fichier.sauvegarde", "Sauvegarde et restauration", "core:poste", icone="bi-hdd", preuve="AJOUT-ERP"),
