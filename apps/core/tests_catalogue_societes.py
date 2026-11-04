@@ -1,9 +1,10 @@
 """Contrôles du catalogue de bases, sans modification des bases existantes."""
 import json
+import sqlite3
 import tempfile
 from pathlib import Path
 from django.test import SimpleTestCase
-from apps.core.catalogue_societes import lire_catalogue, regrouper, enregistrer_exercice_suivant
+from apps.core.catalogue_societes import lire_catalogue, regrouper, enregistrer_exercice_suivant, publier_exercice_sqlite_valide
 
 
 class CatalogueSocietesTests(SimpleTestCase):
@@ -153,3 +154,27 @@ class CatalogueSocietesTests(SimpleTestCase):
             suivante = enregistrer_exercice_suivant(fichier, "a", "a0002.sqlite3", "a-0002")
             self.assertEqual(suivante["exercice"], "0002")
             self.assertEqual(lire_catalogue(fichier)[-1]["exercice_precedent"], "a")
+
+    def test_publication_sqlite_exige_base_erp_physique(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = Path(dossier)
+            catalogue = racine / "societes.json"
+            source = {**self.bases[0], "base": str(racine / "source.sqlite3")}
+            catalogue.write_text(json.dumps({"version": 1, "bases": [source]}), encoding="utf-8")
+            avant = catalogue.read_bytes()
+            cible = racine / "2027.sqlite3"
+            with self.assertRaisesRegex(ValueError, "fichier SQLite absolu existant requis"):
+                publier_exercice_sqlite_valide(catalogue, "a", str(cible), "a-2027")
+            self.assertEqual(catalogue.read_bytes(), avant)
+            with sqlite3.connect(cible) as connexion:
+                connexion.execute("CREATE TABLE table_inconnue (id INTEGER)")
+            with self.assertRaisesRegex(ValueError, "base ERP compatible"):
+                publier_exercice_sqlite_valide(catalogue, "a", str(cible), "a-2027")
+            self.assertEqual(catalogue.read_bytes(), avant)
+            with sqlite3.connect(cible) as connexion:
+                for table in ("django_migrations", "auth_user", "core_societe"):
+                    connexion.execute(f"CREATE TABLE {table} (id INTEGER)")
+            suivante = publier_exercice_sqlite_valide(catalogue, "a", str(cible), "a-2027")
+            self.assertEqual(suivante["exercice"], "2027")
+            self.assertEqual(suivante["base"], str(cible.resolve()))
+            self.assertTrue(lire_catalogue(catalogue)[0]["cloture"])
