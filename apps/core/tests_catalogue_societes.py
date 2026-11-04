@@ -144,3 +144,12 @@ class CatalogueSocietesTests(SimpleTestCase):
             with self.assertRaisesRegex(ValueError, "hors limites"):
                 enregistrer_exercice_suivant(fichier, "a", "a9999.sqlite3", "a-9999")
             self.assertEqual(fichier.read_bytes(), avant)
+
+    def test_publication_annee_initiale_conserve_quatre_chiffres(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier) / "societes.json"
+            premiere = {**self.bases[0], "exercice": "0001"}
+            fichier.write_text(json.dumps({"version": 1, "bases": [premiere]}), encoding="utf-8")
+            suivante = enregistrer_exercice_suivant(fichier, "a", "a0002.sqlite3", "a-0002")
+            self.assertEqual(suivante["exercice"], "0002")
+            self.assertEqual(lire_catalogue(fichier)[-1]["exercice_precedent"], "a")
