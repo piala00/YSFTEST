@@ -119,7 +119,7 @@ def enregistrer_exercice_suivant(fichier, identifiant_precedent, nouvelle_base, 
         raise ValueError("base du nouvel exercice requise")
     if int(precedente["exercice"]) >= 9998:
         raise ValueError("Année suivante hors limites")
-    annee = str(int(precedente["exercice"]) + 1)
+    annee = f"{int(precedente['exercice']) + 1:04d}"
     if any(b["id"] == nouvel_identifiant or
            (b["societe"].casefold() == precedente["societe"].casefold() and
             b["agence"].casefold() == precedente["agence"].casefold() and b["exercice"] == annee)
