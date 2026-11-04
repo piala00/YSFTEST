@@ -107,3 +107,18 @@ isolée). Manquent :
 
 Sources benchmark : Dolibarr (système de menus), Odoo (menus/réglages par module, visibilité par
 rôle), principes sandbox pause/instantané (Inngest, E2B).
+
+
+### Configuration de l'ouverture SQL Server (implémentation P0)
+
+Le catalogue JSON conserve uniquement l'identifiant, le moteur `mssql` et le nom de la base.
+Pour une entrée d'identifiant `transport_2026`, définir sur le **poste serveur** :
+`ERP_SOCIETE_SQL_TRANSPORT_2026_HOST`, éventuellement
+`ERP_SOCIETE_SQL_TRANSPORT_2026_USER`, `ERP_SOCIETE_SQL_TRANSPORT_2026_PASSWORD`
+et `ERP_SOCIETE_SQL_TRANSPORT_2026_PORT`. Sans utilisateur, l'authentification Windows
+est utilisée. Les secrets ne doivent jamais être ajoutés au catalogue ni au dépôt.
+La base doit exister et contenir une société ERP initialisée ; l'ouverture ne crée ni ne migre
+la base. La vérification précède toute modification de la configuration active ; puis le
+poste redémarre et l'utilisateur doit se reconnecter dans la base choisie.
+**Reste à valider sur un poste Windows réel** : connexion SQL Server, redémarrage,
+isolation des sessions et conservation des paramètres après redémarrage.
