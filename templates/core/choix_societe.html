@@ -10,7 +10,7 @@ input[type=search]{padding:10px;width:min(380px,100%)}button{padding:10px;backgr
 small{color:#667}.alerte{padding:14px;background:#fff3d7}
 </style></head><body><main>
 <h1>Choix de la société</h1>
-<p>Sélectionnez une société, une agence et un exercice. L'ouverture de la base sera disponible après raccordement sécurisé au redémarrage.</p>
+<p>Sélectionnez une société, une agence et un exercice. L'ouverture est réservée à l'administrateur sur le poste serveur. La connexion sera demandée dans la société ouverte.</p>
 <form method="get"><label for="q">Rechercher une société, une agence ou une année</label><br>
 <input id="q" type="search" name="q" value="{{ recherche }}" placeholder="Nom ou année">
 <label><input type="checkbox" name="clotures" value="1" {% if afficher_clotures %}checked{% endif %}> Afficher les exercices clôturés</label>
@@ -21,6 +21,11 @@ small{color:#667}.alerte{padding:14px;background:#fff3d7}
 {% for agence in groupe.agences %}<div class="agence"><h3>{{ agence.agence }}</h3>
 {% for exercice in agence.exercices %}<div class="exercice">{{ exercice.exercice }}
 {% if exercice.cloture %}<small>— clôturé (consultation seule)</small>{% else %}<small>— ouvert</small>{% endif %}
+<form method="post" style="display:inline;padding:0;margin:0;box-shadow:none">
+{% csrf_token %}<input type="hidden" name="base_id" value="{{ exercice.id }}">
+<input type="hidden" name="confirmation" value="OUVRIR">
+<button type="submit" {% if exercice.moteur != "sqlite" %}disabled title="SQL Server : raccordement à venir"{% endif %}>Ouvrir</button>
+</form>
 </div>{% endfor %}</div>{% endfor %}</section>
 {% empty %}<p>Aucun exercice correspondant.</p>{% endfor %}
 <p><a href="/">Retour à l'accueil</a></p></main></body></html>
