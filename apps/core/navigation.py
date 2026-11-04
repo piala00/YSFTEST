@@ -1256,6 +1256,29 @@ def selon_metier(elements, metiers):
             for e in elements if not e.edition or e.edition in metiers]
 
 
+def menu_fichier_global():
+    """Point d'entrée société unique, partagé par tous les modules.
+
+    Les opérations propres au poste restent dans Administration du poste.
+    Les commandes non encore implémentées restent indisponibles, sans fausse URL.
+    """
+    return Onglet("fichier", "Fichier", "bi-folder2", [
+        E("fichier.nouvelle_societe", "Nouvelle société", "core:installation", icone="bi-file-earmark-plus", preuve="AJOUT-ERP"),
+        E("fichier.ouvrir_societe", "Ouvrir une société…", "core:choix_societe", icone="bi-folder2-open", preuve="AJOUT-ERP"),
+        E("fichier.fermer_societe", "Fermer la société", "core:choix_societe", icone="bi-x-square", preuve="AJOUT-ERP"),
+        E("fichier.restaurer_societe", "Restaurer une société", "core:restaurer_societe", preuve="AJOUT-ERP"),
+        SEP(),
+        E("fichier.sauvegarde", "Sauvegarde et restauration", "core:poste", icone="bi-hdd", preuve="AJOUT-ERP"),
+        E("fichier.import_export", "Import / Export", preuve="AJOUT-ERP"),
+        E("fichier.autorisations", "Autorisations d'accès", "comptabilite:autorisations", icone="bi-shield-lock", preuve="AJOUT-ERP"),
+        E("fichier.journal_evenements", "Journal des événements", "comptabilite:journal_evenements", preuve="AJOUT-ERP"),
+        E("fichier.cloture_annuelle", "Clôturer l'exercice et ouvrir le suivant", preuve="AJOUT-ERP"),
+        SEP(),
+        E("fichier.imprimer", "Imprimer…", action="imprimer", icone="bi-printer"),
+        E("fichier.quitter", "Quitter", action="quitter", icone="bi-power"),
+    ])
+
+
 def structure_module(module, chemin="", parametres=None):
     """Menus du module, avec le menu et l'élément actifs."""
     parametres = parametres or {}
@@ -1263,6 +1286,8 @@ def structure_module(module, chemin="", parametres=None):
     onglets = []
     metiers = _metier()
     for onglet in module.onglets:
+        if onglet.code == "fichier":
+            onglet = menu_fichier_global()
         avant = meilleur["noeud"]
         arbre = _arbre(module, selon_metier(onglet.elements, metiers), chemin, parametres, meilleur)
         onglets.append({"code": onglet.code, "titre": onglet.titre, "icone": onglet.icone, "elements": arbre,
