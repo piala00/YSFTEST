@@ -39,3 +39,25 @@ def regrouper(bases, recherche="", afficher_clotures=False):
         {"agence": agence, "exercices": sorted(exercices, key=lambda b: (b["exercice"], b["id"]), reverse=True)}
         for agence, exercices in sorted(agences.items(), key=lambda x: x[0].casefold())]}
         for nom, agences in sorted(groupes.items(), key=lambda x: x[0].casefold())]
+
+
+def verifier_base_sqlite(nom):
+    """Refuse une base absente, non ERP ou dont le chemin est ambigu."""
+    import sqlite3
+    from urllib.parse import quote
+    chemin = Path(nom)
+    if not chemin.is_absolute() or not chemin.is_file():
+        raise ValueError("fichier SQLite absolu existant requis")
+    # Mode lecture seule : ne crée ni ne modifie la base ciblée.
+    uri = "file:" + quote(str(chemin.resolve()), safe="/:") + "?mode=ro"
+    try:
+        with sqlite3.connect(uri, uri=True, timeout=3) as base:
+            tables = {r[0] for r in base.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            if not {"django_migrations", "auth_user", "core_societe"}.issubset(tables):
+                raise ValueError("la base sélectionnée n'est pas une base ERP compatible")
+            resultat = base.execute("PRAGMA quick_check").fetchone()
+            if not resultat or resultat[0] != "ok":
+                raise ValueError("la base sélectionnée est endommagée")
+    except sqlite3.DatabaseError as exc:
+        raise ValueError("base SQLite illisible") from exc
+    return str(chemin.resolve())
