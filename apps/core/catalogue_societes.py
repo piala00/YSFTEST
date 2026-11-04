@@ -32,6 +32,22 @@ def lire_catalogue(fichier):
         localisations.add(localisation)
         exercices.add(exercice)
         bases.append({**entree, "cloture": entree.get("cloture", False)})
+    # Un exercice N+1 ne doit jamais pointer vers une autre société/agence,
+    # une année incorrecte ou un exercice N encore ouvert.
+    par_id = {base["id"]: base for base in bases}
+    for entree in bases:
+        parent_id = entree.get("exercice_precedent")
+        if parent_id is None:
+            continue
+        if not isinstance(parent_id, str) or parent_id not in par_id or parent_id == entree["id"]:
+            raise ValueError("Lien historique d'exercice invalide")
+        parent = par_id[parent_id]
+        if (parent["societe"].casefold() != entree["societe"].casefold() or
+                parent["agence"].casefold() != entree["agence"].casefold() or
+                not parent["exercice"].isdigit() or not entree["exercice"].isdigit() or
+                int(entree["exercice"]) != int(parent["exercice"]) + 1 or
+                not parent["cloture"]):
+            raise ValueError("Lien historique d'exercice incohérent")
     return bases
 
 
