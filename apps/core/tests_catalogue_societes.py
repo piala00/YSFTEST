@@ -96,3 +96,33 @@ class CatalogueSocietesTests(SimpleTestCase):
             with self.assertRaisesRegex(ValueError, "exercice suivant déjà enregistré"):
                 enregistrer_exercice_suivant(fichier, "a", "nouveau.sqlite3", "a-2027")
             self.assertEqual(fichier.read_bytes(), avant)
+
+    def test_liens_historiques_incoherents_refuses(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier) / "societes.json"
+            parent = {**self.bases[0], "cloture": True}
+            enfant = {
+                "id": "a-2027", "societe": "Transport A", "agence": "Yaoundé",
+                "exercice": "2027", "moteur": "sqlite", "base": "a2027.sqlite3",
+                "cloture": False, "exercice_precedent": "a",
+            }
+            fichier.write_text(json.dumps({"version": 1, "bases": [parent, enfant]}), encoding="utf-8")
+            self.assertEqual(len(lire_catalogue(fichier)), 2)
+            for modification in (
+                {"exercice_precedent": "inconnu"},
+                {"exercice_precedent": "a-2027"},
+                {"societe": "Autre"},
+                {"agence": "Douala"},
+                {"exercice": "2028"},
+            ):
+                with self.subTest(modification=modification):
+                    fichier.write_text(json.dumps({
+                        "version": 1, "bases": [parent, {**enfant, **modification}],
+                    }), encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "Lien historique"):
+                        lire_catalogue(fichier)
+            fichier.write_text(json.dumps({
+                "version": 1, "bases": [{**parent, "cloture": False}, enfant],
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "Lien historique"):
+                lire_catalogue(fichier)
