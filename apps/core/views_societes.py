@@ -14,6 +14,7 @@ from django.shortcuts import redirect
 
 from . import poste
 from .catalogue_societes import verifier_base_sqlite
+from .ouverture_sqlserver import verifier_base_sqlserver
 from django.shortcuts import render
 
 from .catalogue_societes import lire_catalogue, regrouper
@@ -45,19 +46,20 @@ def choix_societe(request):
         cible = next((b for b in bases if b["id"] == identifiant), None)
         if cible is None:
             return HttpResponseForbidden("Base inconnue du catalogue.")
-        if cible["moteur"] != "sqlite":
-            return HttpResponseForbidden("Ouverture SQL Server non encore disponible.")
         try:
-            fichier_valide = verifier_base_sqlite(cible["base"])
+            if cible["moteur"] == "sqlite":
+                fichier_valide = verifier_base_sqlite(cible["base"])
+                configuration = {
+                    "DB_ENGINE": "sqlite", "SQLITE_FICHIER": fichier_valide,
+                    "DB_HOST": None, "DB_NAME": None, "DB_USER": None,
+                    "DB_PASSWORD": None, "DB_PORT": None, "MIROIR_DB_ENGINE": None,
+                }
+            else:
+                configuration = verifier_base_sqlserver(cible)
             # Déconnecter toutes les sessions de l'ancienne société au redémarrage :
             # les comptes et sessions proviennent de la nouvelle base isolée.
             connection.close()
-            poste.appeler("configurer", {
-                "DB_ENGINE": "sqlite", "SQLITE_FICHIER": fichier_valide,
-                "DB_HOST": None, "DB_NAME": None, "DB_USER": None,
-                "DB_PASSWORD": None, "DB_PORT": None,
-                "MIROIR_DB_ENGINE": None,
-            })
+            poste.appeler("configurer", configuration)
             logout(request)
             poste.appeler("redemarrer")
             return render(request, "core/redemarrage.html", {"titre": "Ouverture de la société"})
