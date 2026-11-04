@@ -1,12 +1,12 @@
 """Contrats du menu Fichier global de l'ERP intégré."""
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.test import TestCase
 
 from apps.core.navigation import MODULES, menu_fichier_global, structure_module
 
 
-class MenuFichierGlobalTests(SimpleTestCase):
+class MenuFichierGlobalTests(TestCase):
     def test_meme_menu_pour_tous_les_modules(self):
         with patch("apps.core.navigation._metier", return_value={"commerce", "transport"}):
             menus = [structure_module(module)[0][0] for module in MODULES]
