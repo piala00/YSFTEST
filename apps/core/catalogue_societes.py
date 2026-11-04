@@ -157,3 +157,22 @@ def enregistrer_exercice_suivant(fichier, identifiant_precedent, nouvelle_base, 
         if temporaire is not None:
             temporaire.unlink(missing_ok=True)
     return suivante
+
+
+def publier_exercice_sqlite_valide(fichier, identifiant_precedent, nouvelle_base, nouvel_identifiant):
+    """Publie N+1 seulement après vérification physique de sa base SQLite ERP.
+
+    Cette opération ne crée pas la base ni les reports à nouveau : le service de
+    clôture doit les terminer avant de l'appeler. En cas d'échec, le catalogue
+    reste inchangé et l'exercice N reste ouvert dans ce catalogue.
+    """
+    bases = lire_catalogue(fichier)
+    precedente = next((b for b in bases if b["id"] == identifiant_precedent), None)
+    if precedente is None:
+        raise ValueError("exercice précédent introuvable")
+    if precedente["moteur"] != "sqlite":
+        raise ValueError("publication SQLite réservée aux bases SQLite")
+    base_verifiee = verifier_base_sqlite(nouvelle_base)
+    return enregistrer_exercice_suivant(
+        fichier, identifiant_precedent, base_verifiee, nouvel_identifiant,
+    )
