@@ -128,18 +128,42 @@ class OutilSimpleTests(unittest.TestCase):
         self.assertFalse((sortie / "cle-privee.pem").exists())
 
     def test_licence_developpeur_signee_toutes_machines(self):
-        cle = outil.charger_cle(self.chemin, self.mdp)
-        sortie = self.dossier / "dev"
-        a = SimpleNamespace(cle=str(self.chemin), fichier=None, sortie=str(sortie), jusqu_au=None, definitive=True)
+        dev = self.dossier / "coffre-dev"
+        with contextlib.redirect_stdout(io.StringIO()):
+            outil.creer_cles(dev, noms_neutres=True, mdp=self.mdp, role="dev")
+        self.assertEqual(outil.role_identite(dev), "dev")
+        cle = outil.charger_cle(outil.chemin_coffre(dev), self.mdp)
+        a = SimpleNamespace(cle=str(outil.chemin_coffre(dev)), fichier=None, sortie=str(dev), jusqu_au=None, definitive=True)
         with contextlib.redirect_stdout(io.StringIO()):
             licence = outil.emettre_developpeur(a, cle_deverrouillee=cle)
-            outil.verifier(licence, sortie / "parametres.dat")
+            outil.verifier(licence, dev / "parametres.dat")
         donnees = json.loads(base64.b64decode(licence.read_text().splitlines()[1]))
         self.assertTrue(donnees["developpeur"])
         self.assertEqual(donnees["edition"], "toutes")
         self.assertEqual(donnees["machine"], "")
         self.assertIsNone(donnees["valable_jusqu_au"])
-        self.assertFalse((sortie / "coffre.dat").exists())
+
+    def test_roles_dev_et_clients_ne_se_melangent_pas(self):
+        # self.coffre : identité CLIENTS (rôle par défaut). On ajoute une identité DÉVELOPPEMENT dédiée.
+        dev = self.dossier / "coffre-dev"
+        with contextlib.redirect_stdout(io.StringIO()):
+            outil.creer_cles(dev, noms_neutres=True, mdp=self.mdp, role="dev")
+        self.assertEqual(outil.role_identite(self.coffre), "clients")
+        self.assertEqual(outil.role_identite(dev), "dev")
+        cle_dev = outil.charger_cle(outil.chemin_coffre(dev), self.mdp)
+        cle_clients = outil.charger_cle(self.chemin, self.mdp)
+        # Clé publique DEV différente de la clé CLIENTS.
+        self.assertNotEqual((dev / "parametres.dat").read_bytes(), (self.coffre / "parametres.dat").read_bytes())
+        # Licence développeur refusée sur l'identité CLIENTS.
+        a_dev = SimpleNamespace(cle=str(self.chemin), fichier=None, sortie=str(self.dossier), jusqu_au=None, definitive=True)
+        with self.assertRaises(SystemExit):
+            outil.emettre_developpeur(a_dev, cle_deverrouillee=cle_clients)
+        # Licence client refusée sur l'identité DÉVELOPPEMENT.
+        a_client = SimpleNamespace(cle=str(outil.chemin_coffre(dev)), client="Société X", niu="", edition="transport",
+            role="seul", site="", code=None, demande=None, postes=1, definitive=True, jusqu_au="", maj_jusqu_au="",
+            sortie=str(dev), fichier=None)
+        with self.assertRaises(SystemExit):
+            outil.emettre(a_client, cle_deverrouillee=cle_dev)
 
     def test_identite_autre_editeur_non_ecrasee(self):
         client = self.dossier / "client"

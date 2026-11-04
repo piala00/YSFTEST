@@ -52,12 +52,26 @@ def mot_de_passe(confirmer=False):
             print("Différents, recommencez.")
 
 
-def creer_cles(dossier, noms_neutres=True, mdp=None):
+ROLE_DEV, ROLE_CLIENTS = "dev", "clients"
+
+
+def role_identite(dossier):
+    """Rôle de l'identité du dossier : 'dev' (essais de l'éditeur) ou 'clients' (production).
+    Un dossier sans marqueur est considéré « clients » (compatibilité avec les identités existantes)."""
+    try:
+        valeur = (Path(dossier) / "identite-role.txt").read_text(encoding="utf-8").strip().lower()
+    except OSError:
+        return ROLE_CLIENTS
+    return ROLE_DEV if valeur.startswith("dev") else ROLE_CLIENTS
+
+
+def creer_cles(dossier, noms_neutres=True, mdp=None, role=ROLE_CLIENTS):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
     dossier = Path(dossier)
     dossier.mkdir(parents=True, exist_ok=True)
+    role = ROLE_DEV if str(role).lower().startswith("dev") else ROLE_CLIENTS
     privee = dossier / ("coffre.dat" if noms_neutres else "cle-privee.pem")
     publique = dossier / ("parametres.dat" if noms_neutres else "cle-publique.txt")
     if any((dossier / nom).exists() for nom in ("coffre.dat", "cle-privee.pem", "parametres.dat", "cle-publique.txt")):
@@ -73,8 +87,10 @@ def creer_cles(dossier, noms_neutres=True, mdp=None):
         publique.write_bytes(b"ERPID\x01" + brut)
     else:
         publique.write_text(base64.b64encode(brut).decode() + "\n", encoding="utf-8")
+    (dossier / "identite-role.txt").write_text(role + "\n", encoding="utf-8")
     print(f"Coffre éditeur : {privee}  (secret ; copie de secours hors ligne)")
     print(f"Identité publique : {publique}  (à fournir au logiciel, jamais le coffre)")
+    print(f"Rôle de l'identité : {'DÉVELOPPEMENT (essais de l’éditeur)' if role == ROLE_DEV else 'CLIENTS (production)'}")
     if not noms_neutres:
         print("  " + publique.read_text().strip())
     ecrire_guide(dossier, brut)
@@ -379,6 +395,9 @@ def emettre(a, mdp=None, cle_deverrouillee=None):
     """Émet la licence : fichier .erplic, et la clé d'activation quand la licence part d'une demande.
     a.fichier : chemin exact du fichier ; sinon a.sortie (dossier) ou, à défaut, le dossier de la clé privée."""
     cle_chemin = Path(a.cle)
+    if role_identite(cle_chemin.parent) == ROLE_DEV:
+        raise SystemExit("Ce dossier est une identité DÉVELOPPEMENT : elle ne signe pas de licences clients. "
+                         "Choisissez votre dossier d'identité CLIENTS (production) pour une licence vendue.")
     cle_privee = cle_deverrouillee or charger_cle(cle_chemin, mdp)
     if getattr(a, "demande", None):
         demande = lire_demande(a.demande, cle_privee)
@@ -457,6 +476,9 @@ def emettre_developpeur(a, mdp=None, cle_deverrouillee=None):
     pour soi. Comme chaque build ne fait confiance qu'à sa clé publique intégrée, un build de production
     refuse cette licence (signée par la clé DEV) : il n'y a donc rien à retirer avant la sortie."""
     cle_chemin = Path(a.cle)
+    if role_identite(cle_chemin.parent) != ROLE_DEV:
+        raise SystemExit("Ce dossier est une identité CLIENTS (production) : la licence développeur exige une identité "
+                         "DÉVELOPPEMENT dédiée (clé différente de la production). Créez-la dans un dossier neuf, rôle Développement.")
     cle_privee = cle_deverrouillee or charger_cle(cle_chemin, mdp)
     registre = cle_chemin.with_name("registre-licences.csv")
     jusqu_au = None if getattr(a, "definitive", False) else date_ou_rien(getattr(a, "jusqu_au", None)) or dans_mois(120)
@@ -920,7 +942,7 @@ def interface(essai=False):
     ttk.Label(installation_tab, text='Le code court reste autonome. Signer une autorisation exige le coffre existant et le code matériel du serveur ; aucune société à saisir.',
               wraplength=520).pack(anchor='w')
 
-    def creer():
+    def creer(role=ROLE_CLIENTS):
         dossier = Path(v['dossier'].get())
         if chemin_coffre(dossier).exists():
             ouvrir_coffre()
@@ -932,9 +954,10 @@ def interface(essai=False):
             erreur(ValueError('Mot de passe trop court ou confirmation différente.'))
             return
         try:
-            creer_cles(dossier, mdp=mdp.encode())
+            creer_cles(dossier, mdp=mdp.encode(), role=role)
             session.ouvrir(chemin_coffre(dossier), lambda: mdp)
-            etat.set('Identité créée : coffre.dat chiffré et parametres.dat binaire, dans ce dossier.')
+            nom = 'DÉVELOPPEMENT (vos essais, toutes machines)' if role == ROLE_DEV else 'CLIENTS (production)'
+            etat.set(f'Identité {nom} créée dans ce dossier : coffre.dat chiffré et parametres.dat binaire.')
             memoriser()
         except (OSError, ValueError, SystemExit) as exc:
             erreur(exc)
@@ -956,8 +979,10 @@ def interface(essai=False):
             erreur(exc)
 
     identite = ttk.Frame(licence_tab)
-    creer_btn = ttk.Button(identite, text='Créer l’identité', command=creer)
+    creer_btn = ttk.Button(identite, text='Créer identité Clients', command=lambda: creer(ROLE_CLIENTS))
     creer_btn.pack(side='left')
+    creer_dev_btn = ttk.Button(identite, text='Créer identité Développeur', command=lambda: creer(ROLE_DEV))
+    creer_dev_btn.pack(side='left', padx=4)
     ttk.Button(identite, text='Regrouper…', command=rassembler).pack(side='left', padx=4)
     ttk.Button(identite, text='Verrouiller', command=verrouiller).pack(side='left')
     def guide():
@@ -1138,7 +1163,11 @@ def interface(essai=False):
     fen.bind('<MouseWheel>',molette)
     def dossier_change(*_):
         session.verrouiller();derniere_licence[0]=None;resultat_installation.set('')
-        etat.set('Dossier sélectionné. Les nouvelles licences seront enregistrées ici avec les clés.')
+        if chemin_coffre(Path(v['dossier'].get())).exists():
+            nom='DÉVELOPPEMENT (vos essais)' if role_identite(v['dossier'].get())==ROLE_DEV else 'CLIENTS (production)'
+            etat.set(f'Identité {nom} dans ce dossier. « Licence développeur » exige une identité Développement ; une licence vendue exige une identité Clients.')
+        else:
+            etat.set('Dossier sans identité. Créez une identité Clients (production) ou Développeur (vos essais).')
         rafraichir()
     v['dossier'].trace_add('write',dossier_change)
     rafraichir()
@@ -1178,9 +1207,25 @@ def interface(essai=False):
             supprimer_btn.invoke()
             assert not premiere.exists() and seconde.exists() and len(registre_lignes(dossier))==1
             assert journal_suppressions(dossier)[-1]['etat']=='supprimee'
-            # Bouton « Licence développeur » : licence signée, toutes machines (indicateur developpeur, sans empreinte).
+            # Séparation des rôles : sur une identité CLIENTS, le bouton « Licence développeur » est refusé.
+            assert role_identite(dossier)==ROLE_CLIENTS
+            avant=derniere_licence[0]
+            developpeur_btn.invoke()
+            assert derniere_licence[0]==avant and 'DÉVELOPPEMENT' in etat.get()
+            # Nouvelle identité DÉVELOPPEMENT dans un dossier dédié.
+            dev_dossier=Path(temporaire.name)/'coffre-dev'
+            v['dossier'].set(str(dev_dossier))
+            creer_dev_btn.invoke()
+            assert role_identite(dev_dossier)==ROLE_DEV
+            assert (dev_dossier/'parametres.dat').read_bytes()!=(dossier/'parametres.dat').read_bytes()   # clé DEV ≠ clé CLIENTS
+            # Sur une identité DÉVELOPPEMENT, une licence client est refusée.
+            v['client'].set('Essai refusé')
+            generer_licence_btn.invoke()
+            assert not any('DEVELOPPEUR' not in p.name for p in dev_dossier.glob('*.erplic'))
+            # Mais la licence développeur est produite : toutes machines (indicateur developpeur, sans empreinte).
             developpeur_btn.invoke()
             licence_dev=derniere_licence[0]
+            assert licence_dev.parent==dev_dossier
             donnees_dev=json.loads(base64.b64decode(licence_dev.read_text().splitlines()[1]))
             assert donnees_dev.get('developpeur') is True and donnees_dev['machine']=='' and donnees_dev['edition']=='toutes'
             for largeur,hauteur in ((760,640),(600,440)):
@@ -1242,6 +1287,8 @@ def main(argv):
     c.set_defaults(noms_neutres=True)
     c.add_argument("--noms-neutres", action="store_true", help="format binaire par défaut : coffre.dat et parametres.dat")
     c.add_argument("--ancien-format", dest="noms_neutres", action="store_false", help="compatibilité explicite PEM / texte")
+    c.add_argument("--role", choices=(ROLE_CLIENTS, ROLE_DEV), default=ROLE_CLIENTS,
+                   help="clients (production, défaut) ou dev (essais de l'éditeur : signe les licences développeur)")
     i = s.add_parser("installation")
     for nom in ("--cle", "--client", "--edition"):
         i.add_argument(nom, help="ancienne clé signée seulement ; inutile pour le module autonome")
@@ -1282,7 +1329,7 @@ def main(argv):
     v.add_argument("--publique", required=True)
     a = p.parse_args(argv)
     if a.commande == "cles":
-        creer_cles(a.dossier, noms_neutres=a.noms_neutres)
+        creer_cles(a.dossier, noms_neutres=a.noms_neutres, role=a.role)
     elif a.commande == "installation":
         emettre_installation(a)
     elif a.commande == "emettre":
