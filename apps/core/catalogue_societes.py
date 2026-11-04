@@ -11,6 +11,8 @@ def lire_catalogue(fichier):
     if not isinstance(donnees, dict) or donnees.get("version") != 1 or not isinstance(donnees.get("bases"), list):
         raise ValueError("Catalogue multi-sociétés invalide")
     identifiants = set()
+    localisations = set()
+    exercices = set()
     bases = []
     for entree in donnees["bases"]:
         champs = ("id", "societe", "agence", "exercice", "moteur", "base")
@@ -20,7 +22,15 @@ def lire_catalogue(fichier):
             raise ValueError("Identifiant de base dupliqué")
         if entree["moteur"] not in ("sqlite", "mssql") or not isinstance(entree.get("cloture", False), bool):
             raise ValueError("Moteur ou clôture invalide")
+        localisation = (entree["moteur"], entree["base"].casefold() if entree["moteur"] == "mssql" else entree["base"])
+        exercice = (entree["societe"].casefold(), entree["agence"].casefold(), entree["exercice"])
+        if localisation in localisations:
+            raise ValueError("Base physique dupliquée dans le catalogue")
+        if exercice in exercices:
+            raise ValueError("Exercice société/agence dupliqué")
         identifiants.add(entree["id"])
+        localisations.add(localisation)
+        exercices.add(exercice)
         bases.append({**entree, "cloture": entree.get("cloture", False)})
     return bases
 
