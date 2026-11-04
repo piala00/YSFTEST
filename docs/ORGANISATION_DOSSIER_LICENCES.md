@@ -31,6 +31,21 @@ séparées automatiquement (Développeur / Clients), et un classement par socié
 - **Un seul fichier** pour le client : la licence `.erplic` autorise l'installation (pas de clé
   d'installation séparée — décision du 2026-11-04).
 
+## Atelier PORTABLE et AUTO-RECONNU (demande 2026-11-04)
+L'atelier est **autonome et portable** : tout ce dont l'outil a besoin vit dedans
+(coffres = clés privées **chiffrées**, `parametres.dat` = clés publiques, registres,
+dossiers par société, licences). Un marqueur `atelier.json` à la racine le rend
+**auto-reconnaissable**.
+
+Usage visé : je **copie le dossier entier** (clé USB, autre poste), j'ouvre l'outil sur
+**n'importe quelle machine**, je **sélectionne le dossier** → l'outil détecte l'atelier et
+**charge automatiquement** les identités Développeur et Clients (il suffit de saisir le mot
+de passe du coffre pour signer). Aucune reconfiguration.
+
+Sécurité : le coffre reste **chiffré par mot de passe** ; le transporter sur une clé USB est
+donc protégé (sans le mot de passe, la clé privée est inexploitable). La clé publique
+(`parametres.dat`) n'est pas secrète.
+
 ## Migration de l'identité de production existante (ne JAMAIS la perdre)
 Si l'atelier (ou un ancien dossier) contient déjà un `coffre.dat` à sa racine (cas actuel :
 `C:\Users\…\ERP-OHADA-Licences\coffre.dat`), l'outil **déplace** ce coffre + `parametres.dat` +
