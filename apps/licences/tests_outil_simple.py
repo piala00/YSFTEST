@@ -175,6 +175,54 @@ class OutilSimpleTests(unittest.TestCase):
         self.assertEqual(chemin.read_bytes(), avant)
 
 
+class AtelierPortableTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.dossier = Path(self.temp.name)
+        self.mdp = b"Exemple-fictif-uniquement"
+
+    def test_preparer_atelier_structure_et_reconnaissance(self):
+        atelier = self.dossier / "ERP-OHADA-Licences"
+        outil.preparer_atelier(atelier)
+        self.assertTrue((atelier / "Developpeur").is_dir())
+        self.assertTrue((atelier / "Clients").is_dir())
+        self.assertTrue((atelier / "atelier.json").is_file())
+        self.assertTrue(outil.est_atelier(atelier))
+        self.assertEqual(outil.sous_dossier_role(atelier, "dev").name, "Developpeur")
+        self.assertEqual(outil.sous_dossier_role(atelier, "clients").name, "Clients")
+
+    def test_dossier_societe_nom_nettoye(self):
+        clients = self.dossier / "Clients"
+        self.assertEqual(outil.dossier_societe(clients, "GTC Bertoua !").name, "GTC-Bertoua")
+        self.assertEqual(outil.dossier_societe(clients, "").name, "Societe")
+
+    def test_migration_coffre_racine_vers_clients_sans_perte(self):
+        atelier = self.dossier / "ancien"
+        with contextlib.redirect_stdout(io.StringIO()):
+            outil.creer_cles(atelier, noms_neutres=True, mdp=self.mdp, role="clients")  # coffre à la RACINE
+        empreinte_avant = (atelier / "parametres.dat").read_bytes()
+        deplaces = outil.migrer_coffre_racine(atelier)
+        self.assertIn("coffre.dat", deplaces)
+        clients = atelier / "Clients"
+        # Déplacé dans Clients/, chargeable, rôle clients, et copie de sécurité conservée.
+        self.assertTrue(outil.chemin_coffre(clients).exists())
+        self.assertFalse((atelier / "coffre.dat").exists())
+        self.assertEqual((clients / "parametres.dat").read_bytes(), empreinte_avant)
+        self.assertEqual(outil.role_identite(clients), "clients")
+        outil.charger_cle(outil.chemin_coffre(clients), self.mdp)
+        self.assertTrue((atelier / "migration-coffre-sauvegarde" / "coffre.dat").is_file())
+
+    def test_migration_ne_touche_pas_un_clients_deja_configure(self):
+        atelier = self.dossier / "atelier"
+        outil.preparer_atelier(atelier)
+        with contextlib.redirect_stdout(io.StringIO()):
+            outil.creer_cles(atelier / "Clients", noms_neutres=True, mdp=self.mdp, role="clients")
+        avant = (atelier / "Clients" / "coffre.dat").read_bytes()
+        self.assertIsNone(outil.migrer_coffre_racine(atelier))        # rien à migrer, aucun écrasement
+        self.assertEqual((atelier / "Clients" / "coffre.dat").read_bytes(), avant)
+
+
 if __name__ == "__main__":
     unittest.main()
 

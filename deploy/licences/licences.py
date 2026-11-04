@@ -23,6 +23,7 @@ import json
 import os
 import re
 import secrets  # import explicite pour PyInstaller : format_cles est compilé en module natif
+import shutil
 import sys
 from pathlib import Path
 
@@ -63,6 +64,66 @@ def role_identite(dossier):
     except OSError:
         return ROLE_CLIENTS
     return ROLE_DEV if valeur.startswith("dev") else ROLE_CLIENTS
+
+
+# ---------------------------------------------------------------- Atelier portable (un dossier, deux identités)
+MARQUEUR_ATELIER = "atelier.json"
+SOUS_DOSSIERS = {ROLE_DEV: "Developpeur", ROLE_CLIENTS: "Clients"}
+
+
+def sous_dossier_role(atelier, role):
+    """Sous-dossier d'identité dans l'atelier : Developpeur/ (dev) ou Clients/ (production)."""
+    return Path(atelier) / SOUS_DOSSIERS[ROLE_DEV if str(role).lower().startswith("dev") else ROLE_CLIENTS]
+
+
+def est_atelier(dossier):
+    """Un dossier est un atelier s'il porte le marqueur ou contient déjà Developpeur/ ou Clients/."""
+    d = Path(dossier)
+    return (d / MARQUEUR_ATELIER).is_file() or (d / "Developpeur").is_dir() or (d / "Clients").is_dir()
+
+
+def preparer_atelier(atelier):
+    """Prépare la structure portable : marqueur + sous-dossiers Developpeur/ et Clients/.
+    Ne touche jamais aux coffres existants ; auto-reconnu ensuite par est_atelier()."""
+    d = Path(atelier)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "Developpeur").mkdir(exist_ok=True)
+    (d / "Clients").mkdir(exist_ok=True)
+    marqueur = d / MARQUEUR_ATELIER
+    if not marqueur.exists():
+        marqueur.write_text(json.dumps({"atelier": "ERP-OHADA-Licences", "version": 1},
+                                       ensure_ascii=False) + "\n", encoding="utf-8")
+    return d
+
+
+def dossier_societe(clients_dossier, societe):
+    """Sous-dossier d'archivage par société, sous Clients/ (nom nettoyé)."""
+    return Path(clients_dossier) / (nom_propre(societe or "") or "Societe")
+
+
+def migrer_coffre_racine(atelier):
+    """Si un ancien coffre est à la RACINE de l'atelier, le déplacer dans Clients/ en gardant une
+    copie de sécurité. Ne fait rien si Clients/ possède déjà un coffre (jamais d'écrasement/perte).
+    Retourne la liste des fichiers déplacés, ou None si rien à migrer."""
+    atelier = Path(atelier)
+    clients = sous_dossier_role(atelier, ROLE_CLIENTS)
+    if chemin_coffre(clients).exists():
+        return None                                           # Clients déjà configuré : on ne touche à rien
+    if not any((atelier / nom).is_file() for nom in ("coffre.dat", "cle-privee.pem")):
+        return None                                           # pas de coffre à la racine
+    clients.mkdir(parents=True, exist_ok=True)
+    sauvegarde = atelier / "migration-coffre-sauvegarde"      # copie de sécurité avant déplacement
+    sauvegarde.mkdir(exist_ok=True)
+    deplaces = []
+    for nom in ("coffre.dat", "cle-privee.pem", "parametres.dat", "cle-publique.txt",
+                "registre-licences.csv", "identite-role.txt", "registre-installations.csv"):
+        src = atelier / nom
+        if src.is_file():
+            shutil.copy2(src, sauvegarde / nom)
+            shutil.move(str(src), str(clients / nom))
+            deplaces.append(nom)
+    (clients / "identite-role.txt").write_text(ROLE_CLIENTS + "\n", encoding="utf-8")
+    return deplaces
 
 
 def creer_cles(dossier, noms_neutres=True, mdp=None, role=ROLE_CLIENTS):
