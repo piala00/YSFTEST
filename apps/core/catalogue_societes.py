@@ -148,7 +148,8 @@ def enregistrer_exercice_suivant(fichier, identifiant_precedent, nouvelle_base, 
         ) as flux:
             temporaire = Path(flux.name)
             json.dump({"version": 1, "bases": nouvelle_liste}, flux, ensure_ascii=False, indent=2)
-            flux.write("\n")
+            flux.write("
+")
             flux.flush()
             os.fsync(flux.fileno())
         lire_catalogue(temporaire)
@@ -176,7 +177,12 @@ def publier_exercice_sqlite_valide(fichier, identifiant_precedent, nouvelle_base
     # jamais faire publier la base de l'exercice N comme celle de N+1.
     base_verifiee = verifier_base_sqlite(nouvelle_base)
     for entree in bases:
-        if entree["moteur"] == "sqlite" and (\n            Path(entree["base"]).resolve() == Path(base_verifiee) or\n            (Path(entree["base"]).is_file() and\n             Path(entree["base"]).stat().st_dev == Path(base_verifiee).stat().st_dev and\n             Path(entree["base"]).stat().st_ino == Path(base_verifiee).stat().st_ino)\n        ):
+        if entree["moteur"] == "sqlite" and (
+            Path(entree["base"]).resolve() == Path(base_verifiee) or
+            (Path(entree["base"]).is_file() and
+             Path(entree["base"]).stat().st_dev == Path(base_verifiee).stat().st_dev and
+             Path(entree["base"]).stat().st_ino == Path(base_verifiee).stat().st_ino)
+        ):
             raise ValueError("base physique déjà enregistrée")
     return enregistrer_exercice_suivant(
         fichier, identifiant_precedent, base_verifiee, nouvel_identifiant,
