@@ -126,3 +126,21 @@ class CatalogueSocietesTests(SimpleTestCase):
             }), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "Lien historique"):
                 lire_catalogue(fichier)
+
+    def test_refus_annees_invalides_et_depassement(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier) / "societes.json"
+            for annee in ("26", "20x6", "２０２６", "0000", "9999"):
+                with self.subTest(annee=annee):
+                    fichier.write_text(json.dumps({"version": 1, "bases": [
+                        {**self.bases[0], "exercice": annee},
+                    ]}), encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "Année"):
+                        lire_catalogue(fichier)
+            fichier.write_text(json.dumps({"version": 1, "bases": [
+                {**self.bases[0], "exercice": "9998"},
+            ]}), encoding="utf-8")
+            avant = fichier.read_bytes()
+            with self.assertRaisesRegex(ValueError, "hors limites"):
+                enregistrer_exercice_suivant(fichier, "a", "a9999.sqlite3", "a-9999")
+            self.assertEqual(fichier.read_bytes(), avant)
