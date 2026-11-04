@@ -48,12 +48,12 @@ def choix_societe(request):
         if cible["moteur"] != "sqlite":
             return HttpResponseForbidden("Ouverture SQL Server non encore disponible.")
         try:
-            verifier_base_sqlite(cible["base"])
+            fichier_valide = verifier_base_sqlite(cible["base"])
             # Déconnecter toutes les sessions de l'ancienne société au redémarrage :
             # les comptes et sessions proviennent de la nouvelle base isolée.
             connection.close()
             poste.appeler("configurer", {
-                "DB_ENGINE": "sqlite", "SQLITE_FICHIER": cible["base"],
+                "DB_ENGINE": "sqlite", "SQLITE_FICHIER": fichier_valide,
                 "DB_HOST": None, "DB_NAME": None, "DB_USER": None,
                 "DB_PASSWORD": None, "DB_PORT": None,
                 "MIROIR_DB_ENGINE": None,
