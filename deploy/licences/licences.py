@@ -882,6 +882,13 @@ def interface(essai=False):
     derniere_licence = [None]
     dernier_code = [None]
 
+    def atelier():
+        return Path(v['dossier'].get())
+
+    def identite(role):
+        """Sous-dossier d'identité de l'atelier : Clients\\ (production) ou Developpeur\\ (essais)."""
+        return sous_dossier_role(atelier(), role)
+
     def erreur(exc):
         if essai:
             raise RuntimeError(str(exc)) from exc
@@ -972,11 +979,12 @@ def interface(essai=False):
         return (os.environ.get('ERP_LICENCES_MDP') or 'Essai-Interface-Fictif-2026') if essai else simpledialog.askstring(
             'Coffre du propriétaire', texte, show='*', parent=fen)
 
-    def ouvrir_coffre():
+    def ouvrir_coffre(dossier=None):
+        dossier = Path(dossier) if dossier else identite(ROLE_CLIENTS)
         try:
-            cle = session.ouvrir(chemin_coffre(v['dossier'].get()), lambda: demander_mdp('Mot de passe — une fois pour cette session :'))
+            cle = session.ouvrir(chemin_coffre(dossier), lambda: demander_mdp('Mot de passe — une fois pour cette session :'))
             if cle:
-                ecrire_identite(cle, v['dossier'].get())
+                ecrire_identite(cle, dossier)
                 etat.set('Coffre ouvert pour cette session. Clé publique binaire : parametres.dat.')
             return cle
         except (OSError, ValueError, SystemExit) as exc:
@@ -994,7 +1002,7 @@ def interface(essai=False):
             cle = ouvrir_coffre()
             if cle is None:
                 return
-            fichier = creer_autorisation_installation(cle, code, resultat_installation.get(), fin, v['dossier'].get())
+            fichier = creer_autorisation_installation(cle, code, resultat_installation.get(), fin, str(identite(ROLE_CLIENTS)))
             statut_installation.configure(text=f'Autorisation signée créée : {fichier.name}. Ce fichier ne remplace pas la licence d’exploitation.')
         except (OSError, ValueError, SystemExit) as exc:
             erreur(exc)
@@ -1004,9 +1012,10 @@ def interface(essai=False):
               wraplength=520).pack(anchor='w')
 
     def creer(role=ROLE_CLIENTS):
-        dossier = Path(v['dossier'].get())
+        dossier = identite(role)
+        dossier.mkdir(parents=True, exist_ok=True)
         if chemin_coffre(dossier).exists():
-            ouvrir_coffre()
+            ouvrir_coffre(dossier)
             return
         mdp = demander_mdp('Choisissez le mot de passe du coffre (10 caractères minimum) :')
         if not mdp:
@@ -1017,9 +1026,10 @@ def interface(essai=False):
         try:
             creer_cles(dossier, mdp=mdp.encode(), role=role)
             session.ouvrir(chemin_coffre(dossier), lambda: mdp)
-            nom = 'DÉVELOPPEMENT (vos essais, toutes machines)' if role == ROLE_DEV else 'CLIENTS (production)'
-            etat.set(f'Identité {nom} créée dans ce dossier : coffre.dat chiffré et parametres.dat binaire.')
+            nom = 'DÉVELOPPEMENT (Developpeur\\, toutes machines)' if role == ROLE_DEV else 'CLIENTS (Clients\\, production)'
+            etat.set(f'Identité {nom} créée : coffre.dat chiffré et parametres.dat binaire.')
             memoriser()
+            rafraichir()
         except (OSError, ValueError, SystemExit) as exc:
             erreur(exc)
 
@@ -1032,7 +1042,7 @@ def interface(essai=False):
         if not mdp:
             return
         try:
-            chemin = regrouper_identite(source, v['dossier'].get(), mdp.encode())
+            chemin = regrouper_identite(source, str(identite(ROLE_CLIENTS)), mdp.encode())
             session.ouvrir(chemin, lambda: mdp)
             etat.set('Identité rassemblée au format binaire. L’original est conservé à son emplacement.')
             memoriser()
@@ -1048,7 +1058,7 @@ def interface(essai=False):
     ttk.Button(identite, text='Verrouiller', command=verrouiller).pack(side='left')
     def guide():
         try:
-            fichier=ecrire_guide(v['dossier'].get())
+            fichier=ecrire_guide(str(identite(ROLE_CLIENTS)))
             etat.set(f'Guide disponible : {fichier.name}')
             if os.name=='nt' and not essai:
                 os.startfile(fichier)
@@ -1120,30 +1130,31 @@ def interface(essai=False):
     def rafraichir(*_):
         registre.delete(*registre.get_children())
         try:
-            choix_client['values']=list(clients_connus(v['dossier'].get()))
-            for l in reversed(registre_lignes(v['dossier'].get())):
+            choix_client['values']=list(clients_connus(identite(ROLE_CLIENTS)))
+            for l in reversed(registre_lignes(identite(ROLE_CLIENTS))):
                 registre.insert('', 'end', values=(l['numero'],l['client'],l['postes'],l['valable_jusqu_au'] or 'Permanente'))
         except (OSError,ValueError,KeyError) as exc:
             etat.set(f'Registre non disponible : {exc}')
 
     def generer():
         try:
-            dossier=Path(v['dossier'].get())
-            if not chemin_coffre(dossier).exists():
-                raise ValueError('Créez votre identité, ou rassemblez le coffre existant dans ce dossier.')
+            clients=identite(ROLE_CLIENTS)
+            if not chemin_coffre(clients).exists():
+                raise ValueError('Créez d’abord l’identité Clients (bouton « Créer identité Clients »).')
             if not v['client'].get().strip():
                 raise ValueError('Indiquez la société à licencier ou ouvrez sa demande.')
-            cle=ouvrir_coffre()
+            cle=ouvrir_coffre(clients)
             if cle is None:
                 return
-            a=argparse.Namespace(cle=str(chemin_coffre(dossier)), client=v['client'].get(), niu=v['niu'].get(),
+            sortie=dossier_societe(clients, v['client'].get())
+            a=argparse.Namespace(cle=str(chemin_coffre(clients)), client=v['client'].get(), niu=v['niu'].get(),
                 edition=v['edition'].get(), role=v['role'].get(), site=v['site'].get(), code=v['code'].get(),
                 demande=v['demande'].get() or None, postes=int(v['postes'].get()), definitive=v['duree'].get()=='definitive',
-                jusqu_au=v['jusqu_au'].get(),maj_jusqu_au=v['maj'].get(),sortie=str(dossier),fichier=None)
+                jusqu_au=v['jusqu_au'].get(),maj_jusqu_au=v['maj'].get(),sortie=str(sortie),fichier=None)
             fichier=emettre(a,cle_deverrouillee=cle)
             derniere_licence[0]=fichier
             memoriser();rafraichir()
-            etat.set(f'Licence {fichier.name} créée à côté de coffre.dat et parametres.dat. Exportez le paquet client pour la remettre.')
+            etat.set(f'Licence {fichier.name} créée dans Clients\\{sortie.name}\\. Exportez le paquet client pour la remettre.')
         except (OSError,ValueError,SystemExit) as exc:
             erreur(exc)
 
@@ -1153,10 +1164,10 @@ def interface(essai=False):
             selection=registre.selection()
             if selection:
                 numero=registre.item(selection[0],'values')[0]
-                chemin=next((Path(l['fichier']) for l in registre_lignes(v['dossier'].get()) if l['numero']==numero),chemin)
+                chemin=next((Path(l['fichier']) for l in registre_lignes(identite(ROLE_CLIENTS)) if l['numero']==numero),chemin)
             if not chemin:
                 raise ValueError('Générez ou sélectionnez une licence dans la liste.')
-            fichier=exporter_client(chemin,v['dossier'].get())
+            fichier=exporter_client(chemin,Path(chemin).parent)
             etat.set(f'Paquet client : {fichier.name}. Il contient la licence, l’identité publique et la notice, jamais votre coffre.')
             return fichier
         except (OSError,ValueError,SystemExit) as exc:
@@ -1169,7 +1180,7 @@ def interface(essai=False):
             if len(selection)!=1:
                 raise ValueError('Sélectionnez la licence à supprimer dans la liste.')
             numero=registre.item(selection[0],'values')[0]
-            detail=preparer_suppression(v['dossier'].get(),numero)
+            detail=preparer_suppression(identite(ROLE_CLIENTS),numero)
             texte=(f"Licence : {detail['numero']}\nSociété : {detail['client']}\n"
                    f"Édition : {detail['edition']} — {detail['postes']} postes\nServeur : {detail['machine']}\n"
                    f"Fichier : {Path(detail['fichier']).name}\n\n"
@@ -1180,7 +1191,7 @@ def interface(essai=False):
             if not confirme:
                 etat.set('Suppression annulée ; aucun fichier déplacé.')
                 return
-            supprimer_licence(v['dossier'].get(),detail,confirme=True)
+            supprimer_licence(identite(ROLE_CLIENTS),detail,confirme=True)
             if derniere_licence[0] and str(derniere_licence[0].resolve())==detail['fichier']:
                 derniere_licence[0]=None
             rafraichir()
@@ -1190,19 +1201,19 @@ def interface(essai=False):
 
     def generer_developpeur():
         try:
-            dossier=Path(v['dossier'].get())
-            if not chemin_coffre(dossier).exists():
-                raise ValueError('Créez d’abord une identité de DÉVELOPPEMENT (coffre dédié) dans ce dossier, jamais le coffre de production.')
-            cle=ouvrir_coffre()
+            dev=identite(ROLE_DEV)
+            if not chemin_coffre(dev).exists():
+                raise ValueError('Créez d’abord l’identité Développeur (bouton « Créer identité Développeur »).')
+            cle=ouvrir_coffre(dev)
             if cle is None:
                 return
-            a=argparse.Namespace(cle=str(chemin_coffre(dossier)),definitive=v['duree'].get()=='definitive',
-                jusqu_au=v['jusqu_au'].get(),sortie=str(dossier),fichier=None)
+            a=argparse.Namespace(cle=str(chemin_coffre(dev)),definitive=v['duree'].get()=='definitive',
+                jusqu_au=v['jusqu_au'].get(),sortie=str(dev),fichier=None)
             fichier=emettre_developpeur(a,cle_deverrouillee=cle)
             derniere_licence[0]=fichier
             memoriser();rafraichir()
-            etat.set(f'Licence développeur {fichier.name} créée. Signée par CE coffre : utilisez une identité DÉVELOPPEMENT dédiée '
-                     '(jamais la production). Toutes options, toutes vos machines ; un build de production la refuse.')
+            etat.set(f'Licence développeur {fichier.name} créée dans Developpeur\\. Toutes options, toutes vos machines ; '
+                     'un build de production la refuse.')
         except (OSError,ValueError,SystemExit) as exc:
             erreur(exc)
 
@@ -1224,63 +1235,69 @@ def interface(essai=False):
     fen.bind('<MouseWheel>',molette)
     def dossier_change(*_):
         session.verrouiller();derniere_licence[0]=None;resultat_installation.set('')
-        if chemin_coffre(Path(v['dossier'].get())).exists():
-            nom='DÉVELOPPEMENT (vos essais)' if role_identite(v['dossier'].get())==ROLE_DEV else 'CLIENTS (production)'
-            etat.set(f'Identité {nom} dans ce dossier. « Licence développeur » exige une identité Développement ; une licence vendue exige une identité Clients.')
-        else:
-            etat.set('Dossier sans identité. Créez une identité Clients (production) ou Développeur (vos essais).')
+        migres=None
+        try:
+            preparer_atelier(atelier())                       # crée Developpeur\ et Clients\ + marqueur
+            migres=migrer_coffre_racine(atelier())            # déplace un ancien coffre racine vers Clients\ (copie de sécurité)
+        except OSError:
+            pass
+        cli='présente' if chemin_coffre(identite(ROLE_CLIENTS)).exists() else 'à créer'
+        dev='présente' if chemin_coffre(identite(ROLE_DEV)).exists() else 'à créer'
+        prefixe=('Coffre de production déplacé dans Clients\\ (copie de sécurité conservée). ' if migres else '')
+        etat.set(f'{prefixe}Atelier : identité Clients {cli}, identité Développeur {dev}. '
+                 '« Générer la licence » utilise Clients ; « Licence développeur » utilise Développeur.')
         rafraichir()
     v['dossier'].trace_add('write',dossier_change)
     rafraichir()
     etat.set('Choisissez votre dossier. La création du code d’installation ne nécessite aucune clé.')
     if essai:
         try:
-            dossier=Path(temporaire.name)
+            atelier_dir=Path(temporaire.name)
+            clients=atelier_dir/'Clients'; dev=atelier_dir/'Developpeur'
             assert len(onglets.tabs())==2
+            v['dossier'].set(str(atelier_dir))                 # déclenche la préparation auto de l'atelier
+            assert clients.is_dir() and dev.is_dir() and (atelier_dir/'atelier.json').is_file()
             generer_code_btn.invoke()
             assert fc.est_installation_courte(dernier_code[0])
-            assert not chemin_coffre(dossier).exists() and not v['client'].get()
+            assert not chemin_coffre(clients).exists() and not v['client'].get()
             onglets.select(licence_onglet)
-            creer_btn.invoke()
-            demande=dossier/'DEMANDE-ESSAI.erpdem'
+            creer_btn.invoke()                                 # identité CLIENTS dans Clients\
+            assert chemin_coffre(clients).exists() and role_identite(clients)==ROLE_CLIENTS
+            demande=atelier_dir/'DEMANDE-ESSAI.erpdem'
             demande.write_text(fc.demande_ecrire({'societe':'Société fictive GUI','materiel':'POSTE-INTERFACE-FICTIF',
                 'machine_nom':'GUI-FICTIVE','edition':'transport','role':'seul','site':'',
                 'installation':dernier_code[0],'cle_installation':dernier_code[0]}),encoding='utf-8')
             charger_demande(demande)
             generer_licence_btn.invoke()
-            assert derniere_licence[0] and derniere_licence[0].parent==dossier
-            assert (dossier/'coffre.dat').exists() and (dossier/'parametres.dat').read_bytes().startswith(b'ERPID\x01')
-            assert not (dossier/'cle-publique.txt').exists()
+            # Licence dans un sous-dossier PAR SOCIÉTÉ, sous Clients\ ; registre à la racine Clients\.
+            assert derniere_licence[0] and derniere_licence[0].parent.parent==clients
+            dossier_soc=derniere_licence[0].parent
+            assert (clients/'coffre.dat').exists() and (dossier_soc/'parametres.dat').read_bytes().startswith(b'ERPID\x01')
+            assert (clients/'registre-licences.csv').exists() and not (clients/'cle-publique.txt').exists()
             fichier=exporter()
             import zipfile
             with zipfile.ZipFile(fichier) as z:
                 assert 'coffre.dat' not in z.namelist() and 'parametres.dat' in z.namelist()
                 assert len(z.namelist())==3
-            assert (dossier/'INSTALLATION_CLE_PUBLIQUE.md').is_file()
-            # Une deuxième licence reste intacte après annulation puis suppression de la première.
+            assert (dossier_soc/'INSTALLATION_CLE_PUBLIQUE.md').is_file()
+            # Une deuxième licence reste intacte après suppression de la première.
             premiere=derniere_licence[0]
             generer_licence_btn.invoke()
             seconde=derniere_licence[0]
-            cible=next(i for i in registre.get_children() if registre.item(i,'values')[0]==registre_lignes(dossier)[0]['numero'])
+            cible=next(i for i in registre.get_children() if registre.item(i,'values')[0]==registre_lignes(clients)[0]['numero'])
             registre.selection_set(cible)
             supprimer_btn.invoke()
-            assert premiere.exists() and len(registre_lignes(dossier))==2
+            assert premiere.exists() and len(registre_lignes(clients))==2
             supprimer_btn.invoke()
-            assert not premiere.exists() and seconde.exists() and len(registre_lignes(dossier))==1
-            assert journal_suppressions(dossier)[-1]['etat']=='supprimee'
-            # Le dossier initial est une identité CLIENTS (production). (Le refus du bouton développeur sur une
-            # identité CLIENTS, et de la licence client sur une identité DEV, est vérifié dans tests_outil_simple.)
-            assert role_identite(dossier)==ROLE_CLIENTS
-            # Nouvelle identité DÉVELOPPEMENT dans un dossier dédié : clé publique différente de CLIENTS.
-            dev_dossier=Path(temporaire.name)/'coffre-dev'
-            v['dossier'].set(str(dev_dossier))
+            assert not premiere.exists() and seconde.exists() and len(registre_lignes(clients))==1
+            assert journal_suppressions(clients)[-1]['etat']=='supprimee'
+            # Identité DÉVELOPPEUR dans Developpeur\ (clé ≠ Clients) + licence développeur par son bouton.
             creer_dev_btn.invoke()
-            assert role_identite(dev_dossier)==ROLE_DEV
-            assert (dev_dossier/'parametres.dat').read_bytes()!=(dossier/'parametres.dat').read_bytes()
-            # Le bouton « Licence développeur » produit la licence : toutes machines (indicateur developpeur, sans empreinte).
+            assert chemin_coffre(dev).exists() and role_identite(dev)==ROLE_DEV
+            assert (dev/'parametres.dat').read_bytes()!=(clients/'parametres.dat').read_bytes()
             developpeur_btn.invoke()
             licence_dev=derniere_licence[0]
-            assert licence_dev and licence_dev.parent==dev_dossier
+            assert licence_dev and licence_dev.parent==dev
             donnees_dev=json.loads(base64.b64decode(licence_dev.read_text().splitlines()[1]))
             assert donnees_dev.get('developpeur') is True and donnees_dev['machine']=='' and donnees_dev['edition']=='toutes'
             for largeur,hauteur in ((760,640),(600,440)):
