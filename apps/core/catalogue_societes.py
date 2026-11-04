@@ -101,11 +101,13 @@ def enregistrer_exercice_suivant(fichier, identifiant_precedent, nouvelle_base, 
         raise ValueError("base du nouvel exercice requise")
     annee = str(int(precedente["exercice"]) + 1)
     if any(b["id"] == nouvel_identifiant or
-           (b["societe"] == precedente["societe"] and
-            b["agence"] == precedente["agence"] and b["exercice"] == annee)
+           (b["societe"].casefold() == precedente["societe"].casefold() and
+            b["agence"].casefold() == precedente["agence"].casefold() and b["exercice"] == annee)
            for b in bases):
         raise ValueError("exercice suivant déjà enregistré")
-    if any(b["moteur"] == precedente["moteur"] and b["base"] == nouvelle_base for b in bases):
+    if any(b["moteur"] == precedente["moteur"] and
+           (b["base"].casefold() == nouvelle_base.casefold() if precedente["moteur"] == "mssql"
+            else b["base"] == nouvelle_base) for b in bases):
         raise ValueError("base déjà enregistrée")
     suivante = {
         "id": nouvel_identifiant, "societe": precedente["societe"],
