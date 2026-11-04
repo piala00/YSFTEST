@@ -1049,13 +1049,13 @@ def interface(essai=False):
         except (OSError, ValueError, SystemExit) as exc:
             erreur(exc)
 
-    identite = ttk.Frame(licence_tab)
-    creer_btn = ttk.Button(identite, text='Créer identité Clients', command=lambda: creer(ROLE_CLIENTS))
+    cadre_identite = ttk.Frame(licence_tab)
+    creer_btn = ttk.Button(cadre_identite, text='Créer identité Clients', command=lambda: creer(ROLE_CLIENTS))
     creer_btn.pack(side='left')
-    creer_dev_btn = ttk.Button(identite, text='Créer identité Développeur', command=lambda: creer(ROLE_DEV))
+    creer_dev_btn = ttk.Button(cadre_identite, text='Créer identité Développeur', command=lambda: creer(ROLE_DEV))
     creer_dev_btn.pack(side='left', padx=4)
-    ttk.Button(identite, text='Regrouper…', command=rassembler).pack(side='left', padx=4)
-    ttk.Button(identite, text='Verrouiller', command=verrouiller).pack(side='left')
+    ttk.Button(cadre_identite, text='Regrouper…', command=rassembler).pack(side='left', padx=4)
+    ttk.Button(cadre_identite, text='Verrouiller', command=verrouiller).pack(side='left')
     def guide():
         try:
             fichier=ecrire_guide(str(identite(ROLE_CLIENTS)))
@@ -1064,8 +1064,8 @@ def interface(essai=False):
                 os.startfile(fichier)
         except (OSError,ValueError) as exc:
             erreur(exc)
-    ttk.Button(identite,text='Guide',command=guide).pack(side='left',padx=4)
-    ligne(0, 'Identité de l’éditeur', identite)
+    ttk.Button(cadre_identite,text='Guide',command=guide).pack(side='left',padx=4)
+    ligne(0, 'Identité de l’éditeur', cadre_identite)
     ttk.Label(licence_tab,textvariable=etat,wraplength=520).grid(row=1,column=0,columnspan=2,sticky='w',pady=4)
     choix_client=ligne(2,'Société à licencier',ttk.Combobox(licence_tab,textvariable=v['client']))
     ligne(3,'Édition',ttk.Combobox(licence_tab,textvariable=v['edition'],values=EDITIONS,state='readonly'))
