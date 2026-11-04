@@ -83,10 +83,6 @@ def verifier_base_sqlite(nom):
             tables = {r[0] for r in base.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not {"django_migrations", "auth_user", "core_societe"}.issubset(tables):
                 raise ValueError("la base sélectionnée n'est pas une base ERP compatible")
-            # Une base migrée mais sans société ne peut pas servir d’exercice ERP.
-            societe = base.execute("SELECT 1 FROM core_societe LIMIT 1").fetchone()
-            if societe is None:
-                raise ValueError("la base sélectionnée ne contient aucune société ERP")
             resultat = base.execute("PRAGMA quick_check").fetchone()
             if not resultat or resultat[0] != "ok":
                 raise ValueError("la base sélectionnée est endommagée")
