@@ -1207,25 +1207,19 @@ def interface(essai=False):
             supprimer_btn.invoke()
             assert not premiere.exists() and seconde.exists() and len(registre_lignes(dossier))==1
             assert journal_suppressions(dossier)[-1]['etat']=='supprimee'
-            # Séparation des rôles : sur une identité CLIENTS, le bouton « Licence développeur » est refusé.
+            # Le dossier initial est une identité CLIENTS (production). (Le refus du bouton développeur sur une
+            # identité CLIENTS, et de la licence client sur une identité DEV, est vérifié dans tests_outil_simple.)
             assert role_identite(dossier)==ROLE_CLIENTS
-            avant=derniere_licence[0]
-            developpeur_btn.invoke()
-            assert derniere_licence[0]==avant and 'DÉVELOPPEMENT' in etat.get()
-            # Nouvelle identité DÉVELOPPEMENT dans un dossier dédié.
+            # Nouvelle identité DÉVELOPPEMENT dans un dossier dédié : clé publique différente de CLIENTS.
             dev_dossier=Path(temporaire.name)/'coffre-dev'
             v['dossier'].set(str(dev_dossier))
             creer_dev_btn.invoke()
             assert role_identite(dev_dossier)==ROLE_DEV
-            assert (dev_dossier/'parametres.dat').read_bytes()!=(dossier/'parametres.dat').read_bytes()   # clé DEV ≠ clé CLIENTS
-            # Sur une identité DÉVELOPPEMENT, une licence client est refusée.
-            v['client'].set('Essai refusé')
-            generer_licence_btn.invoke()
-            assert not any('DEVELOPPEUR' not in p.name for p in dev_dossier.glob('*.erplic'))
-            # Mais la licence développeur est produite : toutes machines (indicateur developpeur, sans empreinte).
+            assert (dev_dossier/'parametres.dat').read_bytes()!=(dossier/'parametres.dat').read_bytes()
+            # Le bouton « Licence développeur » produit la licence : toutes machines (indicateur developpeur, sans empreinte).
             developpeur_btn.invoke()
             licence_dev=derniere_licence[0]
-            assert licence_dev.parent==dev_dossier
+            assert licence_dev and licence_dev.parent==dev_dossier
             donnees_dev=json.loads(base64.b64decode(licence_dev.read_text().splitlines()[1]))
             assert donnees_dev.get('developpeur') is True and donnees_dev['machine']=='' and donnees_dev['edition']=='toutes'
             for largeur,hauteur in ((760,640),(600,440)):
