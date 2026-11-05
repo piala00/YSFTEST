@@ -47,6 +47,9 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
         from urllib.parse import quote
         uri = "file:" + quote(str(source_path), safe="/:") + "?mode=ro"
         with sqlite3.connect(uri, uri=True) as origine:
+            # Defense en profondeur : meme une instruction SQL issue des callbacks
+            # ne peut ecrire dans N (y compris via une base attachee).
+            origine.execute("PRAGMA query_only=ON")
             with sqlite3.connect(str(cible)) as nouvelle:
                 nouvelle.execute("PRAGMA foreign_keys=ON")
                 initialiser(origine, nouvelle)
