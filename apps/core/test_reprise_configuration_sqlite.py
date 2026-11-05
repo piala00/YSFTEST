@@ -83,3 +83,17 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'clés étrangères'):
             recopier_referentiels(self.source, self.cible, ['referentiel', 'enfant'])
         self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
+
+    def test_erreur_insertion_annule_toutes_les_tables(self):
+        for db in (self.source, self.cible):
+            db.execute('CREATE TABLE autre (id INTEGER PRIMARY KEY, valeur TEXT)')
+        self.source.execute("INSERT INTO autre VALUES (1, 'ok')")
+        self.source.execute("INSERT INTO autre VALUES (2, 'erreur')")
+        self.cible.execute("""
+            CREATE TRIGGER rejeter_seconde_ligne BEFORE INSERT ON autre
+            WHEN NEW.id = 2 BEGIN SELECT RAISE(ABORT, 'insertion refusee'); END
+        """)
+        with self.assertRaises(sqlite3.IntegrityError):
+            recopier_referentiels(self.source, self.cible, ['referentiel', 'autre'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
+        self.assertEqual(self.cible.execute('SELECT * FROM autre').fetchall(), [])
