@@ -91,7 +91,9 @@ class BaseSQLServerTests(SimpleTestCase):
             source.manage("shell", "-c", "from django.contrib.auth.models import User; User.objects.create_superuser('chef', '', 'Chef-2026-ok')")
             serveur = dossier_sqlserver(travail, "bascule")
             base = serveur.env["DB_NAME"]
-            reglage = f'bd.reglage_sqlserver("{SERVEUR["hote"]}", "{base}", "{SERVEUR["utilisateur"]}", "{SERVEUR["mdp"]}")'
+            reglage = (f'bd.reglage_sqlserver("{SERVEUR["hote"]}", "{base}", '
+                      f'"{SERVEUR["utilisateur"]}", "{SERVEUR["mdp"]}", '
+                      f'port="{os.environ.get("DB_PORT", "")}")')
             essai = source.py(f"""
 import json
 from apps.core import base_donnees as bd
