@@ -1,0 +1,31 @@
+name: Cloture annuelle SQLite
+
+on:
+  push:
+    branches:
+      - ccr-5592a371-fusjt2
+    paths:
+      - 'apps/core/catalogue_societes.py'
+      - 'apps/core/cloture_annuelle_sqlite.py'
+      - 'apps/core/test_cloture_annuelle_sqlite.py'
+      - '.github/workflows/cloture-sqlite.yml'
+  pull_request:
+    paths:
+      - 'apps/core/catalogue_societes.py'
+      - 'apps/core/cloture_annuelle_sqlite.py'
+      - 'apps/core/test_cloture_annuelle_sqlite.py'
+      - '.github/workflows/cloture-sqlite.yml'
+
+jobs:
+  sqlite-annual-close:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python syntax
+        run: python -m compileall -q apps/core/catalogue_societes.py apps/core/cloture_annuelle_sqlite.py apps/core/test_cloture_annuelle_sqlite.py
+      - name: Annual close regression tests
+        run: python -m unittest -v apps.core.test_cloture_annuelle_sqlite
