@@ -50,8 +50,11 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
             with sqlite3.connect(str(cible)) as nouvelle:
                 nouvelle.execute("PRAGMA foreign_keys=ON")
                 initialiser(origine, nouvelle)
-                nouvelle.commit()
                 reporter(origine, nouvelle)
+                # Configuration et reports forment une seule transaction :
+                # aucune base N+1 partiellement initialisée ne doit être validée.
+                if nouvelle.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                    raise ValueError("références invalides dans la base N+1")
                 nouvelle.commit()
         verifier_base_sqlite(str(cible))
         resultat = publier_exercice_sqlite_valide(
