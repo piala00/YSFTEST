@@ -69,3 +69,43 @@ class ClotureAnnuelleSQLiteTests(TestCase):
                 self.initialiser, self.reporter,
             )
         self.assertEqual(self.cible.read_bytes(), b"sentinelle")
+
+    def test_references_invalides_bloquent_publication(self):
+        def initialiser_invalide(origine, nouvelle):
+            self.initialiser(origine, nouvelle)
+            nouvelle.execute(
+                "CREATE TABLE detail (id INTEGER PRIMARY KEY, "
+                "societe_id INTEGER REFERENCES core_societe(id))"
+            )
+
+        def reporter_invalide(origine, nouvelle):
+            nouvelle.execute("INSERT INTO detail VALUES (1, 999)")
+
+        avant = self.catalogue.read_bytes()
+        with self.assertRaises(sqlite3.IntegrityError):
+            preparer_exercice_sqlite(
+                self.catalogue, "n", str(self.cible), "n1",
+                initialiser_invalide, reporter_invalide,
+            )
+        self.assertFalse(self.cible.exists())
+        self.assertEqual(self.catalogue.read_bytes(), avant)
+
+    def test_reports_voient_configuration_non_encore_validee(self):
+        def initialiser_config(origine, nouvelle):
+            self.initialiser(origine, nouvelle)
+            nouvelle.execute("CREATE TABLE configuration (valeur TEXT)")
+            nouvelle.execute("INSERT INTO configuration VALUES ('active')")
+
+        def reporter_config(origine, nouvelle):
+            self.assertEqual(
+                nouvelle.execute("SELECT valeur FROM configuration").fetchone(),
+                ("active",),
+            )
+            nouvelle.execute("INSERT INTO report VALUES (250)")
+
+        preparer_exercice_sqlite(
+            self.catalogue, "n", str(self.cible), "n1",
+            initialiser_config, reporter_config,
+        )
+        with sqlite3.connect(self.cible) as base:
+            self.assertEqual(base.execute("SELECT montant FROM report").fetchone(), (250,))
