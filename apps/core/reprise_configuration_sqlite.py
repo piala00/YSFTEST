@@ -54,12 +54,21 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
             raise ValueError("références circulaires entre référentiels")
         ordre.extend(prets)
         restants.difference_update(prets)
-    for nom in ordre:
-        ident = '"' + nom + '"'
-        source_cols = [r[1] for r in source.execute(f"PRAGMA table_info({ident})")]
-        colonnes = ", ".join('"' + col.replace('"', '""') + '"' for col in source_cols)
-        marqueurs = ", ".join("?" for _ in source_cols)
-        lecture = source.execute(f"SELECT {colonnes} FROM {ident}")
-        cible.executemany(
-            f"INSERT INTO {ident} ({colonnes}) VALUES ({marqueurs})", lecture,
-        )
+    # Le SAVEPOINT protège aussi les appels au sein d'une transaction existante.
+    cible.execute("SAVEPOINT reprise_referentiels")
+    try:
+        for nom in ordre:
+            ident = '"' + nom + '"'
+            source_cols = [r[1] for r in source.execute(f"PRAGMA table_info({ident})")]
+            colonnes = ", ".join('"' + col.replace('"', '""') + '"' for col in source_cols)
+            marqueurs = ", ".join("?" for _ in source_cols)
+            lecture = source.execute(f"SELECT {colonnes} FROM {ident}")
+            cible.executemany(
+                f"INSERT INTO {ident} ({colonnes}) VALUES ({marqueurs})", lecture,
+            )
+    except Exception:
+        cible.execute("ROLLBACK TO SAVEPOINT reprise_referentiels")
+        cible.execute("RELEASE SAVEPOINT reprise_referentiels")
+        raise
+    else:
+        cible.execute("RELEASE SAVEPOINT reprise_referentiels")
