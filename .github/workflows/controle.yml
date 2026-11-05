@@ -111,10 +111,11 @@ jobs:
         env:
           ACCEPT_EULA: "Y"
           MSSQL_SA_PASSWORD: "Essai-ERP-2026!"      # conteneur jetable du contrôle, aucune donnée
-        ports: ["1433:1433"]
+        ports: ["11433:1433"]
     env:
       DB_ENGINE: mssql
       DB_HOST: 127.0.0.1
+      DB_PORT: "11433"
       DB_USER: sa
       DB_PASSWORD: "Essai-ERP-2026!"
       DB_NAME: ERP_ESSAI
@@ -130,7 +131,7 @@ jobs:
           sudo apt-get install -y libltdl7 > /dev/null || true
           pip install -r requirements.txt "mssql-django>=2.0" mssql-python
       - name: Attendre SQL Server
-        run: for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/1433) 2>/dev/null && exit 0; sleep 2; done; exit 1
+        run: for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/11433) 2>/dev/null && exit 0; sleep 2; done; exit 1
       - name: Tests (SQL Server 2022)
         run: python manage.py test --noinput -v1
 
