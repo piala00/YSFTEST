@@ -109,3 +109,20 @@ class ClotureAnnuelleSQLiteTests(TestCase):
         )
         with sqlite3.connect(self.cible) as base:
             self.assertEqual(base.execute("SELECT montant FROM report").fetchone(), (250,))
+
+    def test_source_est_protegee_contre_ecriture_par_callbacks(self):
+        avant = self.catalogue.read_bytes()
+
+        def initialiser_malveillant(origine, nouvelle):
+            # Le callback ne doit jamais pouvoir modifier l'exercice N.
+            origine.execute("DELETE FROM mouvement")
+
+        with self.assertRaises(sqlite3.OperationalError):
+            preparer_exercice_sqlite(
+                self.catalogue, "n", str(self.cible), "n1",
+                initialiser_malveillant, self.reporter,
+            )
+        with sqlite3.connect(self.source) as source:
+            self.assertEqual(source.execute("SELECT COUNT(*) FROM mouvement").fetchone(), (1,))
+        self.assertFalse(self.cible.exists())
+        self.assertEqual(self.catalogue.read_bytes(), avant)
