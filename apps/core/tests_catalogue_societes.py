@@ -195,3 +195,25 @@ class CatalogueSocietesTests(SimpleTestCase):
             with self.assertRaisesRegex(ValueError, "base physique déjà enregistrée"):
                 publier_exercice_sqlite_valide(catalogue, "a", alias, "a-2027")
             self.assertEqual(catalogue.read_bytes(), avant)
+
+    def test_publication_refuse_references_sqlite_invalides(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = Path(dossier)
+            catalogue = racine / "societes.json"
+            catalogue.write_text(json.dumps({"version": 1, "bases": [
+                {**self.bases[0], "base": str(racine / "2026.sqlite3")},
+            ]}), encoding="utf-8")
+            cible = racine / "2027.sqlite3"
+            with sqlite3.connect(cible) as connexion:
+                for table in ("django_migrations", "auth_user", "core_societe"):
+                    connexion.execute(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY)")
+                connexion.execute(
+                    "CREATE TABLE reference_test (id INTEGER PRIMARY KEY, "
+                    "societe_id INTEGER REFERENCES core_societe(id))"
+                )
+                connexion.execute("INSERT INTO reference_test VALUES (1, 999)")
+            avant = catalogue.read_bytes()
+            with self.assertRaisesRegex(ValueError, "références invalides"):
+                publier_exercice_sqlite_valide(catalogue, "a", str(cible), "a-2027")
+            self.assertEqual(catalogue.read_bytes(), avant)
+            self.assertFalse(next(b for b in lire_catalogue(catalogue) if b["id"] == "a")["cloture"])
