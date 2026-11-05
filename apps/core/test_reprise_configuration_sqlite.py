@@ -36,3 +36,17 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
         self.cible.execute("INSERT INTO referentiel VALUES (2, 'B')")
         with self.assertRaisesRegex(ValueError, 'non vide'):
             recopier_referentiels(self.source, self.cible, ['referentiel'])
+
+    def test_prevalidation_ne_copie_rien_si_deuxieme_table_incompatible(self):
+        for db in (self.source, self.cible):
+            db.execute('CREATE TABLE autre (id INTEGER PRIMARY KEY, nom TEXT)')
+        self.cible.execute('ALTER TABLE autre ADD COLUMN supplement TEXT')
+        with self.assertRaisesRegex(ValueError, 'incompatible'):
+            recopier_referentiels(self.source, self.cible, ['referentiel', 'autre'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
+
+    def test_types_de_colonnes_incompatibles_refuses(self):
+        self.cible.execute('DROP TABLE referentiel')
+        self.cible.execute('CREATE TABLE referentiel (id INTEGER PRIMARY KEY, nom INTEGER)')
+        with self.assertRaisesRegex(ValueError, 'incompatible'):
+            recopier_referentiels(self.source, self.cible, ['referentiel'])
