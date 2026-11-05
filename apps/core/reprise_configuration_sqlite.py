@@ -32,7 +32,25 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
             raise ValueError(f"structure de référentiel incompatible : {nom}")
         if cible.execute(f"SELECT 1 FROM {ident} LIMIT 1").fetchone():
             raise ValueError(f"table N+1 non vide : {nom}")
+    # Respecter les dépendances FK même si la liste métier est inversée.
+    # Détecter les cycles AVANT toute insertion pour éviter une copie partielle.
+    dependances = {}
+    noms = set(tables)
     for nom in tables:
+        ident = '"' + nom + '"'
+        parents = {ligne[2] for ligne in cible.execute(f"PRAGMA foreign_key_list({ident})")}
+        dependances[nom] = (parents & noms) - {nom}
+        if nom in parents:
+            raise ValueError(f"référence circulaire de référentiel : {nom}")
+    ordre = []
+    restants = set(tables)
+    while restants:
+        prets = [nom for nom in tables if nom in restants and not (dependances[nom] & restants)]
+        if not prets:
+            raise ValueError("références circulaires entre référentiels")
+        ordre.extend(prets)
+        restants.difference_update(prets)
+    for nom in ordre:
         ident = '"' + nom + '"'
         source_cols = [r[1] for r in source.execute(f"PRAGMA table_info({ident})")]
         colonnes = ", ".join('"' + col.replace('"', '""') + '"' for col in source_cols)
