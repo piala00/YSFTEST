@@ -109,3 +109,15 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
         self.cible.execute('CREATE UNIQUE INDEX cible_nom_unique ON referentiel(nom)')
         recopier_referentiels(self.source, self.cible, ['referentiel'])
         self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [(1, 'A')])
+
+    def test_index_unique_partiel_refuse_avant_copie(self):
+        self.source.execute('CREATE UNIQUE INDEX unique_partiel ON referentiel(nom) WHERE id > 0')
+        with self.assertRaisesRegex(ValueError, 'complexes'):
+            recopier_referentiels(self.source, self.cible, ['referentiel'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
+
+    def test_index_unique_expression_refuse_avant_copie(self):
+        self.source.execute('CREATE UNIQUE INDEX unique_expression ON referentiel(lower(nom))')
+        with self.assertRaisesRegex(ValueError, 'complexes'):
+            recopier_referentiels(self.source, self.cible, ['referentiel'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
