@@ -50,3 +50,22 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
         self.cible.execute('CREATE TABLE referentiel (id INTEGER PRIMARY KEY, nom INTEGER)')
         with self.assertRaisesRegex(ValueError, 'incompatible'):
             recopier_referentiels(self.source, self.cible, ['referentiel'])
+
+    def test_dependances_copie_parent_avant_enfant(self):
+        for db in (self.source, self.cible):
+            db.execute('PRAGMA foreign_keys=ON')
+            db.execute('CREATE TABLE parent (id INTEGER PRIMARY KEY)')
+            db.execute('CREATE TABLE enfant (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))')
+        self.source.execute('INSERT INTO parent VALUES (1)')
+        self.source.execute('INSERT INTO enfant VALUES (2, 1)')
+        recopier_referentiels(self.source, self.cible, ['enfant', 'parent'])
+        self.assertEqual(self.cible.execute('SELECT * FROM enfant').fetchall(), [(2, 1)])
+
+    def test_dependances_circulaires_refusees_avant_copie(self):
+        for db in (self.source, self.cible):
+            db.execute('CREATE TABLE parent (id INTEGER PRIMARY KEY, enfant_id INTEGER REFERENCES enfant(id))')
+            db.execute('CREATE TABLE enfant (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))')
+        self.source.execute('INSERT INTO parent VALUES (1, NULL)')
+        with self.assertRaisesRegex(ValueError, 'circulaires'):
+            recopier_referentiels(self.source, self.cible, ['parent', 'enfant'])
+        self.assertEqual(self.cible.execute('SELECT * FROM parent').fetchall(), [])
