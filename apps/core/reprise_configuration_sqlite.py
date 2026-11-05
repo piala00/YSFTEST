@@ -88,6 +88,10 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
             cible.executemany(
                 f"INSERT INTO {ident} ({colonnes}) VALUES ({marqueurs})", lecture,
             )
+        # Contrôle systématique, même lorsque PRAGMA foreign_keys est désactivé.
+        violations = cible.execute("PRAGMA foreign_key_check").fetchall()
+        if violations:
+            raise sqlite3.IntegrityError(f"références étrangères invalides après reprise : {violations[:5]}")
     except Exception:
         cible.execute("ROLLBACK TO SAVEPOINT reprise_referentiels")
         cible.execute("RELEASE SAVEPOINT reprise_referentiels")
