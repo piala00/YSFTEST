@@ -121,3 +121,25 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'complexes'):
             recopier_referentiels(self.source, self.cible, ['referentiel'])
         self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
+
+    def test_fk_invalide_controle_desactive_annule_toutes_les_tables(self):
+        for db in (self.source, self.cible):
+            db.execute('CREATE TABLE parent (id INTEGER PRIMARY KEY)')
+            db.execute('CREATE TABLE enfant (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))')
+            db.execute('PRAGMA foreign_keys=OFF')
+        self.source.execute('INSERT INTO enfant VALUES (2, 999)')
+        with self.assertRaisesRegex(sqlite3.IntegrityError, 'références étrangères invalides'):
+            recopier_referentiels(self.source, self.cible, ['referentiel', 'enfant'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
+        self.assertEqual(self.cible.execute('SELECT * FROM enfant').fetchall(), [])
+
+    def test_fk_valide_controle_desactive_accepte(self):
+        for db in (self.source, self.cible):
+            db.execute('CREATE TABLE parent (id INTEGER PRIMARY KEY)')
+            db.execute('CREATE TABLE enfant (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))')
+            db.execute('PRAGMA foreign_keys=OFF')
+        self.source.execute('INSERT INTO parent VALUES (7)')
+        self.source.execute('INSERT INTO enfant VALUES (8, 7)')
+        recopier_referentiels(self.source, self.cible, ['enfant', 'parent'])
+        self.assertEqual(self.cible.execute('SELECT * FROM enfant').fetchall(), [(8, 7)])
+        self.assertEqual(self.cible.execute('PRAGMA foreign_key_check').fetchall(), [])
