@@ -69,3 +69,17 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'circulaires'):
             recopier_referentiels(self.source, self.cible, ['parent', 'enfant'])
         self.assertEqual(self.cible.execute('SELECT * FROM parent').fetchall(), [])
+
+    def test_refus_cible_fk_modifiee_avant_toute_copie(self):
+        for db in (self.source, self.cible):
+            db.execute('CREATE TABLE parent (id INTEGER PRIMARY KEY)')
+            db.execute('CREATE TABLE autre (id INTEGER PRIMARY KEY)')
+        self.source.execute(
+            'CREATE TABLE enfant (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))'
+        )
+        self.cible.execute(
+            'CREATE TABLE enfant (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES autre(id))'
+        )
+        with self.assertRaisesRegex(ValueError, 'clés étrangères'):
+            recopier_referentiels(self.source, self.cible, ['referentiel', 'enfant'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
