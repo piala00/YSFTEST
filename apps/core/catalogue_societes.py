@@ -129,6 +129,18 @@ def enregistrer_exercice_suivant(fichier, identifiant_precedent, nouvelle_base, 
            (b["base"].casefold() == nouvelle_base.casefold() if precedente["moteur"] == "mssql"
             else b["base"] == nouvelle_base) for b in bases):
         raise ValueError("base déjà enregistrée")
+    # Interdit aussi les alias physiques lorsque ce point d’entrée est appelé directement.
+    # Ne pas exiger ici que la nouvelle base existe : le flux MSSQL est distinct.
+    if precedente["moteur"] == "sqlite":
+        cible = Path(nouvelle_base)
+        for entree in bases:
+            if entree["moteur"] != "sqlite":
+                continue
+            source = Path(entree["base"])
+            if source.resolve() == cible.resolve():
+                raise ValueError("base physique déjà enregistrée")
+            if source.is_file() and cible.is_file() and source.samefile(cible):
+                raise ValueError("base physique déjà enregistrée")
     suivante = {
         "id": nouvel_identifiant, "societe": precedente["societe"],
         "agence": precedente["agence"], "exercice": annee,
