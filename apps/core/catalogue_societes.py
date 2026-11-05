@@ -22,7 +22,20 @@ def lire_catalogue(fichier):
             raise ValueError("Identifiant de base dupliqué")
         if entree["moteur"] not in ("sqlite", "mssql") or not isinstance(entree.get("cloture", False), bool):
             raise ValueError("Moteur ou clôture invalide")
-        localisation = (entree["moteur"], entree["base"].casefold() if entree["moteur"] == "mssql" else entree["base"])
+        # Normaliser les chemins SQLite pour éviter qu'un alias (../ ou symlink)
+        # n'associe la même base physique à plusieurs exercices.
+        # SQL Server conserve une comparaison insensible à la casse.
+        if entree["moteur"] == "sqlite":
+            chemin_base = Path(entree["base"]).expanduser().resolve()
+            localisation = ("sqlite", str(chemin_base))
+            # Deux liens physiques distincts peuvent viser le même inode.
+            if chemin_base.is_file():
+                identite = ("sqlite-inode", chemin_base.stat().st_dev, chemin_base.stat().st_ino)
+                if identite in localisations:
+                    raise ValueError("Base physique dupliquée dans le catalogue")
+                localisations.add(identite)
+        else:
+            localisation = ("mssql", entree["base"].casefold())
         if len(entree["exercice"]) != 4 or not entree["exercice"].isascii() or not entree["exercice"].isdigit() or int(entree["exercice"]) < 1 or int(entree["exercice"]) >= 9999:
             raise ValueError("Année d’exercice invalide (AAAA attendu)")
         exercice = (entree["societe"].casefold(), entree["agence"].casefold(), entree["exercice"])
