@@ -35,6 +35,32 @@ class CatalogueSocietesTests(SimpleTestCase):
             with self.assertRaisesRegex(ValueError, "dupliqué"):
                 lire_catalogue(fichier)
 
+    def test_catalogue_refuse_alias_sqlite_physiques(self):
+        import os
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = Path(dossier)
+            source = racine / "2026.sqlite3"
+            with sqlite3.connect(source) as connexion:
+                connexion.execute("CREATE TABLE exemple (id INTEGER)")
+            catalogue = racine / "societes.json"
+            premiere = {**self.bases[0], "base": str(source)}
+            for alias in (str(racine / "sous" / ".." / source.name),
+                          str(racine / "alias.sqlite3")):
+                if alias.endswith("alias.sqlite3"):
+                    try:
+                        os.link(source, alias)
+                    except (OSError, NotImplementedError):
+                        continue
+                else:
+                    (racine / "sous").mkdir(exist_ok=True)
+                seconde = {**self.bases[1], "base": alias}
+                catalogue.write_text(json.dumps({
+                    "version": 1, "bases": [premiere, seconde],
+                }), encoding="utf-8")
+                with self.subTest(alias=alias):
+                    with self.assertRaisesRegex(ValueError, "physique dupliquée"):
+                        lire_catalogue(catalogue)
+
     def test_publication_annuelle_et_lien_historique(self):
         with tempfile.TemporaryDirectory() as dossier:
             fichier = Path(dossier) / "societes.json"
