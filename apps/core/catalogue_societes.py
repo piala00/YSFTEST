@@ -86,6 +86,9 @@ def verifier_base_sqlite(nom):
             resultat = base.execute("PRAGMA quick_check").fetchone()
             if not resultat or resultat[0] != "ok":
                 raise ValueError("la base sélectionnée est endommagée")
+            # quick_check ne vérifie pas les références entre tables.
+            if base.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                raise ValueError("la base sélectionnée contient des références invalides")
     except sqlite3.DatabaseError as exc:
         raise ValueError("base SQLite illisible") from exc
     return str(chemin.resolve())
