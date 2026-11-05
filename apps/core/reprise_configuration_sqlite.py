@@ -18,6 +18,10 @@ def _contraintes_uniques(connexion, nom):
             for col in connexion.execute(f"PRAGMA index_xinfo({index_ident})")
             if col[5]
         )
+        # Les index partiels et sur expressions ne sont pas comparables
+        # par leurs seules colonnes : refuser toute reprise ambiguë.
+        if index[4] or any(col[1] < 0 for col in connexion.execute(f"PRAGMA index_xinfo({index_ident})") if col[5]):
+            raise ValueError(f"contraintes uniques complexes non prises en charge : {nom}")
         resultat.append((index[3], bool(index[4]), colonnes))
     return sorted(resultat, key=repr)
 
