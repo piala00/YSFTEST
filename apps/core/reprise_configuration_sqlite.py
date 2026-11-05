@@ -30,6 +30,10 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
         cible_cols = cible.execute(f"PRAGMA table_info({ident})").fetchall()
         if not source_cols or source_cols != cible_cols:
             raise ValueError(f"structure de référentiel incompatible : {nom}")
+        # Les colonnes identiques ne garantissent pas les mêmes contraintes FK.
+        if (source.execute(f"PRAGMA foreign_key_list({ident})").fetchall() !=
+                cible.execute(f"PRAGMA foreign_key_list({ident})").fetchall()):
+            raise ValueError(f"clés étrangères de référentiel incompatibles : {nom}")
         if cible.execute(f"SELECT 1 FROM {ident} LIMIT 1").fetchone():
             raise ValueError(f"table N+1 non vide : {nom}")
     # Respecter les dépendances FK même si la liste métier est inversée.
