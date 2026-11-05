@@ -5,6 +5,22 @@ aucune table de mouvements n'est sélectionnée automatiquement.
 """
 import sqlite3
 
+def _contraintes_uniques(connexion, nom):
+    """Compare les index uniques par colonnes, pas par noms auto-générés."""
+    ident = '"' + nom + '"'
+    resultat = []
+    for index in connexion.execute(f"PRAGMA index_list({ident})"):
+        if not index[2]:
+            continue
+        index_ident = '"' + index[1].replace('"', '""') + '"'
+        colonnes = tuple(
+            (col[2], col[3], col[4], col[5])
+            for col in connexion.execute(f"PRAGMA index_xinfo({index_ident})")
+            if col[5]
+        )
+        resultat.append((index[3], bool(index[4]), colonnes))
+    return sorted(resultat, key=repr)
+
 
 def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection, tables):
     """Copie les lignes des tables autorisées, sans créer ni modifier le schéma.
@@ -34,6 +50,8 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
         if (source.execute(f"PRAGMA foreign_key_list({ident})").fetchall() !=
                 cible.execute(f"PRAGMA foreign_key_list({ident})").fetchall()):
             raise ValueError(f"clés étrangères de référentiel incompatibles : {nom}")
+        if _contraintes_uniques(source, nom) != _contraintes_uniques(cible, nom):
+            raise ValueError(f"contraintes uniques de référentiel incompatibles : {nom}")
         if cible.execute(f"SELECT 1 FROM {ident} LIMIT 1").fetchone():
             raise ValueError(f"table N+1 non vide : {nom}")
     # Respecter les dépendances FK même si la liste métier est inversée.
