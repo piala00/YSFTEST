@@ -176,8 +176,7 @@ def enregistrer_exercice_suivant(fichier, identifiant_precedent, nouvelle_base, 
         ) as flux:
             temporaire = Path(flux.name)
             json.dump({"version": 1, "bases": nouvelle_liste}, flux, ensure_ascii=False, indent=2)
-            flux.write("
-")
+            flux.write("\n")
             flux.flush()
             os.fsync(flux.fileno())
         lire_catalogue(temporaire)
