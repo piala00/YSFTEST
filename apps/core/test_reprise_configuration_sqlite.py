@@ -97,3 +97,15 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
             recopier_referentiels(self.source, self.cible, ['referentiel', 'autre'])
         self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
         self.assertEqual(self.cible.execute('SELECT * FROM autre').fetchall(), [])
+
+    def test_contrainte_unique_absente_refusee_avant_copie(self):
+        self.source.execute('CREATE UNIQUE INDEX ref_nom_unique ON referentiel(nom)')
+        with self.assertRaisesRegex(ValueError, 'contraintes uniques'):
+            recopier_referentiels(self.source, self.cible, ['referentiel'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
+
+    def test_contrainte_unique_equivalente_acceptee(self):
+        self.source.execute('CREATE UNIQUE INDEX source_nom_unique ON referentiel(nom)')
+        self.cible.execute('CREATE UNIQUE INDEX cible_nom_unique ON referentiel(nom)')
+        recopier_referentiels(self.source, self.cible, ['referentiel'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [(1, 'A')])
