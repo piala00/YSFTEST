@@ -63,24 +63,35 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
         (exercice_source_id,),
     ).fetchone():
         raise ValueError("écritures non validées en N")
+    # Ne jamais sommer des DECIMAL SQLite avec SUM() : SQLite convertit
+    # les montants en flottants binaires, ce qui peut modifier les centimes
+    # sur les grands livres volumineux. Agrégation exacte en Decimal.
     lignes = source.execute("""
-        SELECT c.numero, l.tiers_id, SUM(l.debit), SUM(l.credit)
+        SELECT c.numero, l.tiers_id, l.debit, l.credit
         FROM comptabilite_ligneecriture l
         JOIN comptabilite_ecriture e ON e.id=l.ecriture_id
         JOIN comptabilite_compte c ON c.id=l.compte_id
         WHERE e.exercice_id=? AND e.statut='VALIDEE'
-        GROUP BY c.numero, l.tiers_id
-        ORDER BY c.numero, l.tiers_id
-    """, (exercice_source_id,)).fetchall()
-    # SQLite SUM(REAL) peut introduire des erreurs flottantes : vérifier
-    # les sommes avec Decimal et arrondir au centime explicitement.
+        ORDER BY c.numero, l.tiers_id, l.id
+    """, (exercice_source_id,))
     soldes = defaultdict(lambda: Decimal("0.00"))
+    gestion = defaultdict(lambda: Decimal("0.00"))
     for numero_compte, tiers_id, debit, credit in lignes:
-        if not numero_compte or numero_compte[0] not in "12345":
-            # Les comptes de gestion ne sont pas reportés.
-            continue
-        solde = (Decimal(str(debit or 0)) - Decimal(str(credit or 0))).quantize(CENTIME)
-        soldes[(numero_compte, tiers_id)] += solde
+        if not numero_compte:
+            raise ValueError("écriture sans numéro de compte")
+        montant = Decimal(str(debit or 0)) - Decimal(str(credit or 0))
+        if numero_compte[0] in "12345":
+            soldes[(numero_compte, tiers_id)] += montant
+        elif numero_compte[0] in "678":
+            gestion[numero_compte] += montant
+    # La clôture des comptes de gestion doit avoir été réellement passée
+    # en N ; leur solde global nul ne suffit pas si charges et produits
+    # s'annulent seulement entre eux.
+    non_soldes = [numero for numero, solde in gestion.items()
+                  if solde.quantize(CENTIME) != 0]
+    if non_soldes:
+        raise ValueError("comptes de gestion non soldés en N : " + ", ".join(sorted(non_soldes)[:10]))
+    soldes = {cle: solde.quantize(CENTIME) for cle, solde in soldes.items()}
     total = sum(soldes.values(), Decimal("0.00"))
     if total != 0:
         raise ValueError(f"balance d'ouverture déséquilibrée : {total} ; clôturer le résultat N")
