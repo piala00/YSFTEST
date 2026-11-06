@@ -143,3 +143,15 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
         recopier_referentiels(self.source, self.cible, ['enfant', 'parent'])
         self.assertEqual(self.cible.execute('SELECT * FROM enfant').fetchall(), [(8, 7)])
         self.assertEqual(self.cible.execute('PRAGMA foreign_key_check').fetchall(), [])
+
+    def test_colonne_generee_refusee_avant_toute_copie(self):
+        for db in (self.source, self.cible):
+            db.execute(
+                "CREATE TABLE calcule (id INTEGER PRIMARY KEY, valeur INTEGER, "
+                "double_valeur INTEGER GENERATED ALWAYS AS (valeur * 2) STORED)"
+            )
+        self.source.execute("INSERT INTO calcule (id, valeur) VALUES (1, 3)")
+        with self.assertRaisesRegex(ValueError, 'generees ou cachees'):
+            recopier_referentiels(self.source, self.cible, ['referentiel', 'calcule'])
+        self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
+        self.assertEqual(self.cible.execute('SELECT * FROM calcule').fetchall(), [])
