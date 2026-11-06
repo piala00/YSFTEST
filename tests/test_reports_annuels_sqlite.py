@@ -112,5 +112,26 @@ class ReportsAnnuelsTests(unittest.TestCase):
         self.assertEqual(str(lignes[1][1]), '999999999999.99')
 
 
+    def test_refuse_deux_pieces_desequilibrees_qui_se_compensent(self):
+        n, suivant = base(), base()
+        n.executemany(
+            "INSERT INTO comptabilite_ecriture(id, exercice_id, statut) VALUES(?,1,'VALIDEE')",
+            [(1,), (2,)],
+        )
+        n.executemany(
+            "INSERT INTO comptabilite_ligneecriture(ecriture_id, compte_id, debit, credit) VALUES(?,?,?,?)",
+            [(1, 1, 100, 0), (2, 2, 0, 100)],
+        )
+        with self.assertRaisesRegex(ValueError, "pièce validée déséquilibrée"):
+            reporter_balance_validee(n, suivant, 1, 1, "2027-01-01")
+        self.assertEqual(suivant.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 0)
+
+    def test_refuse_piece_validee_sans_ligne(self):
+        n, suivant = base(), base()
+        n.execute("INSERT INTO comptabilite_ecriture(id, exercice_id, statut) VALUES(1,1,'VALIDEE')")
+        with self.assertRaisesRegex(ValueError, "sans ligne"):
+            reporter_balance_validee(n, suivant, 1, 1, "2027-01-01")
+
+
 if __name__ == "__main__":
     unittest.main()
