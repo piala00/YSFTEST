@@ -16,11 +16,13 @@ REFERENTIELS_OBLIGATOIRES = (
     "core_societe", "comptabilite_compte", "comptabilite_journal",
     "commercial_tiers", "core_agence", "auth_user", "auth_group",
     "django_content_type", "auth_permission", "comptabilite_sectionanalytique",
+    "comptabilite_taxe", "comptabilite_banque",
     "auth_user_groups", "auth_user_user_permissions", "auth_group_permissions",
     "core_droitacces", "core_acceslogiciel",
 )
 REFERENTIELS_TRANSPORT = (
     "transport_gare", "transport_ligne", "transport_vehicule",
+    "transport_arretligne", "transport_changementgamme",
 )
 
 
