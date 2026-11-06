@@ -5,6 +5,8 @@ Aucun document commercial, mouvement de stock ou voyage n'est recopié.
 """
 from datetime import date
 
+from apps.core.catalogue_societes import lire_catalogue
+
 from apps.core.cloture_annuelle_sqlite import preparer_exercice_sqlite
 from apps.core.reprise_configuration_sqlite import recopier_referentiels
 from apps.core.reports_annuels_sqlite import reporter_balance_validee
@@ -56,6 +58,12 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
         raise ValueError("année N+1 invalide")
     if not callable(migrer_cible):
         raise TypeError("migrations N+1 obligatoires")
+    # Refuser une année qui ne correspond pas au dossier sélectionné.
+    entrees = [b for b in lire_catalogue(catalogue) if b["id"] == identifiant]
+    if len(entrees) != 1 or entrees[0]["moteur"] != "sqlite":
+        raise ValueError("dossier annuel SQLite introuvable")
+    if int(entrees[0]["exercice"]) + 1 != annee:
+        raise ValueError("année N+1 différente de celle du catalogue")
     etat = {}
 
     def initialiser(source, cible):
@@ -66,7 +74,8 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
         if len(exercices) != 1:
             raise ValueError("la base N doit contenir exactement un exercice")
         ancien_id, debut, fin, cloture = exercices[0]
-        if date.fromisoformat(fin).year != annee - 1:
+        if (date.fromisoformat(debut).year != annee - 1 or
+                date.fromisoformat(fin).year != annee - 1):
             raise ValueError("année N+1 non consécutive à N")
         if date.fromisoformat(debut) > date.fromisoformat(fin):
             raise ValueError("dates de N invalides")
