@@ -105,6 +105,7 @@ jobs:
 
   tests-sqlserver:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     services:
       mssql:
         image: mcr.microsoft.com/mssql/server:2022-latest
@@ -133,7 +134,26 @@ jobs:
       - name: Attendre SQL Server
         run: for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/11433) 2>/dev/null && exit 0; sleep 2; done; exit 1
       - name: Tests (SQL Server 2022)
-        run: python manage.py test --noinput -v1
+        timeout-minutes: 18
+        shell: bash
+        run: |
+          set -o pipefail
+          # Borne la suite meme si un subprocess ou une requete SQL reste bloque.
+          # Le code 124/137 distingue le timeout d'un echec de test ordinaire.
+          timeout --verbose --signal=TERM --kill-after=30s 16m \\
+            python -u manage.py test --noinput -v1
+      - name: Diagnostic SQL Server apres echec ou timeout
+        if: failure()
+        shell: bash
+        run: |
+          echo '=== Processus Python / SQL actifs ==='
+          ps -eo pid,ppid,stat,etime,args | grep -E 'python|sqlservr|manage.py|timeout' | head -80 || true
+          echo '=== Memoire et disque ==='
+          free -h || true
+          df -h || true
+          echo '=== Connectivite SQL Server ==='
+          timeout 5 bash -c 'echo > /dev/tcp/127.0.0.1/11433' && echo 'Port SQL accessible' || echo 'Port SQL inaccessible'
+
 
   activation-compilee:
     runs-on: windows-latest
