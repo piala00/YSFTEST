@@ -35,6 +35,24 @@ def base():
 
 
 class ReportsAnnuelsTests(unittest.TestCase):
+    def test_refuse_date_ouverture_non_conforme(self):
+        n, suivant = base(), base()
+        for date_invalide in ("2027-02-01", "2027-01-02", "2027-13-01", "2027-1-1"):
+            with self.subTest(date=date_invalide):
+                with self.assertRaisesRegex(ValueError, "date d'ouverture"):
+                    reporter_balance_validee(n, suivant, 1, 1, date_invalide)
+        self.assertEqual(suivant.execute(
+            "SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 0)
+
+    def test_refuse_annee_an_incompatible_avec_exercice_cible(self):
+        n, suivant = base(), base()
+        suivant.execute("ALTER TABLE core_exercice ADD COLUMN code TEXT")
+        suivant.execute("UPDATE core_exercice SET code='2028'")
+        with self.assertRaisesRegex(ValueError, "année de la pièce AN"):
+            reporter_balance_validee(n, suivant, 1, 1, "2027-01-01")
+        self.assertEqual(suivant.execute(
+            "SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 0)
+
     def test_report_equilibre_et_tiers(self):
         n, suivant = base(), base()
         n.execute("""INSERT INTO comptabilite_ecriture
