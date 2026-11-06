@@ -64,6 +64,31 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
         (exercice_source_id,),
     ).fetchone():
         raise ValueError("écritures non validées en N")
+    # Une balance globalement équilibrée ne garantit pas l'intégrité des pièces.
+    # Refuser les écritures validées individuellement déséquilibrées, y compris
+    # lorsque deux erreurs opposées se compensent dans le grand livre.
+    totaux_pieces = {}
+    for piece_id, debit, credit in source.execute("""
+        SELECT e.id, l.debit, l.credit
+        FROM comptabilite_ecriture e
+        LEFT JOIN comptabilite_ligneecriture l ON l.ecriture_id=e.id
+        WHERE e.exercice_id=? AND e.statut='VALIDEE'
+        ORDER BY e.id, l.id
+    """, (exercice_source_id,)):
+        if piece_id not in totaux_pieces:
+            totaux_pieces[piece_id] = [Decimal("0"), Decimal("0"), 0]
+        if debit is None or credit is None:
+            raise ValueError(f"pièce validée sans ligne comptable : {piece_id}")
+        d, cr = Decimal(str(debit)), Decimal(str(credit))
+        if not d.is_finite() or not cr.is_finite() or d < 0 or cr < 0 or (d and cr) or (not d and not cr):
+            raise ValueError(f"ligne comptable invalide dans la pièce {piece_id}")
+        totaux_pieces[piece_id][0] += d
+        totaux_pieces[piece_id][1] += cr
+        totaux_pieces[piece_id][2] += 1
+    for piece_id, (debit, credit, _) in totaux_pieces.items():
+        if debit != credit or debit <= 0:
+            raise ValueError(f"pièce validée déséquilibrée en N : {piece_id}")
+
     # Ne jamais sommer des DECIMAL SQLite avec SUM() : SQLite convertit
     # les montants en flottants binaires, ce qui peut modifier les centimes
     # sur les grands livres volumineux. Agrégation exacte en Decimal.
