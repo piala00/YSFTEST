@@ -38,6 +38,15 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
         raise ValueError("nom de table de référentiel invalide")
     if len(set(tables)) != len(tables):
         raise ValueError("table de référentiel dupliquée")
+    # Un déclencheur INSERT peut écrire dans les tables de mouvements lors de
+    # la reprise : refuser les schémas non explicitement audités.
+    for nom in tables:
+        for connexion in (source, cible):
+            if connexion.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='trigger' AND tbl_name=? LIMIT 1",
+                (nom,),
+            ).fetchone() is not None:
+                raise ValueError(f"déclencheur de référentiel non pris en charge : {nom}")
     # Prévalider toutes les tables avant la première insertion.
     for nom in tables:
         for connexion in (source, cible):
