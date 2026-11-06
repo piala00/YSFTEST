@@ -6,6 +6,7 @@ Le résultat doit être équilibré après clôture du résultat comptable en N.
 """
 from collections import defaultdict
 from decimal import Decimal
+from datetime import date
 import sqlite3
 
 
@@ -33,6 +34,18 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
     Les lignes sont agrégées par compte, tiers, section et véhicule,
     préservant les dimensions analytiques des soldes de bilan.
     """
+    # Une pièce d'ouverture ne doit jamais être antidatée, ni rattachée
+    # à un exercice différent de l'année de son numéro AN.
+    try:
+        ouverture = date.fromisoformat(date_ouverture)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("date d'ouverture invalide") from exc
+    if ouverture.month != 1 or ouverture.day != 1 or ouverture.isoformat() != date_ouverture:
+        raise ValueError("date d'ouverture : premier janvier obligatoire")
+    if "code" in _colonnes(cible, "core_exercice"):
+        exercice = cible.execute("SELECT code FROM core_exercice WHERE id=?", (exercice_cible_id,)).fetchone()
+        if exercice and str(exercice[0]) != str(ouverture.year):
+            raise ValueError("année de la pièce AN différente de l'exercice N+1")
     for connexion in (source, cible):
         for table in ("comptabilite_compte", "comptabilite_journal",
                       "comptabilite_ecriture", "comptabilite_ligneecriture",
