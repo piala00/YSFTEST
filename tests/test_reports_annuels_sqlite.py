@@ -57,5 +57,31 @@ class ReportsAnnuelsTests(unittest.TestCase):
         self.assertEqual(suivant.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0],0)
 
 
+    def test_refuse_comptes_de_gestion_non_soldes(self):
+        n, suivant = base(), base()
+        n.execute("INSERT INTO comptabilite_compte VALUES(3,'6010000')")
+        n.execute("INSERT INTO comptabilite_compte VALUES(4,'7010000')")
+        n.execute("INSERT INTO comptabilite_ecriture(id, exercice_id, statut) VALUES(1,1,'VALIDEE')")
+        n.executemany("""INSERT INTO comptabilite_ligneecriture
+          (ecriture_id, compte_id, debit, credit) VALUES(1,?,?,?)""",
+          [(3,100,0),(4,0,100)])
+        with self.assertRaisesRegex(ValueError, "comptes de gestion non soldés"):
+            reporter_balance_validee(n,suivant,1,1,'2027-01-01')
+        self.assertEqual(suivant.execute(
+            "SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 0)
+
+    def test_report_decimal_exact_sur_grand_montant(self):
+        n, suivant = base(), base()
+        n.execute("INSERT INTO comptabilite_ecriture(id, exercice_id, statut) VALUES(1,1,'VALIDEE')")
+        n.executemany("""INSERT INTO comptabilite_ligneecriture
+          (ecriture_id, compte_id, tiers_id, debit, credit) VALUES(1,?,?,?,?)""",
+          [(1,7,'999999999999.99',0),(2,None,0,'999999999999.99')])
+        self.assertEqual(reporter_balance_validee(n,suivant,1,1,'2027-01-01'),2)
+        lignes = suivant.execute(
+            "SELECT debit,credit FROM comptabilite_ligneecriture ORDER BY compte_id").fetchall()
+        self.assertEqual(str(lignes[0][0]), '999999999999.99')
+        self.assertEqual(str(lignes[1][1]), '999999999999.99')
+
+
 if __name__ == "__main__":
     unittest.main()
