@@ -85,14 +85,14 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
         self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
 
     def test_erreur_insertion_annule_toutes_les_tables(self):
+        # Même schéma dans N et N+1 : une CHECK invalide dans la source
+        # (import historique avec contraintes désactivées) doit provoquer
+        # une erreur pendant la copie, après insertion du premier référentiel.
         for db in (self.source, self.cible):
-            db.execute('CREATE TABLE autre (id INTEGER PRIMARY KEY, valeur TEXT)')
+            db.execute("CREATE TABLE autre (id INTEGER PRIMARY KEY, valeur TEXT CHECK(valeur != 'erreur'))")
+        self.source.execute('PRAGMA ignore_check_constraints=ON')
         self.source.execute("INSERT INTO autre VALUES (1, 'ok')")
         self.source.execute("INSERT INTO autre VALUES (2, 'erreur')")
-        self.cible.execute("""
-            CREATE TRIGGER rejeter_seconde_ligne BEFORE INSERT ON autre
-            WHEN NEW.id = 2 BEGIN SELECT RAISE(ABORT, 'insertion refusee'); END
-        """)
         with self.assertRaises(sqlite3.IntegrityError):
             recopier_referentiels(self.source, self.cible, ['referentiel', 'autre'])
         self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
