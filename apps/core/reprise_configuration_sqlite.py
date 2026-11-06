@@ -55,6 +55,10 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
             ).fetchone() is None:
                 raise ValueError(f"table de référentiel absente : {nom}")
         ident = '"' + nom + '"'
+        # PRAGMA table_info masque les colonnes generees et cachees.
+        for connexion in (source, cible):
+            if any(ligne[6] for ligne in connexion.execute(f"PRAGMA table_xinfo({ident})")):
+                raise ValueError(f"colonnes generees ou cachees non prises en charge : {nom}")
         source_cols = source.execute(f"PRAGMA table_info({ident})").fetchall()
         cible_cols = cible.execute(f"PRAGMA table_info({ident})").fetchall()
         if not source_cols or source_cols != cible_cols:
