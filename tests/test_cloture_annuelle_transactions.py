@@ -59,5 +59,22 @@ class ClotureTransactionTests(unittest.TestCase):
                          ['bases'][0]['cloture'])
 
 
+    def test_source_reste_lecture_seule_si_initialisation_tente_une_ecriture(self):
+        """Même un callback fautif ne peut pas modifier la base de l'année N."""
+        def initialiser_interdit(source, destination):
+            self.initialiser(source, destination)
+            source.execute('INSERT INTO core_societe(id) VALUES (99)')
+
+        with self.assertRaises(sqlite3.OperationalError):
+            preparer_exercice_sqlite(self.catalogue, 'annee2026', self.cible,
+                                     'annee2027', initialiser_interdit,
+                                     lambda source, destination: None)
+        self.assertFalse(self.cible.exists())
+        with sqlite3.connect(self.source) as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM core_societe').fetchone()[0], 0)
+        donnees = json.loads(self.catalogue.read_text(encoding='utf-8'))
+        self.assertEqual(len(donnees['bases']), 1)
+        self.assertFalse(donnees['bases'][0]['cloture'])
+
 if __name__ == '__main__':
     unittest.main()
