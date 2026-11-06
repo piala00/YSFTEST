@@ -96,7 +96,7 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
                 self.assertEqual(db.execute("SELECT date FROM comptabilite_ecriture").fetchone()[0], "2027-01-01")
                 self.assertEqual(db.execute("""SELECT tiers_id,section_id,vehicule_id,debit
                     FROM comptabilite_ligneecriture WHERE compte_id=1""").fetchone(),
-                                 (5,3,7,'125.5'))
+                                 (5,3,7,'125.50'))
             with sqlite3.connect(ancien) as db:
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 1)
 
