@@ -79,8 +79,8 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
         ident = '"' + nom + '"'
         parents = {ligne[2] for ligne in cible.execute(f"PRAGMA foreign_key_list({ident})")}
         dependances[nom] = (parents & noms) - {nom}
-        if nom in parents:
-            raise ValueError(f"référence circulaire de référentiel : {nom}")
+        # Les références à soi-même sont normales (ex. Gare.rattachement).
+        # Leur insertion est différée puis contrôlée par foreign_key_check.
     ordre = []
     restants = set(tables)
     while restants:
@@ -92,6 +92,9 @@ def recopier_referentiels(source: sqlite3.Connection, cible: sqlite3.Connection,
     # Le SAVEPOINT protège aussi les appels au sein d'une transaction existante.
     cible.execute("SAVEPOINT reprise_referentiels")
     try:
+        # Un enfant peut précéder son parent dans une table auto-référencée.
+        # La vérification explicite finale reste obligatoire.
+        cible.execute("PRAGMA defer_foreign_keys=ON")
         for nom in ordre:
             ident = '"' + nom + '"'
             source_cols = [r[1] for r in source.execute(f"PRAGMA table_info({ident})")]
