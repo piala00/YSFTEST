@@ -31,6 +31,9 @@ def initialiser_dossier_annuel(source, cible, annee, *, transport=True):
     if transport:
         tables.extend(REFERENTIELS_TRANSPORT)
     recopier_referentiels(source, cible, tables)
+    # Les verrouillages des journaux appartiennent à N : N+1 doit être
+    # saisissable dès son ouverture, y compris dans le journal AN.
+    cible.execute("UPDATE comptabilite_journal SET cloture_au=NULL")
     # Un exercice neuf est propre à N+1, et non une copie de N.
     if cible.execute("SELECT 1 FROM core_exercice LIMIT 1").fetchone():
         raise ValueError("N+1 contient déjà un exercice")
