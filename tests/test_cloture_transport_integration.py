@@ -71,7 +71,9 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
             }]}), encoding="utf-8")
 
             def migrer(db):
-                db.executescript(SCHEMA)
+                for statement in SCHEMA.split(';'):
+                    if statement.strip():
+                        db.execute(statement)
 
             # Schéma minimal réel : l'adaptateur utilise les mêmes services
             # de copie, report et publication que la production.
@@ -94,7 +96,7 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
                 self.assertEqual(db.execute("SELECT date FROM comptabilite_ecriture").fetchone()[0], "2027-01-01")
                 self.assertEqual(db.execute("""SELECT tiers_id,section_id,vehicule_id,debit
                     FROM comptabilite_ligneecriture WHERE compte_id=1""").fetchone(),
-                                 (5,3,7,125.5))
+                                 (5,3,7,'125.5'))
             with sqlite3.connect(ancien) as db:
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 1)
 
