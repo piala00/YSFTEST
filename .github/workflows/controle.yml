@@ -140,7 +140,7 @@ jobs:
           set -o pipefail
           # Borne la suite meme si un subprocess ou une requete SQL reste bloque.
           # Le code 124/137 distingue le timeout d'un echec de test ordinaire.
-          timeout --verbose --signal=TERM --kill-after=30s 16m python -u manage.py test --noinput -v1
+          timeout --verbose --signal=TERM --kill-after=30s 16m python -u tests_navigateur/sqlserver_test_runner.py
       - name: Diagnostic SQL Server apres echec ou timeout
         if: failure()
         shell: bash
