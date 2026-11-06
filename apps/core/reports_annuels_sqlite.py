@@ -30,7 +30,8 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
 
     Les comptes de gestion (classes 6 et 7) doivent être soldés en N. Une
     balance non équilibrée est refusée plutôt que de fabriquer un résultat.
-    Les lignes sont agrégées par compte ET tiers, préservant le suivi tiers.
+    Les lignes sont agrégées par compte, tiers, section et véhicule,
+    préservant les dimensions analytiques des soldes de bilan.
     """
     for connexion in (source, cible):
         for table in ("comptabilite_compte", "comptabilite_journal",
@@ -39,7 +40,7 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
             _table(connexion, table)
     for connexion in (source, cible):
         colonnes = _colonnes(connexion, "comptabilite_ligneecriture")
-        if not {"tiers_id", "debit", "credit", "compte_id", "ecriture_id"} <= colonnes:
+        if not {"tiers_id", "section_id", "vehicule_id", "debit", "credit", "compte_id", "ecriture_id"} <= colonnes:
             raise ValueError("schéma comptable incompatible")
     if not cible.execute("SELECT 1 FROM core_exercice WHERE id=? AND cloture=0",
                          (exercice_cible_id,)).fetchone():
@@ -67,21 +68,21 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
     # les montants en flottants binaires, ce qui peut modifier les centimes
     # sur les grands livres volumineux. Agrégation exacte en Decimal.
     lignes = source.execute("""
-        SELECT c.numero, l.tiers_id, l.debit, l.credit
+        SELECT c.numero, l.tiers_id, l.section_id, l.vehicule_id, l.debit, l.credit
         FROM comptabilite_ligneecriture l
         JOIN comptabilite_ecriture e ON e.id=l.ecriture_id
         JOIN comptabilite_compte c ON c.id=l.compte_id
         WHERE e.exercice_id=? AND e.statut='VALIDEE'
-        ORDER BY c.numero, l.tiers_id, l.id
+        ORDER BY c.numero, l.tiers_id, l.section_id, l.vehicule_id, l.id
     """, (exercice_source_id,))
     soldes = defaultdict(lambda: Decimal("0.00"))
     gestion = defaultdict(lambda: Decimal("0.00"))
-    for numero_compte, tiers_id, debit, credit in lignes:
+    for numero_compte, tiers_id, section_id, vehicule_id, debit, credit in lignes:
         if not numero_compte:
             raise ValueError("écriture sans numéro de compte")
         montant = Decimal(str(debit or 0)) - Decimal(str(credit or 0))
         if numero_compte[0] in "12345":
-            soldes[(numero_compte, tiers_id)] += montant
+            soldes[(numero_compte, tiers_id, section_id, vehicule_id)] += montant
         elif numero_compte[0] in "678":
             gestion[numero_compte] += montant
     # La clôture des comptes de gestion doit avoir été réellement passée
@@ -99,7 +100,7 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
     if "tiers_id" in _colonnes(cible, "comptabilite_ligneecriture"):
         _table(cible, "commercial_tiers")
     insertions = []
-    for (numero_compte, tiers_id), solde in soldes.items():
+    for (numero_compte, tiers_id, section_id, vehicule_id), solde in soldes.items():
         if not solde:
             continue
         if numero_compte not in comptes:
@@ -108,7 +109,15 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
             "SELECT 1 FROM commercial_tiers WHERE id=?", (tiers_id,)
         ).fetchone():
             raise ValueError(f"tiers manquant dans N+1 : {tiers_id}")
-        insertions.append((comptes[numero_compte], tiers_id, str(max(solde, 0)),
+        if section_id is not None and not cible.execute(
+            "SELECT 1 FROM comptabilite_sectionanalytique WHERE id=?", (section_id,)
+        ).fetchone():
+            raise ValueError(f"section analytique manquante dans N+1 : {section_id}")
+        if vehicule_id is not None and not cible.execute(
+            "SELECT 1 FROM transport_vehicule WHERE id=?", (vehicule_id,)
+        ).fetchone():
+            raise ValueError(f"véhicule manquant dans N+1 : {vehicule_id}")
+        insertions.append((comptes[numero_compte], tiers_id, section_id, vehicule_id, str(max(solde, 0)),
                            str(max(-solde, 0))))
     if not insertions:
         return 0
@@ -129,9 +138,9 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
         piece_id = cible.execute("SELECT last_insert_rowid()").fetchone()[0]
         cible.executemany("""
             INSERT INTO comptabilite_ligneecriture
-            (ecriture_id, compte_id, tiers_id, libelle, debit, credit,
+            (ecriture_id, compte_id, tiers_id, section_id, vehicule_id, libelle, debit, credit,
              lettrage, source_cle)
-            VALUES (?, ?, ?, 'Solde ouverture', ?, ?, '', '')
+            VALUES (?, ?, ?, ?, ?, 'Solde ouverture', ?, ?, '', '')
         """, [(piece_id, *ligne) for ligne in insertions])
     except Exception:
         cible.execute("ROLLBACK TO SAVEPOINT reports_ouverture")
