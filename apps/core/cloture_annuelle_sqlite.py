@@ -3,6 +3,7 @@
 Les services métier fournis doivent initialiser les référentiels et calculer
 les reports à nouveau ; aucune copie aveugle des mouvements n'est autorisée.
 """
+from contextlib import closing
 from pathlib import Path
 import os
 import sqlite3
@@ -46,19 +47,20 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
         # autorisant l'écriture dans N.
         from urllib.parse import quote
         uri = "file:" + quote(str(source_path), safe="/:") + "?mode=ro"
-        with sqlite3.connect(uri, uri=True) as origine:
-            # Defense en profondeur : meme une instruction SQL issue des callbacks
-            # ne peut ecrire dans N (y compris via une base attachee).
+        # sqlite3.Connection.__exit__ ne ferme PAS la connexion.
+        # closing garantit sa libération avant unlink, notamment sous Windows.
+        with closing(sqlite3.connect(uri, uri=True)) as origine:
             origine.execute("PRAGMA query_only=ON")
-            with sqlite3.connect(str(cible)) as nouvelle:
+            with closing(sqlite3.connect(str(cible))) as nouvelle:
                 nouvelle.execute("PRAGMA foreign_keys=ON")
-                initialiser(origine, nouvelle)
-                reporter(origine, nouvelle)
-                # Configuration et reports forment une seule transaction :
-                # aucune base N+1 partiellement initialisée ne doit être validée.
-                if nouvelle.execute("PRAGMA foreign_key_check").fetchone() is not None:
-                    raise ValueError("références invalides dans la base N+1")
-                nouvelle.commit()
+                with nouvelle:
+                    # DDL SQLite est autrement susceptible de survivre à un
+                    # échec des callbacks en l'absence de BEGIN explicite.
+                    nouvelle.execute("BEGIN IMMEDIATE")
+                    initialiser(origine, nouvelle)
+                    reporter(origine, nouvelle)
+                    if nouvelle.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                        raise ValueError("références invalides dans la base N+1")
         verifier_base_sqlite(str(cible))
         resultat = publier_exercice_sqlite_valide(
             catalogue, identifiant, str(cible), nouvel_identifiant,
