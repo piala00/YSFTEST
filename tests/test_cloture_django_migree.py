@@ -47,7 +47,7 @@ Journal.objects.create(code='AN', intitule='A nouveaux', type_journal='AN', clot
 j = Journal.objects.create(code='OD', intitule='Divers', type_journal='OD')
 e = Ecriture.objects.create(journal=j, exercice=Exercice.objects.get(code='2026'),
     numero='OD-2026-1', date=date(2026,12,31), libelle='Balance de clôture', statut='VALIDEE')
-LigneEcriture.objects.create(ecriture=e, compte=c1, debit=Decimal('125.50'))
+LigneEcriture.objects.create(ecriture=e, compte=c1, tiers=proprietaire, section=g1.section, vehicule=vehicule, debit=Decimal('125.50'))
 LigneEcriture.objects.create(ecriture=e, compte=c2, credit=Decimal('125.50'))
 """
 
@@ -113,6 +113,19 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
                                  sum(Decimal(str(c)) for _, c in montants))
                 self.assertEqual(sum(Decimal(str(d)) for d, _ in montants), Decimal('125.50'))
+                # Les axes comptables de bilan doivent survivre à la reprise AN,
+                # pas seulement le total débit/crédit.
+                axes = db.execute("""SELECT t.code, s.code, v.immatriculation
+                    FROM comptabilite_ligneecriture AS l
+                    JOIN comptabilite_compte AS c ON c.id=l.compte_id
+                    LEFT JOIN commercial_tiers AS t ON t.id=l.tiers_id
+                    LEFT JOIN comptabilite_sectionanalytique AS s ON s.id=l.section_id
+                    LEFT JOIN transport_vehicule AS v ON v.id=l.vehicule_id
+                    WHERE c.numero='411000'""").fetchone()
+                self.assertEqual(axes, ('PROP-01', 'G-YDE', 'CE-123-AA'))
+                self.assertEqual(db.execute("""SELECT COUNT(*) FROM comptabilite_ligneecriture
+                    WHERE tiers_id IS NOT NULL AND section_id IS NOT NULL
+                      AND vehicule_id IS NOT NULL""").fetchone()[0], 1)
             with sqlite3.connect(ancien) as db:
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
 
