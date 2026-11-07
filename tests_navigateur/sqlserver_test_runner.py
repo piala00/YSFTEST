@@ -3,6 +3,7 @@
 The duration log is flushed immediately so a global timeout still leaves the
 name and elapsed time of the last unfinished test in GitHub Actions logs.
 """
+import hashlib
 import faulthandler
 import os
 from pathlib import Path
@@ -30,6 +31,32 @@ def instrument_tests():
     unittest.TestCase.run = timed_run
 
 
+def partition_suite():
+    """Partition stable par test, sans omettre les tests imbriqués Django."""
+    shard = int(os.environ.get("SQL_TEST_SHARD", "0"))
+    count = int(os.environ.get("SQL_TEST_SHARDS", "1"))
+    if count < 1 or not 0 <= shard < count:
+        raise ValueError("SQL_TEST_SHARD/SQL_TEST_SHARDS invalides")
+    if count == 1:
+        return
+    from django.test.runner import DiscoverRunner
+    original_build = DiscoverRunner.build_suite
+
+    def build_partition(self, *args, **kwargs):
+        suite = original_build(self, *args, **kwargs)
+        def walk(node):
+            for child in node:
+                if isinstance(child, unittest.TestSuite):
+                    yield from walk(child)
+                else:
+                    yield child
+        selected = [test for test in walk(suite)
+                    if int.from_bytes(hashlib.sha256(test.id().encode()).digest()[:8], "big") % count == shard]
+        print(f"[SQL-SHARD] {shard + 1}/{count}: {len(selected)} tests", flush=True)
+        return unittest.TestSuite(selected)
+    DiscoverRunner.build_suite = build_partition
+
+
 def main():
     repository_root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(repository_root))
@@ -37,6 +64,7 @@ def main():
     faulthandler.enable(all_threads=True)
     faulthandler.dump_traceback_later(120, repeat=True, file=sys.stderr)
     instrument_tests()
+    partition_suite()
     sys.argv = ["manage.py", "test", "--noinput", "-v2"]
     try:
         runpy.run_path(str(repository_root / "manage.py"), run_name="__main__")
