@@ -25,7 +25,12 @@ CREATE TABLE comptabilite_journal (
 );
 CREATE TABLE commercial_tiers (id INTEGER PRIMARY KEY, nom TEXT);
 CREATE TABLE comptabilite_sectionanalytique (id INTEGER PRIMARY KEY, nom TEXT);
-CREATE TABLE transport_vehicule (id INTEGER PRIMARY KEY, nom TEXT);
+CREATE TABLE transport_vehicule (id INTEGER PRIMARY KEY, nom TEXT, proprietaire_id INTEGER REFERENCES commercial_tiers(id));
+CREATE TABLE transport_chauffeur (id INTEGER PRIMARY KEY, nom TEXT);
+CREATE TABLE transport_gare (id INTEGER PRIMARY KEY, nom TEXT, rattachement_id INTEGER REFERENCES transport_gare(id));
+CREATE TABLE transport_ligne (id INTEGER PRIMARY KEY, gare_depart_id INTEGER REFERENCES transport_gare(id), gare_arrivee_id INTEGER REFERENCES transport_gare(id));
+CREATE TABLE transport_arretligne (id INTEGER PRIMARY KEY, ligne_id INTEGER REFERENCES transport_ligne(id), gare_id INTEGER REFERENCES transport_gare(id));
+CREATE TABLE transport_changementgamme (id INTEGER PRIMARY KEY, vehicule_id INTEGER REFERENCES transport_vehicule(id), gamme TEXT);
 CREATE TABLE comptabilite_ecriture (
  id INTEGER PRIMARY KEY, journal_id INTEGER, exercice_id INTEGER, numero TEXT,
  date TEXT, libelle TEXT, reference TEXT, statut TEXT, origine TEXT,
@@ -58,7 +63,13 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
                 db.execute("INSERT INTO comptabilite_journal VALUES (1,'AN','AN','2026-12-31')")
                 db.execute("INSERT INTO commercial_tiers VALUES (5,'Client')")
                 db.execute("INSERT INTO comptabilite_sectionanalytique VALUES (3,'Agence')")
-                db.execute("INSERT INTO transport_vehicule VALUES (7,'Bus VIP')")
+                db.execute("INSERT INTO transport_vehicule VALUES (7,'Bus VIP',5)")
+                db.execute("INSERT INTO transport_chauffeur VALUES (4,'Conducteur')")
+                db.execute("INSERT INTO transport_gare VALUES (10,'Gare principale',NULL)")
+                db.execute("INSERT INTO transport_gare VALUES (11,'Point de vente',10)")
+                db.execute("INSERT INTO transport_ligne VALUES (12,10,11)")
+                db.execute("INSERT INTO transport_arretligne VALUES (13,12,11)")
+                db.execute("INSERT INTO transport_changementgamme VALUES (14,7,'VIP')")
                 db.execute("""INSERT INTO comptabilite_ecriture
                     (id,journal_id,exercice_id,numero,date,statut)
                     VALUES (1,1,1,'OD-1','2026-12-31','VALIDEE')""")
@@ -90,7 +101,9 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
             referentiels = ("core_societe", "auth_user", "django_content_type",
                             "auth_permission", "comptabilite_compte",
                             "comptabilite_journal", "commercial_tiers",
-                            "comptabilite_sectionanalytique", "transport_vehicule")
+                            "comptabilite_sectionanalytique", "transport_vehicule",
+                            "transport_chauffeur", "transport_gare", "transport_ligne",
+                            "transport_arretligne", "transport_changementgamme")
             with patch("apps.core.adaptateur_cloture_transport_sqlite.REFERENTIELS_OBLIGATOIRES",
                        referentiels):
                 resultat = preparer_dossier_transport_sqlite(
@@ -105,6 +118,11 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
                 self.assertEqual(db.execute("SELECT id FROM django_content_type").fetchone()[0], 7)
                 self.assertEqual(db.execute("SELECT id, content_type_id FROM auth_permission").fetchone(), (9, 7))
                 self.assertIsNone(db.execute("SELECT cloture_au FROM comptabilite_journal").fetchone()[0])
+                self.assertEqual(db.execute("SELECT rattachement_id FROM transport_gare WHERE id=11").fetchone()[0], 10)
+                self.assertEqual(db.execute("SELECT gare_depart_id, gare_arrivee_id FROM transport_ligne").fetchone(), (10, 11))
+                self.assertEqual(db.execute("SELECT ligne_id, gare_id FROM transport_arretligne").fetchone(), (12, 11))
+                self.assertEqual(db.execute("SELECT proprietaire_id FROM transport_vehicule").fetchone()[0], 5)
+                self.assertEqual(db.execute("SELECT nom FROM transport_chauffeur").fetchone()[0], 'Conducteur')
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 1)
                 self.assertEqual(db.execute("SELECT date FROM comptabilite_ecriture").fetchone()[0], "2027-01-01")
                 self.assertEqual(db.execute("""SELECT tiers_id,section_id,vehicule_id,debit
