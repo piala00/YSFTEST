@@ -156,6 +156,11 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             self.assertTrue(entrees['n']['cloture'])
             self.assertEqual(str(entrees['n']['exercice']), '2026')
             self.assertEqual(str(entrees['n1']['exercice']), '2027')
+            self.assertEqual(entrees['n1']['exercice_precedent'], 'n')
+            self.assertEqual(entrees['n1']['societe'], entrees['n']['societe'])
+            self.assertEqual(entrees['n1']['agence'], entrees['n']['agence'])
+            self.assertEqual(Path(entrees['n1']['base']).resolve(), nouveau.resolve())
+            self.assertFalse(entrees['n1']['cloture'])
             with sqlite3.connect(ancien) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
