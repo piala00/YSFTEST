@@ -13,6 +13,8 @@ from apps.core.catalogue_societes import lire_catalogue
 SCHEMA = """
 CREATE TABLE django_migrations (id INTEGER PRIMARY KEY);
 CREATE TABLE auth_user (id INTEGER PRIMARY KEY, username TEXT);
+CREATE TABLE django_content_type (id INTEGER PRIMARY KEY, app_label TEXT, model TEXT);
+CREATE TABLE auth_permission (id INTEGER PRIMARY KEY, name TEXT, content_type_id INTEGER REFERENCES django_content_type(id), codename TEXT);
 CREATE TABLE core_societe (id INTEGER PRIMARY KEY, nom TEXT);
 CREATE TABLE core_exercice (
  id INTEGER PRIMARY KEY, code TEXT, date_debut TEXT, date_fin TEXT, cloture INTEGER
@@ -48,6 +50,8 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
                 db.executescript(SCHEMA)
                 db.execute("INSERT INTO core_societe VALUES (1,'Transport')")
                 db.execute("INSERT INTO auth_user VALUES (1,'admin')")
+                db.execute("INSERT INTO django_content_type VALUES (7,'transport','gare')")
+                db.execute("INSERT INTO auth_permission VALUES (9,'Voir gare',7,'view_gare')")
                 db.execute("INSERT INTO core_exercice VALUES (1,'2026','2026-01-01','2026-12-31',0)")
                 db.executemany("INSERT INTO comptabilite_compte VALUES (?,?)",
                                [(1,'411000'), (2,'101000')])
@@ -77,10 +81,14 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
                 for statement in SCHEMA.split(';'):
                     if statement.strip():
                         db.execute(statement)
+                # Django post_migrate creates permissions with independent IDs.
+                db.execute("INSERT INTO django_content_type VALUES (1,'transport','gare')")
+                db.execute("INSERT INTO auth_permission VALUES (1,'Voir gare',1,'view_gare')")
 
             # Schéma minimal réel : l'adaptateur utilise les mêmes services
             # de copie, report et publication que la production.
-            referentiels = ("core_societe", "auth_user", "comptabilite_compte",
+            referentiels = ("core_societe", "auth_user", "django_content_type",
+                            "auth_permission", "comptabilite_compte",
                             "comptabilite_journal", "commercial_tiers",
                             "comptabilite_sectionanalytique", "transport_vehicule")
             with patch("apps.core.adaptateur_cloture_transport_sqlite.REFERENTIELS_OBLIGATOIRES",
@@ -94,6 +102,8 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
             self.assertTrue(next(b for b in bases if b["id"] == "transport_2026")["cloture"])
             with sqlite3.connect(nouveau) as db:
                 self.assertEqual(db.execute("SELECT code FROM core_exercice").fetchone()[0], "2027")
+                self.assertEqual(db.execute("SELECT id FROM django_content_type").fetchone()[0], 7)
+                self.assertEqual(db.execute("SELECT id, content_type_id FROM auth_permission").fetchone(), (9, 7))
                 self.assertIsNone(db.execute("SELECT cloture_au FROM comptabilite_journal").fetchone()[0])
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 1)
                 self.assertEqual(db.execute("SELECT date FROM comptabilite_ecriture").fetchone()[0], "2027-01-01")
