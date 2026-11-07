@@ -69,7 +69,6 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
     etat = {}
 
     def initialiser(source, cible):
-        migrer_cible(cible)
         exercices = source.execute(
             "SELECT id, date_debut, date_fin, cloture FROM core_exercice ORDER BY date_fin DESC"
         ).fetchall()
@@ -94,4 +93,5 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
                                  etat["nouveau_id"], f"{annee}-01-01")
 
     return preparer_exercice_sqlite(catalogue, identifiant, destination,
-                                   nouvel_identifiant, initialiser, reporter)
+                                   nouvel_identifiant, initialiser, reporter,
+                                   preparer_schema=migrer_cible)
