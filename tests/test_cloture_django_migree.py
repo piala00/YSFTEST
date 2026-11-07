@@ -31,7 +31,8 @@ from apps.commercial.models import Tiers
 Societe.objects.create(raison_sociale='Transport Centrale', activite='TRANSPORT')
 Exercice.objects.create(code='2026', date_debut=date(2026,1,1), date_fin=date(2026,12,31))
 User.objects.create_user(username='controle', password='test-local-only')
-Group.objects.create(name='Guichet')
+groupe = Group.objects.create(name='Guichet')
+User.objects.get(username='controle').groups.add(groupe)
 g1 = Gare.objects.create(code='YDE', nom='Yaoundé', ville='Yaoundé')
 g2 = Gare.objects.create(code='DLA', nom='Douala', ville='Douala')
 pv = Gare.objects.create(code='PVY', nom='Point de vente', ville='Yaoundé', type_gare='POINT_VENTE', rattachement=g1)
@@ -88,6 +89,9 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
                 self.assertEqual(db.execute('SELECT username FROM auth_user').fetchone()[0], 'controle')
                 self.assertEqual(db.execute('SELECT name FROM auth_group').fetchone()[0], 'Guichet')
+                self.assertEqual(db.execute("""SELECT u.username, g.name FROM auth_user_groups AS ug
+                    JOIN auth_user AS u ON ug.user_id=u.id
+                    JOIN auth_group AS g ON ug.group_id=g.id""").fetchall(), [('controle', 'Guichet')])
                 self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], None)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_gare').fetchone()[0], 3)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
