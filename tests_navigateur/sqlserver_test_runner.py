@@ -64,32 +64,12 @@ def partition_suite():
 
 
 def main():
-    # Chaque processus possède sa base de tests indépendante. Deux suites
-    # tournent en parallèle plutôt que de dépasser la borne globale de CI.
+    # Sans matrice explicite, exécuter la suite entière dans un seul processus.
+    # Le lancement implicite de deux SQL Server sur un même runner a causé
+    # SIGBUS (-7). La matrice CI définit SQL_TEST_SHARD explicitement.
     if "SQL_TEST_SHARD" not in os.environ:
-        children = []
-        for shard in range(2):
-            env = os.environ.copy()
-            env["SQL_TEST_SHARDS"] = "2"
-            env["SQL_TEST_SHARD"] = str(shard)
-            env["DB_NAME"] = f"{env.get('DB_NAME', 'ERP_ESSAI')}_SHARD_{shard}"
-            print(f"[SQL-SHARD-START] {shard + 1}/2 database={env['DB_NAME']}", flush=True)
-            children.append(subprocess.Popen([sys.executable, "-u", __file__], env=env))
-        codes = []
-        try:
-            for child in children:
-                codes.append(child.wait())
-        except BaseException:
-            for child in children:
-                if child.poll() is None:
-                    child.terminate()
-            for child in children:
-                child.wait()
-            raise
-        print(f"[SQL-SHARD-RESULTS] {codes}", flush=True)
-        if any(code != 0 for code in codes):
-            raise SystemExit(1)
-        return
+        os.environ["SQL_TEST_SHARD"] = "0"
+        os.environ["SQL_TEST_SHARDS"] = "1"
     repository_root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(repository_root))
     os.chdir(repository_root)
