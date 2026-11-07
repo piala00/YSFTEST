@@ -106,6 +106,12 @@ jobs:
   tests-sqlserver:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # Un conteneur SQL Server par runner : deux moteurs simultanés sur
+    # le même runner ont provoqué SIGBUS (-7), malgré 721 tests exécutés.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
     services:
       mssql:
         image: mcr.microsoft.com/mssql/server:2022-latest
@@ -119,7 +125,9 @@ jobs:
       DB_PORT: "11433"
       DB_USER: sa
       DB_PASSWORD: "Essai-ERP-2026!"
-      DB_NAME: ERP_ESSAI
+      DB_NAME: ERP_ESSAI_SHARD_${{ matrix.shard }}
+      SQL_TEST_SHARD: ${{ matrix.shard }}
+      SQL_TEST_SHARDS: "2"
       DB_PYTHON_DRIVER: mssql_python
       DB_EXTRA_PARAMS: TrustServerCertificate=yes
     steps:
