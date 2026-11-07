@@ -81,6 +81,8 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             )
             self.assertEqual(resultat['exercice_precedent'], 'n')
             self.assertTrue(next(b for b in lire_catalogue(catalogue) if b['id'] == 'n')['cloture'])
+            with sqlite3.connect(ancien) as source_db:
+                historique_source = source_db.execute('''SELECT gamme, debut FROM transport_changementgamme ORDER BY id''').fetchall()
             with sqlite3.connect(nouveau) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
@@ -91,14 +93,14 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_vehicule').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_chauffeur').fetchone()[0], 1)
-                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_changementgamme').fetchone()[0], 1)
+                self.assertEqual(db.execute('''SELECT gamme, debut FROM transport_changementgamme ORDER BY id''').fetchall(), historique_source)
                 self.assertEqual(db.execute("""SELECT tiers.code FROM transport_vehicule AS veh
                     JOIN commercial_tiers AS tiers ON veh.proprietaire_id=tiers.id
                     WHERE veh.immatriculation='CE-123-AA'""").fetchone()[0], 'PROP-01')
-                self.assertEqual(db.execute("""SELECT historique.gamme, historique.debut
+                self.assertIn(('CLASSIQUE', '2026-01-01'), db.execute("""SELECT historique.gamme, historique.debut
                     FROM transport_changementgamme AS historique
                     JOIN transport_vehicule AS veh ON historique.vehicule_id=veh.id
-                    WHERE veh.immatriculation='CE-123-AA'""").fetchone(), ('CLASSIQUE', '2026-01-01'))
+                    WHERE veh.immatriculation='CE-123-AA'""").fetchall())
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_arretligne').fetchone()[0], 1)
                 self.assertEqual(db.execute("""SELECT parent.code FROM transport_gare AS point
                     JOIN transport_gare AS parent ON point.rattachement_id=parent.id
