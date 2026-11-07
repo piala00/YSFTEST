@@ -126,8 +126,18 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute("""SELECT COUNT(*) FROM comptabilite_ligneecriture
                     WHERE tiers_id IS NOT NULL AND section_id IS NOT NULL
                       AND vehicule_id IS NOT NULL""").fetchone()[0], 1)
+            # N reste intact et N+1 doit conserver le lien de provenance.
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertEqual(set(entrees), {'n', 'n1'})
+            self.assertTrue(entrees['n']['cloture'])
+            self.assertEqual(str(entrees['n']['exercice']), '2026')
+            self.assertEqual(str(entrees['n1']['exercice']), '2027')
             with sqlite3.connect(ancien) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT date FROM comptabilite_ecriture').fetchone()[0], '2026-12-31')
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+                self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], '2026-12-31')
 
 
 if __name__ == '__main__':
