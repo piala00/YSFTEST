@@ -44,6 +44,7 @@ ChangementGamme.objects.create(vehicule=vehicule, gamme='CLASSIQUE', debut=date(
 Chauffeur.objects.create(nom='Chauffeur de contrôle', permis='TEST-2026')
 c1 = Compte.objects.create(numero='411000', intitule='Clients')
 c2 = Compte.objects.create(numero='101000', intitule='Capital')
+Agence.objects.create(code='CTR', nom='Agence Centre', ville='Yaoundé', locale=True, compte_liaison=c2)
 Journal.objects.create(code='AN', intitule='A nouveaux', type_journal='AN', cloture_au=date(2026,12,31))
 j = Journal.objects.create(code='OD', intitule='Divers', type_journal='OD')
 e = Ecriture.objects.create(journal=j, exercice=Exercice.objects.get(code='2026'),
@@ -93,6 +94,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                     JOIN auth_user AS u ON ug.user_id=u.id
                     JOIN auth_group AS g ON ug.group_id=g.id""").fetchall(), [('controle', 'Guichet')])
                 self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], None)
+                self.assertEqual(db.execute("SELECT code, nom, ville, locale, compte_liaison_id IS NOT NULL FROM core_agence").fetchall(), [('CTR', 'Agence Centre', 'Yaoundé', 1, 1)])
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_gare').fetchone()[0], 3)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_vehicule').fetchone()[0], 1)
