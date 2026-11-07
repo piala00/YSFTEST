@@ -71,6 +71,9 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
             }]}), encoding="utf-8")
 
             def migrer(db):
+                # Reproduit la contrainte de Django schema_editor SQLite :
+                # désactivation FK impossible au sein d'une transaction.
+                self.assertFalse(db.in_transaction)
                 for statement in SCHEMA.split(';'):
                     if statement.strip():
                         db.execute(statement)
