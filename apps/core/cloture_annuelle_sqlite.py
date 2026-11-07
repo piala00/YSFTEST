@@ -14,7 +14,7 @@ from apps.core.catalogue_societes import (
 
 
 def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identifiant,
-                            initialiser, reporter):
+                            initialiser, reporter, preparer_schema=None):
     """Crée N+1 puis publie le lien seulement après initialisation et reports.
 
     initialiser(source, destination) doit créer le schéma et recopier uniquement
@@ -28,6 +28,8 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
         raise ValueError("exercice SQLite introuvable")
     if source["cloture"]:
         raise ValueError("exercice précédent déjà clôturé")
+    if preparer_schema is not None and not callable(preparer_schema):
+        raise TypeError("préparation du schéma invalide")
     if not callable(initialiser) or not callable(reporter):
         raise TypeError("initialisation et reports obligatoires")
     source_path = Path(verifier_base_sqlite(source["base"]))
@@ -53,6 +55,19 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
             origine.execute("PRAGMA query_only=ON")
             with closing(sqlite3.connect(str(cible))) as nouvelle:
                 nouvelle.execute("PRAGMA foreign_keys=ON")
+                # Les migrations Django SQLite doivent désactiver les FK pendant
+                # leur schema_editor ; SQLite interdit ce PRAGMA dans BEGIN.
+                # Le fichier N+1 étant exclusif et supprimé sur échec, cette
+                # préparation hors transaction ne publie aucune donnée.
+                if preparer_schema is not None:
+                    nouvelle.execute("PRAGMA foreign_keys=OFF")
+                    try:
+                        preparer_schema(nouvelle)
+                        nouvelle.commit()
+                    finally:
+                        nouvelle.execute("PRAGMA foreign_keys=ON")
+                    if nouvelle.execute("PRAGMA foreign_key_check").fetchone():
+                        raise ValueError("schéma N+1 invalide après migrations")
                 with nouvelle:
                     # DDL SQLite est autrement susceptible de survivre à un
                     # échec des callbacks en l'absence de BEGIN explicite.
