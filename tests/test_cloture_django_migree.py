@@ -26,11 +26,18 @@ from decimal import Decimal
 from django.contrib.auth.models import User, Group
 from apps.core.models import Societe, Exercice, Agence
 from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
-from apps.transport.models import Gare
+from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, Chauffeur
 Societe.objects.create(raison_sociale='Transport Centrale', activite='TRANSPORT')
 Exercice.objects.create(code='2026', date_debut=date(2026,1,1), date_fin=date(2026,12,31))
 User.objects.create_user(username='controle', password='test-local-only')
 Group.objects.create(name='Guichet')
+g1 = Gare.objects.create(code='YDE', nom='Yaoundé', ville='Yaoundé')
+g2 = Gare.objects.create(code='DLA', nom='Douala', ville='Douala')
+pv = Gare.objects.create(code='PVY', nom='Point de vente', ville='Yaoundé', type_gare='POINT_VENTE', rattachement=g1)
+ligne = Ligne.objects.create(code='YDE-DLA', gare_depart=g1, gare_arrivee=g2, prix_billet=5000)
+ArretLigne.objects.create(ligne=ligne, gare=pv, ordre=1)
+Vehicule.objects.create(immatriculation='CE-123-AA', nombre_places=40, gamme='CLASSIQUE')
+Chauffeur.objects.create(nom='Chauffeur de contrôle', permis='TEST-2026')
 c1 = Compte.objects.create(numero='411000', intitule='Clients')
 c2 = Compte.objects.create(numero='101000', intitule='Capital')
 Journal.objects.create(code='AN', intitule='A nouveaux', type_journal='AN', cloture_au=date(2026,12,31))
@@ -77,6 +84,18 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT username FROM auth_user').fetchone()[0], 'controle')
                 self.assertEqual(db.execute('SELECT name FROM auth_group').fetchone()[0], 'Guichet')
                 self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], None)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_gare').fetchone()[0], 3)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_vehicule').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_chauffeur').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_arretligne').fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT parent.code FROM transport_gare AS point
+                    JOIN transport_gare AS parent ON point.rattachement_id=parent.id
+                    WHERE point.code='PVY'""").fetchone()[0], 'YDE')
+                self.assertEqual(db.execute("""SELECT depart.code, arrivee.code FROM transport_ligne AS ligne
+                    JOIN transport_gare AS depart ON ligne.gare_depart_id=depart.id
+                    JOIN transport_gare AS arrivee ON ligne.gare_arrivee_id=arrivee.id
+                    WHERE ligne.code='YDE-DLA'""").fetchone(), ('YDE', 'DLA'))
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT date FROM comptabilite_ecriture').fetchone()[0], '2027-01-01')
                 montants = db.execute('SELECT debit,credit FROM comptabilite_ligneecriture ORDER BY compte_id').fetchall()
