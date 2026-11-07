@@ -32,6 +32,27 @@ def instrument_tests():
     unittest.TestCase.run = timed_run
 
 
+def instrument_database_lifecycle():
+    """Expose the expensive Django database phases separately from test bodies."""
+    from django.test.runner import DiscoverRunner
+
+    for phase in ("setup_databases", "teardown_databases", "run_suite"):
+        original = getattr(DiscoverRunner, phase)
+
+        def timed(self, *args, _phase=phase, _original=original, **kwargs):
+            started = time.monotonic()
+            print(f"[SQL-PHASE-START] {_phase}", flush=True)
+            try:
+                return _original(self, *args, **kwargs)
+            finally:
+                print(
+                    f"[SQL-PHASE-END] {_phase} {time.monotonic() - started:.3f}s",
+                    flush=True,
+                )
+
+        setattr(DiscoverRunner, phase, timed)
+
+
 def partition_suite():
     """Partition stable par classe, sans dupliquer les fixtures Django."""
     shard = int(os.environ.get("SQL_TEST_SHARD", "0"))
@@ -76,6 +97,7 @@ def main():
     faulthandler.enable(all_threads=True)
     faulthandler.dump_traceback_later(120, repeat=True, file=sys.stderr)
     instrument_tests()
+    instrument_database_lifecycle()
     partition_suite()
     sys.argv = ["manage.py", "test", "--noinput", "-v2"]
     try:
