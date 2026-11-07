@@ -35,6 +35,16 @@ def initialiser_dossier_annuel(source, cible, annee, *, transport=True):
     tables = list(REFERENTIELS_OBLIGATOIRES)
     if transport:
         tables.extend(REFERENTIELS_TRANSPORT)
+    # Django's post_migrate populates django_content_type and auth_permission
+    # automatically in the freshly migrated target. They are NOT annual
+    # transactions: replace these generated rows with N's stable primary keys
+    # before copying users/groups and their permission associations. Without
+    # this, recopier_referentiels rejects the non-empty target and N+1 cannot
+    # be opened on a genuinely migrated Django database.
+    # This runs inside the caller's BEGIN IMMEDIATE transaction; rollback
+    # restores the generated rows if any subsequent copy/report fails.
+    for nom in ("auth_permission", "django_content_type"):
+        cible.execute(f'DELETE FROM "{nom}"')
     recopier_referentiels(source, cible, tables)
     # Les verrouillages des journaux appartiennent à N : N+1 doit être
     # saisissable dès son ouverture, y compris dans le journal AN.
