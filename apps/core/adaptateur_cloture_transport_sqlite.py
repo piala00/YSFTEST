@@ -79,8 +79,11 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
         if (date.fromisoformat(debut).year != annee - 1 or
                 date.fromisoformat(fin).year != annee - 1):
             raise ValueError("année N+1 non consécutive à N")
-        if date.fromisoformat(debut) > date.fromisoformat(fin):
-            raise ValueError("dates de N invalides")
+        # Une base annuelle doit couvrir l'année civile entière : un exercice
+        # partiel archivé ferait perdre la continuité des reports N vers N+1.
+        if (date.fromisoformat(debut) != date(annee - 1, 1, 1) or
+                date.fromisoformat(fin) != date(annee - 1, 12, 31)):
+            raise ValueError("l'exercice N doit couvrir toute l'année civile")
         # La clôture métier de N doit avoir été calculée et validée.
         # Le catalogue n'est clôturé qu'après succès de toute l'opération.
         etat["ancien_id"] = ancien_id
