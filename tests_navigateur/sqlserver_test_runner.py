@@ -33,7 +33,7 @@ def instrument_tests():
 
 
 def partition_suite():
-    """Partition stable par test, sans omettre les tests imbriqués Django."""
+    """Partition stable par classe, sans dupliquer les fixtures Django."""
     shard = int(os.environ.get("SQL_TEST_SHARD", "0"))
     count = int(os.environ.get("SQL_TEST_SHARDS", "1"))
     if count < 1 or not 0 <= shard < count:
@@ -51,8 +51,13 @@ def partition_suite():
                     yield from walk(child)
                 else:
                     yield child
-        selected = [test for test in walk(suite)
-                    if int.from_bytes(hashlib.sha256(test.id().encode()).digest()[:8], "big") % count == shard]
+        selected = []
+        for test in walk(suite):
+            cls = type(test)
+            key = cls.__module__ + "." + cls.__qualname__
+            assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
+            if assigned == shard:
+                selected.append(test)
         print(f"[SQL-SHARD] {shard + 1}/{count}: {len(selected)} tests", flush=True)
         return unittest.TestSuite(selected)
     DiscoverRunner.build_suite = build_partition
