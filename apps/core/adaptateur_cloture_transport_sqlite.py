@@ -49,8 +49,52 @@ def initialiser_dossier_annuel(source, cible, annee, *, transport=True):
     return cible.execute("SELECT last_insert_rowid()").fetchone()[0]
 
 
+
+def migrer_schema_django_sqlite(cible):
+    """Crée le schéma N+1 avec les vraies migrations Django, sans données N.
+
+    La migration s'exécute dans un processus isolé, car la connexion sqlite3
+    de clôture n'est pas une connexion gérée par Django. Le processus doit
+    terminer avant la transaction de reprise et avant toute publication.
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    chemin = cible.execute("PRAGMA database_list").fetchone()[2]
+    if not chemin or not Path(chemin).is_file():
+        raise ValueError("base cible SQLite introuvable pour les migrations Django")
+    racine = Path(__file__).resolve().parents[2]
+    environnement = os.environ.copy()
+    environnement.pop("DATABASE_URL", None)
+    environnement.update({
+        "DB_ENGINE": "sqlite",
+        "SQLITE_FICHIER": str(Path(chemin).resolve()),
+        "MIROIR_DB_ENGINE": "",
+        "ERP_ASSISTANT": "0",
+        "ERP_LICENCE": "0",
+        "RELAIS_ACTIF": "0",
+    })
+    try:
+        resultat = subprocess.run(
+            [sys.executable, "-u", str(racine / "manage.py"),
+             "migrate", "--noinput", "--verbosity", "1"],
+            cwd=str(racine), env=environnement, capture_output=True,
+            text=True, timeout=240, check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("migrations Django N+1 bloquées après 240 secondes") from exc
+    if resultat.returncode:
+        diagnostic = (resultat.stdout + "\\n" + resultat.stderr)[-6000:]
+        raise RuntimeError(f"migrations Django N+1 échouées ({resultat.returncode}): {diagnostic}")
+    # L'autre processus a modifié le schéma : abandonner les éventuels
+    # statements préparés avant la reprise transactionnelle.
+    cible.execute("PRAGMA schema_version").fetchone()
+
+
 def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
-                                     nouvel_identifiant, annee, migrer_cible):
+                                     nouvel_identifiant, annee, migrer_cible=None):
     """Crée N+1 et sa pièce AN dans une transaction, puis publie le catalogue.
 
     migrer_cible est un callback qui crée uniquement le schéma cible à partir
@@ -58,8 +102,10 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
     """
     if not isinstance(annee, int) or not 1900 <= annee <= 9998:
         raise ValueError("année N+1 invalide")
+    if migrer_cible is None:
+        migrer_cible = migrer_schema_django_sqlite
     if not callable(migrer_cible):
-        raise TypeError("migrations N+1 obligatoires")
+        raise TypeError("migrations N+1 invalides")
     # Refuser une année qui ne correspond pas au dossier sélectionné.
     entrees = [b for b in lire_catalogue(catalogue) if b["id"] == identifiant]
     if len(entrees) != 1 or entrees[0]["moteur"] != "sqlite":
