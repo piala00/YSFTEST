@@ -142,5 +142,47 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], '2026-12-31')
 
 
+    def test_echec_balance_ne_publie_pas_n_plus_un(self):
+        """Une pièce validée déséquilibrée doit laisser N et le catalogue intacts."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            ancien.touch()
+            with sqlite3.connect(ancien) as db:
+                migrer_schema_django_sqlite(db)
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                       ERP_LICENCE='0', RELAIS_ACTIF='0')
+            proc = subprocess.run(
+                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', SEED],
+                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            # Dégrader volontairement une pièce validée, sans désactiver les FK.
+            with sqlite3.connect(ancien) as db:
+                db.execute("""UPDATE comptabilite_ligneecriture
+                              SET credit='124.50' WHERE credit>0""")
+                db.commit()
+            original = {'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}
+            catalogue.write_text(json.dumps(original), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'pièce validée déséquilibrée'):
+                preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertFalse(nouveau.exists(), 'la base N+1 échouée doit être supprimée')
+            self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
+            with sqlite3.connect(ancien) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute(
+                    'SELECT credit FROM comptabilite_ligneecriture WHERE credit>0'
+                ).fetchone()[0], 124.5)
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+
+
 if __name__ == '__main__':
     unittest.main()
