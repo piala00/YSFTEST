@@ -26,7 +26,8 @@ from decimal import Decimal
 from django.contrib.auth.models import User, Group
 from apps.core.models import Societe, Exercice, Agence
 from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
-from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, Chauffeur
+from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, Chauffeur, ChangementGamme
+from apps.commercial.models import Tiers
 Societe.objects.create(raison_sociale='Transport Centrale', activite='TRANSPORT')
 Exercice.objects.create(code='2026', date_debut=date(2026,1,1), date_fin=date(2026,12,31))
 User.objects.create_user(username='controle', password='test-local-only')
@@ -36,7 +37,9 @@ g2 = Gare.objects.create(code='DLA', nom='Douala', ville='Douala')
 pv = Gare.objects.create(code='PVY', nom='Point de vente', ville='Yaoundé', type_gare='POINT_VENTE', rattachement=g1)
 ligne = Ligne.objects.create(code='YDE-DLA', gare_depart=g1, gare_arrivee=g2, prix_billet=5000)
 ArretLigne.objects.create(ligne=ligne, gare=pv, ordre=1)
-Vehicule.objects.create(immatriculation='CE-123-AA', nombre_places=40, gamme='CLASSIQUE')
+proprietaire = Tiers.objects.create(code='PROP-01', nom='Propriétaire contrôle', type_tiers='FOURNISSEUR')
+vehicule = Vehicule.objects.create(immatriculation='CE-123-AA', nombre_places=40, gamme='CLASSIQUE', proprietaire=proprietaire)
+ChangementGamme.objects.create(vehicule=vehicule, gamme='CLASSIQUE', debut=date(2026,1,1))
 Chauffeur.objects.create(nom='Chauffeur de contrôle', permis='TEST-2026')
 c1 = Compte.objects.create(numero='411000', intitule='Clients')
 c2 = Compte.objects.create(numero='101000', intitule='Capital')
@@ -88,6 +91,14 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_vehicule').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_chauffeur').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_changementgamme').fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT tiers.code FROM transport_vehicule AS veh
+                    JOIN commercial_tiers AS tiers ON veh.proprietaire_id=tiers.id
+                    WHERE veh.immatriculation='CE-123-AA'""").fetchone()[0], 'PROP-01')
+                self.assertEqual(db.execute("""SELECT historique.gamme, historique.debut
+                    FROM transport_changementgamme AS historique
+                    JOIN transport_vehicule AS veh ON historique.vehicule_id=veh.id
+                    WHERE veh.immatriculation='CE-123-AA'""").fetchone(), ('CLASSIQUE', '2026-01-01'))
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_arretligne').fetchone()[0], 1)
                 self.assertEqual(db.execute("""SELECT parent.code FROM transport_gare AS point
                     JOIN transport_gare AS parent ON point.rattachement_id=parent.id
