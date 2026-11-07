@@ -109,6 +109,24 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                     JOIN transport_gare AS depart ON ligne.gare_depart_id=depart.id
                     JOIN transport_gare AS arrivee ON ligne.gare_arrivee_id=arrivee.id
                     WHERE ligne.code='YDE-DLA'""").fetchone(), ('YDE', 'DLA'))
+                # N+1 conserve les référentiels, jamais les mouvements de N.
+                # Les écritures copiées doivent être uniquement les à-nouveaux.
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture WHERE origine='CLOTURE_ANNUELLE'"
+                ).fetchone()[0], 1)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture WHERE numero='OD-2026-1'"
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture WHERE exercice_id NOT IN "
+                    "(SELECT id FROM core_exercice)"
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute(
+                    "SELECT code FROM comptabilite_journal ORDER BY code"
+                ).fetchall(), [('AN',), ('OD',)])
+                self.assertEqual(db.execute(
+                    "SELECT numero FROM comptabilite_compte ORDER BY numero"
+                ).fetchall(), [('101000',), ('411000',)])
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT date FROM comptabilite_ecriture').fetchone()[0], '2027-01-01')
                 montants = db.execute('SELECT debit,credit FROM comptabilite_ligneecriture ORDER BY compte_id').fetchall()
