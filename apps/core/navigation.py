@@ -169,15 +169,27 @@ def menu_fichier_comptabilite():
     ])
 
 
+def entrees_communes_fichier(module):
+    """Commandes **globales** du menu Fichier, définies une seule fois (dé-duplication #72 étape A).
+
+    Ces commandes agissent sur toute la société (droits, audit, sauvegarde) et doivent être
+    identiques dans chaque module. Un seul endroit les décrit désormais, au lieu d'être recopiées
+    dans le menu Fichier de chaque logiciel.
+    """
+    return [
+        E("fichier.autorisations", "Autorisations d'accès", f"{module}:autorisations", icone="bi-shield-lock"),
+        E("fichier.journal_evenements", "Journal des événements", f"{module}:journal_evenements", icone="bi-clock-history", preuve="AJOUT-ERP"),
+        E("fichier.sauvegarde", "Sauvegarde et restauration", f"{module}:sauvegarde", icone="bi-hdd", preuve="AJOUT-ERP"),
+    ]
+
+
 def menu_fichier(module, societe_url, fermer=True):
     return Onglet("fichier", "Fichier", "bi-folder2", [
         E("fichier.societe", "Paramètres société", icone="bi-building", enfants=[
             E("fichier.societe.identification", "Identification", societe_url),
             *([E("fichier.societe.exercices", "Exercices comptables", "comptabilite:exercices")] if module == "comptabilite" else []),
         ]),
-        E("fichier.autorisations", "Autorisations d'accès", f"{module}:autorisations", icone="bi-shield-lock"),
-        E("fichier.journal_evenements", "Journal des événements", f"{module}:journal_evenements", icone="bi-clock-history", preuve="AJOUT-ERP"),
-        E("fichier.sauvegarde", "Sauvegarde et restauration", f"{module}:sauvegarde", icone="bi-hdd", preuve="AJOUT-ERP"),
+        *entrees_communes_fichier(module),
         *([E("fichier.sauvegarde_journee", "Sauvegarde de fin de journée", f"{module}:sauvegarde_journee",
              icone="bi-hdd-stack", preuve="AJOUT-ERP")] if module in ("commercial", "transport", "comptabilite") else []),
         E("fichier.poste", "Administration du poste", "core:poste", icone="bi-pc-display", preuve="AJOUT-ERP"),
@@ -339,9 +351,7 @@ GESTION_COMMERCIALE = Module(
             ]),
             E("fichier.lire_infos", "Lire les informations"),
             E("fichier.configuration", "Configuration système et partage"),
-            E("fichier.autorisations", "Autorisations d'accès", "commercial:autorisations", icone="bi-shield-lock"),
-            E("fichier.journal_evenements", "Journal des événements", "commercial:journal_evenements", icone="bi-clock-history", preuve="AJOUT-ERP"),
-            E("fichier.sauvegarde", "Sauvegarde et restauration", "commercial:sauvegarde", icone="bi-hdd", preuve="AJOUT-ERP"),
+            *entrees_communes_fichier("commercial"),
             E("fichier.reprise", "Reprise d'un dossier existant", "commercial:reprise_dossier", icone="bi-database-down",
               preuve="AJOUT-ERP"),
             E("fichier.echanges", "Échanges entre agences", "commercial:echanges", icone="bi-arrow-left-right", preuve="AJOUT-ERP"),
