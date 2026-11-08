@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Clôturer l'exercice et ouvrir le suivant{% endblock %}
+{% block content %}
+<div class="page-title"><h1><i class="bi bi-calendar-check" style="color:var(--module)"></i> Clôturer l'exercice et ouvrir le suivant</h1></div>
+{% include "core/_onglets_poste.html" %}
+
+{% if succes %}<div class="alert alert-success small">{{ succes }}</div>{% endif %}
+{% if erreur %}<div class="alert alert-warning small">{{ erreur }}</div>{% endif %}
+
+<div class="card card-body">
+  <p class="small text-muted mb-2">
+    La clôture annuelle crée la <strong>base de l'année suivante</strong> (chaque année = une base
+    séparée) : elle y recopie la <strong>configuration</strong> (plan comptable, journaux, tiers,
+    véhicules, utilisateurs…) et y passe les <strong>reports à nouveau</strong> depuis les écritures
+    validées de l'exercice en cours. L'exercice actuel est alors <strong>figé (clôturé)</strong> et
+    reste consultable ; la nouvelle base s'ouvre par « Ouvrir une société ». Aucun mouvement n'est
+    recopié.
+  </p>
+
+  {% if courante %}
+    <table class="table table-sm small mb-3" style="max-width:34rem"><tbody>
+      <tr><th>Société</th><td>{{ courante.societe }}</td></tr>
+      <tr><th>Agence</th><td>{{ courante.agence }}</td></tr>
+      <tr><th>Exercice en cours</th><td>{{ courante.exercice }}{% if courante.cloture %} <span class="badge bg-secondary">clôturé</span>{% endif %}</td></tr>
+      {% if annee_suivante %}<tr><th>Nouvel exercice</th><td><strong>{{ annee_suivante }}</strong></td></tr>{% endif %}
+    </tbody></table>
+
+    {% if courante.cloture %}
+      <div class="alert alert-info small mb-0">Cet exercice est déjà clôturé. Ouvrez l'exercice suivant par « Ouvrir une société ».</div>
+    {% elif not compile %}
+      <div class="alert alert-info small mb-0">La clôture s'exécute sur le <strong>poste serveur</strong> (elle crée un nouveau fichier de base).
+        Lancez-la depuis le poste serveur, après avoir terminé les saisies.</div>
+    {% else %}
+      <form method="post" class="d-flex flex-column gap-2" style="max-width:34rem">{% csrf_token %}
+        <div class="alert alert-warning small mb-1">Terminez les saisies de l'exercice avant de clôturer. L'exercice en cours deviendra consultable seulement.</div>
+        <input name="confirmation" class="form-control form-control-sm" placeholder="Tapez CLOTURER pour confirmer" autocomplete="off" required>
+        <button class="btn btn-primary"><i class="bi bi-calendar-check"></i> Clôturer {{ courante.exercice }} et créer {{ annee_suivante }}</button>
+      </form>
+    {% endif %}
+  {% elif not erreur %}
+    <div class="alert alert-info small mb-0">La base en cours d'utilisation n'est pas inscrite au catalogue multi-sociétés :
+      la clôture annuelle automatique n'est pas disponible pour ce dossier.</div>
+  {% endif %}
+</div>
+{% endblock %}

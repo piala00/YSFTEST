@@ -111,7 +111,9 @@ def menu_fichier_comptabilite():
     P = "fichier.parametres"
     return Onglet("fichier", "Fichier", "bi-folder2", [
         E("fichier.nouveau", "Nouveau", icone="bi-file-earmark-plus", preuve=D),
-        E("fichier.ouvrir", "Ouvrir", icone="bi-folder2-open", preuve=D),
+        E("fichier.ouvrir_societe", "Ouvrir une société", "core:choix_societe", icone="bi-folder2-open", preuve="AJOUT-ERP"),
+        E("fichier.cloture_annuelle", "Clôturer l'exercice et ouvrir le suivant", "core:cloture_exercice_annuel",
+          icone="bi-calendar-check", preuve="AJOUT-ERP"),
         E("fichier.favoris", "Favoris", icone="bi-star", preuve=D),
         E("fichier.fermer", "Fermer", icone="bi-x-square", action="fermer", preuve=D),
         SEP(),
@@ -183,12 +185,26 @@ def entrees_communes_fichier(module):
     ]
 
 
+def entrees_societe_fichier():
+    """Commandes multi-sociétés du menu Fichier (façon Sage) : choisir la base de travail et clôturer.
+
+    « Ouvrir une société » = choisir la base (société / agence / **année**) dans laquelle travailler,
+    comme dans Sage. « Clôturer l'exercice et ouvrir le suivant » crée la base de l'année N+1.
+    """
+    return [
+        E("fichier.ouvrir_societe", "Ouvrir une société", "core:choix_societe", icone="bi-folder2-open", preuve="AJOUT-ERP"),
+        E("fichier.cloture_annuelle", "Clôturer l'exercice et ouvrir le suivant", "core:cloture_exercice_annuel",
+          icone="bi-calendar-check", preuve="AJOUT-ERP"),
+    ]
+
+
 def menu_fichier(module, societe_url, fermer=True):
     return Onglet("fichier", "Fichier", "bi-folder2", [
         E("fichier.societe", "Paramètres société", icone="bi-building", enfants=[
             E("fichier.societe.identification", "Identification", societe_url),
             *([E("fichier.societe.exercices", "Exercices comptables", "comptabilite:exercices")] if module == "comptabilite" else []),
         ]),
+        *entrees_societe_fichier(),
         *entrees_communes_fichier(module),
         *([E("fichier.sauvegarde_journee", "Sauvegarde de fin de journée", f"{module}:sauvegarde_journee",
              icone="bi-hdd-stack", preuve="AJOUT-ERP")] if module in ("commercial", "transport", "comptabilite") else []),
@@ -321,7 +337,9 @@ GESTION_COMMERCIALE = Module(
     onglets=[
         Onglet("fichier", "Fichier", "bi-folder2", [
             E("fichier.nouveau", "Nouveau"),
-            E("fichier.ouvrir", "Ouvrir"),
+            E("fichier.ouvrir_societe", "Ouvrir une société", "core:choix_societe", icone="bi-folder2-open", preuve="AJOUT-ERP"),
+            E("fichier.cloture_annuelle", "Clôturer l'exercice et ouvrir le suivant", "core:cloture_exercice_annuel",
+              icone="bi-calendar-check", preuve="AJOUT-ERP"),
             E("fichier.favoris", "Favoris"),
             E("fichier.fermer", "Fermer", icone="bi-x-square", action="fermer"),
             SEP(),
