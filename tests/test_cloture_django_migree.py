@@ -5,7 +5,6 @@ est un fichier SQLite migré par manage.py, sans schéma de test artificiel.
 """
 import json
 import os
-import shutil
 import sqlite3
 import subprocess
 import sys
@@ -84,7 +83,13 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             raise RuntimeError(proc.stdout + proc.stderr)
 
     def _copier_source(self, chemin):
-        shutil.copy2(self._fixture_source, chemin)
+        # Django peut laisser des pages validées dans le journal WAL : copier
+        # seulement le fichier principal avec shutil.copy2 perd ces écritures.
+        # backup() produit un instantané SQLite cohérent, WAL compris, tout en
+        # conservant une base indépendante pour chaque scénario.
+        with sqlite3.connect(self._fixture_source) as source:
+            with sqlite3.connect(chemin) as cible:
+                source.backup(cible)
 
     def test_cloture_migrations_reelles_et_balance(self):
         with tempfile.TemporaryDirectory() as temporaire:
