@@ -1017,7 +1017,7 @@ def interface(essai=False):
               wraplength=520).pack(anchor='w')
 
     def creer(role=ROLE_CLIENTS):
-        dossier = identite(role)
+        dossier = dossier_identite(role)
         dossier.mkdir(parents=True, exist_ok=True)
         if chemin_coffre(dossier).exists():
             ouvrir_coffre(dossier)
