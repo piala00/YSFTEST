@@ -31,4 +31,5 @@ urlpatterns = [
     path("api/", include("apps.api.urls")),
     path("relais/", include("apps.relais.urls")),
     path("licence/", licences_views.licence, name="licence"),
+    path("licence/tarifs/", licences_views.tarifs, name="tarifs"),
 ]

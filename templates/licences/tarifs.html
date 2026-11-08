@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Tarifs des licences{% endblock %}
+{% block content %}
+<div class="page-title"><h1><i class="bi bi-tags" style="color:var(--module)"></i> Tarifs des licences</h1></div>
+{% include "core/_onglets_poste.html" %}
+
+<p class="small text-muted mb-3">Barème indicatif intégré au logiciel (consultable hors ligne), en
+  <strong>{{ grille.devise }}</strong>. Deux formules au choix : <strong>abonnement</strong> ou
+  <strong>licence définitive + maintenance</strong>. Les taxes (TVA) ne sont pas incluses.</p>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-auto">
+    <label class="form-label small mb-0">Agences / sociétés</label>
+    <input type="number" min="1" name="agences" value="{{ grille.parametres.agences }}" class="form-control form-control-sm" style="width:8rem">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small mb-0">Postes (total)</label>
+    <input type="number" min="1" name="postes" value="{{ grille.parametres.postes }}" class="form-control form-control-sm" style="width:8rem">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small mb-0">Modules optionnels</label>
+    <input type="number" min="0" name="modules" value="{{ grille.parametres.modules }}" class="form-control form-control-sm" style="width:8rem">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-primary"><i class="bi bi-calculator"></i> Calculer</button>
+  </div>
+  <div class="col-12"><div class="form-text">Un poste est inclus par agence dans l'abonnement ; les postes au-delà sont facturés.</div></div>
+</form>
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6"><i class="bi bi-arrow-repeat"></i> Abonnement</h2>
+    <table class="table table-sm small mb-2"><thead><tr><th>Élément</th><th class="text-end">Qté</th><th class="text-end">Mensuel</th><th class="text-end">Annuel</th></tr></thead>
+    <tbody>
+      {% for ligne in grille.abonnement.lignes %}
+      <tr><td>{{ ligne.libelle }}</td><td class="text-end">{{ ligne.quantite }}</td>
+        <td class="text-end">{{ ligne.mensuel|floatformat:0 }}</td>
+        <td class="text-end">{{ ligne.annuel|floatformat:0 }}</td></tr>
+      {% endfor %}
+      <tr class="fw-bold border-top"><td>Total</td><td></td>
+        <td class="text-end">{{ grille.abonnement.total_mensuel|floatformat:0 }} {{ grille.devise }}/mois</td>
+        <td class="text-end">{{ grille.abonnement.total_annuel|floatformat:0 }} {{ grille.devise }}/an</td></tr>
+    </tbody></table>
+    <div class="form-text">L'annuel équivaut à ~10 mois (deux mois offerts).</div>
+  </div></div>
+
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6"><i class="bi bi-infinity"></i> Licence définitive + maintenance</h2>
+    <table class="table table-sm small mb-2"><thead><tr><th>Élément</th><th class="text-end">Qté</th><th class="text-end">Montant</th></tr></thead>
+    <tbody>
+      {% for l in grille.definitive.lignes %}
+      <tr><td>{{ l.libelle }}</td><td class="text-end">{{ l.quantite }}</td><td class="text-end">{{ l.total|floatformat:0 }}</td></tr>
+      {% endfor %}
+      <tr class="fw-bold border-top"><td>Total licence</td><td></td><td class="text-end">{{ grille.definitive.licence|floatformat:0 }} {{ grille.devise }}</td></tr>
+      <tr><td>Maintenance annuelle ({{ grille.definitive.maintenance_taux_pourcent }} %)</td><td></td><td class="text-end">{{ grille.definitive.maintenance_annuelle|floatformat:0 }} {{ grille.devise }}/an</td></tr>
+      <tr class="fw-bold"><td>Première année (licence + maintenance)</td><td></td><td class="text-end">{{ grille.definitive.total_premiere_annee|floatformat:0 }} {{ grille.devise }}</td></tr>
+    </tbody></table>
+    <div class="form-text">La maintenance (mises à jour + assistance) se renouvelle chaque année.</div>
+  </div></div>
+</div>
+
+<div class="card card-body mt-3">
+  <h2 class="h6"><i class="bi bi-signpost-2"></i> Comment acquérir une licence</h2>
+  <ol class="small mb-0">
+    <li>Sur l'écran <a href="{% url 'licence' %}">Licence</a>, téléchargez le fichier de demande (le code de ce poste).</li>
+    <li>Envoyez-le à l'éditeur avec la formule choisie (abonnement ou définitive) et le nombre d'agences, postes et modules.</li>
+    <li>Vous recevez en retour un seul fichier de licence (<code>.erplic</code>) : déposez-le sur l'écran Licence pour activer le logiciel.</li>
+  </ol>
+</div>
+{% endblock %}

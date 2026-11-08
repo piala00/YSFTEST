@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
 from . import licence as l
+from . import tarifs as t
 from .models import LicenceDeposee
 
 
@@ -62,4 +63,20 @@ def licence(request):
         "essai_ouvertures": l.ESSAI_OUVERTURES,
         "historique": LicenceDeposee.objects.select_related("deposee_par")[:20], "cles": bool(l.cles_publiques()),
         "empreintes_publiques": l.empreintes_publiques()})
+
+
+@login_required
+def tarifs(request):
+    """Fichier › Administration du poste › Licence › Tarifs : barème hors ligne et devis indicatif.
+
+    Visible par tout utilisateur connecté (notamment en version d'essai, sans site web) : il
+    affiche la grille intégrée au build et calcule un devis selon agences/postes/modules saisis.
+    """
+    agences = request.GET.get("agences", 1)
+    postes = request.GET.get("postes", agences)
+    modules = request.GET.get("modules", 0)
+    return render(request, "licences/tarifs.html", {
+        "onglet_poste": "licence", "titre": "Tarifs des licences",
+        "etat": l.etat(), "demande": l.demande(),
+        "grille": t.grille(agences, postes, modules)})
 
