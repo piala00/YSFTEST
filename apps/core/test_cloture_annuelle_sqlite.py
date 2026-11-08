@@ -1,6 +1,7 @@
 """Tests de l'orchestration annuelle sans accès SQL Server."""
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 from pathlib import Path
 from unittest import TestCase
@@ -17,7 +18,7 @@ class ClotureAnnuelleSQLiteTests(TestCase):
         self.source = racine / "2026.sqlite3"
         self.cible = racine / "2027.sqlite3"
         self.catalogue = racine / "societes.json"
-        with sqlite3.connect(self.source) as base:
+        with closing(sqlite3.connect(self.source)) as base, base:
             for table in ("django_migrations", "auth_user", "core_societe"):
                 base.execute(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY)")
             base.execute("CREATE TABLE mouvement (id INTEGER PRIMARY KEY)")
@@ -42,7 +43,7 @@ class ClotureAnnuelleSQLiteTests(TestCase):
             self.initialiser, self.reporter,
         )
         self.assertEqual(entree["exercice_precedent"], "n")
-        with sqlite3.connect(self.cible) as base:
+        with closing(sqlite3.connect(self.cible)) as base, base:
             self.assertEqual(base.execute("SELECT montant FROM report").fetchone(), (120,))
             self.assertNotIn("mouvement", {
                 row[0] for row in base.execute("SELECT name FROM sqlite_master")
@@ -107,7 +108,7 @@ class ClotureAnnuelleSQLiteTests(TestCase):
             self.catalogue, "n", str(self.cible), "n1",
             initialiser_config, reporter_config,
         )
-        with sqlite3.connect(self.cible) as base:
+        with closing(sqlite3.connect(self.cible)) as base, base:
             self.assertEqual(base.execute("SELECT montant FROM report").fetchone(), (250,))
 
     def test_source_est_protegee_contre_ecriture_par_callbacks(self):
@@ -122,7 +123,7 @@ class ClotureAnnuelleSQLiteTests(TestCase):
                 self.catalogue, "n", str(self.cible), "n1",
                 initialiser_malveillant, self.reporter,
             )
-        with sqlite3.connect(self.source) as source:
+        with closing(sqlite3.connect(self.source)) as source, source:
             self.assertEqual(source.execute("SELECT COUNT(*) FROM mouvement").fetchone(), (1,))
         self.assertFalse(self.cible.exists())
         self.assertEqual(self.catalogue.read_bytes(), avant)

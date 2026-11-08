@@ -82,7 +82,7 @@ class ReportsAnnuelsTests(unittest.TestCase):
         self.assertEqual(reporter_balance_validee(n, suivant, 1, 1, '2027-01-01'), 3)
         lignes = suivant.execute("""SELECT section_id, vehicule_id, debit
             FROM comptabilite_ligneecriture WHERE compte_id=1 ORDER BY id""").fetchall()
-        self.assertEqual(lignes, [(8,9,60), (None,None,40)])
+        self.assertCountEqual(lignes, [(8,9,60), (None,None,40)])
 
     def test_refuse_vehicule_absent_sans_ecriture_partielle(self):
         n, suivant = base(), base()

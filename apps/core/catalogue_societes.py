@@ -1,5 +1,6 @@
 """Catalogue des bases par société, agence et exercice, sans connexion implicite."""
 import json
+from contextlib import closing
 from pathlib import Path
 
 
@@ -92,7 +93,7 @@ def verifier_base_sqlite(nom):
     # Mode lecture seule : ne crée ni ne modifie la base ciblée.
     uri = "file:" + quote(str(chemin.resolve()), safe="/:") + "?mode=ro"
     try:
-        with sqlite3.connect(uri, uri=True, timeout=3) as base:
+        with closing(sqlite3.connect(uri, uri=True, timeout=3)) as base:
             tables = {r[0] for r in base.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not {"django_migrations", "auth_user", "core_societe"}.issubset(tables):
                 raise ValueError("la base sélectionnée n'est pas une base ERP compatible")
