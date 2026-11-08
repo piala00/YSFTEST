@@ -5,6 +5,7 @@ ici avec une base miroir SQLite ; le même essai a été fait sur SQL Server 202
 """
 import os
 import sqlite3
+from contextlib import closing
 import subprocess
 import sys
 import tempfile
@@ -29,7 +30,7 @@ class MiroirTests(SimpleTestCase):
                               capture_output=True, text=True, timeout=600)
 
     def total(self, fichier, sql):
-        with sqlite3.connect(fichier) as c:
+        with closing(sqlite3.connect(fichier)) as c, c:
             return c.execute(sql).fetchone()
 
     def test_copie_complete_puis_refus_d_une_base_etrangere(self):
@@ -44,7 +45,7 @@ class MiroirTests(SimpleTestCase):
             self.assertEqual(self.total(self.travail, sql), self.total(self.miroir, sql))
         self.assertGreater(self.total(self.miroir, "SELECT COUNT(*) FROM comptabilite_compte")[0], 0)
 
-        with sqlite3.connect(self.miroir) as c:                   # une table étrangère : ce n'est pas une base de l'ERP
+        with closing(sqlite3.connect(self.miroir)) as c, c:                   # une table étrangère : ce n'est pas une base de l'ERP
             c.execute("CREATE TABLE F_COMPTET (CT_Num TEXT)")
         r = self.manage("miroir")
         self.assertNotEqual(r.returncode, 0)

@@ -1,6 +1,7 @@
 """Contrôles du catalogue de bases, sans modification des bases existantes."""
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 from pathlib import Path
 from django.test import SimpleTestCase
@@ -40,7 +41,7 @@ class CatalogueSocietesTests(SimpleTestCase):
         with tempfile.TemporaryDirectory() as dossier:
             racine = Path(dossier)
             source = racine / "2026.sqlite3"
-            with sqlite3.connect(source) as connexion:
+            with closing(sqlite3.connect(source)) as connexion, connexion:
                 connexion.execute("CREATE TABLE exemple (id INTEGER)")
             catalogue = racine / "societes.json"
             premiere = {**self.bases[0], "base": str(source)}
@@ -192,12 +193,12 @@ class CatalogueSocietesTests(SimpleTestCase):
             with self.assertRaisesRegex(ValueError, "fichier SQLite absolu existant requis"):
                 publier_exercice_sqlite_valide(catalogue, "a", str(cible), "a-2027")
             self.assertEqual(catalogue.read_bytes(), avant)
-            with sqlite3.connect(cible) as connexion:
+            with closing(sqlite3.connect(cible)) as connexion, connexion:
                 connexion.execute("CREATE TABLE table_inconnue (id INTEGER)")
             with self.assertRaisesRegex(ValueError, "base ERP compatible"):
                 publier_exercice_sqlite_valide(catalogue, "a", str(cible), "a-2027")
             self.assertEqual(catalogue.read_bytes(), avant)
-            with sqlite3.connect(cible) as connexion:
+            with closing(sqlite3.connect(cible)) as connexion, connexion:
                 for table in ("django_migrations", "auth_user", "core_societe"):
                     connexion.execute(f"CREATE TABLE {table} (id INTEGER)")
             suivante = publier_exercice_sqlite_valide(catalogue, "a", str(cible), "a-2027")
@@ -209,7 +210,7 @@ class CatalogueSocietesTests(SimpleTestCase):
         with tempfile.TemporaryDirectory() as dossier:
             racine = Path(dossier)
             source = racine / "source.sqlite3"
-            with sqlite3.connect(source) as connexion:
+            with closing(sqlite3.connect(source)) as connexion, connexion:
                 for table in ("django_migrations", "auth_user", "core_societe"):
                     connexion.execute(f"CREATE TABLE {table} (id INTEGER)")
             catalogue = racine / "societes.json"
@@ -230,7 +231,7 @@ class CatalogueSocietesTests(SimpleTestCase):
                 {**self.bases[0], "base": str(racine / "2026.sqlite3")},
             ]}), encoding="utf-8")
             cible = racine / "2027.sqlite3"
-            with sqlite3.connect(cible) as connexion:
+            with closing(sqlite3.connect(cible)) as connexion, connexion:
                 for table in ("django_migrations", "auth_user", "core_societe"):
                     connexion.execute(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY)")
                 connexion.execute(

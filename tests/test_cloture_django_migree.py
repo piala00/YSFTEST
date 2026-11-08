@@ -6,6 +6,7 @@ est un fichier SQLite migré par manage.py, sans schéma de test artificiel.
 import json
 import os
 import sqlite3
+from contextlib import closing
 import subprocess
 import sys
 import tempfile
@@ -61,7 +62,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
             catalogue = dossier / 'catalogue.json'
             ancien.touch()
-            with sqlite3.connect(ancien) as db:
+            with closing(sqlite3.connect(ancien)) as db, db:
                 migrer_schema_django_sqlite(db)
             env = os.environ.copy()
             env.pop('DATABASE_URL', None)
@@ -83,9 +84,9 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             )
             self.assertEqual(resultat['exercice_precedent'], 'n')
             self.assertTrue(next(b for b in lire_catalogue(catalogue) if b['id'] == 'n')['cloture'])
-            with sqlite3.connect(ancien) as source_db:
+            with closing(sqlite3.connect(ancien)) as source_db, source_db:
                 historique_source = source_db.execute('''SELECT gamme, debut FROM transport_changementgamme ORDER BY id''').fetchall()
-            with sqlite3.connect(nouveau) as db:
+            with closing(sqlite3.connect(nouveau)) as db, db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
                 self.assertEqual(db.execute('SELECT username FROM auth_user').fetchone()[0], 'controle')
@@ -163,7 +164,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             self.assertEqual(entrees['n1']['agence'], entrees['n']['agence'])
             self.assertEqual(Path(entrees['n1']['base']).resolve(), nouveau.resolve())
             self.assertFalse(entrees['n1']['cloture'])
-            with sqlite3.connect(ancien) as db:
+            with closing(sqlite3.connect(ancien)) as db, db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT date FROM comptabilite_ecriture').fetchone()[0], '2026-12-31')
@@ -178,7 +179,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
             catalogue = dossier / 'catalogue.json'
             ancien.touch()
-            with sqlite3.connect(ancien) as db:
+            with closing(sqlite3.connect(ancien)) as db, db:
                 migrer_schema_django_sqlite(db)
             env = os.environ.copy()
             env.pop('DATABASE_URL', None)
@@ -191,7 +192,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             )
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
             # Dégrader volontairement une pièce validée, sans désactiver les FK.
-            with sqlite3.connect(ancien) as db:
+            with closing(sqlite3.connect(ancien)) as db, db:
                 db.execute("""UPDATE comptabilite_ligneecriture
                               SET credit='124.50' WHERE credit>0""")
                 db.commit()
@@ -205,7 +206,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
             self.assertFalse(nouveau.exists(), 'la base N+1 échouée doit être supprimée')
             self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
-            with sqlite3.connect(ancien) as db:
+            with closing(sqlite3.connect(ancien)) as db, db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute(
                     'SELECT credit FROM comptabilite_ligneecriture WHERE credit>0'

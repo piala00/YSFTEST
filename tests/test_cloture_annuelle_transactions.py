@@ -1,6 +1,7 @@
 """Régressions de clôture : pas de publication après échec des callbacks."""
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,7 +18,7 @@ class ClotureTransactionTests(unittest.TestCase):
         self.source = self.dossier / '2026.sqlite3'
         self.cible = self.dossier / '2027.sqlite3'
         self.catalogue = self.dossier / 'societes.json'
-        with sqlite3.connect(self.source) as db:
+        with closing(sqlite3.connect(self.source)) as db, db:
             for table in ('django_migrations', 'auth_user', 'core_societe'):
                 db.execute(f'CREATE TABLE {table} (id INTEGER PRIMARY KEY)')
         self.catalogue.write_text(json.dumps({'version': 1, 'bases': [{
@@ -70,7 +71,7 @@ class ClotureTransactionTests(unittest.TestCase):
                                      'annee2027', initialiser_interdit,
                                      lambda source, destination: None)
         self.assertFalse(self.cible.exists())
-        with sqlite3.connect(self.source) as db:
+        with closing(sqlite3.connect(self.source)) as db, db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM core_societe').fetchone()[0], 0)
         donnees = json.loads(self.catalogue.read_text(encoding='utf-8'))
         self.assertEqual(len(donnees['bases']), 1)

@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import sqlite3
+from contextlib import closing
 import stat
 import tempfile
 import time
@@ -23,7 +24,7 @@ class ProgrammeCompileTests(SimpleTestCase):
         self.addCleanup(lambda: [os.chmod(f, stat.S_IREAD | stat.S_IWRITE) for f in Path(temporaire.name).rglob("*") if f.is_file()])
         self.donnees = Path(temporaire.name)
         self.base = self.donnees / "erp.sqlite3"
-        with sqlite3.connect(self.base) as c:
+        with closing(sqlite3.connect(self.base)) as c, c:
             c.execute("CREATE TABLE t (n INTEGER)")
             c.execute("INSERT INTO t VALUES (1)")
         env = {"ERP_DONNEES": str(self.donnees), "SQLITE_FICHIER": str(self.base), "ERP_SAUVEGARDE_GARDER": "2",
@@ -33,7 +34,7 @@ class ProgrammeCompileTests(SimpleTestCase):
             self.addCleanup(patch.stop)
 
     def valeur(self, fichier):
-        with sqlite3.connect(fichier) as c:
+        with closing(sqlite3.connect(fichier)) as c, c:
             return c.execute("SELECT MAX(n) FROM t").fetchone()[0]
 
     def test_donnees_hors_du_dossier_du_programme(self):
@@ -44,7 +45,7 @@ class ProgrammeCompileTests(SimpleTestCase):
     def test_sauvegardes_controlees_en_lecture_seule_et_rotation(self):
         faites = []
         for n in (2, 3, 4):
-            with sqlite3.connect(self.base) as c:
+            with closing(sqlite3.connect(self.base)) as c, c:
                 c.execute("INSERT INTO t VALUES (?)", [n])
             fichier = lanceur.sauvegarder(self.base, self.donnees)
             os.utime(fichier, (time.time() + n, time.time() + n))   # dates distinctes
@@ -69,7 +70,7 @@ class ProgrammeCompileTests(SimpleTestCase):
 
     def test_restaurer_met_la_base_actuelle_de_cote(self):
         lanceur.sauvegarder(self.base, self.donnees)
-        with sqlite3.connect(self.base) as c:
+        with closing(sqlite3.connect(self.base)) as c, c:
             c.execute("INSERT INTO t VALUES (9)")
         self.assertEqual(lanceur.restaurer(self.donnees), 0)
         self.assertEqual(self.valeur(self.base), 1)

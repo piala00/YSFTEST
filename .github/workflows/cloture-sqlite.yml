@@ -5,6 +5,11 @@ on:
     branches:
       - ccr-5592a371-fusjt2
     paths:
+      - 'tests/test_cloture*.py'
+      - 'tests/test_reports_annuels_sqlite.py'
+      - 'tests/test_reprise*.py'
+      - 'outils/orchestration.py'
+      - 'tests/test_orchestration.py'
       - 'apps/core/catalogue_societes.py'
       - 'apps/core/cloture_annuelle_sqlite.py'
       - 'apps/core/test_cloture_annuelle_sqlite.py'
@@ -13,6 +18,11 @@ on:
       - '.github/workflows/cloture-sqlite.yml'
   pull_request:
     paths:
+      - 'tests/test_cloture*.py'
+      - 'tests/test_reports_annuels_sqlite.py'
+      - 'tests/test_reprise*.py'
+      - 'outils/orchestration.py'
+      - 'tests/test_orchestration.py'
       - 'apps/core/catalogue_societes.py'
       - 'apps/core/cloture_annuelle_sqlite.py'
       - 'apps/core/test_cloture_annuelle_sqlite.py'
@@ -22,14 +32,30 @@ on:
 
 jobs:
   sqlite-annual-close:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
       - name: Python syntax
         run: python -m compileall -q apps/core/catalogue_societes.py apps/core/cloture_annuelle_sqlite.py apps/core/test_cloture_annuelle_sqlite.py apps/core/reprise_configuration_sqlite.py apps/core/test_reprise_configuration_sqlite.py
       - name: Annual close regression tests
         run: python -m unittest -v apps.core.test_cloture_annuelle_sqlite apps.core.test_reprise_configuration_sqlite
+      - name: Dépendances des migrations Django
+        run: pip install -r requirements.txt
+      - name: Vérifier le lanceur
+        run: python -m unittest tests.test_orchestration -v
+      - name: Critères automatisés P0.3
+        run: python outils/orchestration.py p03 --execute --jobs 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preuves-p03-${{ matrix.os }}
+          path: work/preuves
+          if-no-files-found: error

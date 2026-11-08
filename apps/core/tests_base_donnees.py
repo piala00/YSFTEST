@@ -6,6 +6,7 @@ import os
 import tempfile
 import unittest
 import uuid
+from contextlib import closing
 
 from django.test import SimpleTestCase
 
@@ -60,25 +61,25 @@ class BaseSQLiteTests(SimpleTestCase):
             lignes = source.py(f"""
 import json
 from apps.core import base_donnees as bd
-print(json.dumps(bd.changer_de_moteur(bd.reglage_sqlite("{cible}"))))""")
+print(json.dumps(bd.changer_de_moteur(bd.reglage_sqlite({cible!r}))))""")
             self.assertGreater(lignes, 100)
             nouvelle = Dossier(travail, "nouvelle")
             self.assertEqual(nouvelle.py(COMPTES), source.py(COMPTES))
             # Une base d'un autre logiciel est refusée et laissée intacte
             import sqlite3
 
-            with sqlite3.connect(f"{travail}/autre.sqlite3") as c:
+            with closing(sqlite3.connect(f"{travail}/autre.sqlite3")) as c, c:
                 c.execute("CREATE TABLE F_COMPTET (CT_Num TEXT)")
             refus = source.py(f"""
 import json
 from apps.core import base_donnees as bd
 try:
-    bd.changer_de_moteur(bd.reglage_sqlite("{travail}/autre.sqlite3"))
+    bd.changer_de_moteur(bd.reglage_sqlite({(travail + '/autre.sqlite3')!r}))
     print(json.dumps("accepté"))
 except Exception as exc:
     print(json.dumps(str(exc)))""")
             self.assertIn("pas une base de l'ERP", refus)
-            with sqlite3.connect(f"{travail}/autre.sqlite3") as c:
+            with closing(sqlite3.connect(f"{travail}/autre.sqlite3")) as c, c:
                 self.assertEqual(c.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()[0], 1)
 
 
@@ -131,7 +132,7 @@ print(json.dumps(bd.restaurer_sqlserver(connections.databases["default"], {fichi
                 serveur.py(f"""
 import json
 from apps.core import base_donnees as bd
-print(json.dumps(bd.changer_de_moteur(bd.reglage_sqlite("{retour}"))))""")
+print(json.dumps(bd.changer_de_moteur(bd.reglage_sqlite({retour!r}))))""")
                 self.assertEqual(Dossier(travail, "retour").py(COMPTES), source.py(COMPTES))
             finally:
                 source.py(f"""

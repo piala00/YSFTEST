@@ -1,6 +1,7 @@
 """Tests d'intégrité de la création de la base annuelle N+1."""
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,7 +17,7 @@ class ClotureAnnuelleIntegriteTests(unittest.TestCase):
         self.n = dossier / "2026.sqlite3"
         self.n1 = dossier / "2027.sqlite3"
         self.catalogue = dossier / "societes.json"
-        with sqlite3.connect(self.n) as db:
+        with closing(sqlite3.connect(self.n)) as db, db:
             db.execute("CREATE TABLE django_migrations (id INTEGER PRIMARY KEY)")
             db.execute("CREATE TABLE auth_user (id INTEGER PRIMARY KEY)")
             db.execute("CREATE TABLE core_societe (id INTEGER PRIMARY KEY)")
@@ -44,7 +45,7 @@ class ClotureAnnuelleIntegriteTests(unittest.TestCase):
             "transport-2027", self.initialiser, reporter)
         self.assertEqual(resultat["exercice_precedent"], "transport-2026")
         self.assertEqual(resultat["exercice"], "2027")
-        with sqlite3.connect(self.n1) as db:
+        with closing(sqlite3.connect(self.n1)) as db, db:
             self.assertEqual(db.execute("SELECT * FROM report").fetchall(), [("411", 12500)])
             self.assertIsNone(db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='balance'").fetchone())

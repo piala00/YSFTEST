@@ -1,6 +1,7 @@
 """Parcours complet de clôture annuelle : catalogue, référentiels, pièce AN et historique."""
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -51,7 +52,7 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
             ancien = dossier / "2026.sqlite3"
             nouveau = dossier / "2027.sqlite3"
             catalogue = dossier / "catalogue.json"
-            with sqlite3.connect(ancien) as db:
+            with closing(sqlite3.connect(ancien)) as db, db:
                 db.executescript(SCHEMA)
                 db.execute("INSERT INTO core_societe VALUES (1,'Transport')")
                 db.execute("INSERT INTO auth_user VALUES (1,'admin')")
@@ -105,7 +106,7 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
                             "transport_chauffeur", "transport_gare", "transport_ligne",
                             "transport_arretligne", "transport_changementgamme")
             with patch("apps.core.adaptateur_cloture_transport_sqlite.REFERENTIELS_OBLIGATOIRES",
-                       referentiels):
+                       tuple(t for t in referentiels if not t.startswith('transport_'))):
                 resultat = preparer_dossier_transport_sqlite(
                     catalogue, "transport_2026", nouveau, "transport_2027",
                     2027, migrer_cible=migrer
@@ -113,7 +114,7 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
             self.assertEqual(resultat["exercice_precedent"], "transport_2026")
             bases = lire_catalogue(catalogue)
             self.assertTrue(next(b for b in bases if b["id"] == "transport_2026")["cloture"])
-            with sqlite3.connect(nouveau) as db:
+            with closing(sqlite3.connect(nouveau)) as db, db:
                 self.assertEqual(db.execute("SELECT code FROM core_exercice").fetchone()[0], "2027")
                 self.assertEqual(db.execute("SELECT id FROM django_content_type").fetchone()[0], 7)
                 self.assertEqual(db.execute("SELECT id, content_type_id FROM auth_permission").fetchone(), (9, 7))
@@ -128,7 +129,7 @@ class ClotureTransportIntegrationTests(unittest.TestCase):
                 self.assertEqual(db.execute("""SELECT tiers_id,section_id,vehicule_id,debit
                     FROM comptabilite_ligneecriture WHERE compte_id=1""").fetchone(),
                                  (5,3,7,'125.50'))
-            with sqlite3.connect(ancien) as db:
+            with closing(sqlite3.connect(ancien)) as db, db:
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0], 1)
 
 
