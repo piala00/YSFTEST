@@ -4,6 +4,7 @@ The duration log is flushed immediately so a global timeout still leaves the
 name and elapsed time of the last unfinished test in GitHub Actions logs.
 """
 import hashlib
+import atexit
 import faulthandler
 import os
 import subprocess
@@ -17,6 +18,16 @@ import unittest
 def instrument_tests():
     original_run = unittest.TestCase.run
     threshold = float(os.environ.get("SQL_TEST_SLOW_SECONDS", "15"))
+    durations = []
+
+    def report_slowest():
+        if not durations:
+            return
+        print(f"[SQL-TEST-SUMMARY] {len(durations)} tests timed; 20 slowest:", flush=True)
+        for elapsed, test_name in sorted(durations, reverse=True)[:20]:
+            print(f"[SQL-TEST-TOP] {elapsed:.3f}s {test_name}", flush=True)
+
+    atexit.register(report_slowest)
 
     def timed_run(self, result=None):
         test_name = self.id()
@@ -26,6 +37,7 @@ def instrument_tests():
             return original_run(self, result)
         finally:
             elapsed = time.monotonic() - started
+            durations.append((elapsed, test_name))
             marker = "SLOW" if elapsed >= threshold else "END"
             print(f"[SQL-TEST-{marker}] {elapsed:.3f}s {test_name}", flush=True)
 
