@@ -135,26 +135,31 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
     if total != 0:
         raise ValueError(f"balance d'ouverture déséquilibrée : {total} ; clôturer le résultat N")
     comptes = dict(cible.execute("SELECT numero, id FROM comptabilite_compte"))
-    if "tiers_id" in _colonnes(cible, "comptabilite_ligneecriture"):
-        _table(cible, "commercial_tiers")
+    # Valider les références en une lecture par table plutôt qu'une requête
+    # par ligne AN. Les grands livres ventilés par tiers/axe/véhicule peuvent
+    # contenir des milliers de soldes distincts.
+    references = (
+        ("tiers", "commercial_tiers", 1),
+        ("section analytique", "comptabilite_sectionanalytique", 2),
+        ("véhicule", "transport_vehicule", 3),
+    )
+    identifiants = {}
+    for libelle, table, position in references:
+        demandes = {cle[position] for cle, solde in soldes.items()
+                    if solde and cle[position] is not None}
+        if demandes:
+            _table(cible, table)
+            existants = {ligne[0] for ligne in cible.execute(f'SELECT id FROM "{table}"')}
+            manquants = demandes - existants
+            if manquants:
+                raise ValueError(f"{libelle} manquant dans N+1 : {min(manquants)}")
+        identifiants[libelle] = demandes
     insertions = []
     for (numero_compte, tiers_id, section_id, vehicule_id), solde in soldes.items():
         if not solde:
             continue
         if numero_compte not in comptes:
             raise ValueError(f"compte manquant dans N+1 : {numero_compte}")
-        if tiers_id is not None and not cible.execute(
-            "SELECT 1 FROM commercial_tiers WHERE id=?", (tiers_id,)
-        ).fetchone():
-            raise ValueError(f"tiers manquant dans N+1 : {tiers_id}")
-        if section_id is not None and not cible.execute(
-            "SELECT 1 FROM comptabilite_sectionanalytique WHERE id=?", (section_id,)
-        ).fetchone():
-            raise ValueError(f"section analytique manquante dans N+1 : {section_id}")
-        if vehicule_id is not None and not cible.execute(
-            "SELECT 1 FROM transport_vehicule WHERE id=?", (vehicule_id,)
-        ).fetchone():
-            raise ValueError(f"véhicule manquant dans N+1 : {vehicule_id}")
         insertions.append((comptes[numero_compte], tiers_id, section_id, vehicule_id, str(max(solde, 0)),
                            str(max(-solde, 0))))
     if not insertions:
