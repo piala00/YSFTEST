@@ -252,6 +252,15 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             with sqlite3.connect(ancien) as db:
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+            # Une seconde invocation ne doit ni rouvrir N, ni publier N+2,
+            # ni modifier les écritures à nouveau déjà produites.
+            from django.core.management.base import CommandError
+            catalogue_apres = catalogue.read_bytes()
+            with self.assertRaisesRegex(CommandError, 'déjà clôturé'):
+                call_command('cloturer_exercice', 'n', catalogue=str(catalogue), verbosity=0)
+            self.assertEqual(catalogue.read_bytes(), catalogue_apres)
+            with sqlite3.connect(suivant['base']) as db:
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
 
     def test_echec_balance_ne_publie_pas_n_plus_un(self):
         """Une pièce validée déséquilibrée doit laisser N et le catalogue intacts."""
