@@ -83,7 +83,16 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
     # Une seule lecture ordonnée du grand livre valide chaque pièce et
     # agrège les soldes. Sur SQL Server distant, éviter deux parcours complets
     # réduit les allers-retours sans supprimer aucune vérification métier.
-    totaux_pieces = {}
+    # ORDER BY e.id permet de vérifier chaque pièce en flux, sans conserver
+    # tous les totaux en mémoire sur les grands livres volumineux.
+    piece_courante = None
+    debit_piece = Decimal("0")
+    credit_piece = Decimal("0")
+
+    def verifier_piece(piece_id, debit, credit):
+        if piece_id is not None and (debit != credit or debit <= 0):
+            raise ValueError(f"pièce validée déséquilibrée en N : {piece_id}")
+
     soldes = defaultdict(lambda: Decimal("0.00"))
     gestion = defaultdict(lambda: Decimal("0.00"))
     lignes = source.execute("""
@@ -96,8 +105,11 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
         ORDER BY e.id, l.id
     """, (exercice_source_id,))
     for piece_id, numero_compte, tiers_id, section_id, vehicule_id, debit, credit in lignes:
-        if piece_id not in totaux_pieces:
-            totaux_pieces[piece_id] = [Decimal("0"), Decimal("0")]
+        if piece_id != piece_courante:
+            verifier_piece(piece_courante, debit_piece, credit_piece)
+            piece_courante = piece_id
+            debit_piece = Decimal("0")
+            credit_piece = Decimal("0")
         if debit is None or credit is None:
             raise ValueError(f"pièce validée sans ligne comptable : {piece_id}")
         d, cr = Decimal(str(debit)), Decimal(str(credit))
@@ -105,16 +117,14 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
             raise ValueError(f"ligne comptable invalide dans la pièce {piece_id}")
         if not numero_compte:
             raise ValueError("écriture sans numéro de compte")
-        totaux_pieces[piece_id][0] += d
-        totaux_pieces[piece_id][1] += cr
+        debit_piece += d
+        credit_piece += cr
         montant = d - cr
         if numero_compte[0] in "12345":
             soldes[(numero_compte, tiers_id, section_id, vehicule_id)] += montant
         elif numero_compte[0] in "678":
             gestion[numero_compte] += montant
-    for piece_id, (debit, credit) in totaux_pieces.items():
-        if debit != credit or debit <= 0:
-            raise ValueError(f"pièce validée déséquilibrée en N : {piece_id}")
+    verifier_piece(piece_courante, debit_piece, credit_piece)
 
     # La clôture des comptes de gestion doit avoir été réellement passée
     # en N ; leur solde global nul ne suffit pas si charges et produits
