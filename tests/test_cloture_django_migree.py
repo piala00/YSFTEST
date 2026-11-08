@@ -122,6 +122,14 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                     JOIN transport_vehicule AS veh ON historique.vehicule_id=veh.id
                     WHERE veh.immatriculation='CE-123-AA'""").fetchall())
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_arretligne').fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT ligne.code, gare.code, arret.ordre
+                    FROM transport_arretligne AS arret
+                    JOIN transport_ligne AS ligne ON ligne.id=arret.ligne_id
+                    JOIN transport_gare AS gare ON gare.id=arret.gare_id""").fetchall(),
+                    [('YDE-DLA', 'PVY', 1)])
+                self.assertEqual(db.execute("""SELECT section.code FROM transport_gare AS gare
+                    JOIN comptabilite_sectionanalytique AS section ON section.id=gare.section_id
+                    WHERE gare.code='YDE'""").fetchone()[0], 'G-YDE')
                 self.assertEqual(db.execute("""SELECT parent.code FROM transport_gare AS point
                     JOIN transport_gare AS parent ON point.rattachement_id=parent.id
                     WHERE point.code='PVY'""").fetchone()[0], 'YDE')
