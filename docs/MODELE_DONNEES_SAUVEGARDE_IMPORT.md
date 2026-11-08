@@ -28,10 +28,25 @@ commande, pour ne garder qu'un sens par mot et ranger les menus en conséquence 
   « Sauvegarde de fin de journée agence → direction » (F-BKP-03, qui est un **lot**, pas une
   restauration intégrale).
 
-### 3. Ouvrir une société (multi-société) — **consulter une autre base sans la mélanger**
-- Bascule vers une **autre base isolée** (autre société, autre agence, autre année) pour la
-  **consulter / y travailler**, sans toucher à la base courante.
+### 3. Ouvrir / Nouveau une société (multi-société) — **choisir la base dans laquelle TRAVAILLER**
+C'est le fonctionnement **normal** d'entrée dans le logiciel, **exactement comme Sage** (et non une
+simple consultation) :
+- Menu **Fichier → Ouvrir** = choisir la base (société / agence / **année**) dans laquelle
+  travailler ; **Fichier → Nouveau** = créer une société.
+- On **sélectionne la base** (ex. 2026) → l'écran **login** (utilisateur + mot de passe) apparaît →
+  on se connecte → on **travaille**.
+- Pour changer d'année/société : on se **déconnecte**, **Fichier → Ouvrir**, on choisit l'autre base
+  (ex. 2025), login, et on y travaille. Une année **clôturée** s'ouvre en **lecture seule**
+  (consultation) ; une année ouverte s'ouvre pour **travailler**. L'action « Ouvrir » est la même.
+- Chez le propriétaire, **chaque année = une base séparée** (une base par exercice) — d'où
+  l'importance de ce sélecteur.
 - Code : « Choix de la société » (`views_societes`), catalogue multi-sociétés, une base par année.
+  La bascule passe par un **redémarrage + login sur la nouvelle base** (déjà en place).
+
+> Lien avec la question « agence → direction » : si la direction veut seulement **regarder** la
+> base complète d'une agence, elle l'**ouvre** comme une société à part (lecture), au lieu de la
+> **restaurer** (qui écraserait sa propre base). Mais l'usage premier de « Ouvrir » reste de
+> **choisir la base de travail**, pas la consultation.
 
 ## Réponse à la question « agence sauvegarde → direction restaure »
 
