@@ -5,6 +5,7 @@ est un fichier SQLite migré par manage.py, sans schéma de test artificiel.
 """
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -58,24 +59,39 @@ LigneEcriture.objects.create(ecriture=e, compte=c2, credit=Decimal('125.50'))
 
 
 class ClotureDjangoMigreeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # La source Django migrée et peuplée est immuable : la préparer une
+        # seule fois, puis isoler chaque scénario dans sa propre copie SQLite.
+        # Chaque N+1 continue d'être migrée réellement par le code métier.
+        cls._fixture_temp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._fixture_temp.cleanup)
+        cls._fixture_source = Path(cls._fixture_temp.name) / 'source.sqlite3'
+        cls._fixture_source.touch()
+        with sqlite3.connect(cls._fixture_source) as db:
+            migrer_schema_django_sqlite(db)
+        env = os.environ.copy()
+        env.pop('DATABASE_URL', None)
+        env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(cls._fixture_source),
+                   MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                   ERP_LICENCE='0', RELAIS_ACTIF='0')
+        proc = subprocess.run(
+            [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', SEED],
+            cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+        )
+        if proc.returncode:
+            raise RuntimeError(proc.stdout + proc.stderr)
+
+    def _copier_source(self, chemin):
+        shutil.copy2(self._fixture_source, chemin)
+
     def test_cloture_migrations_reelles_et_balance(self):
         with tempfile.TemporaryDirectory() as temporaire:
             dossier = Path(temporaire)
             ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
             catalogue = dossier / 'catalogue.json'
-            ancien.touch()
-            with sqlite3.connect(ancien) as db:
-                migrer_schema_django_sqlite(db)
-            env = os.environ.copy()
-            env.pop('DATABASE_URL', None)
-            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
-                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
-                       ERP_LICENCE='0', RELAIS_ACTIF='0')
-            proc = subprocess.run(
-                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', SEED],
-                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
-            )
-            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self._copier_source(ancien)
             catalogue.write_text(json.dumps({'version': 1, 'bases': [{
                 'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
                 'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
@@ -199,19 +215,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             dossier = Path(temporaire)
             ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
             catalogue = dossier / 'catalogue.json'
-            ancien.touch()
-            with sqlite3.connect(ancien) as db:
-                migrer_schema_django_sqlite(db)
-            env = os.environ.copy()
-            env.pop('DATABASE_URL', None)
-            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
-                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
-                       ERP_LICENCE='0', RELAIS_ACTIF='0')
-            proc = subprocess.run(
-                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', SEED],
-                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
-            )
-            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self._copier_source(ancien)
             # Dégrader volontairement une pièce validée, sans désactiver les FK.
             with sqlite3.connect(ancien) as db:
                 db.execute("""UPDATE comptabilite_ligneecriture
