@@ -23,7 +23,7 @@ RACINE = Path(__file__).resolve().parents[1]
 SEED = """
 from datetime import date
 from decimal import Decimal
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
 from apps.core.models import Societe, Exercice, Agence
 from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
 from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, Chauffeur, ChangementGamme
@@ -33,6 +33,9 @@ Exercice.objects.create(code='2026', date_debut=date(2026,1,1), date_fin=date(20
 User.objects.create_user(username='controle', password='test-local-only')
 groupe = Group.objects.create(name='Guichet')
 User.objects.get(username='controle').groups.add(groupe)
+permission = Permission.objects.get(codename='view_user', content_type__app_label='auth')
+groupe.permissions.add(permission)
+User.objects.get(username='controle').user_permissions.add(permission)
 g1 = Gare.objects.create(code='YDE', nom='Yaoundé', ville='Yaoundé')
 g2 = Gare.objects.create(code='DLA', nom='Douala', ville='Douala')
 pv = Gare.objects.create(code='PVY', nom='Point de vente', ville='Yaoundé', type_gare='POINT_VENTE', rattachement=g1)
@@ -94,6 +97,17 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                     JOIN auth_user AS u ON ug.user_id=u.id
                     JOIN auth_group AS g ON ug.group_id=g.id""").fetchall(), [('controle', 'Guichet')])
                 self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], None)
+                self.assertEqual(db.execute("""SELECT COUNT(*) FROM auth_user_user_permissions AS up
+                    JOIN auth_permission AS p ON p.id=up.permission_id
+                    JOIN auth_user AS u ON u.id=up.user_id
+                    WHERE u.username='controle' AND p.codename='view_user'""").fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT COUNT(*) FROM auth_group_permissions AS gp
+                    JOIN auth_permission AS p ON p.id=gp.permission_id
+                    JOIN auth_group AS g ON g.id=gp.group_id
+                    WHERE g.name='Guichet' AND p.codename='view_user'""").fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT c.numero FROM core_agence AS a
+                    JOIN comptabilite_compte AS c ON c.id=a.compte_liaison_id
+                    WHERE a.code='CTR'""").fetchone()[0], '101000')
                 self.assertEqual(db.execute("SELECT code, nom, ville, locale, compte_liaison_id IS NOT NULL FROM core_agence").fetchall(), [('CTR', 'Agence Centre', 'Yaoundé', 1, 1)])
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_gare').fetchone()[0], 3)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
