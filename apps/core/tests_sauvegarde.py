@@ -36,6 +36,43 @@ class SauvegardeTests(TransactionTestCase):
         self.assertTrue(JournalEvenement.objects.filter(action="RESTAURATION").exists())
         self.assertLess(JournalEvenement.objects.count(), evenements_avant)
 
+    def test_sauvegarde_chiffree_puis_restauration(self):
+        from apps.core import coffre_sauvegarde as cs
+
+        self.client.force_login(self.admin)
+        url = reverse("commercial:sauvegarde")
+        mdp = "Coffre-fictif-2026"
+        reponse = self.client.post(url, {"action": "sauvegarder_chiffre",
+                                         "mot_de_passe": mdp, "mot_de_passe_confirmation": mdp})
+        self.assertEqual(reponse.status_code, 200)
+        self.assertIn(".erpcoffre", reponse["Content-Disposition"])
+        octets = reponse.content
+        self.assertTrue(cs.est_coffre(octets))
+        Tiers.objects.create(code="CAPRES", nom="Créé après la sauvegarde")
+        Tiers.objects.filter(code="CSAUVE").delete()
+
+        # Mauvais mot de passe : refus, aucune donnée touchée.
+        mauvais = SimpleUploadedFile("s.erpcoffre", octets, content_type="application/octet-stream")
+        self.client.post(url, {"action": "restaurer_chiffre", "confirmation": "RESTAURER",
+                               "mot_de_passe": "incorrect", "fichier": mauvais})
+        self.assertTrue(Tiers.objects.filter(code="CAPRES").exists())
+        self.assertFalse(Tiers.objects.filter(code="CSAUVE").exists())
+
+        # Bon mot de passe : restauration effective.
+        bon = SimpleUploadedFile("s.erpcoffre", octets, content_type="application/octet-stream")
+        self.client.post(url, {"action": "restaurer_chiffre", "confirmation": "RESTAURER",
+                               "mot_de_passe": mdp, "fichier": bon})
+        self.assertTrue(Tiers.objects.filter(code="CSAUVE").exists())
+        self.assertFalse(Tiers.objects.filter(code="CAPRES").exists())
+        self.assertTrue(JournalEvenement.objects.filter(action="RESTAURATION").exists())
+
+    def test_sauvegarde_chiffree_exige_mots_de_passe_concordants(self):
+        self.client.force_login(self.admin)
+        url = reverse("commercial:sauvegarde")
+        reponse = self.client.post(url, {"action": "sauvegarder_chiffre",
+                                         "mot_de_passe": "court", "mot_de_passe_confirmation": "court"})
+        self.assertEqual(reponse.status_code, 302)      # refusé (moins de 8 caractères), pas de téléchargement
+
     def test_fichier_refuse_sans_rien_modifier(self):
         for contenu in (b"pas du json", b'[{"model": "core.societe"}]'):
             with self.assertRaises(ValueError):

@@ -292,6 +292,47 @@ def sauvegarde(request, module):
         reponse = HttpResponse(contenu, content_type="application/json; charset=utf-8")
         reponse["Content-Disposition"] = f'attachment; filename="erp-sauvegarde-{timezone.localtime():%Y%m%d-%H%M}.json"'
         return reponse
+    if request.method == "POST" and request.POST.get("action") == "sauvegarder_chiffre":
+        from . import coffre_sauvegarde as cs
+
+        mot_de_passe = request.POST.get("mot_de_passe", "")
+        if len(mot_de_passe) < 8 or mot_de_passe != request.POST.get("mot_de_passe_confirmation", ""):
+            messages.error(request, "Choisissez un mot de passe d'au moins 8 caractères, saisi deux fois à l'identique.")
+            return redirect(request.path)
+        octets = cs.chiffrer(s.sauvegarder(), mot_de_passe)
+        journal.enregistrer("SAUVEGARDE", libelle=f"chiffrée, {len(octets) // 1024} Ko")
+        reponse = HttpResponse(octets, content_type="application/octet-stream")
+        reponse["Content-Disposition"] = f'attachment; filename="erp-sauvegarde-{timezone.localtime():%Y%m%d-%H%M}.erpcoffre"'
+        return reponse
+    if request.method == "POST" and request.POST.get("action") == "restaurer_chiffre":
+        from . import coffre_sauvegarde as cs
+
+        fichier = request.FILES.get("fichier")
+        if not fichier or request.POST.get("confirmation") != "RESTAURER":
+            messages.error(request, "Choisissez le fichier chiffré, saisissez le mot de passe et tapez RESTAURER pour confirmer.")
+            return redirect(request.path)
+        try:
+            contenu = cs.dechiffrer(fichier.read(), request.POST.get("mot_de_passe", ""))
+            s.lire(contenu)  # Refuser les anciens exports partiels avant toute opération.
+            from . import poste
+
+            if poste.disponible():
+                poste.appeler("sauvegarder")  # Une erreur empêche le remplacement.
+            entete = s.restaurer(contenu)
+        except (ValueError, UnicodeDecodeError) as exc:
+            messages.error(request, str(exc))
+        except Exception as exc:
+            messages.error(request, f"Restauration impossible, aucune donnée modifiée : {exc}")
+        else:
+            from django.contrib.auth import logout
+
+            auteur = request.user.get_username()
+            logout(request)
+            journal.enregistrer("RESTAURATION", libelle=f"sauvegarde chiffrée du {entete.get('date', '')[:16]}",
+                                details={"auteur_avant_restauration": auteur})
+            messages.success(request, f"Données restaurées depuis la sauvegarde chiffrée ({entete['objets']} enregistrements). "
+                                      "Reconnectez-vous si besoin.")
+        return redirect(request.path)
     if request.method == "POST" and request.POST.get("action") == "restaurer":
         fichier = request.FILES.get("fichier")
         if not fichier or request.POST.get("confirmation") != "RESTAURER":

@@ -24,6 +24,29 @@
       <input name="confirmation" class="form-control form-control-sm mb-2" placeholder="Tapez RESTAURER pour confirmer" autocomplete="off" required>
       <button class="btn btn-outline-danger"><i class="bi bi-upload"></i> Restaurer</button></form>
   </div></div>
+
+  <div class="col-lg-6"><div class="card card-body h-100 border-success-subtle">
+    <h2 class="h6"><i class="bi bi-shield-lock"></i> Sauvegarde chiffrée (anti-vol)</h2>
+    <p class="small text-muted">Produit un fichier <code>.erpcoffre</code> <strong>chiffré</strong> et
+      <strong>protégé par un mot de passe</strong> : transportable sur clé USB sans risque. Sans le mot de passe,
+      le fichier est inexploitable (un vol ou une copie ne révèle rien). Notez bien le mot de passe : il est
+      <strong>irrécupérable</strong>.</p>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="sauvegarder_chiffre">
+      <input type="password" name="mot_de_passe" class="form-control form-control-sm mb-2" placeholder="Mot de passe (8 caractères minimum)" autocomplete="new-password" minlength="8" required>
+      <input type="password" name="mot_de_passe_confirmation" class="form-control form-control-sm mb-2" placeholder="Confirmez le mot de passe" autocomplete="new-password" minlength="8" required>
+      <button class="btn btn-success"><i class="bi bi-shield-lock"></i> Télécharger la sauvegarde chiffrée</button></form>
+  </div></div>
+  <div class="col-lg-6"><div class="card card-body h-100 border-danger-subtle">
+    <h2 class="h6 text-danger"><i class="bi bi-unlock"></i> Restaurer une sauvegarde chiffrée</h2>
+    <p class="small text-muted">Restaure depuis un fichier <code>.erpcoffre</code>. Le <strong>mot de passe est exigé</strong> :
+      sans lui, la restauration est impossible. <strong>Toutes les données actuelles sont remplacées</strong> ; en cas
+      d'échec, rien n'est modifié.</p>
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="restaurer_chiffre">
+      <input type="file" name="fichier" accept=".erpcoffre,application/octet-stream" class="form-control form-control-sm mb-2" required>
+      <input type="password" name="mot_de_passe" class="form-control form-control-sm mb-2" placeholder="Mot de passe de la sauvegarde" autocomplete="off" required>
+      <input name="confirmation" class="form-control form-control-sm mb-2" placeholder="Tapez RESTAURER pour confirmer" autocomplete="off" required>
+      <button class="btn btn-outline-danger"><i class="bi bi-unlock"></i> Déchiffrer et restaurer</button></form>
+  </div></div>
   {% endif %}
 </div>
 {% endblock %}
