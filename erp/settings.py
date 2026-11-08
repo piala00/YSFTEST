@@ -205,6 +205,17 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
 ]
 
+# Un seul mot de passe par session de travail : l'activité prolonge la session (fenêtre
+# glissante), donc un utilisateur qui travaille n'a jamais à se reconnecter en cours de route.
+# La session ne se ferme pas non plus à la fermeture du navigateur (le programme compilé rouvre
+# un profil dédié stable). Durée réglable par ERP_SESSION_HEURES (défaut 1 semaine).
+try:
+    SESSION_COOKIE_AGE = max(1, int(env("ERP_SESSION_HEURES", "168"))) * 3600
+except (TypeError, ValueError):
+    SESSION_COOKIE_AGE = 168 * 3600
+SESSION_SAVE_EVERY_REQUEST = True           # fenêtre glissante : chaque page repousse l'échéance
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
 LANGUAGE_CODE = "fr"
 TIME_ZONE = env("TIME_ZONE", "Africa/Douala")
 USE_I18N = True
