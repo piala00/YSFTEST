@@ -217,6 +217,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
     def test_commande_cloture_sur_base_django_migree(self):
         """Le déclencheur public doit produire N+1, ses AN et le lien historique."""
         from django.core.management import call_command
+        from apps.core.management.commands.cloturer_exercice import Command
 
         with tempfile.TemporaryDirectory() as temporaire:
             dossier = Path(temporaire)
@@ -228,7 +229,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
                 'cloture': False,
             }]}), encoding='utf-8')
-            call_command('cloturer_exercice', 'n', catalogue=str(catalogue), verbosity=0)
+            call_command(Command(), 'n', catalogue=str(catalogue), verbosity=0)
             entrees = {entree['id']: entree for entree in lire_catalogue(catalogue)}
             self.assertEqual(len(entrees), 2)
             self.assertTrue(entrees['n']['cloture'])
@@ -257,7 +258,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             from django.core.management.base import CommandError
             catalogue_apres = catalogue.read_bytes()
             with self.assertRaisesRegex(CommandError, 'déjà clôturé'):
-                call_command('cloturer_exercice', 'n', catalogue=str(catalogue), verbosity=0)
+                call_command(Command(), 'n', catalogue=str(catalogue), verbosity=0)
             self.assertEqual(catalogue.read_bytes(), catalogue_apres)
             with sqlite3.connect(suivant['base']) as db:
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
