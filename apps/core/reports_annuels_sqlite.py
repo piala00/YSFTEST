@@ -80,49 +80,42 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
     # Une balance globalement équilibrée ne garantit pas l'intégrité des pièces.
     # Refuser les écritures validées individuellement déséquilibrées, y compris
     # lorsque deux erreurs opposées se compensent dans le grand livre.
+    # Une seule lecture ordonnée du grand livre valide chaque pièce et
+    # agrège les soldes. Sur SQL Server distant, éviter deux parcours complets
+    # réduit les allers-retours sans supprimer aucune vérification métier.
     totaux_pieces = {}
-    for piece_id, debit, credit in source.execute("""
-        SELECT e.id, l.debit, l.credit
+    soldes = defaultdict(lambda: Decimal("0.00"))
+    gestion = defaultdict(lambda: Decimal("0.00"))
+    lignes = source.execute("""
+        SELECT e.id, c.numero, l.tiers_id, l.section_id, l.vehicule_id,
+               l.debit, l.credit
         FROM comptabilite_ecriture e
         LEFT JOIN comptabilite_ligneecriture l ON l.ecriture_id=e.id
+        LEFT JOIN comptabilite_compte c ON c.id=l.compte_id
         WHERE e.exercice_id=? AND e.statut='VALIDEE'
         ORDER BY e.id, l.id
-    """, (exercice_source_id,)):
+    """, (exercice_source_id,))
+    for piece_id, numero_compte, tiers_id, section_id, vehicule_id, debit, credit in lignes:
         if piece_id not in totaux_pieces:
-            totaux_pieces[piece_id] = [Decimal("0"), Decimal("0"), 0]
+            totaux_pieces[piece_id] = [Decimal("0"), Decimal("0")]
         if debit is None or credit is None:
             raise ValueError(f"pièce validée sans ligne comptable : {piece_id}")
         d, cr = Decimal(str(debit)), Decimal(str(credit))
         if not d.is_finite() or not cr.is_finite() or d < 0 or cr < 0 or (d and cr) or (not d and not cr):
             raise ValueError(f"ligne comptable invalide dans la pièce {piece_id}")
-        totaux_pieces[piece_id][0] += d
-        totaux_pieces[piece_id][1] += cr
-        totaux_pieces[piece_id][2] += 1
-    for piece_id, (debit, credit, _) in totaux_pieces.items():
-        if debit != credit or debit <= 0:
-            raise ValueError(f"pièce validée déséquilibrée en N : {piece_id}")
-
-    # Ne jamais sommer des DECIMAL SQLite avec SUM() : SQLite convertit
-    # les montants en flottants binaires, ce qui peut modifier les centimes
-    # sur les grands livres volumineux. Agrégation exacte en Decimal.
-    lignes = source.execute("""
-        SELECT c.numero, l.tiers_id, l.section_id, l.vehicule_id, l.debit, l.credit
-        FROM comptabilite_ligneecriture l
-        JOIN comptabilite_ecriture e ON e.id=l.ecriture_id
-        JOIN comptabilite_compte c ON c.id=l.compte_id
-        WHERE e.exercice_id=? AND e.statut='VALIDEE'
-        ORDER BY c.numero, l.tiers_id, l.section_id, l.vehicule_id, l.id
-    """, (exercice_source_id,))
-    soldes = defaultdict(lambda: Decimal("0.00"))
-    gestion = defaultdict(lambda: Decimal("0.00"))
-    for numero_compte, tiers_id, section_id, vehicule_id, debit, credit in lignes:
         if not numero_compte:
             raise ValueError("écriture sans numéro de compte")
-        montant = Decimal(str(debit or 0)) - Decimal(str(credit or 0))
+        totaux_pieces[piece_id][0] += d
+        totaux_pieces[piece_id][1] += cr
+        montant = d - cr
         if numero_compte[0] in "12345":
             soldes[(numero_compte, tiers_id, section_id, vehicule_id)] += montant
         elif numero_compte[0] in "678":
             gestion[numero_compte] += montant
+    for piece_id, (debit, credit) in totaux_pieces.items():
+        if debit != credit or debit <= 0:
+            raise ValueError(f"pièce validée déséquilibrée en N : {piece_id}")
+
     # La clôture des comptes de gestion doit avoir été réellement passée
     # en N ; leur solde global nul ne suffit pas si charges et produits
     # s'annulent seulement entre eux.
