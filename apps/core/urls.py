@@ -13,5 +13,8 @@ urlpatterns = [
     path("installation/", views_poste.installation, name="installation"),
     path("poste/", views_poste.administration_poste, name="poste"),
     path("poste/base/", views_poste.base_donnees, name="base_donnees"),
+    # Sauvegarde intégrale (logique, .json / .erpcoffre) : même écran que le raccourci du menu
+    # Fichier, rangé dans le hub Administration du poste (module « core » → onglets du poste).
+    path("poste/sauvegarde/", views.sauvegarde, {"module": "core"}, name="sauvegarde_integrale"),
     path("poste/echanges/", views_poste.echanges_poste, name="echanges_poste"),
 ]

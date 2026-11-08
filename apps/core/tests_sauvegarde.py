@@ -73,6 +73,23 @@ class SauvegardeTests(TransactionTestCase):
                                          "mot_de_passe": "court", "mot_de_passe_confirmation": "court"})
         self.assertEqual(reponse.status_code, 302)      # refusé (moins de 8 caractères), pas de téléchargement
 
+    def test_sauvegarde_integrale_dans_le_hub_administration(self):
+        # Hub Administration du poste : l'écran de sauvegarde intégrale y est accessible (onglets affichés).
+        self.client.force_login(self.admin)
+        reponse = self.client.get(reverse("core:sauvegarde_integrale"))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, 'aria-label="Administration du poste"')   # onglets du hub présents
+        self.assertContains(reponse, "Copies &amp; miroir de la base")          # onglet moteur renommé
+        self.assertContains(reponse, "toutes les données de la société")        # texte d'intro intégrale
+        self.assertContains(reponse, "sauvegarder_chiffre")                     # écran complet (chiffré) inclus
+
+    def test_raccourci_fichier_sauvegarde_sans_onglets_poste(self):
+        # Même écran depuis le menu Fichier (raccourci) : sans les onglets du hub.
+        self.client.force_login(self.admin)
+        reponse = self.client.get(reverse("commercial:sauvegarde"))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertNotContains(reponse, 'aria-label="Administration du poste"')
+
     def test_fichier_refuse_sans_rien_modifier(self):
         for contenu in (b"pas du json", b'[{"model": "core.societe"}]'):
             with self.assertRaises(ValueError):

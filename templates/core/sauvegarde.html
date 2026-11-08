@@ -2,6 +2,10 @@
 {% block title %}Sauvegarde et restauration{% endblock %}
 {% block content %}
 <div class="page-title"><h1><i class="bi bi-hdd" style="color:var(--module)"></i> Sauvegarde et restauration</h1></div>
+{% if onglet_poste %}{% include "core/_onglets_poste.html" %}{% endif %}
+<p class="small text-muted">Sauvegarde <strong>intégrale</strong> du logiciel (toutes les données de la société),
+  à conserver en lieu sûr et à restaurer sur votre propre poste après un sinistre. Pour les copies
+  automatiques de la base et la copie miroir SQL Server, voir « Base de données ».</p>
 {% if not pro_ok %}<div class="alert alert-warning d-flex align-items-center gap-2">
   <i class="bi bi-lock"></i><span>{{ pro_message }}</span>
   <a class="btn btn-sm btn-primary ms-auto" href="{% url 'licence' %}">Déposer une licence</a></div>{% endif %}

@@ -360,7 +360,10 @@ def sauvegarde(request, module):
                 messages.success(request, f"Données restaurées ({entete['objets']} enregistrements). "
                                           "Reconnectez-vous si besoin.")
         return redirect(request.path)
-    return render(request, "core/sauvegarde.html", {"pro_ok": pro_ok, "pro_message": pro_message})
+    contexte = {"pro_ok": pro_ok, "pro_message": pro_message}
+    if module == "core":          # accès depuis le hub « Administration du poste » : afficher ses onglets
+        contexte["onglet_poste"] = "sauvegarde_integrale"
+    return render(request, "core/sauvegarde.html", contexte)
 
 
 def reprise_dossier(request, module):
