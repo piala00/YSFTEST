@@ -214,6 +214,45 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], '2026-12-31')
 
 
+    def test_commande_cloture_sur_base_django_migree(self):
+        """Le déclencheur public doit produire N+1, ses AN et le lien historique."""
+        from django.core.management import call_command
+
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien = dossier / 'n.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            call_command('cloturer_exercice', 'n', catalogue=str(catalogue), verbosity=0)
+            entrees = {entree['id']: entree for entree in lire_catalogue(catalogue)}
+            self.assertEqual(len(entrees), 2)
+            self.assertTrue(entrees['n']['cloture'])
+            suivant = next(entree for entree in entrees.values()
+                           if entree['id'] != 'n')
+            self.assertEqual(suivant['exercice_precedent'], 'n')
+            self.assertEqual(str(suivant['exercice']), '2027')
+            with sqlite3.connect(suivant['base']) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture WHERE origine='CLOTURE_ANNUELLE'"
+                ).fetchone()[0], 1)
+                montants = db.execute(
+                    'SELECT debit, credit FROM comptabilite_ligneecriture'
+                ).fetchall()
+                self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                 sum(Decimal(str(c)) for _, c in montants))
+                self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                 Decimal('125.50'))
+            with sqlite3.connect(ancien) as db:
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+
     def test_echec_balance_ne_publie_pas_n_plus_un(self):
         """Une pièce validée déséquilibrée doit laisser N et le catalogue intacts."""
         with tempfile.TemporaryDirectory() as temporaire:
