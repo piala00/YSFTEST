@@ -890,7 +890,7 @@ def interface(essai=False):
     def atelier():
         return Path(v['dossier'].get())
 
-    def identite(role):
+    def dossier_identite(role):
         """Sous-dossier d'identité de l'atelier : Clients\\ (production) ou Developpeur\\ (essais)."""
         return sous_dossier_role(atelier(), role)
 
@@ -985,7 +985,7 @@ def interface(essai=False):
             'Coffre du propriétaire', texte, show='*', parent=fen)
 
     def ouvrir_coffre(dossier=None):
-        dossier = Path(dossier) if dossier else identite(ROLE_CLIENTS)
+        dossier = Path(dossier) if dossier else dossier_identite(ROLE_CLIENTS)
         try:
             cle = session.ouvrir(chemin_coffre(dossier), lambda: demander_mdp('Mot de passe — une fois pour cette session :'))
             if cle:
@@ -1007,7 +1007,7 @@ def interface(essai=False):
             cle = ouvrir_coffre()
             if cle is None:
                 return
-            fichier = creer_autorisation_installation(cle, code, resultat_installation.get(), fin, str(identite(ROLE_CLIENTS)))
+            fichier = creer_autorisation_installation(cle, code, resultat_installation.get(), fin, str(dossier_identite(ROLE_CLIENTS)))
             statut_installation.configure(text=f'Autorisation signée créée : {fichier.name}. Ce fichier ne remplace pas la licence d’exploitation.')
         except (OSError, ValueError, SystemExit) as exc:
             erreur(exc)
@@ -1047,7 +1047,7 @@ def interface(essai=False):
         if not mdp:
             return
         try:
-            chemin = regrouper_identite(source, str(identite(ROLE_CLIENTS)), mdp.encode())
+            chemin = regrouper_identite(source, str(dossier_identite(ROLE_CLIENTS)), mdp.encode())
             session.ouvrir(chemin, lambda: mdp)
             etat.set('Identité rassemblée au format binaire. L’original est conservé à son emplacement.')
             memoriser()
@@ -1063,7 +1063,7 @@ def interface(essai=False):
     ttk.Button(cadre_identite, text='Verrouiller', command=verrouiller).pack(side='left')
     def guide():
         try:
-            fichier=ecrire_guide(str(identite(ROLE_CLIENTS)))
+            fichier=ecrire_guide(str(dossier_identite(ROLE_CLIENTS)))
             etat.set(f'Guide disponible : {fichier.name}')
             if os.name=='nt' and not essai:
                 os.startfile(fichier)
@@ -1135,15 +1135,15 @@ def interface(essai=False):
     def rafraichir(*_):
         registre.delete(*registre.get_children())
         try:
-            choix_client['values']=list(clients_connus(identite(ROLE_CLIENTS)))
-            for l in reversed(registre_lignes(identite(ROLE_CLIENTS))):
+            choix_client['values']=list(clients_connus(dossier_identite(ROLE_CLIENTS)))
+            for l in reversed(registre_lignes(dossier_identite(ROLE_CLIENTS))):
                 registre.insert('', 'end', values=(l['numero'],l['client'],l['postes'],l['valable_jusqu_au'] or 'Permanente'))
         except (OSError,ValueError,KeyError) as exc:
             etat.set(f'Registre non disponible : {exc}')
 
     def generer():
         try:
-            clients=identite(ROLE_CLIENTS)
+            clients=dossier_identite(ROLE_CLIENTS)
             if not chemin_coffre(clients).exists():
                 raise ValueError('Créez d’abord l’identité Clients (bouton « Créer identité Clients »).')
             if not v['client'].get().strip():
@@ -1169,7 +1169,7 @@ def interface(essai=False):
             selection=registre.selection()
             if selection:
                 numero=registre.item(selection[0],'values')[0]
-                chemin=next((Path(l['fichier']) for l in registre_lignes(identite(ROLE_CLIENTS)) if l['numero']==numero),chemin)
+                chemin=next((Path(l['fichier']) for l in registre_lignes(dossier_identite(ROLE_CLIENTS)) if l['numero']==numero),chemin)
             if not chemin:
                 raise ValueError('Générez ou sélectionnez une licence dans la liste.')
             fichier=exporter_client(chemin,Path(chemin).parent)
@@ -1185,7 +1185,7 @@ def interface(essai=False):
             if len(selection)!=1:
                 raise ValueError('Sélectionnez la licence à supprimer dans la liste.')
             numero=registre.item(selection[0],'values')[0]
-            detail=preparer_suppression(identite(ROLE_CLIENTS),numero)
+            detail=preparer_suppression(dossier_identite(ROLE_CLIENTS),numero)
             texte=(f"Licence : {detail['numero']}\nSociété : {detail['client']}\n"
                    f"Édition : {detail['edition']} — {detail['postes']} postes\nServeur : {detail['machine']}\n"
                    f"Fichier : {Path(detail['fichier']).name}\n\n"
@@ -1196,7 +1196,7 @@ def interface(essai=False):
             if not confirme:
                 etat.set('Suppression annulée ; aucun fichier déplacé.')
                 return
-            supprimer_licence(identite(ROLE_CLIENTS),detail,confirme=True)
+            supprimer_licence(dossier_identite(ROLE_CLIENTS),detail,confirme=True)
             if derniere_licence[0] and str(derniere_licence[0].resolve())==detail['fichier']:
                 derniere_licence[0]=None
             rafraichir()
@@ -1206,7 +1206,7 @@ def interface(essai=False):
 
     def generer_developpeur():
         try:
-            dev=identite(ROLE_DEV)
+            dev=dossier_identite(ROLE_DEV)
             if not chemin_coffre(dev).exists():
                 raise ValueError('Créez d’abord l’identité Développeur (bouton « Créer identité Développeur »).')
             cle=ouvrir_coffre(dev)
@@ -1246,8 +1246,8 @@ def interface(essai=False):
             migres=migrer_coffre_racine(atelier())            # déplace un ancien coffre racine vers Clients\ (copie de sécurité)
         except OSError:
             pass
-        cli='présente' if chemin_coffre(identite(ROLE_CLIENTS)).exists() else 'à créer'
-        dev='présente' if chemin_coffre(identite(ROLE_DEV)).exists() else 'à créer'
+        cli='présente' if chemin_coffre(dossier_identite(ROLE_CLIENTS)).exists() else 'à créer'
+        dev='présente' if chemin_coffre(dossier_identite(ROLE_DEV)).exists() else 'à créer'
         prefixe=('Coffre de production déplacé dans Clients\\ (copie de sécurité conservée). ' if migres else '')
         etat.set(f'{prefixe}Atelier : identité Clients {cli}, identité Développeur {dev}. '
                  '« Générer la licence » utilise Clients ; « Licence développeur » utilise Développeur.')
