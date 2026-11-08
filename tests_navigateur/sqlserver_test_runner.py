@@ -10,6 +10,7 @@ import os
 import subprocess
 from pathlib import Path
 import runpy
+import signal
 import sys
 import time
 import unittest
@@ -28,6 +29,18 @@ def instrument_tests():
             print(f"[SQL-TEST-TOP] {elapsed:.3f}s {test_name}", flush=True)
 
     atexit.register(report_slowest)
+
+    # GNU timeout sends SIGTERM: atexit handlers do not run for this signal.
+    # Preserve the original termination semantics while retaining diagnostics.
+    def on_termination(signum, frame):
+        print(f"[SQL-TEST-TERMINATED] signal={signum}", flush=True)
+        report_slowest()
+        faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, on_termination)
 
     def timed_run(self, result=None):
         test_name = self.id()
