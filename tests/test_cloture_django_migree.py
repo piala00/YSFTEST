@@ -304,5 +304,43 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
 
 
+    def test_commande_refuse_balance_invalide_sans_publier(self):
+        """Le point d'entrée public doit garantir l'atomicité d'une clôture refusée."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien = dossier / 'n.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with sqlite3.connect(ancien) as db:
+                db.execute("UPDATE comptabilite_ligneecriture SET credit=124.50 WHERE credit>0")
+                db.commit()
+            original = {'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}
+            catalogue.write_text(json.dumps(original), encoding='utf-8')
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                       ERP_LICENCE='0', RELAIS_ACTIF='0')
+            nouveau = dossier / 'n1.sqlite3'
+            commande = [sys.executable, str(RACINE / 'manage.py'),
+                        'cloturer_exercice', 'n', '--catalogue', str(catalogue),
+                        '--destination', str(nouveau), '--nouvel-identifiant', 'n1']
+            execution = subprocess.run(commande, cwd=RACINE, env=env,
+                                       capture_output=True, text=True, timeout=180)
+            self.assertNotEqual(execution.returncode, 0)
+            self.assertIn('pièce validée déséquilibrée',
+                          execution.stdout + execution.stderr)
+            self.assertFalse(nouveau.exists())
+            self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
+            with sqlite3.connect(ancien) as db:
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT credit FROM comptabilite_ligneecriture WHERE credit>0').fetchone()[0], 124.5)
+
+
 if __name__ == '__main__':
     unittest.main()
