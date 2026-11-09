@@ -216,9 +216,9 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
 
     def test_commande_cloture_sur_base_django_migree(self):
         """Le déclencheur public doit produire N+1, ses AN et le lien historique."""
-        from django.core.management import call_command
-        from apps.core.management.commands.cloturer_exercice import Command
-
+        # Passer par manage.py dans un processus distinct : call_command(Command())
+        # contourne la découverte publique des commandes et avait masqué
+        # l'erreur "Unknown command: cloturer_exercice" en CI.
         with tempfile.TemporaryDirectory() as temporaire:
             dossier = Path(temporaire)
             ancien = dossier / 'n.sqlite3'
@@ -229,7 +229,17 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
                 'cloture': False,
             }]}), encoding='utf-8')
-            call_command(Command(), 'n', catalogue=str(catalogue), verbosity=0)
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                       ERP_LICENCE='0', RELAIS_ACTIF='0')
+            commande = [sys.executable, str(RACINE / 'manage.py'),
+                        'cloturer_exercice', 'n', '--catalogue', str(catalogue)]
+            execution = subprocess.run(commande, cwd=RACINE, env=env,
+                                       capture_output=True, text=True, timeout=180)
+            self.assertEqual(execution.returncode, 0,
+                             execution.stdout + execution.stderr)
             entrees = {entree['id']: entree for entree in lire_catalogue(catalogue)}
             self.assertEqual(len(entrees), 2)
             self.assertTrue(entrees['n']['cloture'])
@@ -255,10 +265,11 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
             # Une seconde invocation ne doit ni rouvrir N, ni publier N+2,
             # ni modifier les écritures à nouveau déjà produites.
-            from django.core.management.base import CommandError
             catalogue_apres = catalogue.read_bytes()
-            with self.assertRaisesRegex(CommandError, 'déjà clôturé'):
-                call_command(Command(), 'n', catalogue=str(catalogue), verbosity=0)
+            seconde = subprocess.run(commande, cwd=RACINE, env=env,
+                                     capture_output=True, text=True, timeout=60)
+            self.assertNotEqual(seconde.returncode, 0)
+            self.assertIn('déjà clôturé', seconde.stdout + seconde.stderr)
             self.assertEqual(catalogue.read_bytes(), catalogue_apres)
             with sqlite3.connect(suivant['base']) as db:
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
