@@ -350,7 +350,12 @@ def solde_tresorerie(compte, jusqua):
 
     lignes = LigneEcriture.objects.filter(compte=compte, ecriture__date__lte=jusqua, ecriture__site_origine="",
                                           ecriture__statut=Ecriture.STATUT_VALIDEE)
-    return sum((l.debit - l.credit for l in lignes), ZERO)
+    # Agréger côté SQL : ne pas matérialiser toutes les lignes historiques à
+    # chaque contrôle de caisse (simulation multi-mois et guichet réel).
+    from django.db.models import Sum
+
+    totaux = lignes.aggregate(total_debit=Sum("debit"), total_credit=Sum("credit"))
+    return (totaux["total_debit"] or ZERO) - (totaux["total_credit"] or ZERO)
 
 
 @transaction.atomic
