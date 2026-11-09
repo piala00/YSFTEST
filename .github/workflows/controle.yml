@@ -316,9 +316,25 @@ jobs:
         shell: pwsh
         run: |
           $dist = "dist\ERP-OHADA-${{ matrix.nom }}"
-          Invoke-WebRequest "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe" -OutFile "$env:RUNNER_TEMP\winsw.exe"
-          $empreinte = (Get-FileHash "$env:RUNNER_TEMP\winsw.exe" -Algorithm SHA256).Hash
-          if ($empreinte -ne "05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA") { throw "WinSW : empreinte inattendue ($empreinte)" }
+          $source = "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe"
+          $destination = "$env:RUNNER_TEMP\winsw.exe"
+          $attendue = "05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA"
+          $telecharge = $false
+          for ($tentative = 1; $tentative -le 3; $tentative++) {
+            try {
+              Invoke-WebRequest $source -OutFile $destination -TimeoutSec 60 -ErrorAction Stop
+              $empreinte = (Get-FileHash $destination -Algorithm SHA256).Hash
+              if ($empreinte -ne $attendue) { throw "WinSW : empreinte inattendue ($empreinte)" }
+              $telecharge = $true
+              break
+            } catch {
+              Remove-Item $destination -ErrorAction SilentlyContinue
+              if ($tentative -eq 3) { throw }
+              Write-Warning "WinSW : tentative $tentative/3 échouée : $_"
+              Start-Sleep -Seconds (5 * $tentative)
+            }
+          }
+          if (-not $telecharge) { throw "WinSW : téléchargement non vérifié" }
           Copy-Item "$env:RUNNER_TEMP\winsw.exe" "$dist\ERP-OHADA-${{ matrix.nom }}-service.exe"
           (Get-Content deploy\installateur\service.xml -Raw).Replace("@EDITION@", "${{ matrix.nom }}").Replace("@PORT@", "${{ matrix.port }}") |
             Set-Content "$dist\ERP-OHADA-${{ matrix.nom }}-service.xml" -Encoding utf8
