@@ -56,6 +56,42 @@ def instrument_tests():
 
     unittest.TestCase.run = timed_run
 
+    # Les lenteurs de setUpClass/tearDownClass ne passent pas par TestCase.run.
+    # Le runner Django les déclenche via unittest.TestSuite : instrumenter ces
+    # points pour distinguer préparation de données, attente SQL et test métier.
+    original_class_setup = unittest.TestSuite._handleClassSetUp
+    original_class_teardown = unittest.TestSuite._tearDownPreviousClass
+
+    def timed_class_setup(self, test, result):
+        previous = getattr(result, "_previousTestClass", None)
+        current = test.__class__
+        if previous is current:
+            return original_class_setup(self, test, result)
+        started = time.monotonic()
+        print(f"[SQL-FIXTURE-START] setUpClass {current.__module__}.{current.__qualname__}", flush=True)
+        try:
+            return original_class_setup(self, test, result)
+        finally:
+            print(f"[SQL-FIXTURE-END] setUpClass {current.__module__}.{current.__qualname__} "
+                  f"{time.monotonic() - started:.3f}s", flush=True)
+
+    def timed_class_teardown(self, test, result):
+        previous = getattr(result, "_previousTestClass", None)
+        current = test.__class__ if test is not None else None
+        if previous is None or previous is current:
+            return original_class_teardown(self, test, result)
+        started = time.monotonic()
+        name = f"{previous.__module__}.{previous.__qualname__}"
+        print(f"[SQL-FIXTURE-START] tearDownClass {name}", flush=True)
+        try:
+            return original_class_teardown(self, test, result)
+        finally:
+            print(f"[SQL-FIXTURE-END] tearDownClass {name} "
+                  f"{time.monotonic() - started:.3f}s", flush=True)
+
+    unittest.TestSuite._handleClassSetUp = timed_class_setup
+    unittest.TestSuite._tearDownPreviousClass = timed_class_teardown
+
 
 def instrument_database_lifecycle():
     """Expose the expensive Django database phases separately from test bodies."""
