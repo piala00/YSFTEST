@@ -632,6 +632,51 @@ def initialiser(edition_, donnees, demander_compte=True):
         print("  puis renseigner la société et le rôle de ce serveur (direction, agence ou site unique).")
 
 
+def inscrire_base_au_catalogue(donnees):
+    """Inscrit la base de la société au catalogue multi-sociétés, sans jamais bloquer le démarrage.
+
+    Rend « Ouvrir une société » et la clôture annuelle utilisables : la base courante apparaît dans
+    le catalogue dès que la société a été nommée (assistant de premier démarrage terminé). C'est une
+    fonction de confort : toute erreur est ignorée et le logiciel démarre quoi qu'il arrive.
+    """
+    try:
+        catalogue = os.environ.get("ERP_CATALOGUE_SOCIETES", "").strip()
+        base = base_sqlite()
+        if not catalogue or base is None:
+            return
+        from django.core.management import call_command
+        from apps.core.catalogue_societes import lire_catalogue
+        from apps.core.models import Exercice, Societe
+
+        societe = Societe.objects.first()
+        if societe is None or not societe.assistant_termine:
+            return                                    # attendre le vrai nom (assistant de premier démarrage)
+        exercice = (Exercice.objects.filter(cloture=False).order_by("-date_fin").first()
+                    or Exercice.objects.order_by("-date_fin").first())
+        if exercice is None or not (len(exercice.code) == 4 and exercice.code.isdigit()):
+            return                                    # le catalogue attend une année AAAA
+        cible = str(base.resolve())
+        try:
+            existantes = lire_catalogue(catalogue) if Path(catalogue).is_file() else []
+        except (OSError, ValueError):
+            return
+        for entree in existantes:
+            if entree.get("moteur") == "sqlite":
+                try:
+                    if Path(entree["base"]).resolve() == Path(cible):
+                        return                        # déjà inscrite : rien à faire
+                except OSError:
+                    continue
+        call_command("inscrire_base_catalogue", societe=societe.raison_sociale, agence="Siège",
+                     exercice=exercice.code, base=cible, catalogue=catalogue)
+        journal(f"Base inscrite au catalogue multi-sociétés : {societe.raison_sociale} ({exercice.code})")
+    except Exception as exc:                          # confort : ne jamais empêcher le démarrage
+        try:
+            journal(f"Catalogue multi-sociétés : inscription ignorée ({str(exc)[:160]})")
+        except Exception:
+            pass
+
+
 def _navigateur_chromium():
     """Chemin d'un navigateur Chromium récent (Edge puis Chrome) sur Windows, sinon None.
 
@@ -937,7 +982,11 @@ def main(argv):
         marqueur.unlink()
         journal(f"Restauration SQL Server depuis {fichier} (base actuelle sauvegardée dans "
                 f"{restaurer_sqlserver(settings.DATABASES['default'], fichier)})")
+    if not os.environ.get("ERP_DOSSIER_SIMULATION"):
+        # Catalogue multi-sociétés du poste (pour « Ouvrir une société » et la clôture annuelle).
+        os.environ.setdefault("ERP_CATALOGUE_SOCIETES", str(donnees / "societes.json"))
     initialiser(edition_, donnees)
+    inscrire_base_au_catalogue(donnees)              # confort, jamais bloquant
     from apps.licences.licence import proteger_ancienne_installation
 
     proteger_ancienne_installation(donnees)
