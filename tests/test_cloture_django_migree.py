@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 
@@ -68,7 +69,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
         cls.addClassCleanup(cls._fixture_temp.cleanup)
         cls._fixture_source = Path(cls._fixture_temp.name) / 'source.sqlite3'
         cls._fixture_source.touch()
-        with sqlite3.connect(cls._fixture_source) as db:
+        with closing(sqlite3.connect(cls._fixture_source)) as db:
             migrer_schema_django_sqlite(db)
         env = os.environ.copy()
         env.pop('DATABASE_URL', None)
@@ -87,8 +88,8 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
         # seulement le fichier principal avec shutil.copy2 perd ces écritures.
         # backup() produit un instantané SQLite cohérent, WAL compris, tout en
         # conservant une base indépendante pour chaque scénario.
-        with sqlite3.connect(self._fixture_source) as source:
-            with sqlite3.connect(chemin) as cible:
+        with closing(sqlite3.connect(self._fixture_source)) as source:
+            with closing(sqlite3.connect(chemin)) as cible:
                 source.backup(cible)
 
     def test_cloture_migrations_reelles_et_balance(self):
