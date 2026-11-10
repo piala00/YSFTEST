@@ -25,6 +25,7 @@ class SoldeTresorerieAggregationTests(TestCase):
         )
         jour = datetime.date(2026, 1, 10)
         lendemain = jour + datetime.timedelta(days=1)
+        solde_initial = solde_tresorerie(self.compte, jour - datetime.timedelta(days=1))
         creer_ecriture(
             self.journal, jour, "Entrée test agrégation",
             [{"compte": self.compte, "debit": Decimal("15000")},
@@ -40,6 +41,6 @@ class SoldeTresorerieAggregationTests(TestCase):
             [{"compte": self.compte, "debit": Decimal("2000")},
              {"compte": contrepartie, "credit": Decimal("2000")}],
         )
-        self.assertEqual(solde_tresorerie(self.compte, jour - datetime.timedelta(days=1)), Decimal("0"))
-        self.assertEqual(solde_tresorerie(self.compte, jour), Decimal("11000"))
-        self.assertEqual(solde_tresorerie(self.compte, lendemain), Decimal("13000"))
+        self.assertEqual(solde_tresorerie(self.compte, jour - datetime.timedelta(days=1)), solde_initial)
+        self.assertEqual(solde_tresorerie(self.compte, jour), solde_initial + Decimal("11000"))
+        self.assertEqual(solde_tresorerie(self.compte, lendemain), solde_initial + Decimal("13000"))
