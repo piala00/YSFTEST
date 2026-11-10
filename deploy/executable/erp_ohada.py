@@ -906,12 +906,15 @@ def main(argv):
                 metier += ["--departs-jour", str(criteres["departs_jour"]), "--echelle", str(criteres["echelle"])]
                 if rapide and criteres["scenarios_complets"]:
                     metier += ["--departs-jour", "4"]
-                call_command("simulation", "--mois", debut, *periode, *metier, *rapide,
+                from apps.transport.management.commands.simulation import Command as _CommandeSimulation
+                cmd = _CommandeSimulation()
+                call_command(cmd, "--mois", debut, *periode, *metier, *rapide,
                              "--journal-scenarios", str(donnees / "SCENARIOS-SIMULATION.json"),
                              "--rapport", str(donnees / "BILAN-SIMULATION.md"))
                 initialiser(edition_, donnees, demander_compte=False)
                 Societe.objects.update(assistant_termine=True)
-                ds.terminer(donnees)
+                dernier = str(cmd.par_mois[-1][1])[:7] if getattr(cmd, "par_mois", None) else ""
+                ds.terminer(donnees, interrompu=getattr(cmd, "interrompu", False), dernier_mois=dernier)
                 return 0
             except Exception as exc:
                 ds.terminer(donnees, str(exc))

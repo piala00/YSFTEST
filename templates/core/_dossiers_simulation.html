@@ -8,7 +8,8 @@
   <div class="alert alert-info small">Ouvrir un autre dossier sauvegarde le dossier courant puis redémarre le serveur. Tous les postes connectés changent de dossier et doivent se reconnecter. Terminez les saisies avant de confirmer. Votre société reste conservée à son emplacement.</div>
   {% for d in etat.simulations %}
   <section class="border rounded p-2 mb-2">
-    <div class="d-flex flex-wrap gap-2"><strong>{{ d.nom }}</strong><span class="badge text-bg-secondary">{{ d.etat }}</span>{% if d.actif %}<span class="badge text-bg-warning">Dossier ouvert</span>{% endif %}</div>
+    <div class="d-flex flex-wrap gap-2"><strong>{{ d.nom }}</strong><span class="badge text-bg-secondary">{{ d.etat }}</span>{% if d.interrompu %}<span class="badge text-bg-warning">interrompue{% if d.dernier_mois %} après {{ d.dernier_mois }}{% endif %}</span>{% endif %}{% if d.actif %}<span class="badge text-bg-warning">Dossier ouvert</span>{% endif %}</div>
+    {% if d.interrompu and d.etat == 'prete' %}<div class="small text-muted mt-1">Génération arrêtée volontairement : données partielles mais complètes et consultables. Vous pouvez ouvrir ce dossier, le télécharger, ou le supprimer et relancer une génération plus longue.</div>{% endif %}
     {% if d.erreur %}<div class="text-danger small">{{ d.erreur }}</div>{% endif %}
     {% if d.etat == 'preparation' %}<div class="small mt-1">Génération en préparation, parfois longue selon le nombre de mois. Vous pouvez fermer cette page et revenir ici.</div>
       <form method="post" class="mt-1">{% csrf_token %}<button class="btn btn-sm btn-outline-warning" name="action" value="simulation_arreter">Arrêter la génération</button>

@@ -193,11 +193,14 @@ def creer(racine, debut, duree, criteres=None):
     return identifiant, dossier
 
 
-def terminer(dossier, erreur=""):
+def terminer(dossier, erreur="", interrompu=False, dernier_mois=""):
+    """Clôt une génération. interrompu=True : arrêt propre demandé (données partielles mais
+    valides et consultables) ; dernier_mois = dernier mois réellement produit (AAAA-MM)."""
     d = lire_json(dossier / MANIFESTE)
     if not erreur:
         verifier_base(dossier / BASE)
-    d.update(etat="erreur" if erreur else "prete", erreur=str(erreur)[:300])
+    d.update(etat="erreur" if erreur else "prete", erreur=str(erreur)[:300],
+             interrompu=bool(interrompu) and not erreur, dernier_mois=str(dernier_mois)[:7])
     ecrire_json(dossier / MANIFESTE, d)
 
 

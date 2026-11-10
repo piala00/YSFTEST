@@ -97,3 +97,25 @@ class ArreterSimulationPosteTests(SimpleTestCase):
         with mock.patch.dict(lanceur.SIMULATION, {"processus": None, "dossier": ""}, clear=False):
             with self.assertRaises(ValueError):
                 lanceur.arreter_simulation(Path(tempfile.gettempdir()))
+
+
+class TerminerInterrompuTests(SimpleTestCase):
+    """Le manifeste du dossier retient qu'une génération a été arrêtée proprement (données valides)."""
+
+    def test_interruption_propre_marquee_et_consultable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, dossier = ds.creer(Path(tmp), "2026-09", "3")
+            with mock.patch.object(ds, "verifier_base"):           # pas de vraie base ERP dans ce test
+                ds.terminer(dossier, interrompu=True, dernier_mois="2026-10-31")
+            d = ds.lire_json(dossier / ds.MANIFESTE)
+            self.assertEqual(d["etat"], "prete")                   # consultable / ouvrable comme société
+            self.assertTrue(d["interrompu"])
+            self.assertEqual(d["dernier_mois"], "2026-10")
+
+    def test_erreur_n_est_pas_une_interruption_propre(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, dossier = ds.creer(Path(tmp), "2026-09", "1")
+            ds.terminer(dossier, erreur="panne", interrompu=True)
+            d = ds.lire_json(dossier / ds.MANIFESTE)
+            self.assertEqual(d["etat"], "erreur")
+            self.assertFalse(d["interrompu"])
