@@ -74,10 +74,13 @@ def instrument_tests():
         if previous is current:
             return original_class_setup(self, test, result)
         started = time.monotonic()
+        prior = (active["name"], active["started"])
+        active["name"], active["started"] = f"setUpClass {current.__module__}.{current.__qualname__}", started
         print(f"[SQL-FIXTURE-START] setUpClass {current.__module__}.{current.__qualname__}", flush=True)
         try:
             return original_class_setup(self, test, result)
         finally:
+            active["name"], active["started"] = prior
             print(f"[SQL-FIXTURE-END] setUpClass {current.__module__}.{current.__qualname__} "
                   f"{time.monotonic() - started:.3f}s", flush=True)
 
@@ -88,10 +91,13 @@ def instrument_tests():
             return original_class_teardown(self, test, result)
         started = time.monotonic()
         name = f"{previous.__module__}.{previous.__qualname__}"
+        prior = (active["name"], active["started"])
+        active["name"], active["started"] = f"tearDownClass {name}", started
         print(f"[SQL-FIXTURE-START] tearDownClass {name}", flush=True)
         try:
             return original_class_teardown(self, test, result)
         finally:
+            active["name"], active["started"] = prior
             print(f"[SQL-FIXTURE-END] tearDownClass {name} "
                   f"{time.monotonic() - started:.3f}s", flush=True)
 
