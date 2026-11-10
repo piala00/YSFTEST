@@ -20,6 +20,7 @@ def instrument_tests():
     original_run = unittest.TestCase.run
     threshold = float(os.environ.get("SQL_TEST_SLOW_SECONDS", "15"))
     durations = []
+    active = {"name": None, "started": None}
 
     def report_slowest():
         if not durations:
@@ -33,6 +34,9 @@ def instrument_tests():
     # GNU timeout sends SIGTERM: atexit handlers do not run for this signal.
     # Preserve the original termination semantics while retaining diagnostics.
     def on_termination(signum, frame):
+        if active["name"] is not None:
+            elapsed = time.monotonic() - active["started"]
+            print(f"[SQL-TEST-INCOMPLETE] {elapsed:.3f}s {active['name']}", flush=True)
         print(f"[SQL-TEST-TERMINATED] signal={signum}", flush=True)
         report_slowest()
         faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
@@ -45,11 +49,13 @@ def instrument_tests():
     def timed_run(self, result=None):
         test_name = self.id()
         started = time.monotonic()
+        active["name"], active["started"] = test_name, started
         print(f"[SQL-TEST-START] {test_name}", flush=True)
         try:
             return original_run(self, result)
         finally:
             elapsed = time.monotonic() - started
+            active["name"], active["started"] = None, None
             durations.append((elapsed, test_name))
             marker = "SLOW" if elapsed >= threshold else "END"
             print(f"[SQL-TEST-{marker}] {elapsed:.3f}s {test_name}", flush=True)
