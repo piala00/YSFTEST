@@ -65,6 +65,37 @@ def generation_active(dossier):
         return True
 
 
+# --- Arrêt coopératif d'une génération en cours (G-SIM-04) ------------------
+# Une génération longue avance par tranches (mois par mois). Déposer ce marqueur
+# demande un arrêt PROPRE : la tranche en cours se termine (données consultables),
+# puis la génération s'arrête et se marque « interrompue ». Rien n'est effacé.
+def demander_arret(dossier):
+    """Demande l'arrêt propre de la génération en cours dans ce dossier de simulation."""
+    chemin = Path(dossier) / ".arreter"
+    if chemin.is_symlink():
+        raise ValueError("Marqueur d'arrêt invalide.")
+    chemin.write_text("1", encoding="utf-8")
+
+
+def arret_demande(dossier):
+    """Vrai si un arrêt a été demandé pour ce dossier (marqueur présent)."""
+    chemin = Path(dossier) / ".arreter"
+    if chemin.is_symlink():
+        return False
+    return chemin.exists()
+
+
+def effacer_arret(dossier):
+    """Retire le marqueur d'arrêt (au lancement d'une nouvelle génération)."""
+    chemin = Path(dossier) / ".arreter"
+    if chemin.is_symlink():
+        return
+    try:
+        chemin.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def ecrire_json(chemin, donnees):
     temporaire = chemin.with_name(chemin.name + ".tmp")
     temporaire.write_text(json.dumps(donnees, ensure_ascii=False, indent=2), encoding="utf-8")

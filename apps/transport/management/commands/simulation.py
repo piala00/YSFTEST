@@ -16,7 +16,9 @@ import contextlib
 import datetime
 import random
 import time
+from pathlib import Path
 
+from apps.core.dossiers_simulation import arret_demande, effacer_arret
 from apps.transport.simulation_metier import SimulationMetierMixin
 from decimal import Decimal
 from unittest import mock
@@ -96,6 +98,15 @@ class Command(SimulationMetierMixin, BaseCommand):
         self.configurer_metier(o)
         self.r = random.Random(o["graine"])
         self.echelle = o["echelle"]
+        # Arrêt coopératif : le dossier de simulation est le répertoire du fichier SQLite.
+        nom_base = base.get("NAME")
+        self.dossier_sim = Path(nom_base).resolve().parent if nom_base else None
+        self.interrompu = False
+        if self.dossier_sim is not None:
+            try:
+                effacer_arret(self.dossier_sim)                  # repartir d'un marqueur propre
+            except OSError:
+                self.dossier_sim = None
         self.mois = []                                           # [(premier jour, jours simulés)]
         for k in range(o["nombre_mois"]):
             a, m = annee + (mois - 1 + k) // 12, (mois - 1 + k) % 12 + 1
@@ -108,7 +119,7 @@ class Command(SimulationMetierMixin, BaseCommand):
             self.preparer(o["vehicules"], o["salaries"])
             self.initialiser_metier()
         self.par_mois = []
-        for jours in self.mois:
+        for idx, jours in enumerate(self.mois):
             self.mois_jours, avant = jours, dict(self.compteurs)
             for jour in jours:
                 avant_jour = dict(self.compteurs)
@@ -123,6 +134,14 @@ class Command(SimulationMetierMixin, BaseCommand):
             with horloge(self.maintenant):
                 self.fin_de_mois(jours[0], jours[-1])
             self.par_mois.append((jours[0], jours[-1], {k: self.compteurs[k] - avant[k] for k in self.compteurs}))
+            # Arrêt propre demandé à l'écran : la tranche (ce mois) est terminée et consultable ;
+            # on s'arrête avant le mois suivant plutôt que de tout annuler.
+            if (self.dossier_sim is not None and idx + 1 < len(self.mois)
+                    and arret_demande(self.dossier_sim)):
+                self.interrompu = True
+                self.stdout.write(f"Arrêt demandé : génération interrompue après {jours[-1]:%m/%Y} "
+                                  f"({idx + 1}/{len(self.mois)} mois ; données déjà consultables).")
+                break
         if o["journal_scenarios"]:
             self.ecrire_rapports_metier(o["journal_scenarios"])
         bilan = self.bilan()
