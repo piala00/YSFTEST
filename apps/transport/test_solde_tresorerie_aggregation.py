@@ -42,5 +42,9 @@ class SoldeTresorerieAggregationTests(TestCase):
              {"compte": contrepartie, "credit": Decimal("2000")}],
         )
         self.assertEqual(solde_tresorerie(self.compte, jour - datetime.timedelta(days=1)), solde_initial)
-        self.assertEqual(solde_tresorerie(self.compte, jour), solde_initial + Decimal("11000"))
+        # Une seule agrégation SQL, quelle que soit la taille de l’historique :
+        # détecte une régression vers une lecture ligne par ligne ou des N+1.
+        with self.assertNumQueries(1):
+            solde_jour = solde_tresorerie(self.compte, jour)
+        self.assertEqual(solde_jour, solde_initial + Decimal("11000"))
         self.assertEqual(solde_tresorerie(self.compte, lendemain), solde_initial + Decimal("13000"))
