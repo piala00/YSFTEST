@@ -478,6 +478,19 @@ def supprimer_simulation(donnees, identifiant=""):
     ds.supprimer(racine, identifiant)
 
 
+def arreter_simulation(donnees):
+    """Demande l'arrêt PROPRE de la génération en cours : elle termine le mois en cours puis s'arrête
+    (données déjà produites conservées et consultables), au lieu d'être tuée en plein mois."""
+    from apps.core import dossiers_simulation as ds
+
+    identifiant = SIMULATION.get("dossier")
+    p = SIMULATION["processus"]
+    if not identifiant or p is None or p.poll() is not None:
+        raise ValueError("aucune génération n'est en cours")
+    ds.demander_arret(ds.emplacement(racine_dossiers(donnees), identifiant))
+    return identifiant
+
+
 def ouvrir_dossier(donnees, identifiant, utilisateur):
     from apps.core import dossiers_simulation as ds
 
@@ -814,6 +827,7 @@ def enregistrer_actions(donnees, port):
         restaurer_au_demarrage=lambda nom: prevoir_restauration(donnees, nom),
         simulation_creer=lambda debut, duree, criteres=None: creer_simulation(donnees, port, debut, duree, criteres),
         simulation_supprimer=lambda identifiant="": supprimer_simulation(donnees, identifiant),
+        simulation_arreter=lambda: arreter_simulation(donnees),
         dossier_exporter=lambda identifiant: __import__("apps.core.dossiers_simulation", fromlist=["exporter"]).exporter(racine_dossiers(donnees), identifiant),
         dossier_importer=lambda fichier, utilisateur: importer_dossier(donnees, fichier, utilisateur),
         dossier_ouvrir=lambda identifiant, utilisateur: ouvrir_dossier(donnees, identifiant, utilisateur),

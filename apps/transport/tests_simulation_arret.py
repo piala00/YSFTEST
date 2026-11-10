@@ -3,15 +3,22 @@
 Deux niveaux : les marqueurs d'arrêt (apps.core.dossiers_simulation) et le respect de la demande
 d'arrêt par la commande « simulation » (s'arrête proprement après la tranche en cours).
 """
+import importlib.util
 import io
 import tempfile
 from pathlib import Path
 from unittest import mock
 
+from django.conf import settings
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 
 from apps.core import dossiers_simulation as ds
+
+_spec = importlib.util.spec_from_file_location(
+    "erp_ohada_sim", settings.BASE_DIR / "deploy" / "executable" / "erp_ohada.py")
+lanceur = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(lanceur)
 
 
 class MarqueurArretTests(SimpleTestCase):
@@ -68,3 +75,25 @@ class SimulationArretTests(TestCase):
         commande = self._commande()                         # aucun arrêt demandé
         self.assertFalse(commande.interrompu)
         self.assertEqual(len(commande.par_mois), 2)
+
+
+class ArreterSimulationPosteTests(SimpleTestCase):
+    """Action poste « simulation_arreter » : dépose le marqueur d'arrêt pour la génération en cours."""
+
+    def test_depose_le_marqueur_pour_la_generation_active(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            racine = Path(tmp)
+            ident = "a" * 32
+            dossier = racine / "dossiers-simulation" / ident
+            dossier.mkdir(parents=True)
+            proc = mock.Mock()
+            proc.poll.return_value = None                    # processus toujours en cours
+            with mock.patch.dict(lanceur.SIMULATION, {"processus": proc, "dossier": ident}, clear=False), \
+                 mock.patch.object(lanceur, "racine_dossiers", return_value=racine):
+                lanceur.arreter_simulation(racine)
+            self.assertTrue(ds.arret_demande(dossier))
+
+    def test_refuse_si_aucune_generation(self):
+        with mock.patch.dict(lanceur.SIMULATION, {"processus": None, "dossier": ""}, clear=False):
+            with self.assertRaises(ValueError):
+                lanceur.arreter_simulation(Path(tempfile.gettempdir()))

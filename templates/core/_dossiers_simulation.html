@@ -10,7 +10,9 @@
   <section class="border rounded p-2 mb-2">
     <div class="d-flex flex-wrap gap-2"><strong>{{ d.nom }}</strong><span class="badge text-bg-secondary">{{ d.etat }}</span>{% if d.actif %}<span class="badge text-bg-warning">Dossier ouvert</span>{% endif %}</div>
     {% if d.erreur %}<div class="text-danger small">{{ d.erreur }}</div>{% endif %}
-    {% if d.etat == 'preparation' %}<div class="small mt-1">Génération en préparation, parfois longue selon le nombre de mois. Vous pouvez fermer cette page et revenir ici.</div>{% endif %}
+    {% if d.etat == 'preparation' %}<div class="small mt-1">Génération en préparation, parfois longue selon le nombre de mois. Vous pouvez fermer cette page et revenir ici.</div>
+      <form method="post" class="mt-1">{% csrf_token %}<button class="btn btn-sm btn-outline-warning" name="action" value="simulation_arreter">Arrêter la génération</button>
+        <span class="form-text ms-2">S'arrête après le mois en cours ; les données déjà produites restent consultables.</span></form>{% endif %}
     {% if d.criteres %}<div class="small text-muted">{{ d.criteres.departs_jour }} départs/jour toutes agences · échelle {{ d.criteres.echelle }}{% if d.criteres.scenarios_complets %} · scénarios métier complets{% endif %}</div>{% endif %}
     {% if d.journal %}<details class="mt-1"><summary class="small">Progression</summary><pre class="small bg-light p-2" style="max-height:12rem;overflow:auto">{{ d.journal }}</pre></details>{% endif %}
     <div class="d-flex flex-wrap align-items-end gap-2 mt-2">

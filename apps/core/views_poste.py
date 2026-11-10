@@ -305,6 +305,10 @@ def administration_poste(request):
                 else:
                     poste.appeler("simulation_supprimer")
                 messages.success(request, "Simulation supprimée (seul le dossier fictif est effacé).")
+            elif action == "simulation_arreter":
+                poste.appeler("simulation_arreter")
+                messages.success(request, "Arrêt demandé : la génération s'arrêtera après le mois en cours "
+                                          "(les données déjà produites restent consultables).")
             elif action == "dossier_exporter":
                 from django.http import FileResponse
 
