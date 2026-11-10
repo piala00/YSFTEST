@@ -343,5 +343,84 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT credit FROM comptabilite_ligneecriture WHERE credit>0').fetchone()[0], 124.5)
 
 
+    def test_plusieurs_pieces_et_ventilations_analytiques_sur_base_migree(self):
+        """Les AN compensent les mouvements par combinaison compte/tiers/axe/véhicule."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with sqlite3.connect(ancien) as db:
+                exercice = db.execute("SELECT id FROM core_exercice WHERE code='2026'").fetchone()[0]
+                journal = db.execute("SELECT id FROM comptabilite_journal WHERE code='OD'").fetchone()[0]
+                compte_client = db.execute("SELECT id FROM comptabilite_compte WHERE numero='411000'").fetchone()[0]
+                compte_capital = db.execute("SELECT id FROM comptabilite_compte WHERE numero='101000'").fetchone()[0]
+                tiers = db.execute("SELECT id FROM commercial_tiers WHERE code='PROP-01'").fetchone()[0]
+                vehicule = db.execute("SELECT id FROM transport_vehicule WHERE immatriculation='CE-123-AA'").fetchone()[0]
+                sections = dict(db.execute("""
+                    SELECT g.code, g.section_id FROM transport_gare g
+                    WHERE g.code IN ('YDE', 'DLA')
+                """))
+                for numero, debit_client, credit_client, section in (
+                    ('OD-2026-2', '50.00', '0.00', sections['DLA']),
+                    ('OD-2026-3', '0.00', '20.00', sections['YDE']),
+                ):
+                    import uuid
+                    db.execute("""
+                        INSERT INTO comptabilite_ecriture
+                        (journal_id, exercice_id, numero, date, libelle, reference,
+                         statut, origine, source_cle, source_empreinte, uid,
+                         site_origine, cree_le)
+                        VALUES (?, ?, ?, '2026-12-31', 'Ventilation de contrôle', '',
+                                'VALIDEE', '', '', '', ?, '', CURRENT_TIMESTAMP)
+                    """, (journal, exercice, numero, str(uuid.uuid4())))
+                    piece = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                    lignes = (
+                        (compte_client, tiers, section, vehicule, debit_client, credit_client),
+                        (compte_capital, None, None, None, credit_client, debit_client),
+                    )
+                    db.executemany("""
+                        INSERT INTO comptabilite_ligneecriture
+                        (ecriture_id, compte_id, tiers_id, section_id, vehicule_id,
+                         libelle, debit, credit, lettrage, source_cle)
+                        VALUES (?, ?, ?, ?, ?, 'Ventilation', ?, ?, '', '')
+                    """, [(piece, *ligne) for ligne in lignes])
+                db.commit()
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            with sqlite3.connect(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture"
+                ).fetchone()[0], 1)
+                lignes = db.execute("""
+                    SELECT c.numero, COALESCE(s.code, ''), COALESCE(t.code, ''),
+                           COALESCE(v.immatriculation, ''), l.debit, l.credit
+                    FROM comptabilite_ligneecriture l
+                    JOIN comptabilite_compte c ON c.id=l.compte_id
+                    LEFT JOIN comptabilite_sectionanalytique s ON s.id=l.section_id
+                    LEFT JOIN commercial_tiers t ON t.id=l.tiers_id
+                    LEFT JOIN transport_vehicule v ON v.id=l.vehicule_id
+                """).fetchall()
+                soldes = {(compte, section, tiers, vehicule):
+                          Decimal(str(debit)) - Decimal(str(credit))
+                          for compte, section, tiers, vehicule, debit, credit in lignes}
+                self.assertEqual(soldes, {
+                    ('411000', 'G-YDE', 'PROP-01', 'CE-123-AA'): Decimal('105.50'),
+                    ('411000', 'G-DLA', 'PROP-01', 'CE-123-AA'): Decimal('50.00'),
+                    ('101000', '', '', ''): Decimal('-155.50'),
+                })
+                self.assertEqual(sum(soldes.values()), Decimal('0.00'))
+            with sqlite3.connect(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 3)
+            self.assertEqual({b['id'] for b in lire_catalogue(catalogue)}, {'n', 'n1'})
+
+
 if __name__ == '__main__':
     unittest.main()
