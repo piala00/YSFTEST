@@ -904,6 +904,8 @@ def main(argv):
                 criteres = ds.normaliser_criteres(json.loads(argv[3]) if len(argv) > 3 and argv[3].startswith("{") else None)
                 metier = (["--scenarios-complets"] if criteres["scenarios_complets"] else [])
                 metier += ["--departs-jour", str(criteres["departs_jour"]), "--echelle", str(criteres["echelle"])]
+                if criteres.get("agences"):
+                    metier += ["--agences", str(criteres["agences"])]
                 if rapide and criteres["scenarios_complets"]:
                     metier += ["--departs-jour", "4"]
                 from apps.transport.management.commands.simulation import Command as _CommandeSimulation

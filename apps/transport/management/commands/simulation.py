@@ -65,6 +65,7 @@ class Command(SimulationMetierMixin, BaseCommand):
         p.add_argument("--rapport", default="", help="Fichier Markdown du bilan")
         p.add_argument("--scenarios-complets", action="store_true", help="Transit, transvasement, incidents colis, garage et retraits propriétaires (fictifs)")
         p.add_argument("--departs-jour", type=int, default=0, help="Nombre exact de départs quotidiens pour toutes les agences réunies (0 : aléatoire)")
+        p.add_argument("--agences", type=int, default=0, help=f"Nombre d'agences simulées (0 : les {len(GARES)} gares ; sinon 2 à {len(GARES)})")
         p.add_argument("--journal-scenarios", default="", help="Rapport JSON traçable des scénarios et temps réellement mesurés")
         p.add_argument("--forcer", action="store_true", help="Lever les contrôles de dossier (tests automatiques seulement)")
 
@@ -96,6 +97,9 @@ class Command(SimulationMetierMixin, BaseCommand):
         if not 1 <= o["nombre_mois"] <= 24:
             raise CommandError("De 1 à 24 mois.")
         self.configurer_metier(o)
+        self.nb_agences = o.get("agences") or len(GARES)
+        if not 2 <= self.nb_agences <= len(GARES):
+            raise CommandError(f"Nombre d'agences : de 2 à {len(GARES)} (0 : toutes).")
         self.r = random.Random(o["graine"])
         self.echelle = o["echelle"]
         # Arrêt coopératif : le dossier de simulation est le répertoire du fichier SQLite.
@@ -198,20 +202,25 @@ class Command(SimulationMetierMixin, BaseCommand):
         creer_ecriture(self.bq, self.jours[0], "Apport initial (simulation)", [{"compte": self.bq.compte_tresorerie, "debit": 48_000_000},
                                                                               {"compte": self.ca.compte_tresorerie, "debit": 2_000_000},
                                                                               {"compte": capital, "credit": 50_000_000}])
-        self.gares = {c: Gare.objects.create(code=c, nom=f"Gare de {v}", ville=v) for c, v in GARES}
+        selection = GARES[:self.nb_agences]
+        codes_retenus = {c for c, _ in selection}
+        self.gares = {c: Gare.objects.create(code=c, nom=f"Gare de {v}", ville=v) for c, v in selection}
         self.lignes = []
         for a, b, km, prix, vip in ROUTES:
+            if a not in codes_retenus or b not in codes_retenus:
+                continue                                     # route hors des agences simulées
             for x, y in ((a, b), (b, a)):
                 for gamme, p in (("CLASSIQUE", prix), ("VIP", vip)):
                     self.lignes.append(Ligne.objects.create(
                         code=f"{x}-{y}{'-VIP' if gamme == 'VIP' else ''}", gare_depart=self.gares[x], gare_arrivee=self.gares[y],
                         distance_km=km, prix_billet=p, gamme=gamme, colis_forfait=2500, colis_prix_kg=50))
         par_trajet = {(l.gare_depart.code, l.gare_arrivee.code, l.gamme): l for l in self.lignes}
+        routes_retenues = [r for r in ROUTES if r[0] in codes_retenus and r[1] in codes_retenus]
         nb_vip = round(nb_vehicules * 0.4)
         self.cars = []
         for i in range(nb_vehicules):
             gamme = "VIP" if i < nb_vip else "CLASSIQUE"
-            a, b, km, *_ = ROUTES[i % len(ROUTES)]
+            a, b, km, *_ = routes_retenues[i % len(routes_retenues)]
             v = Vehicule.objects.create(immatriculation=f"SIM {i + 1:03d} {'VP' if gamme == 'VIP' else 'CL'}",
                                         designation=f"Car {i + 1:02d} (fictif)", gamme=gamme,
                                         nombre_places=self.r.choice([30, 35]) if gamme == "VIP" else self.r.choice([50, 60, 70]))
@@ -219,7 +228,7 @@ class Command(SimulationMetierMixin, BaseCommand):
         self.camions = [Vehicule.objects.create(immatriculation=f"SIM C{i + 1:02d}", designation=f"Camion courrier {i + 1} (fictif)",
                                                 type_vehicule=Vehicule.CAMION, nombre_places=0) for i in range(5)]
         for i, c in enumerate(self.camions):
-            a, b, km, *_ = ROUTES[i]
+            a, b, km, *_ = routes_retenues[i % len(routes_retenues)]
             self.cars.append({"vehicule": c, "aller": par_trajet[(a, b, "CLASSIQUE")], "retour": par_trajet[(b, a, "CLASSIQUE")],
                               "km": km, "courrier": True})
         # Personnel : un chauffeur et un convoyeur par car, le reste dans les gares

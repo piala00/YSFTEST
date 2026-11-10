@@ -167,19 +167,25 @@ def verifier_base(base):
         return societe[0], set(c.execute("SELECT app, name FROM django_migrations"))
 
 
+AGENCES_MAX = 8                                             # nombre de gares définies dans la simulation
+
+
 def normaliser_criteres(criteres=None):
     criteres = criteres or {}
-    if not isinstance(criteres, dict) or set(criteres) - {"departs_jour", "scenarios_complets", "echelle"}:
+    if not isinstance(criteres, dict) or set(criteres) - {"departs_jour", "scenarios_complets", "echelle", "agences"}:
         raise ValueError("Critères de simulation invalides.")
     try:
         n = int(criteres.get("departs_jour", 0))
         echelle = float(criteres.get("echelle", 1))
+        agences = int(criteres.get("agences", 0) or 0)
     except (ValueError, TypeError):
-        raise ValueError("Nombre de départs ou échelle invalide.") from None
+        raise ValueError("Nombre de départs, échelle ou agences invalide.") from None
     profil = criteres.get("scenarios_complets", False)
     if not isinstance(profil, bool) or not 0 <= n <= 2000 or not 0.001 <= echelle <= 1 or (profil and n == 1):
         raise ValueError("Départs : 0 à 2000 (au moins 2 avec scénarios), échelle de 0,001 à 1.")
-    return {"departs_jour": n, "echelle": echelle, "scenarios_complets": profil}
+    if agences and not 2 <= agences <= AGENCES_MAX:
+        raise ValueError(f"Nombre d'agences : de 2 à {AGENCES_MAX} (0 : toutes les agences).")
+    return {"departs_jour": n, "echelle": echelle, "scenarios_complets": profil, "agences": agences}
 
 
 def creer(racine, debut, duree, criteres=None):

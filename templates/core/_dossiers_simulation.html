@@ -27,7 +27,10 @@
     <div class="col-lg-6"><h3 class="h6">Créer une simulation</h3><form method="post">{% csrf_token %}
       <label class="form-label small" for="s-mois">Mois de départ</label><input id="s-mois" name="debut" type="month" class="form-control form-control-sm mb-2" value="{{ etat.mois_courant }}" required>
       <label class="form-label small" for="s-duree">Durée</label><select id="s-duree" name="duree" class="form-select form-select-sm mb-2"><option value="aujourdhui">Jusqu'à aujourd'hui</option><option value="1">1 mois</option><option value="2">2 mois</option><option value="3">3 mois</option><option value="6">6 mois</option><option value="12">12 mois</option><option value="24">24 mois</option></select>
-      <label class="form-label small" for="s-departs">Départs par jour — total de toutes les agences</label>
+      <label class="form-label small" for="s-agences">Nombre d'agences</label>
+      <input id="s-agences" name="agences" type="number" min="2" max="8" placeholder="toutes (8)" class="form-control form-control-sm mb-2">
+      <div class="form-text mb-2">Laisser vide pour les 8 agences, ou choisir de 2 à 8 pour une simulation plus petite.</div>
+      <label class="form-label small" for="s-departs">Départs (voyages) par jour — total de toutes les agences</label>
       <input id="s-departs" name="departs_jour" type="number" min="0" max="2000" value="250" class="form-control form-control-sm mb-2">
       <div class="form-text mb-2">0 conserve les départs aléatoires. Un nombre impose exactement ce total par journée, pas par agence. Le planning fictif prévoit jusqu'à quatre portions par véhicule et adapte la flotte si nécessaire.</div>
       <label class="form-label small" for="s-echelle">Volume des passagers et colis</label><select id="s-echelle" name="echelle" class="form-select form-select-sm mb-2"><option value="1">Complet — tous les passagers simulés</option><option value="0.1">Essai rapide — 10 % du remplissage</option></select>

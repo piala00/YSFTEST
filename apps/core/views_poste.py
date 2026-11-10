@@ -288,10 +288,11 @@ def administration_poste(request):
                 duree = request.POST.get("duree", "")
                 if duree != "aujourdhui" and not (duree.isdigit() and 1 <= int(duree) <= 24):
                     raise ValueError("durée : de 1 à 24 mois, ou jusqu'à aujourd'hui")
-                if "departs_jour" in request.POST or "scenarios_complets" in request.POST:
+                if "departs_jour" in request.POST or "scenarios_complets" in request.POST or "agences" in request.POST:
                     from .dossiers_simulation import normaliser_criteres
                     criteres = normaliser_criteres({"departs_jour": request.POST.get("departs_jour", "0"),
-                        "echelle": request.POST.get("echelle", "1"), "scenarios_complets": request.POST.get("scenarios_complets") == "1"})
+                        "echelle": request.POST.get("echelle", "1"), "agences": request.POST.get("agences", "0"),
+                        "scenarios_complets": request.POST.get("scenarios_complets") == "1"})
                     poste.appeler("simulation_creer", debut, duree, criteres)
                 else:
                     poste.appeler("simulation_creer", debut, duree)

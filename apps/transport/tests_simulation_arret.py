@@ -99,6 +99,38 @@ class ArreterSimulationPosteTests(SimpleTestCase):
                 lanceur.arreter_simulation(Path(tempfile.gettempdir()))
 
 
+class AgencesParametrablesTests(TestCase):
+    """Nombre d'agences simulées paramétrable (les départs/jour l'étaient déjà)."""
+
+    def test_le_nombre_d_agences_limite_les_gares(self):
+        from apps.transport.models import Gare
+        from apps.transport.management.commands.simulation import Command
+
+        call_command(Command(), mois="2026-09", jours=1, nombre_mois=1, vehicules=4, salaries=5,
+                     echelle=0.05, agences=3, forcer=True, graine=1, stdout=io.StringIO())
+        self.assertEqual(Gare.objects.count(), 3)
+
+    def test_agences_hors_bornes_refuse(self):
+        from django.core.management.base import CommandError
+        from apps.transport.management.commands.simulation import Command
+
+        with self.assertRaises(CommandError):
+            call_command(Command(), mois="2026-09", jours=1, vehicules=4, salaries=5,
+                         echelle=0.05, agences=1, forcer=True, stdout=io.StringIO())
+
+
+class CriteresAgencesTests(SimpleTestCase):
+    def test_agences_retenu_dans_les_criteres(self):
+        self.assertEqual(ds.normaliser_criteres({"agences": 4})["agences"], 4)
+
+    def test_agences_absent_vaut_zero_toutes(self):
+        self.assertEqual(ds.normaliser_criteres({})["agences"], 0)
+
+    def test_agences_hors_bornes_refuse(self):
+        with self.assertRaises(ValueError):
+            ds.normaliser_criteres({"agences": 9})
+
+
 class TerminerInterrompuTests(SimpleTestCase):
     """Le manifeste du dossier retient qu'une génération a été arrêtée proprement (données valides)."""
 
