@@ -312,6 +312,18 @@ jobs:
           name: ERP-OHADA-${{ matrix.nom }}-${{ env.ERP_TYPE_PAQUET }}-Windows-exe
           path: dist/ERP-OHADA-${{ matrix.nom }}
           retention-days: 7
+      - name: Simulateur autonome portable (Transport)
+        if: matrix.nom == 'Transport'
+        shell: pwsh
+        run: |
+          Copy-Item "deploy\windows\SIMULATEUR.bat" "dist\ERP-OHADA-Transport\"
+          Copy-Item "deploy\windows\LISEZ-MOI-SIMULATEUR.txt" "dist\ERP-OHADA-Transport\"
+      - uses: actions/upload-artifact@v4
+        if: matrix.nom == 'Transport'
+        with:
+          name: ERP-OHADA-Simulateur
+          path: dist/ERP-OHADA-Transport
+          retention-days: 7
       - name: Service Windows (WinSW, version et empreinte vérifiées)
         shell: pwsh
         run: |

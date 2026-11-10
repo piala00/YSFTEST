@@ -743,6 +743,8 @@ def servir(port, reseau=False, ouvrir=True, resume=()):
 
     hote = "0.0.0.0" if reseau else "127.0.0.1"
     adresse = f"http://127.0.0.1:{port}"
+    # Logiciel de simulation autonome : ouvrir directement l'atelier de simulation.
+    cible = adresse + ("/poste/?onglet=simulation" if os.environ.get("ERP_SIMULATEUR") else "")
     print(f"\n  ERP OHADA {edition().capitalize()} : {adresse}")
     if reseau:
         for ip in adresses_reseau():
@@ -752,7 +754,7 @@ def servir(port, reseau=False, ouvrir=True, resume=()):
         print(f"  {ligne}")
     print("  Gardez cette fenêtre ouverte ; fermez-la pour tout arrêter.\n")
     if ouvrir and not os.environ.get("ERP_SANS_NAVIGATEUR"):
-        threading.Thread(target=lambda: (time.sleep(2), ouvrir_interface(adresse)), daemon=True).start()
+        threading.Thread(target=lambda: (time.sleep(2), ouvrir_interface(cible)), daemon=True).start()
     serve(application, host=hote, port=port, threads=16 if reseau else 8)
 
 
@@ -980,8 +982,14 @@ def main(argv):
         restaurer(donnees, str(donnees / "sauvegardes" / prevue))
     if not controler_base(donnees):
         return 1
-    os.environ.setdefault("ERP_ASSISTANT", "1")                   # premier démarrage : assistant dans le navigateur
-    os.environ["ERP_LICENCE"] = "0" if os.environ.get("ERP_DOSSIER_SIMULATION") else "1"
+    if os.environ.get("ERP_SIMULATEUR"):                          # logiciel de simulation autonome (portable)
+        os.environ["ERP_ASSISTANT"] = "0"                         # base prête, pas d'assistant de société
+        os.environ.setdefault("ERP_ADMIN", "simulateur")          # compte par défaut (données fictives, hors production)
+        os.environ.setdefault("ERP_ADMIN_MDP", "simulateur")
+    else:
+        os.environ.setdefault("ERP_ASSISTANT", "1")               # premier démarrage : assistant dans le navigateur
+    os.environ["ERP_LICENCE"] = "0" if (os.environ.get("ERP_DOSSIER_SIMULATION")
+                                        or os.environ.get("ERP_SIMULATEUR")) else "1"
     # Comme l'ancien serveur de simulation, un dossier fictif identifié est en démonstration.
     # Le choix résulte du catalogue local vérifié, pas d'une variable de désactivation de licence.
     # Dossier de la société : contrôle toujours actif :

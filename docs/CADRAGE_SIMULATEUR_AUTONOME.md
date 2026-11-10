@@ -28,6 +28,18 @@ propriétaire (point 3 du tableau d'avancement, ~15 %).
   l'arrêt à la fin de chaque mois** ; si demandé, elle **termine la tranche en cours** et s'arrête
   (`interrompu=True`), sans rien effacer. 5 tests (`tests_simulation_arret`).
 
+## Logiciel autonome portable (livré)
+Demande du propriétaire : un **logiciel de simulation autonome séparé**, en **dossier portable**
+(zip, sans installation), qui **ouvre directement l'atelier de simulation**.
+- Mode `ERP_SIMULATEUR=1` du lanceur (`deploy/executable/erp_ohada.py`) : licence désactivée,
+  compte par défaut `simulateur` / `simulateur`, ouverture du navigateur directement sur
+  l'écran Simulation (`/poste/?onglet=simulation`), données dans un dossier portable à côté du
+  programme (`donnees-simulateur`).
+- `deploy/windows/SIMULATEUR.bat` (+ `LISEZ-MOI-SIMULATEUR.txt`) : on décompresse et on
+  double-clique ; aucun installateur, aucun service, aucune licence.
+- CI : nouvel artefact **`ERP-OHADA-Simulateur`** (le programme Transport compilé + le .bat +
+  la notice), à télécharger et lancer. **À valider sous Windows par le propriétaire.**
+
 ## Reste à faire (prochaines tranches)
 - **Bouton « Arrêter »** dans Administration du poste → Simulation, actif pendant une génération
   (`generation_active`), qui appelle le poste pour déposer `demander_arret` dans le dossier.
