@@ -167,6 +167,7 @@ def main():
     repository_root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(repository_root))
     os.chdir(repository_root)
+    os.environ.setdefault("SQL_TEST_TIMINGS", "1")
     faulthandler.enable(all_threads=True)
     faulthandler.dump_traceback_later(120, repeat=True, file=sys.stderr)
     instrument_tests()
