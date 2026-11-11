@@ -155,3 +155,45 @@ class RepriseConfigurationSQLiteTests(unittest.TestCase):
             recopier_referentiels(self.source, self.cible, ['referentiel', 'calcule'])
         self.assertEqual(self.cible.execute('SELECT * FROM referentiel').fetchall(), [])
         self.assertEqual(self.cible.execute('SELECT * FROM calcule').fetchall(), [])
+
+    def test_reprise_transport_gares_lignes_arrets_vehicules_et_tiers(self):
+        """Reprise N+1 : relations métier conservées, aucun voyage historique."""
+        schema = (
+            "CREATE TABLE transport_gare (id INTEGER PRIMARY KEY, nom TEXT, "
+            "rattachement_id INTEGER REFERENCES transport_gare(id))",
+            "CREATE TABLE transport_ligne (id INTEGER PRIMARY KEY, "
+            "depart_id INTEGER REFERENCES transport_gare(id), "
+            "arrivee_id INTEGER REFERENCES transport_gare(id))",
+            "CREATE TABLE transport_arretligne (id INTEGER PRIMARY KEY, "
+            "ligne_id INTEGER REFERENCES transport_ligne(id), "
+            "gare_id INTEGER REFERENCES transport_gare(id))",
+            "CREATE TABLE commercial_tiers (id INTEGER PRIMARY KEY, nom TEXT)",
+            "CREATE TABLE transport_vehicule (id INTEGER PRIMARY KEY, "
+            "proprietaire_id INTEGER REFERENCES commercial_tiers(id))",
+            "CREATE TABLE transport_voyage (id INTEGER PRIMARY KEY, "
+            "ligne_id INTEGER REFERENCES transport_ligne(id))",
+        )
+        for db in (self.source, self.cible):
+            for statement in schema:
+                db.execute(statement)
+        self.source.executemany(
+            "INSERT INTO transport_gare VALUES (?, ?, ?)",
+            [(1, "Centre", None), (2, "Est", 1), (3, "Nord", 1)],
+        )
+        self.source.execute("INSERT INTO transport_ligne VALUES (4, 1, 2)")
+        self.source.execute("INSERT INTO transport_arretligne VALUES (5, 4, 3)")
+        self.source.execute("INSERT INTO commercial_tiers VALUES (6, 'Proprietaire')")
+        self.source.execute("INSERT INTO transport_vehicule VALUES (7, 6)")
+        self.source.execute("INSERT INTO transport_voyage VALUES (8, 4)")
+        tables = [
+            "transport_arretligne", "transport_vehicule", "transport_ligne",
+            "transport_gare", "commercial_tiers",
+        ]
+        recopier_referentiels(self.source, self.cible, tables)
+        for table in tables:
+            self.assertEqual(
+                self.cible.execute(f"SELECT * FROM {table} ORDER BY id").fetchall(),
+                self.source.execute(f"SELECT * FROM {table} ORDER BY id").fetchall(),
+            )
+        self.assertEqual(self.cible.execute("SELECT * FROM transport_voyage").fetchall(), [])
+        self.assertEqual(self.cible.execute("PRAGMA foreign_key_check").fetchall(), [])
