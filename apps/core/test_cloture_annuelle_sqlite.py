@@ -61,6 +61,24 @@ class ClotureAnnuelleSQLiteTests(TestCase):
         self.assertFalse(self.cible.exists())
         self.assertEqual(self.catalogue.read_bytes(), avant)
 
+    def test_echec_apres_insertion_annule_la_publication_et_la_base(self):
+        """Une erreur après écriture ne doit jamais publier un N+1 partiel."""
+        avant_catalogue = self.catalogue.read_bytes()
+        avant_source = self.source.read_bytes()
+
+        def reporter_partiel(origine, nouvelle):
+            nouvelle.execute("INSERT INTO report VALUES (999)")
+            raise RuntimeError("échec après insertion AN")
+
+        with self.assertRaisesRegex(RuntimeError, "après insertion"):
+            preparer_exercice_sqlite(
+                self.catalogue, "n", str(self.cible), "n1",
+                self.initialiser, reporter_partiel,
+            )
+        self.assertFalse(self.cible.exists())
+        self.assertEqual(self.catalogue.read_bytes(), avant_catalogue)
+        self.assertEqual(self.source.read_bytes(), avant_source)
+
     def test_destination_existante_jamais_ecrasee(self):
         self.cible.write_bytes(b"sentinelle")
         with self.assertRaises(FileExistsError):
