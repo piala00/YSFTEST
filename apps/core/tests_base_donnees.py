@@ -96,12 +96,12 @@ class BaseSQLServerTests(SimpleTestCase):
                       f'port="{os.environ.get("DB_PORT", "")}")')
             try:
                 essai = source.py(f"""
-    import json
-    from apps.core import base_donnees as bd
-    r = {reglage}
-    avant = bd.tester_sqlserver(r)
-    lignes = bd.changer_de_moteur(r)
-    print(json.dumps([avant, lignes, bd.tester_sqlserver(r)]))""")
+import json
+from apps.core import base_donnees as bd
+r = {reglage}
+avant = bd.tester_sqlserver(r)
+lignes = bd.changer_de_moteur(r)
+print(json.dumps([avant, lignes, bd.tester_sqlserver(r)]))""")
                 self.assertIn("sera créée", essai[0])
                 self.assertGreater(essai[1], 100)
                 self.assertIn("de l'ERP", essai[2])
