@@ -150,6 +150,12 @@ def partition_suite():
             cls = type(test)
             key = cls.__module__ + "." + cls.__qualname__
             assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
+            # CI #461: shard 1 took 829s vs 440s on shard 0. The multi-month
+            # simulation class alone contained a 168s test. Move the entire
+            # class (not individual tests) to the lighter shard, preserving
+            # class fixtures and full coverage. Other shard counts keep hashing.
+            if count == 2 and key == "apps.transport.tests.SimulationPlusieursMoisTests":
+                assigned = 0
             if assigned == shard:
                 selected.append(test)
         print(f"[SQL-SHARD] {shard + 1}/{count}: {len(selected)} tests", flush=True)
