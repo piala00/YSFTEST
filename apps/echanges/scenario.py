@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[2]
@@ -18,7 +19,17 @@ class Dossier:
                     "CONTROLE_HEURE_DEPART": "0"}
 
     def manage(self, *args):
-        r = subprocess.run([sys.executable, "manage.py", *args], cwd=RACINE, env=self.env, capture_output=True, text=True)
+        # Mesurer les processus Django isolés (migrate, init_erp, shell)
+        # sans afficher les arguments pouvant contenir des secrets.
+        started = time.monotonic()
+        operation = args[0] if args else "manage"
+        if os.environ.get("SQL_TEST_TIMINGS"):
+            print(f"[SQL-SUBPROCESS-START] dossier={self.nom} operation={operation}", file=sys.stderr, flush=True)
+        try:
+            r = subprocess.run([sys.executable, "manage.py", *args], cwd=RACINE, env=self.env, capture_output=True, text=True)
+        finally:
+            if os.environ.get("SQL_TEST_TIMINGS"):
+                print(f"[SQL-SUBPROCESS-END] dossier={self.nom} operation={operation} elapsed={time.monotonic() - started:.3f}s", file=sys.stderr, flush=True)
         if r.returncode:
             raise RuntimeError(f"[{self.nom}] manage.py {' '.join(args)}\n{r.stdout}\n{r.stderr}")
         return r.stdout
