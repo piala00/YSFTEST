@@ -13,14 +13,13 @@ def _contraintes_uniques(connexion, nom):
         if not index[2]:
             continue
         index_ident = '"' + index[1].replace('"', '""') + '"'
-        colonnes = tuple(
-            (col[2], col[3], col[4], col[5])
-            for col in connexion.execute(f"PRAGMA index_xinfo({index_ident})")
-            if col[5]
-        )
+        # Une seule lecture des métadonnées par index : la reprise annuelle
+        # vérifie ces contraintes sur N et N+1 pour chaque référentiel.
+        colonnes_index = [col for col in connexion.execute(f"PRAGMA index_xinfo({index_ident})") if col[5]]
+        colonnes = tuple((col[2], col[3], col[4], col[5]) for col in colonnes_index)
         # Les index partiels et sur expressions ne sont pas comparables
         # par leurs seules colonnes : refuser toute reprise ambiguë.
-        if index[4] or any(col[1] < 0 for col in connexion.execute(f"PRAGMA index_xinfo({index_ident})") if col[5]):
+        if index[4] or any(col[1] < 0 for col in colonnes_index):
             raise ValueError(f"contraintes uniques complexes non prises en charge : {nom}")
         resultat.append((index[3], bool(index[4]), colonnes))
     return sorted(resultat, key=repr)
