@@ -85,6 +85,7 @@ def regrouper(bases, recherche="", afficher_clotures=False):
 def verifier_base_sqlite(nom):
     """Refuse une base absente, non ERP ou dont le chemin est ambigu."""
     import sqlite3
+    from contextlib import closing
     from urllib.parse import quote
     chemin = Path(nom)
     if not chemin.is_absolute() or not chemin.is_file():
@@ -92,7 +93,8 @@ def verifier_base_sqlite(nom):
     # Mode lecture seule : ne crée ni ne modifie la base ciblée.
     uri = "file:" + quote(str(chemin.resolve()), safe="/:") + "?mode=ro"
     try:
-        with sqlite3.connect(uri, uri=True, timeout=3) as base:
+        # Connection.__exit__ ne ferme pas SQLite : libérer le handle même en erreur.
+        with closing(sqlite3.connect(uri, uri=True, timeout=3)) as base:
             tables = {r[0] for r in base.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not {"django_migrations", "auth_user", "core_societe"}.issubset(tables):
                 raise ValueError("la base sélectionnée n'est pas une base ERP compatible")
