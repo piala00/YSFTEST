@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import closing
+from contextlib import closing, contextmanager
 from decimal import Decimal
 from pathlib import Path
 
@@ -18,6 +18,18 @@ from apps.core.adaptateur_cloture_transport_sqlite import (
     migrer_schema_django_sqlite, preparer_dossier_transport_sqlite,
 )
 from apps.core.catalogue_societes import lire_catalogue
+
+
+@contextmanager
+def connexion_sqlite(chemin):
+    """Ferme systématiquement les connexions des scénarios, même en erreur.
+
+    sqlite3.Connection.__exit__ valide ou annule une transaction, mais ne
+    ferme pas la connexion ; les tests de clôture créent de nombreuses bases.
+    """
+    with closing(sqlite3.connect(chemin)) as connexion:
+        with connexion:
+            yield connexion
 
 
 RACINE = Path(__file__).resolve().parents[1]
@@ -108,9 +120,9 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             )
             self.assertEqual(resultat['exercice_precedent'], 'n')
             self.assertTrue(next(b for b in lire_catalogue(catalogue) if b['id'] == 'n')['cloture'])
-            with sqlite3.connect(ancien) as source_db:
+            with connexion_sqlite(ancien) as source_db:
                 historique_source = source_db.execute('''SELECT gamme, debut FROM transport_changementgamme ORDER BY id''').fetchall()
-            with sqlite3.connect(nouveau) as db:
+            with connexion_sqlite(nouveau) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
                 self.assertEqual(db.execute('SELECT username FROM auth_user').fetchone()[0], 'controle')
@@ -207,7 +219,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             self.assertEqual(entrees['n1']['agence'], entrees['n']['agence'])
             self.assertEqual(Path(entrees['n1']['base']).resolve(), nouveau.resolve())
             self.assertFalse(entrees['n1']['cloture'])
-            with sqlite3.connect(ancien) as db:
+            with connexion_sqlite(ancien) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT date FROM comptabilite_ecriture').fetchone()[0], '2026-12-31')
@@ -248,7 +260,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                            if entree['id'] != 'n')
             self.assertEqual(suivant['exercice_precedent'], 'n')
             self.assertEqual(str(suivant['exercice']), '2027')
-            with sqlite3.connect(suivant['base']) as db:
+            with connexion_sqlite(suivant['base']) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
                 self.assertEqual(db.execute(
@@ -261,7 +273,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                                  sum(Decimal(str(c)) for _, c in montants))
                 self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
                                  Decimal('125.50'))
-            with sqlite3.connect(ancien) as db:
+            with connexion_sqlite(ancien) as db:
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
             # Une seconde invocation ne doit ni rouvrir N, ni publier N+2,
@@ -272,7 +284,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             self.assertNotEqual(seconde.returncode, 0)
             self.assertIn('déjà clôturé', seconde.stdout + seconde.stderr)
             self.assertEqual(catalogue.read_bytes(), catalogue_apres)
-            with sqlite3.connect(suivant['base']) as db:
+            with connexion_sqlite(suivant['base']) as db:
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
 
     def test_echec_balance_ne_publie_pas_n_plus_un(self):
@@ -283,7 +295,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             catalogue = dossier / 'catalogue.json'
             self._copier_source(ancien)
             # Dégrader volontairement une pièce validée, sans désactiver les FK.
-            with sqlite3.connect(ancien) as db:
+            with connexion_sqlite(ancien) as db:
                 db.execute("""UPDATE comptabilite_ligneecriture
                               SET credit='124.50' WHERE credit>0""")
                 db.commit()
@@ -297,7 +309,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
             self.assertFalse(nouveau.exists(), 'la base N+1 échouée doit être supprimée')
             self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
-            with sqlite3.connect(ancien) as db:
+            with connexion_sqlite(ancien) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute(
                     'SELECT credit FROM comptabilite_ligneecriture WHERE credit>0'
@@ -312,7 +324,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             ancien = dossier / 'n.sqlite3'
             catalogue = dossier / 'catalogue.json'
             self._copier_source(ancien)
-            with sqlite3.connect(ancien) as db:
+            with connexion_sqlite(ancien) as db:
                 db.execute("UPDATE comptabilite_ligneecriture SET credit=124.50 WHERE credit>0")
                 db.commit()
             original = {'version': 1, 'bases': [{
@@ -337,7 +349,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                           execution.stdout + execution.stderr)
             self.assertFalse(nouveau.exists())
             self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
-            with sqlite3.connect(ancien) as db:
+            with connexion_sqlite(ancien) as db:
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT credit FROM comptabilite_ligneecriture WHERE credit>0').fetchone()[0], 124.5)
@@ -350,7 +362,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
             catalogue = dossier / 'catalogue.json'
             self._copier_source(ancien)
-            with sqlite3.connect(ancien) as db:
+            with connexion_sqlite(ancien) as db:
                 exercice = db.execute("SELECT id FROM core_exercice WHERE code='2026'").fetchone()[0]
                 journal = db.execute("SELECT id FROM comptabilite_journal WHERE code='OD'").fetchone()[0]
                 compte_client = db.execute("SELECT id FROM comptabilite_compte WHERE numero='411000'").fetchone()[0]
@@ -392,7 +404,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 'cloture': False,
             }]}), encoding='utf-8')
             preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
-            with sqlite3.connect(nouveau) as db:
+            with connexion_sqlite(nouveau) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM comptabilite_ecriture"
@@ -415,7 +427,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                     ('101000', '', '', ''): Decimal('-155.50'),
                 })
                 self.assertEqual(sum(soldes.values()), Decimal('0.00'))
-            with sqlite3.connect(ancien) as db:
+            with connexion_sqlite(ancien) as db:
                 self.assertEqual(db.execute(
                     'SELECT COUNT(*) FROM comptabilite_ecriture'
                 ).fetchone()[0], 3)
@@ -448,7 +460,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             self.assertEqual(entrees['n2']['exercice_precedent'], 'n1')
 
             for chemin, annee in ((n1, '2027'), (n2, '2028')):
-                with sqlite3.connect(chemin) as db:
+                with connexion_sqlite(chemin) as db:
                     self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                     self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
                                      [(annee,)])
@@ -476,7 +488,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                     self.assertEqual(db.execute(
                         "SELECT COUNT(*) FROM auth_user WHERE username='controle'"
                     ).fetchone()[0], 1)
-            with sqlite3.connect(n) as db:
+            with connexion_sqlite(n) as db:
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
                                  [('2026',)])
                 self.assertEqual(db.execute(
@@ -499,7 +511,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 'cloture': False,
             }]}), encoding='utf-8')
             preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
-            with sqlite3.connect(n1) as db:
+            with connexion_sqlite(n1) as db:
                 exercice = db.execute(
                     "SELECT id FROM core_exercice WHERE code='2027'"
                 ).fetchone()[0]
@@ -532,7 +544,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                       (piece, capital, '25.00', '0.00')])
                 db.commit()
             preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
-            with sqlite3.connect(n2) as db:
+            with connexion_sqlite(n2) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM comptabilite_ecriture"
@@ -551,7 +563,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(Decimal(str(soldes['101000'])), Decimal('-100.50'))
                 self.assertEqual(sum(Decimal(str(v)) for v in soldes.values()),
                                  Decimal('0.00'))
-            with sqlite3.connect(n1) as db:
+            with connexion_sqlite(n1) as db:
                 self.assertEqual(db.execute(
                     "SELECT COUNT(*) FROM comptabilite_ecriture"
                 ).fetchone()[0], 2)
