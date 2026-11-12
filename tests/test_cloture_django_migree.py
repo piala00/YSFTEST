@@ -484,5 +484,77 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 ).fetchone()[0], 1)
 
 
+
+    def test_cloture_suivante_integre_les_mouvements_du_nouvel_exercice(self):
+        """Un mouvement de N+1 modifie les AN de N+2, sans reprendre les pièces."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            n, n1, n2 = (dossier / nom for nom in
+                         ('2026.sqlite3', '2027.sqlite3', '2028.sqlite3'))
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(n)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(n),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
+            with sqlite3.connect(n1) as db:
+                exercice = db.execute(
+                    "SELECT id FROM core_exercice WHERE code='2027'"
+                ).fetchone()[0]
+                journal = db.execute(
+                    "SELECT id FROM comptabilite_journal WHERE code='OD'"
+                ).fetchone()[0]
+                client = db.execute(
+                    "SELECT id FROM comptabilite_compte WHERE numero='411000'"
+                ).fetchone()[0]
+                capital = db.execute(
+                    "SELECT id FROM comptabilite_compte WHERE numero='101000'"
+                ).fetchone()[0]
+                import uuid
+                db.execute("""
+                    INSERT INTO comptabilite_ecriture
+                    (journal_id, exercice_id, numero, date, libelle, reference,
+                     statut, origine, source_cle, source_empreinte, uid,
+                     site_origine, cree_le)
+                    VALUES (?, ?, 'OD-2027-1', '2027-12-31',
+                            'Règlement exercice 2027', '', 'VALIDEE', '',
+                            '', '', ?, '', CURRENT_TIMESTAMP)
+                """, (journal, exercice, str(uuid.uuid4())))
+                piece = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                db.executemany("""
+                    INSERT INTO comptabilite_ligneecriture
+                    (ecriture_id, compte_id, libelle, debit, credit,
+                     lettrage, source_cle)
+                    VALUES (?, ?, 'Règlement', ?, ?, '', '')
+                """, [(piece, client, '0.00', '25.00'),
+                      (piece, capital, '25.00', '0.00')])
+                db.commit()
+            preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
+            with sqlite3.connect(n2) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture"
+                ).fetchone()[0], 1)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture "
+                    "WHERE numero='OD-2027-1'"
+                ).fetchone()[0], 0)
+                soldes = dict(db.execute("""
+                    SELECT c.numero, SUM(l.debit-l.credit)
+                    FROM comptabilite_ligneecriture l
+                    JOIN comptabilite_compte c ON c.id=l.compte_id
+                    GROUP BY c.numero
+                """).fetchall())
+                self.assertEqual(Decimal(str(soldes['411000'])), Decimal('100.50'))
+                self.assertEqual(Decimal(str(soldes['101000'])), Decimal('-100.50'))
+                self.assertEqual(sum(Decimal(str(v)) for v in soldes.values()),
+                                 Decimal('0.00'))
+            with sqlite3.connect(n1) as db:
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture"
+                ).fetchone()[0], 2)
+
 if __name__ == '__main__':
     unittest.main()
