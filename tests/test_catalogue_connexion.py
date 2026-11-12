@@ -1,5 +1,6 @@
 """Régression : la validation du catalogue ferme ses connexions SQLite."""
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,7 +27,7 @@ class FermetureCatalogueTests(unittest.TestCase):
         connect_reel = sqlite3.connect
         with tempfile.TemporaryDirectory() as dossier:
             chemin = Path(dossier) / "erp.sqlite3"
-            with connect_reel(chemin) as db:
+            with closing(connect_reel(chemin)) as db:
                 for table in ("django_migrations", "auth_user", "core_societe"):
                     db.execute(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY)")
             connexions = []
@@ -38,7 +39,7 @@ class FermetureCatalogueTests(unittest.TestCase):
 
             with patch("sqlite3.connect", side_effect=connecter):
                 self.assertEqual(verifier_base_sqlite(str(chemin)), str(chemin.resolve()))
-                with connect_reel(chemin) as db:
+                with closing(connect_reel(chemin)) as db:
                     db.execute("DROP TABLE core_societe")
                 with self.assertRaisesRegex(ValueError, "compatible"):
                     verifier_base_sqlite(str(chemin))
