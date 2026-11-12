@@ -422,5 +422,67 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             self.assertEqual({b['id'] for b in lire_catalogue(catalogue)}, {'n', 'n1'})
 
 
+    def test_clotures_successives_sur_bases_django_migrees(self):
+        """N -> N+1 -> N+2 conserve les AN sans dupliquer les mouvements."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            n, n1, n2 = (dossier / nom for nom in
+                         ('2026.sqlite3', '2027.sqlite3', '2028.sqlite3'))
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(n)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(n),
+                'cloture': False,
+            }]}), encoding='utf-8')
+
+            preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
+            preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
+
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertEqual(set(entrees), {'n', 'n1', 'n2'})
+            self.assertTrue(entrees['n']['cloture'])
+            self.assertTrue(entrees['n1']['cloture'])
+            self.assertFalse(entrees['n2']['cloture'])
+            self.assertEqual(entrees['n1']['exercice_precedent'], 'n')
+            self.assertEqual(entrees['n2']['exercice_precedent'], 'n1')
+
+            for chemin, annee in ((n1, '2027'), (n2, '2028')):
+                with sqlite3.connect(chemin) as db:
+                    self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                    self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                     [(annee,)])
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM comptabilite_ecriture"
+                    ).fetchone()[0], 1)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM comptabilite_ecriture "
+                        "WHERE origine='CLOTURE_ANNUELLE'"
+                    ).fetchone()[0], 1)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM comptabilite_ecriture "
+                        "WHERE numero='OD-2026-1'"
+                    ).fetchone()[0], 0)
+                    montants = db.execute(
+                        'SELECT debit, credit FROM comptabilite_ligneecriture'
+                    ).fetchall()
+                    self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                     Decimal('125.50'))
+                    self.assertEqual(sum(Decimal(str(c)) for _, c in montants),
+                                     Decimal('125.50'))
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM transport_gare"
+                    ).fetchone()[0], 3)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM auth_user WHERE username='controle'"
+                    ).fetchone()[0], 1)
+            with sqlite3.connect(n) as db:
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2026',)])
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 1)
+
+
 if __name__ == '__main__':
     unittest.main()
