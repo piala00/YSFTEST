@@ -435,9 +435,14 @@ class Command(SimulationMetierMixin, BaseCommand):
                 if d.montant_du > 0:                             # profil historique conservé
                     ReglementPartenaire(partenaire=ct.partenaire, decompte=d, montant=(d.montant_du * Decimal("0.6")).quantize(Decimal("1")),
                                         caisse=self.bq, date=fin).enregistrer()
-        dette = sum((l.credit - l.debit for l in LigneEcriture.objects.filter(tiers=self.fournisseur,
-                                                                              compte=self.fournisseur.get_compte_collectif())),
-                    Decimal(0))
+        # Agréger dans SQL plutôt que matérialiser toutes les lignes fournisseur.
+        from django.db.models import Sum
+
+        solde_fournisseur = LigneEcriture.objects.filter(
+            tiers=self.fournisseur,
+            compte=self.fournisseur.get_compte_collectif(),
+        ).aggregate(debit=Sum("debit"), credit=Sum("credit"))
+        dette = (solde_fournisseur["credit"] or Decimal(0)) - (solde_fournisseur["debit"] or Decimal(0))
         if dette > 0:                                            # règlement du fournisseur par la banque
             journal = self.caisse_pour(dette,fin) if self.profil_complet else self.bq
             creer_ecriture(journal, fin, "Règlement fournisseur pièces (fictif)",
