@@ -303,6 +303,16 @@ class Command(SimulationMetierMixin, BaseCommand):
         from apps.transport.models_depenses import DemandeDepense
 
         r = self.r
+        diagnostic_sql = bool(os.environ.get('SQL_TEST_TIMINGS'))
+        debut_etape = time.perf_counter()
+
+        def mesurer_etape(nom):
+            nonlocal debut_etape
+            maintenant = time.perf_counter()
+            if diagnostic_sql:
+                print(f'[SIM-JOUR] {jour} {nom} {maintenant - debut_etape:.3f}s', flush=True)
+            debut_etape = maintenant
+
         with horloge(self.moment(jour, 5)), transaction.atomic():
             if jour == self.mois_jours[0]:                      # achats du magasin pour le mois
                 achat = AchatMagasin.objects.create(date=jour, fournisseur=self.fournisseur, facture="FICTIVE-01")
@@ -319,6 +329,7 @@ class Command(SimulationMetierMixin, BaseCommand):
                 LigneAchatMagasin.objects.create(achat=achat, destination=LigneAchatMagasin.VEHICULE, designation="Pare-brise",
                                                  prix_unitaire=85000, vehicule=self.cars[0]["vehicule"])
                 achat.valider(self.agent)
+        mesurer_etape('preparation_et_achats')
         departs = []
         for c, ligne, heure in self.plan_journee(jour):
             with horloge(self.moment(jour, max(heure - 3, 0))), transaction.atomic():
@@ -343,8 +354,10 @@ class Command(SimulationMetierMixin, BaseCommand):
                     colis.charger(d)
                     self.compteurs["colis"] += 1
             departs.append((d, c, heure))
+        mesurer_etape('billets_et_colis')
         with horloge(self.moment(jour, 0)), transaction.atomic():
             self.scenarios_avant_depart(jour, departs)
+        mesurer_etape('scenarios_avant_depart')
         for d, c, heure in departs:
             with horloge(self.moment(jour, heure, 5)), transaction.atomic():
                 if self.profil_complet and d.pk in (getattr(self, '_depart_scenario', None), getattr(self, '_depart_suite_scenario', None)):
@@ -362,6 +375,7 @@ class Command(SimulationMetierMixin, BaseCommand):
             with horloge(self.moment(arrivee_jour, arrivee_heure)), transaction.atomic():
                 d.arriver()
                 self.scenarios_apres_arrivee(jour, d)
+        mesurer_etape('departs_carburant_arrivees')
         with horloge(self.moment(jour, 20)), transaction.atomic():
             if self.compteurs["colis"]:                          # emballages consommés pour les colis du jour
                 carton = self.articles["CART"]
@@ -399,6 +413,7 @@ class Command(SimulationMetierMixin, BaseCommand):
                 t = TransfertFonds(origine=self.ca, destination=self.bq, montant=versement, date_envoi=jour, porteur="Convoyeur de fonds")
                 t.envoyer(self.chef)
                 t.recevoir(self.chef, date=jour)
+        mesurer_etape('operations_fin_journee')
 
     # ------------------------------------------------------------------ fin de mois
     @transaction.atomic
