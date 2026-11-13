@@ -117,11 +117,19 @@ class Command(SimulationMetierMixin, BaseCommand):
             nb_jours = min(o["jours"] or 31, calendar.monthrange(a, m)[1])
             self.mois.append([d for d in (datetime.date(a, m, j) for j in range(1, nb_jours + 1)) if fin is None or d <= fin])
         self.jours = [j for jours in self.mois for j in jours]
+        # La CI capture stdout des commandes dans les tests. Ces traces
+        # facultatives restent visibles directement dans les logs GitHub.
+        diagnostic_sql = bool(__import__('os').environ.get('SQL_TEST_TIMINGS'))
+        def trace_phase(phase, debut):
+            if diagnostic_sql:
+                print(f'[SIM-PHASE] {phase} {time.perf_counter() - debut:.3f}s', flush=True)
+        debut_phase = time.perf_counter()
         self.exercices()
         self.moment(self.jours[0], 6)
         with horloge(self.maintenant):
             self.preparer(o["vehicules"], o["salaries"])
             self.initialiser_metier()
+        trace_phase('initialisation', debut_phase)
         self.par_mois = []
         for idx, jours in enumerate(self.mois):
             self.mois_jours, avant = jours, dict(self.compteurs)
@@ -129,14 +137,17 @@ class Command(SimulationMetierMixin, BaseCommand):
                 avant_jour = dict(self.compteurs)
                 chrono = time.perf_counter()
                 self.journee(jour)
+                trace_phase(f'journee {jour}', chrono)
                 self.mesures.append({"jour": str(jour), "secondes": round(time.perf_counter()-chrono, 3),
                     "departs": self.compteurs['voyages']-avant_jour['voyages'],
                     "billets": self.compteurs['billets']-avant_jour['billets'], "echelle": self.echelle})
                 self.stdout.write(f"Durée réelle {jour} : {self.mesures[-1]['secondes']:.3f} s · {self.mesures[-1]['departs']} départs · {self.mesures[-1]['billets']} billets")
                 self.stdout.write(f"{jour:%d/%m/%Y} : {self.compteurs['voyages']} voyages, {self.compteurs['billets']} billets")
             self.moment(jours[-1], 22)
+            debut_phase = time.perf_counter()
             with horloge(self.maintenant):
                 self.fin_de_mois(jours[0], jours[-1])
+            trace_phase(f'fin_de_mois {jours[0]:%Y-%m}', debut_phase)
             self.par_mois.append((jours[0], jours[-1], {k: self.compteurs[k] - avant[k] for k in self.compteurs}))
             # Arrêt propre demandé à l'écran : la tranche (ce mois) est terminée et consultable ;
             # on s'arrête avant le mois suivant plutôt que de tout annuler.
@@ -148,8 +159,10 @@ class Command(SimulationMetierMixin, BaseCommand):
                 break
         if o["journal_scenarios"]:
             self.ecrire_rapports_metier(o["journal_scenarios"])
+        debut_phase = time.perf_counter()
         bilan = self.bilan()
         texte = self.texte_bilan(bilan, o)
+        trace_phase('bilan_et_controles', debut_phase)
         self.stdout.write(texte)
         if o["rapport"]:
             with open(o["rapport"], "w", encoding="utf-8") as f:
