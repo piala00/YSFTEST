@@ -65,22 +65,30 @@ def instrument_tests():
     # Django's per-test fixture lifecycle runs inside TestCase.run. Separate
     # database flush/fixture loading from the actual test method without
     # changing transaction or connection semantics.
+    import inspect
     from django.test import SimpleTestCase
     for phase in ("_pre_setup", "_post_teardown"):
-        original = getattr(SimpleTestCase, phase)
+        # Preserve the original descriptor: Django versions may expose these
+        # hooks as instance methods or classmethods. A plain function assigned
+        # over a classmethod loses binding and breaks every SQL Server test.
+        descriptor = inspect.getattr_static(SimpleTestCase, phase)
+        is_classmethod = isinstance(descriptor, classmethod)
+        original = descriptor.__func__ if is_classmethod else descriptor
 
-        def timed_fixture(self, _phase=phase, _original=original):
-            started = time.monotonic()
-            try:
-                # Django declares these hooks as classmethods. getattr() returns
-                # an already-bound method, so passing self adds an invalid arg.
-                return _original.__func__(type(self)) if isinstance(getattr(_original, "__self__", None), type) else _original(self)
-            finally:
-                elapsed = time.monotonic() - started
-                if elapsed >= threshold:
-                    print(f"[SQL-TEST-FIXTURE-SLOW] {_phase} {elapsed:.3f}s {self.id()}", flush=True)
+        def make_timed_fixture(phase_name, original_method, class_bound):
+            def timed_fixture(receiver):
+                started = time.monotonic()
+                try:
+                    return original_method(receiver)
+                finally:
+                    elapsed = time.monotonic() - started
+                    if elapsed >= threshold:
+                        name = (receiver.__module__ + "." + receiver.__qualname__
+                                if class_bound else receiver.id())
+                        print(f"[SQL-TEST-FIXTURE-SLOW] {phase_name} {elapsed:.3f}s {name}", flush=True)
+            return classmethod(timed_fixture) if class_bound else timed_fixture
 
-        setattr(SimpleTestCase, phase, timed_fixture)
+        setattr(SimpleTestCase, phase, make_timed_fixture(phase, original, is_classmethod))
 
 
     # Les lenteurs de setUpClass/tearDownClass ne passent pas par TestCase.run.
