@@ -14,6 +14,7 @@ Après l'essai : supprimer le fichier du dossier de simulation, ou créer la vra
 import calendar
 import contextlib
 import datetime
+import os
 import random
 import time
 from pathlib import Path
@@ -119,7 +120,7 @@ class Command(SimulationMetierMixin, BaseCommand):
         self.jours = [j for jours in self.mois for j in jours]
         # La CI capture stdout des commandes dans les tests. Ces traces
         # facultatives restent visibles directement dans les logs GitHub.
-        diagnostic_sql = bool(__import__('os').environ.get('SQL_TEST_TIMINGS'))
+        diagnostic_sql = bool(os.environ.get('SQL_TEST_TIMINGS'))
         def trace_phase(phase, debut):
             if diagnostic_sql:
                 print(f'[SIM-PHASE] {phase} {time.perf_counter() - debut:.3f}s', flush=True)
