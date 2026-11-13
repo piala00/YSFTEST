@@ -62,6 +62,25 @@ def instrument_tests():
 
     unittest.TestCase.run = timed_run
 
+    # Django's per-test fixture lifecycle runs inside TestCase.run. Separate
+    # database flush/fixture loading from the actual test method without
+    # changing transaction or connection semantics.
+    from django.test import SimpleTestCase
+    for phase in ("_pre_setup", "_post_teardown"):
+        original = getattr(SimpleTestCase, phase)
+
+        def timed_fixture(self, _phase=phase, _original=original):
+            started = time.monotonic()
+            try:
+                return _original(self)
+            finally:
+                elapsed = time.monotonic() - started
+                if elapsed >= threshold:
+                    print(f"[SQL-TEST-FIXTURE-SLOW] {_phase} {elapsed:.3f}s {self.id()}", flush=True)
+
+        setattr(SimpleTestCase, phase, timed_fixture)
+
+
     # Les lenteurs de setUpClass/tearDownClass ne passent pas par TestCase.run.
     # Le runner Django les déclenche via unittest.TestSuite : instrumenter ces
     # points pour distinguer préparation de données, attente SQL et test métier.
