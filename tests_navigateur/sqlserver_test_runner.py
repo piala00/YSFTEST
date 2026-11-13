@@ -74,7 +74,7 @@ def instrument_tests():
             try:
                 # Django declares these hooks as classmethods. getattr() returns
                 # an already-bound method, so passing self adds an invalid arg.
-                return _original() if getattr(_original, "__self__", None) is not None else _original(self)
+                return _original.__func__(type(self)) if isinstance(getattr(_original, "__self__", None), type) else _original(self)
             finally:
                 elapsed = time.monotonic() - started
                 if elapsed >= threshold:
