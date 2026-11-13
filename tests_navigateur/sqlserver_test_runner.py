@@ -72,7 +72,9 @@ def instrument_tests():
         def timed_fixture(self, _phase=phase, _original=original):
             started = time.monotonic()
             try:
-                return _original(self)
+                # Django declares these hooks as classmethods. getattr() returns
+                # an already-bound method, so passing self adds an invalid arg.
+                return _original() if getattr(_original, "__self__", None) is not None else _original(self)
             finally:
                 elapsed = time.monotonic() - started
                 if elapsed >= threshold:
