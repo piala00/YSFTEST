@@ -73,7 +73,7 @@ def instrument_tests():
             return original_call_test_method(self, method)
         finally:
             elapsed = time.monotonic() - started
-            print(f"[SQL-TEST-BODY] {elapsed:.3f}s {self.id()}", flush=True)
+            print(f"[SQL-TEST-BODY] {elapsed:.3f}s {unittest.TestCase.id(self)}", flush=True)
 
     unittest.TestCase._callTestMethod = timed_test_method
 
