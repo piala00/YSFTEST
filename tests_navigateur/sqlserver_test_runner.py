@@ -62,6 +62,21 @@ def instrument_tests():
 
     unittest.TestCase.run = timed_run
 
+    # Mesurer séparément le corps du test : TestCase.run inclut également
+    # setUp/tearDown et les transactions Django. Ce marqueur permet de
+    # distinguer un calcul métier lent d'une attente de fixture SQL Server.
+    original_call_test_method = unittest.TestCase._callTestMethod
+
+    def timed_test_method(self, method):
+        started = time.monotonic()
+        try:
+            return original_call_test_method(self, method)
+        finally:
+            elapsed = time.monotonic() - started
+            print(f"[SQL-TEST-BODY] {elapsed:.3f}s {self.id()}", flush=True)
+
+    unittest.TestCase._callTestMethod = timed_test_method
+
     # Django's per-test fixture lifecycle runs inside TestCase.run. Separate
     # database flush/fixture loading from the actual test method without
     # changing transaction or connection semantics.
