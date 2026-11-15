@@ -479,13 +479,43 @@ class Command(SimulationMetierMixin, BaseCommand):
 
         ana = analytique.vehicules(debut, fin)
 
-        def mois_gl(d, f, prefixe):
-            a = (LigneEcriture.objects.filter(ecriture__date__range=(d, f), ecriture__statut=Ecriture.STATUT_VALIDEE,
-                                              compte__numero__startswith=prefixe).aggregate(d=Sum("debit"), c=Sum("credit")))
-            return (a["d"] or 0) - (a["c"] or 0)
+        # Regrouper les classes 6/7 par mois en une requête au lieu de
+        # deux agrégations SQL pour chacun des mois simulés.
+        from django.db.models.functions import ExtractMonth, ExtractYear
 
-        mensuel = [{"debut": d, "fin": f, **n, "produits": -mois_gl(d, f, "7"), "charges": mois_gl(d, f, "6")}
-                   for d, f, n in self.par_mois]
+        lignes_mensuelles = (
+            LigneEcriture.objects.filter(
+                ecriture__date__range=(debut, fin),
+                ecriture__statut=Ecriture.STATUT_VALIDEE,
+                compte__numero__startswith="6",
+            )
+            .annotate(annee=ExtractYear("ecriture__date"), mois=ExtractMonth("ecriture__date"))
+            .values("annee", "mois")
+            .annotate(d=Sum("debit"), c=Sum("credit"))
+        )
+        charges_mensuelles = {
+            (ligne["annee"], ligne["mois"]): (ligne["d"] or Decimal(0)) - (ligne["c"] or Decimal(0))
+            for ligne in lignes_mensuelles
+        }
+        produits_mensuels = {
+            (ligne["annee"], ligne["mois"]): (ligne["c"] or Decimal(0)) - (ligne["d"] or Decimal(0))
+            for ligne in (
+                LigneEcriture.objects.filter(
+                    ecriture__date__range=(debut, fin),
+                    ecriture__statut=Ecriture.STATUT_VALIDEE,
+                    compte__numero__startswith="7",
+                )
+                .annotate(annee=ExtractYear("ecriture__date"), mois=ExtractMonth("ecriture__date"))
+                .values("annee", "mois")
+                .annotate(d=Sum("debit"), c=Sum("credit"))
+            )
+        }
+        mensuel = [
+            {"debut": d, "fin": f, **n,
+             "produits": produits_mensuels.get((d.year, d.month), Decimal(0)),
+             "charges": charges_mensuelles.get((d.year, d.month), Decimal(0))}
+            for d, f, n in self.par_mois
+        ]
         return {"mensuel": mensuel,
             **self.compteurs, "ecritures": Ecriture.objects.count(), "debit": tot["d"] or 0, "credit": tot["c"] or 0,
             "produits": -solde("7"), "charges": solde("6"), "billets_70611": -solde("70611"), "bagages_70614": -solde("70614"),
