@@ -462,7 +462,7 @@ class Command(SimulationMetierMixin, BaseCommand):
     # ------------------------------------------------------------------ fin de mois
     @transaction.atomic
     def fin_de_mois(self, debut, fin):
-        from apps.comptabilite.models import LigneEcriture
+        from apps.comptabilite.models import Ecriture, LigneEcriture
         from apps.comptabilite.services import creer_ecriture
         from apps.partenaires.models import Decompte, ReglementPartenaire
         from apps.personnel.models import PeriodePaie
@@ -485,6 +485,7 @@ class Command(SimulationMetierMixin, BaseCommand):
         solde_fournisseur = LigneEcriture.objects.filter(
             tiers=self.fournisseur,
             compte=self.fournisseur.get_compte_collectif(),
+            ecriture__statut=Ecriture.STATUT_VALIDEE,
         ).aggregate(debit=Sum("debit"), credit=Sum("credit"))
         dette = (solde_fournisseur["credit"] or Decimal(0)) - (solde_fournisseur["debit"] or Decimal(0))
         if dette > 0:                                            # règlement du fournisseur par la banque
