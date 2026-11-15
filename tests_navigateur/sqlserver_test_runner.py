@@ -47,7 +47,7 @@ def instrument_tests():
         signal.signal(signal.SIGTERM, on_termination)
 
     def timed_run(self, result=None):
-        test_name = self.id()
+        test_name = unittest.TestCase.id(self)
         started = time.monotonic()
         active["name"], active["started"] = test_name, started
         print(f"[SQL-TEST-START] {test_name}", flush=True)
@@ -99,7 +99,7 @@ def instrument_tests():
                     elapsed = time.monotonic() - started
                     if elapsed >= threshold:
                         name = (receiver.__module__ + "." + receiver.__qualname__
-                                if class_bound else receiver.id())
+                                if class_bound else unittest.TestCase.id(receiver))
                         print(f"[SQL-TEST-FIXTURE-SLOW] {phase_name} {elapsed:.3f}s {name}", flush=True)
             return classmethod(timed_fixture) if class_bound else timed_fixture
 
