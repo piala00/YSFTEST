@@ -466,7 +466,8 @@ class Command(SimulationMetierMixin, BaseCommand):
         # Les préfixes OHADA se recouvrent (7 / 70611, 6 / 6053, etc.) :
         # chaque solde conserve exactement la sémantique de startswith.
         soldes_comptes = list(
-            LigneEcriture.objects.values("compte__numero")
+            LigneEcriture.objects.filter(ecriture__statut=Ecriture.STATUT_VALIDEE)
+            .values("compte__numero")
             .annotate(d=Sum("debit"), c=Sum("credit"))
         )
 
