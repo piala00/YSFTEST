@@ -54,10 +54,10 @@ class SimulationMetierMixin:
 
     def plan_journee(self, jour):
         if not self.profil_complet and not self.departs_jour:
-            for c in self.cars:
+            for i, c in enumerate(self.cars):
                 if self.r.random() > .72:
                     continue
-                ligne = c['aller'] if (jour.day + self.cars.index(c)) % 2 else c['retour']
+                ligne = c['aller'] if (jour.day + i) % 2 else c['retour']
                 yield c, ligne, self.r.choice([6, 7, 8, 10, 13, 15])
             return
         scenarios = self.profil_complet and jour == self.mois_jours[0]
