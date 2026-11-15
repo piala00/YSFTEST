@@ -462,9 +462,20 @@ class Command(SimulationMetierMixin, BaseCommand):
         debut, fin = self.jours[0], self.jours[-1]
         tot = LigneEcriture.objects.filter(ecriture__statut=Ecriture.STATUT_VALIDEE).aggregate(d=Sum("debit"), c=Sum("credit"))
 
+        # Un seul regroupement SQL par compte pour les contrôles du bilan.
+        # Les préfixes OHADA se recouvrent (7 / 70611, 6 / 6053, etc.) :
+        # chaque solde conserve exactement la sémantique de startswith.
+        soldes_comptes = list(
+            LigneEcriture.objects.values("compte__numero")
+            .annotate(d=Sum("debit"), c=Sum("credit"))
+        )
+
         def solde(prefixe):
-            a = LigneEcriture.objects.filter(compte__numero__startswith=prefixe).aggregate(d=Sum("debit"), c=Sum("credit"))
-            return (a["d"] or 0) - (a["c"] or 0)
+            return sum(
+                ((ligne["d"] or Decimal(0)) - (ligne["c"] or Decimal(0))
+                 for ligne in soldes_comptes if ligne["compte__numero"].startswith(prefixe)),
+                Decimal(0),
+            )
 
         ana = analytique.vehicules(debut, fin)
 
