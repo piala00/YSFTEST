@@ -347,6 +347,7 @@ class Command(SimulationMetierMixin, BaseCommand):
         from apps.transport.models_depenses import DemandeDepense
 
         r = self.r
+        colis_avant_jour = self.compteurs['colis']
         diagnostic_sql = bool(os.environ.get('SQL_TEST_TIMINGS'))
         debut_etape = time.perf_counter()
 
@@ -421,7 +422,7 @@ class Command(SimulationMetierMixin, BaseCommand):
                 self.scenarios_apres_arrivee(jour, d)
         mesurer_etape('departs_carburant_arrivees')
         with horloge(self.moment(jour, 20)), transaction.atomic():
-            if self.compteurs["colis"]:                          # emballages consommés pour les colis du jour
+            if self.compteurs["colis"] > colis_avant_jour:       # emballages uniquement si colis créés ce jour
                 carton = self.articles["CART"]
                 carton.refresh_from_db()
                 besoin = Decimal(min(len(departs), int(carton.quantite)))
