@@ -137,7 +137,34 @@ class Command(SimulationMetierMixin, BaseCommand):
             for jour in jours:
                 avant_jour = dict(self.compteurs)
                 chrono = time.perf_counter()
-                self.journee(jour)
+                # Profil SQL facultatif : identifier les requêtes réellement lentes
+                # sans modifier les transactions ni allonger le timeout CI.
+                if diagnostic_sql:
+                    from django.db import connection as sql_connection
+                    requetes = {"nombre": 0, "duree": 0.0, "lentes": []}
+
+                    def mesurer_requete(execute, sql, params, many, context):
+                        debut_sql = time.perf_counter()
+                        try:
+                            return execute(sql, params, many, context)
+                        finally:
+                            ecoule = time.perf_counter() - debut_sql
+                            requetes["nombre"] += 1
+                            requetes["duree"] += ecoule
+                            if ecoule >= 0.5:
+                                # Empreinte et durée seulement : jamais de paramètres
+                                # SQL (données métier potentiellement sensibles).
+                                import hashlib
+                                empreinte = hashlib.sha256(sql.encode("utf-8")).hexdigest()[:12]
+                                requetes["lentes"].append((ecoule, empreinte))
+
+                    with sql_connection.execute_wrapper(mesurer_requete):
+                        self.journee(jour)
+                    print(f'[SIM-SQL] {jour} count={requetes["nombre"]} '
+                          f'db_seconds={requetes["duree"]:.3f} '
+                          f'slowest={sorted(requetes["lentes"], reverse=True)[:5]}', flush=True)
+                else:
+                    self.journee(jour)
                 trace_phase(f'journee {jour}', chrono)
                 self.mesures.append({"jour": str(jour), "secondes": round(time.perf_counter()-chrono, 3),
                     "departs": self.compteurs['voyages']-avant_jour['voyages'],
