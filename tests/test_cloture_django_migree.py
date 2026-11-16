@@ -317,6 +317,59 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
 
 
+    def test_deux_pieces_desequilibrees_ne_se_compensent_pas(self):
+        """Deux erreurs opposées ne doivent pas autoriser une clôture N+1."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with connexion_sqlite(ancien) as db:
+                # La pièce initiale a un excédent débit de 1,00.
+                db.execute("""UPDATE comptabilite_ligneecriture
+                              SET credit=124.50 WHERE credit>0""")
+                # La seconde pièce compense exactement l'écart au niveau
+                # de la balance globale, mais reste individuellement fausse.
+                db.execute("""INSERT INTO comptabilite_ecriture
+                    (journal_id, exercice_id, numero, date, libelle, reference,
+                     statut, origine, source_cle, source_empreinte, uid,
+                     site_origine, cree_le)
+                    SELECT journal_id, exercice_id, 'OD-2026-2', date,
+                           'Pièce erronée compensatrice', '', 'VALIDEE',
+                           '', '', '', 'regression-contrepartie-2026', '',
+                           CURRENT_TIMESTAMP
+                    FROM comptabilite_ecriture WHERE numero='OD-2026-1'""")
+                piece_id = db.execute(
+                    "SELECT id FROM comptabilite_ecriture WHERE numero='OD-2026-2'"
+                ).fetchone()[0]
+                compte_id = db.execute(
+                    "SELECT id FROM comptabilite_compte WHERE numero='101000'"
+                ).fetchone()[0]
+                db.execute("""INSERT INTO comptabilite_ligneecriture
+                    (ecriture_id, compte_id, libelle, debit, credit,
+                     lettrage, source_cle)
+                    VALUES (?, ?, 'Écart inverse', 0, 1, '', '')""",
+                           (piece_id, compte_id))
+            original = {'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}
+            catalogue.write_text(json.dumps(original), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'pièce validée déséquilibrée'):
+                preparer_dossier_transport_sqlite(
+                    catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertFalse(nouveau.exists())
+            self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')),
+                             original)
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 2)
+                self.assertEqual(db.execute(
+                    'SELECT code FROM core_exercice'
+                ).fetchone()[0], '2026')
+
     def test_commande_refuse_balance_invalide_sans_publier(self):
         """Le point d'entrée public doit garantir l'atomicité d'une clôture refusée."""
         with tempfile.TemporaryDirectory() as temporaire:
