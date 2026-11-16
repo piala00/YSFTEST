@@ -70,6 +70,7 @@ def migrer_schema_django_sqlite(cible):
     import os
     import subprocess
     import sys
+    import time
     from pathlib import Path
 
     chemin = cible.execute("PRAGMA database_list").fetchone()[2]
@@ -86,6 +87,8 @@ def migrer_schema_django_sqlite(cible):
         "ERP_LICENCE": "0",
         "RELAIS_ACTIF": "0",
     })
+    debut_migration = time.monotonic()
+    print(f"[CLOTURE-MIGRATION-START] {Path(chemin).name}", flush=True)
     try:
         resultat = subprocess.run(
             [sys.executable, "-u", str(racine / "manage.py"),
@@ -94,9 +97,11 @@ def migrer_schema_django_sqlite(cible):
             text=True, timeout=240, check=False,
         )
     except subprocess.TimeoutExpired as exc:
+        print(f"[CLOTURE-MIGRATION-TIMEOUT] {time.monotonic() - debut_migration:.3f}s", flush=True)
         raise RuntimeError("migrations Django N+1 bloquées après 240 secondes") from exc
+    print(f"[CLOTURE-MIGRATION-END] {time.monotonic() - debut_migration:.3f}s code={resultat.returncode}", flush=True)
     if resultat.returncode:
-        diagnostic = (resultat.stdout + "\\n" + resultat.stderr)[-6000:]
+        diagnostic = (resultat.stdout + "\n" + resultat.stderr)[-6000:]
         raise RuntimeError(f"migrations Django N+1 échouées ({resultat.returncode}): {diagnostic}")
     # L'autre processus a modifié le schéma : abandonner les éventuels
     # statements préparés avant la reprise transactionnelle.
