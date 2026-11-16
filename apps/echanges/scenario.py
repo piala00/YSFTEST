@@ -6,7 +6,9 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
+from functools import lru_cache
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[2]
@@ -40,8 +42,26 @@ class Dossier:
         return json.loads(sortie.strip().splitlines()[-1]) if sortie.strip() else None
 
     def creer(self):
-        self.manage("migrate", "-v0")
+        # Les migrations ne dépendent pas de l'agence : préparer une seule base
+        # de schéma par processus de scénario, puis la copier avant init_erp.
+        # init_erp reste exécuté séparément pour chaque dossier (identité,
+        # configuration et données propres à l'agence).
+        Path(self.base).write_bytes(_schema_sqlite_migre())
         self.manage("init_erp", "--activite", "transport", "-v0")
+
+
+@lru_cache(maxsize=1)
+def _schema_sqlite_migre():
+    """Schéma Django migré une fois, sans données métier ni identité d'agence.
+
+    Le modèle n'est conservé qu'en mémoire dans le processus de test : chaque
+    dossier obtient son propre fichier SQLite, ses transactions et init_erp.
+    """
+    with tempfile.TemporaryDirectory(prefix="erp-schema-") as repertoire:
+        modele = Dossier(repertoire, "schema")
+        modele.manage("migrate", "-v0")
+        # Le sous-processus migrate a fermé ses connexions avant la lecture.
+        return Path(modele.base).read_bytes()
 
 
 def lots_de(sortie):
