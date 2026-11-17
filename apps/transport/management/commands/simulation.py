@@ -451,23 +451,48 @@ class Command(SimulationMetierMixin, BaseCommand):
         with horloge(self.moment(jour, 0)), transaction.atomic():
             self.scenarios_avant_depart(jour, departs)
         mesurer_etape('scenarios_avant_depart')
+        # Sous-chronométrage du traitement le plus coûteux, sans toucher aux
+        # écritures ni à l'ordonnancement des transactions métier.
+        sous_phases = {nom: [0, 0.0] for nom in (
+            "depart", "incidents_en_route", "carburant_et_caisse", "arrivee", "incidents_apres_arrivee")}
+
+        def chronometrer_sous_phase(nom, debut):
+            if diagnostic_sql:
+                stats = sous_phases[nom]
+                stats[0] += 1
+                stats[1] += time.perf_counter() - debut
+
         for d, c, heure in departs:
             with horloge(self.moment(jour, heure, 5)), transaction.atomic():
+                debut_operation = time.perf_counter() if diagnostic_sql else None
+                if self.profil_complet
                 if self.profil_complet and d.pk in (getattr(self, '_depart_scenario', None), getattr(self, '_depart_suite_scenario', None)):
                     self.tracer_scenario('Transport', 'Départ : reconnaissance des produits de cette portion, sans nouvel encaissement', d.partir)
                 else:
                     d.partir()
+                chronometrer_sous_phase("depart", debut_operation)
+                debut_operation = time.perf_counter() if diagnostic_sql else None
                 self.scenarios_en_route(jour, d)
+                chronometrer_sous_phase("incidents_en_route", debut_operation)
+                debut_operation = time.perf_counter() if diagnostic_sql else None
                 litres = Decimal(c["km"] * 35 // 100)
                 PleinCarburant(vehicule=c["vehicule"], depart=d, litres=litres, prix_litre=PRIX_LITRE,
                                caisse=self.caisse_pour(litres * PRIX_LITRE, jour), date=jour).enregistrer()
                 self.compteurs["voyages"] += 1
                 self.compteurs["pleins"] += 1
+                chronometrer_sous_phase("carburant_et_caisse", debut_operation)
             arrivee_jour = jour + datetime.timedelta(days=(heure+6)//24) if self.departs_jour else jour
             arrivee_heure = (heure+6)%24 if self.departs_jour else min(heure+6,23)
             with horloge(self.moment(arrivee_jour, arrivee_heure)), transaction.atomic():
+                debut_operation = time.perf_counter() if diagnostic_sql else None
                 d.arriver()
+                chronometrer_sous_phase("arrivee", debut_operation)
+                debut_operation = time.perf_counter() if diagnostic_sql else None
                 self.scenarios_apres_arrivee(jour, d)
+                chronometrer_sous_phase("incidents_apres_arrivee", debut_operation)
+        if diagnostic_sql:
+            for nom, (appels, secondes) in sous_phases.items():
+                print(f'[SIM-TRANSPORT] {jour} {nom} appels={appels} duree={secondes:.3f}s', flush=True)
         mesurer_etape('departs_carburant_arrivees')
         with horloge(self.moment(jour, 20)), transaction.atomic():
             if self.compteurs["colis"] > colis_avant_jour:       # emballages uniquement si colis créés ce jour
