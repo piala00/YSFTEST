@@ -394,7 +394,16 @@ class Command(SimulationMetierMixin, BaseCommand):
             maintenant = time.perf_counter()
             if diagnostic_sql:
                 print(f'[SIM-JOUR] {jour} {nom} {maintenant - debut_etape:.3f}s', flush=True)
-            self._sim_sql_etape = nom
+            # Le chronomètre clôt la phase « nom » ; les requêtes suivantes
+            # appartiennent à la phase suivante, et non à celle qui vient de finir.
+            phase_suivante = {
+                "preparation_et_achats": "billets_et_colis",
+                "billets_et_colis": "scenarios_avant_depart",
+                "scenarios_avant_depart": "departs_carburant_arrivees",
+                "departs_carburant_arrivees": "operations_fin_journee",
+                "operations_fin_journee": "terminee",
+            }
+            self._sim_sql_etape = phase_suivante[nom]
             debut_etape = maintenant
 
         with horloge(self.moment(jour, 5)), transaction.atomic():
