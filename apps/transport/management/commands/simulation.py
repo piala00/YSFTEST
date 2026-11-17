@@ -465,7 +465,6 @@ class Command(SimulationMetierMixin, BaseCommand):
         for d, c, heure in departs:
             with horloge(self.moment(jour, heure, 5)), transaction.atomic():
                 debut_operation = time.perf_counter() if diagnostic_sql else None
-                if self.profil_complet
                 if self.profil_complet and d.pk in (getattr(self, '_depart_scenario', None), getattr(self, '_depart_suite_scenario', None)):
                     self.tracer_scenario('Transport', 'Départ : reconnaissance des produits de cette portion, sans nouvel encaissement', d.partir)
                 else:
