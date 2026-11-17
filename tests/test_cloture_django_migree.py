@@ -621,5 +621,55 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                     "SELECT COUNT(*) FROM comptabilite_ecriture"
                 ).fetchone()[0], 2)
 
+
+    def test_echec_apres_migration_et_reprise_ne_publie_rien(self):
+        """Une erreur pendant les AN annule N+1 même après reprise des référentiels."""
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            original = {'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}
+            catalogue.write_text(json.dumps(original), encoding='utf-8')
+            with connexion_sqlite(ancien) as db:
+                avant = db.execute(
+                    'SELECT COUNT(*), SUM(debit), SUM(credit) FROM comptabilite_ligneecriture'
+                ).fetchone()
+
+            def interrompre_apres_reprise(source, cible, ancien_id, nouveau_id, date_an):
+                # Les migrations et la copie des référentiels ont réellement abouti.
+                self.assertEqual(cible.execute(
+                    "SELECT code FROM core_exercice"
+                ).fetchone(), ('2027',))
+                self.assertEqual(cible.execute(
+                    "SELECT COUNT(*) FROM transport_gare"
+                ).fetchone()[0], 3)
+                self.assertEqual(cible.execute(
+                    "SELECT COUNT(*) FROM auth_user WHERE username='controle'"
+                ).fetchone()[0], 1)
+                raise RuntimeError('interruption volontaire des AN')
+
+            with patch('apps.core.adaptateur_cloture_transport_sqlite.reporter_balance_validee',
+                       side_effect=interrompre_apres_reprise):
+                with self.assertRaisesRegex(RuntimeError, 'interruption volontaire des AN'):
+                    preparer_dossier_transport_sqlite(
+                        catalogue, 'n', nouveau, 'n1', 2027)
+
+            self.assertFalse(nouveau.exists(), 'aucun dossier N+1 partiel ne doit subsister')
+            self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*), SUM(debit), SUM(credit) FROM comptabilite_ligneecriture'
+                ).fetchone(), avant)
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2026',)])
+
+
 if __name__ == '__main__':
     unittest.main()
