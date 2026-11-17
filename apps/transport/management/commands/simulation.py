@@ -141,7 +141,8 @@ class Command(SimulationMetierMixin, BaseCommand):
                 # sans modifier les transactions ni allonger le timeout CI.
                 if diagnostic_sql:
                     from django.db import connection as sql_connection
-                    requetes = {"nombre": 0, "duree": 0.0, "lentes": [], "par_sql": {}}
+                    requetes = {"nombre": 0, "duree": 0.0, "lentes": [], "par_sql": {}, "par_etape": {}}
+                    self._sim_sql_etape = "preparation_et_achats"
 
                     def mesurer_requete(execute, sql, params, many, context):
                         debut_sql = time.perf_counter()
@@ -154,6 +155,11 @@ class Command(SimulationMetierMixin, BaseCommand):
                             # Regrouper par texte SQL (sans paramètres) pour repérer
                             # les N+1 : des milliers de requêtes rapides peuvent
                             # coûter davantage qu'une requête lente isolée.
+                            etape = getattr(self, "_sim_sql_etape", "inconnue")
+                            par_etape = requetes["par_etape"].setdefault(etape, {})
+                            etape_stats = par_etape.setdefault(sql, [0, 0.0])
+                            etape_stats[0] += 1
+                            etape_stats[1] += ecoule
                             stats = requetes["par_sql"].setdefault(sql, [0, 0.0, 0.0])
                             stats[0] += 1
                             stats[1] += ecoule
@@ -176,6 +182,16 @@ class Command(SimulationMetierMixin, BaseCommand):
                          "max_s": round(stats[2], 3)}
                         for sql, stats in top_cumules
                     ]
+                    for etape, signatures in requetes["par_etape"].items():
+                        dominantes = sorted(signatures.items(), key=lambda item: item[1][1], reverse=True)[:3]
+                        total = sum(s[0] for s in signatures.values())
+                        secondes = sum(s[1] for s in signatures.values())
+                        top = [{"sha": hashlib.sha256(sql.encode("utf-8")).hexdigest()[:12],
+                                "count": stats[0], "total_s": round(stats[1], 3)}
+                               for sql, stats in dominantes]
+                        print(f'[SIM-SQL-ETAPE] {jour} phase={etape} count={total} '
+                              f'db_seconds={secondes:.3f} top={top}', flush=True)
+                    self._sim_sql_etape = None
                     print(f'[SIM-SQL] {jour} count={requetes["nombre"]} '
                           f'db_seconds={requetes["duree"]:.3f} '
                           f'slowest={sorted(requetes["lentes"], reverse=True)[:5]} '
@@ -378,6 +394,7 @@ class Command(SimulationMetierMixin, BaseCommand):
             maintenant = time.perf_counter()
             if diagnostic_sql:
                 print(f'[SIM-JOUR] {jour} {nom} {maintenant - debut_etape:.3f}s', flush=True)
+            self._sim_sql_etape = nom
             debut_etape = maintenant
 
         with horloge(self.moment(jour, 5)), transaction.atomic():
