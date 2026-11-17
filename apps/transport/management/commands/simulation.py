@@ -182,6 +182,13 @@ class Command(SimulationMetierMixin, BaseCommand):
                           f'top_cumulative={top_cumules}', flush=True)
                 else:
                     self.journee(jour)
+                if diagnostic_sql:
+                    stats_caisse = getattr(self, "_diagnostic_caisse", None)
+                    if stats_caisse:
+                        print(f'[SIM-CAISSE] {jour} appels={stats_caisse["appels"]} '
+                              f'total_s={stats_caisse["secondes"]:.3f} '
+                              f'max_s={stats_caisse["max_s"]:.3f}', flush=True)
+                        self._diagnostic_caisse = None
                 trace_phase(f'journee {jour}', chrono)
                 self.mesures.append({"jour": str(jour), "secondes": round(time.perf_counter()-chrono, 3),
                     "departs": self.compteurs['voyages']-avant_jour['voyages'],
@@ -228,7 +235,22 @@ class Command(SimulationMetierMixin, BaseCommand):
 
         if self.profil_complet:
             return self.assurer_especes(montant, jour)
-        return self.ca if solde_tresorerie(self.ca.compte_tresorerie, jour) >= montant else self.bq
+        # Mesurer séparément les recalculs du solde, suspects de croître avec
+        # l'historique des écritures. Ne pas mettre en cache un solde mutable.
+        diagnostic = bool(os.environ.get("SQL_TEST_TIMINGS"))
+        debut = time.perf_counter() if diagnostic else None
+        try:
+            solde = solde_tresorerie(self.ca.compte_tresorerie, jour)
+        finally:
+            if diagnostic:
+                stats = getattr(self, "_diagnostic_caisse", None)
+                if stats is None:
+                    stats = self._diagnostic_caisse = {"appels": 0, "secondes": 0.0, "max_s": 0.0}
+                duree = time.perf_counter() - debut
+                stats["appels"] += 1
+                stats["secondes"] += duree
+                stats["max_s"] = max(stats["max_s"], duree)
+        return self.ca if solde >= montant else self.bq
 
     def moment(self, jour, heure, minute=0):
         self.maintenant = timezone.make_aware(datetime.datetime.combine(jour, datetime.time(heure, minute)))
