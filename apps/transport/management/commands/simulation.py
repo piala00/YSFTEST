@@ -423,8 +423,19 @@ class Command(SimulationMetierMixin, BaseCommand):
                                                  prix_unitaire=85000, vehicule=self.cars[0]["vehicule"])
                 achat.valider(self.agent)
         mesurer_etape('preparation_et_achats')
+        # Mesurer les opérations métier, séparément des requêtes SQL et des
+        # commits de transaction : la somme des temps SQL seule ne révèle pas
+        # les coûts Python, validations et signaux de vente/chargement.
+        vente_stats = {nom: [0, 0.0] for nom in ("billet_vendre", "colis_enregistrer", "colis_charger", "transaction_depart")}
+
+        def chronometrer_vente(nom, debut):
+            if diagnostic_sql:
+                vente_stats[nom][0] += 1
+                vente_stats[nom][1] += time.perf_counter() - debut
+
         departs = []
         for c, ligne, heure in self.plan_journee(jour):
+            debut_transaction = time.perf_counter() if diagnostic_sql else None
             with horloge(self.moment(jour, max(heure - 3, 0))), transaction.atomic():
                 d = Depart.objects.create(ligne=ligne, date=jour, heure=datetime.time(heure), vehicule=c["vehicule"],
                                           chauffeur=c["chauffeur"])
@@ -434,19 +445,29 @@ class Command(SimulationMetierMixin, BaseCommand):
                     reserve = self.reserve_scenarios(c, heure, jour)
                     for k in range(min(voyageurs, d.places - reserve)):
                         bagages = r.random() < 0.15
+                        debut_vente = time.perf_counter() if diagnostic_sql else None
                         Billet(depart=d, voyageur=f"Voyageur {k + 1} (fictif)",
                                paiement=Billet.MOBILE_MONEY if r.random() < (0.05 if self.profil_complet else 0.2) else Billet.ESPECES,
                                bagages="1 colis encombrant" if bagages else "", bagages_nombre=1 if bagages else 0,
                                prix_bagages=Decimal(r.choice([1000, 2000, 3000])) if bagages else Decimal(0)).vendre(self.agent)
+                        chronometrer_vente("billet_vendre", debut_vente)
                         self.compteurs["billets"] += 1
                         self.compteurs["bagages"] += bagages
                 nb_colis = max(0, int(r.randint(0, 3 if not c.get("courrier") else 12) * max(self.echelle, 0.25)))
                 for k in range(nb_colis):
+                    debut_colis = time.perf_counter() if diagnostic_sql else None
                     colis = Colis(gare_depart=ligne.gare_depart, gare_arrivee=ligne.gare_arrivee, expediteur="Expéditeur (fictif)",
                                   destinataire="Destinataire (fictif)", poids=Decimal(r.randint(2, 40)), description="Carton").enregistrer()
+                    chronometrer_vente("colis_enregistrer", debut_colis)
+                    debut_chargement = time.perf_counter() if diagnostic_sql else None
                     colis.charger(d)
+                    chronometrer_vente("colis_charger", debut_chargement)
                     self.compteurs["colis"] += 1
+            chronometrer_vente("transaction_depart", debut_transaction)
             departs.append((d, c, heure))
+        if diagnostic_sql:
+            for nom, (appels, secondes) in vente_stats.items():
+                print(f"[SIM-VENTES] {jour} {nom} appels={appels} duree={secondes:.3f}s", flush=True)
         mesurer_etape('billets_et_colis')
         with horloge(self.moment(jour, 0)), transaction.atomic():
             self.scenarios_avant_depart(jour, departs)
