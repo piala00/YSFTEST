@@ -39,7 +39,7 @@ jobs:
       - run: pip install -r requirements.txt tblib
       - name: Tests (SQLite)
         run: python manage.py test --noinput --parallel 4 -v1
-      - name: Clôture N vers N+1 sur deux bases réellement migrées (unittest hors découverte Django)
+      - name: Métadonnées SQL Server groupées (tests unitaires sans serveur)\n        run: python -m unittest tests.test_structure_batch_sqlserver -v\n      - name: Clôture N vers N+1 sur deux bases réellement migrées (unittest hors découverte Django)
         run: python -m unittest tests.test_cloture_django_migree -v
       - name: Cohérence du snapshot WAL lors d'une écriture concurrente sur N
         run: python -m unittest tests.test_cloture_snapshot_sqlite -v
