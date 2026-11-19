@@ -5,18 +5,52 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
 
+
+def _colonnes_sql_server(presentes):
+    """Read SQL Server column metadata in one round trip when names are unambiguous.
+
+    If several schemas contain the same table name, leave that table to Django's
+    normal introspection to preserve its schema resolution semantics.
+    """
+    if connection.vendor != "microsoft":
+        return {}
+    from collections import Counter
+
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT t.name, c.name FROM sys.tables AS t "
+            "JOIN sys.columns AS c ON c.object_id = t.object_id "
+            "WHERE t.is_ms_shipped = 0"
+        )
+        rows = cur.fetchall()
+        cur.execute(
+            "SELECT name FROM sys.tables WHERE is_ms_shipped = 0"
+        )
+        counts = Counter(name.casefold() for (name,) in cur.fetchall())
+    by_table = {}
+    for table, column in rows:
+        key = table.casefold()
+        if counts[key] == 1 and table in presentes:
+            by_table.setdefault(table, set()).add(column.casefold())
+    return by_table
+
+
 def analyser():
     attendues = {m._meta.db_table: m for m in apps.get_models(include_auto_created=True)
                  if m._meta.managed and not m._meta.swapped and m._meta.can_migrate(connection)}
     presentes = set(connection.introspection.table_names())
     etrangeres = sorted(presentes - set(attendues) - {"django_migrations"})
     anomalies = []
+    # A single catalog scan avoids one slow metadata round trip per table.
+    colonnes_groupees = _colonnes_sql_server(presentes)
     with connection.cursor() as cur:
         for table, modele in sorted(attendues.items()):
             if table not in presentes:
                 anomalies.append(f"Table absente : {table}.")
                 continue
-            colonnes = {c.name.casefold() for c in connection.introspection.get_table_description(cur, table)}
+            colonnes = colonnes_groupees.get(table)
+            if colonnes is None:
+                colonnes = {c.name.casefold() for c in connection.introspection.get_table_description(cur, table)}
             for champ in modele._meta.local_fields:
                 if champ.column and champ.column.casefold() not in colonnes:
                     anomalies.append(f"Colonne absente : {table}.{champ.column}.")
