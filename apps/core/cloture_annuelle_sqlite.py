@@ -68,6 +68,13 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
                         nouvelle.execute("PRAGMA foreign_keys=ON")
                     if nouvelle.execute("PRAGMA foreign_key_check").fetchone():
                         raise ValueError("schéma N+1 invalide après migrations")
+                # Figer une vue cohérente de N pour les référentiels et les
+                # soldes : sans transaction de lecture, une saisie concurrente
+                # entre les deux étapes produirait un N+1 incohérent.
+                # Le premier SELECT matérialise le snapshot SQLite (BEGIN seul
+                # ne suffit pas). N reste strictement en lecture seule.
+                origine.execute("BEGIN")
+                origine.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
                 with nouvelle:
                     # DDL SQLite est autrement susceptible de survivre à un
                     # échec des callbacks en l'absence de BEGIN explicite.
