@@ -53,7 +53,8 @@ class AdministrationOngletsTests(TestCase):
         def description(cur, table):
             champs = originale(cur, table)
             return [c for c in champs if not (table == Societe._meta.db_table and c.name == "raison_sociale")]
-        with mock.patch.object(connection.introspection, "get_table_description", side_effect=description):
+        with mock.patch.object(connection.introspection, "get_table_description", side_effect=description), \
+                mock.patch.object(structure_base, "_colonnes_sql_server", return_value={}):
             diagnostic = structure_base.analyser()
         self.assertFalse(diagnostic["ok"])
         self.assertIn(f"Colonne absente : {Societe._meta.db_table}.raison_sociale.", diagnostic["anomalies"])
