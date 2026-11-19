@@ -6,7 +6,7 @@ from apps.core import structure_base
 
 
 class BatchColumnMetadataTests(unittest.TestCase):
-    @patch.object(structure_base, "connection")
+    @patch.object(structure_base, "connection", new_callable=MagicMock)
     def test_non_sql_server_uses_existing_introspection(self, connection):
         connection.vendor = "sqlite"
         self.assertEqual(structure_base._colonnes_sql_server({"foo"}), {})
