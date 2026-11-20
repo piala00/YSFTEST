@@ -20,6 +20,7 @@ def instrument_tests():
     original_run = unittest.TestCase.run
     threshold = float(os.environ.get("SQL_TEST_SLOW_SECONDS", "15"))
     durations = []
+    body_durations = {}
     active = {"name": None, "started": None}
 
     def report_slowest():
@@ -28,6 +29,12 @@ def instrument_tests():
         print(f"[SQL-TEST-SUMMARY] {len(durations)} tests timed; 20 slowest:", flush=True)
         for elapsed, test_name in sorted(durations, reverse=True)[:20]:
             print(f"[SQL-TEST-TOP] {elapsed:.3f}s {test_name}", flush=True)
+        # TestCase.run includes setUp/tearDown; rank that overhead separately
+        # so slow fixtures are not mistaken for slow business calculations.
+        overhead = [(max(0.0, elapsed - body_durations[name]), name)
+                    for elapsed, name in durations if name in body_durations]
+        for elapsed, name in sorted(overhead, reverse=True)[:10]:
+            print(f"[SQL-TEST-OVERHEAD-TOP] {elapsed:.3f}s {name}", flush=True)
 
     atexit.register(report_slowest)
 
@@ -73,6 +80,7 @@ def instrument_tests():
             return original_call_test_method(self, method)
         finally:
             elapsed = time.monotonic() - started
+            body_durations[unittest.TestCase.id(self)] = elapsed
             print(f"[SQL-TEST-BODY] {elapsed:.3f}s {unittest.TestCase.id(self)}", flush=True)
 
     unittest.TestCase._callTestMethod = timed_test_method
