@@ -849,7 +849,9 @@ class Billet(models.Model):
         effectuer » : la recette sera constatée au départ de chaque véhicule, pour sa part."""
         from apps.comptabilite.services import creer_ecriture
 
-        depart = Depart.objects.select_for_update().get(pk=self.depart_id)
+        # Charger la ligne et ses gares en une lecture, sans relire les mêmes FK pour chaque billet.
+        depart = (Depart.objects.select_related('ligne__gare_depart', 'ligne__gare_arrivee')
+                  .select_for_update().get(pk=self.depart_id))
         depart.ouvert_a_la_vente()
         if not self.gare_id:
             self.gare = depart.ligne.gare_depart
