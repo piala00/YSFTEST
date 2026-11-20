@@ -13,7 +13,7 @@ class BatchColumnMetadataTests(unittest.TestCase):
         self.assertEqual(structure_base._colonnes_sql_server({"foo"}), {})
         connection.cursor.assert_not_called()
 
-    @patch.object(structure_base, "connection")
+    @patch.dict(structure_base.__dict__, {"connection": MagicMock()})
     def test_batch_and_ambiguous_schema_fallback(self):
         connection = structure_base.connection
         connection.vendor = "microsoft"
