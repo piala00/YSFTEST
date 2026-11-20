@@ -182,6 +182,14 @@ class Command(SimulationMetierMixin, BaseCommand):
                          "max_s": round(stats[2], 3)}
                         for sql, stats in top_cumules
                     ]
+                    # Identifier les formes SQL coûteuses sans journaliser les paramètres.
+                    for sql, stats in sorted(requetes["par_sql"].items(),
+                                             key=lambda item: item[1][1], reverse=True)[:5]:
+                        signature = hashlib.sha256(sql.encode("utf-8")).hexdigest()[:12]
+                        forme = " ".join(sql.split())[:240]
+                        print(f'[SIM-SQL-SIGNATURE] {jour} sha={signature} '
+                              f'count={stats[0]} total_s={stats[1]:.3f} '
+                              f'sql_shape={forme!r}', flush=True)
                     for etape, signatures in requetes["par_etape"].items():
                         dominantes = sorted(signatures.items(), key=lambda item: item[1][1], reverse=True)[:3]
                         total = sum(s[0] for s in signatures.values())
