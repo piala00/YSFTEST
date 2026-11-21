@@ -615,7 +615,7 @@ class Depart(models.Model):
                 t.save(update_fields=["depart_manque", "depart", "siege"])
                 if not t.billet.site_origine:
                     t.billet.tracer("ABSENT", f"Absent au départ {self.numero} : billet à reporter ou à rembourser")
-        troncons = list(self.troncons.filter(statut=Troncon.A_VOYAGER).select_related("billet"))
+        troncons = list(self.troncons.filter(statut=Troncon.A_VOYAGER).select_related("billet", "gare_depart", "gare_arrivee"))
         envois = list(self.colis.filter(statut=Colis.CHARGE, port=Colis.PAYE, recette_constatee=False, ecriture__isnull=False))
         local = _site_local()
         parametres = ParametresTransport.get()
