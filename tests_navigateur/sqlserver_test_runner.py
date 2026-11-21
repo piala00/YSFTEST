@@ -206,8 +206,16 @@ def partition_suite():
             # simulation class alone contained a 168s test. Move the entire
             # class (not individual tests) to the lighter shard, preserving
             # class fixtures and full coverage. Other shard counts keep hashing.
-            if count == 2 and key == "apps.transport.tests.SimulationPlusieursMoisTests":
-                assigned = 0
+            if count == 2:
+                # Mesures CI #44827169289 : shard 0 = 619.815s, shard 1 =
+                # 417.891s. La classe BaseSQLServerTests contient notamment
+                # une migration SQLite -> SQL Server de 54.258s. La placer
+                # sur le shard moins charge, sans scinder ses fixtures, reduit
+                # le desequilibre sans allonger le timeout ni omettre de tests.
+                if key == "apps.transport.tests.SimulationPlusieursMoisTests":
+                    assigned = 0
+                elif key == "apps.core.tests_base_donnees.BaseSQLServerTests":
+                    assigned = 1
             if assigned == shard:
                 selected.append(test)
         print(f"[SQL-SHARD] {shard + 1}/{count}: {len(selected)} tests", flush=True)
