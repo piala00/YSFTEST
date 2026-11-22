@@ -227,6 +227,51 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], '2026-12-31')
 
 
+    def test_ouverture_rechargeable_par_orm_django(self):
+        """N+1 doit être utilisable par l'application, pas seulement lisible en SQL."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(nouveau),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                       ERP_LICENCE='0', RELAIS_ACTIF='0')
+            script = """
+from decimal import Decimal
+from django.contrib.auth.models import User
+from apps.core.models import Exercice, Agence
+from apps.transport.models import Gare, Ligne, Vehicule
+from apps.comptabilite.models import Ecriture, LigneEcriture
+exercice = Exercice.objects.get(code='2027')
+assert User.objects.get(username='controle').groups.filter(name='Guichet').exists()
+assert Agence.objects.get(code='CTR').compte_liaison.numero == '101000'
+assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
+assert Ligne.objects.get(code='YDE-DLA').gare_arrivee.code == 'DLA'
+assert Vehicule.objects.get(immatriculation='CE-123-AA').proprietaire.code == 'PROP-01'
+piece = Ecriture.objects.get(exercice=exercice, origine='CLOTURE_ANNUELLE')
+lignes = list(LigneEcriture.objects.filter(ecriture=piece))
+assert len(lignes) == 2
+assert sum((ligne.debit for ligne in lignes), Decimal('0')) == Decimal('125.50')
+assert sum((ligne.credit for ligne in lignes), Decimal('0')) == Decimal('125.50')
+assert any(ligne.tiers and ligne.section and ligne.vehicule for ligne in lignes)
+assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
+"""
+            resultat = subprocess.run(
+                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', script],
+                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(resultat.returncode, 0,
+                             resultat.stdout + resultat.stderr)
+
     def test_commande_cloture_sur_base_django_migree(self):
         """Le déclencheur public doit produire N+1, ses AN et le lien historique."""
         # Passer par manage.py dans un processus distinct : call_command(Command())
