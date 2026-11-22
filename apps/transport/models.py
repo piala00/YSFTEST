@@ -622,8 +622,18 @@ class Depart(models.Model):
         # Résoudre une seule fois la section analytique du départ pour toutes les lignes de recettes.
         section_depart = self.ligne.gare_depart.section
         debits, lignes = {}, []
+        # Une agence vendeuse peut avoir plusieurs tronçons sur le même départ.
+        # Résoudre son compte de liaison une seule fois évite deux lectures SQL
+        # supplémentaires par billet distant, sans changer les imputations.
+        comptes_liaison = {}
         for t in troncons:                             # billet vendu ailleurs : la somme est chez l'agence vendeuse
-            compte = _compte_liaison(t.billet.site_origine) if t.billet.site_origine else parametres.compte_billets_a_voyager
+            site = t.billet.site_origine
+            if site:
+                if site not in comptes_liaison:
+                    comptes_liaison[site] = _compte_liaison(site)
+                compte = comptes_liaison[site]
+            else:
+                compte = parametres.compte_billets_a_voyager
             debits[compte] = debits.get(compte, ZERO) + t.part + t.part_bagages
         total_billets = sum((t.part for t in troncons), ZERO)
         total_bagages = sum((t.part_bagages for t in troncons), ZERO)
