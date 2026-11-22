@@ -124,6 +124,8 @@ class Command(SimulationMetierMixin, BaseCommand):
         def trace_phase(phase, debut):
             if diagnostic_sql:
                 print(f'[SIM-PHASE] {phase} {time.perf_counter() - debut:.3f}s', flush=True)
+        # Cumuler les sous-phases pour repérer les coûts dominants sur plusieurs mois.
+        self._sim_phases_cumulees = {} if diagnostic_sql else None
         debut_phase = time.perf_counter()
         self.exercices()
         self.moment(self.jours[0], 6)
@@ -240,6 +242,11 @@ class Command(SimulationMetierMixin, BaseCommand):
         texte = self.texte_bilan(bilan, o)
         trace_phase('bilan_et_controles', debut_phase)
         self.stdout.write(texte)
+        if diagnostic_sql:
+            for phase, (appels, secondes) in sorted(
+                    self._sim_phases_cumulees.items(), key=lambda item: item[1][1], reverse=True):
+                print(f"[SIM-PHASE-TOTAL] phase={phase} appels={appels} "
+                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f}", flush=True)
         if o["rapport"]:
             with open(o["rapport"], "w", encoding="utf-8") as f:
                 f.write(texte)
@@ -489,7 +496,11 @@ class Command(SimulationMetierMixin, BaseCommand):
             if diagnostic_sql:
                 stats = sous_phases[nom]
                 stats[0] += 1
-                stats[1] += time.perf_counter() - debut
+                elapsed = time.perf_counter() - debut
+                stats[1] += elapsed
+                cumul = self._sim_phases_cumulees.setdefault(nom, [0, 0.0])
+                cumul[0] += 1
+                cumul[1] += elapsed
 
         for d, c, heure in departs:
             with horloge(self.moment(jour, heure, 5)), transaction.atomic():
