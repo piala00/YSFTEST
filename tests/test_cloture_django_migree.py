@@ -249,10 +249,18 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
 from decimal import Decimal
 from django.contrib.auth.models import User
 from apps.core.models import Exercice, Agence
-from apps.transport.models import Gare, Ligne, Vehicule
-from apps.comptabilite.models import Ecriture, LigneEcriture
+from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, ChangementGamme
+from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
 exercice = Exercice.objects.get(code='2027')
-assert User.objects.get(username='controle').groups.filter(name='Guichet').exists()
+utilisateur = User.objects.get(username='controle')
+assert utilisateur.groups.filter(name='Guichet').exists()
+assert utilisateur.user_permissions.filter(codename='view_user', content_type__app_label='auth').exists()
+assert utilisateur.groups.get(name='Guichet').permissions.filter(codename='view_user', content_type__app_label='auth').exists()
+assert Journal.objects.get(code='AN').cloture_au is None
+assert Journal.objects.filter(code='OD').exists()
+assert set(Compte.objects.values_list('numero', flat=True)) == {'101000', '411000'}
+assert ArretLigne.objects.get(ligne__code='YDE-DLA').gare.code == 'PVY'
+assert ChangementGamme.objects.filter(vehicule__immatriculation='CE-123-AA', gamme='CLASSIQUE').exists()
 assert Agence.objects.get(code='CTR').compte_liaison.numero == '101000'
 assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
 assert Ligne.objects.get(code='YDE-DLA').gare_arrivee.code == 'DLA'
