@@ -619,6 +619,8 @@ class Depart(models.Model):
         envois = list(self.colis.filter(statut=Colis.CHARGE, port=Colis.PAYE, recette_constatee=False, ecriture__isnull=False))
         local = _site_local()
         parametres = ParametresTransport.get()
+        # Résoudre une seule fois la section analytique du départ pour toutes les lignes de recettes.
+        section_depart = self.ligne.gare_depart.section
         debits, lignes = {}, []
         for t in troncons:                             # billet vendu ailleurs : la somme est chez l'agence vendeuse
             compte = _compte_liaison(t.billet.site_origine) if t.billet.site_origine else parametres.compte_billets_a_voyager
@@ -627,11 +629,11 @@ class Depart(models.Model):
         total_bagages = sum((t.part_bagages for t in troncons), ZERO)
         for montant, compte_produit in ((total_billets, parametres.compte_billets), (total_bagages, parametres.compte_bagages)):
             if montant:
-                lignes += [{**l, "vehicule": self.vehicule, "section": self.ligne.gare_depart.section}
+                lignes += [{**l, "vehicule": self.vehicule, "section": section_depart}
                            for l in _ventiler(montant, compte_produit, parametres.taxe_billets)]
         for c in envois:                               # port payé à l'expédition : recette du véhicule qui transporte
             debits[parametres.compte_colis_a_transporter] = debits.get(parametres.compte_colis_a_transporter, ZERO) + c.prix
-            lignes += [{**l, "vehicule": self.vehicule, "section": self.ligne.gare_depart.section}
+            lignes += [{**l, "vehicule": self.vehicule, "section": section_depart}
                        for l in _ventiler(c.prix, c.compte_produit(parametres), parametres.taxe_colis)]
         if lignes:
             self.ecriture_recettes = creer_ecriture(
