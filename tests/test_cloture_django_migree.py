@@ -724,5 +724,54 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                                  [('2026',)])
 
 
+    def test_reprise_apres_echec_transactionnel_sur_base_migree(self):
+        """Une reprise après rollback recrée N+1 sans doublons ni état partiel."""
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+
+            with patch('apps.core.adaptateur_cloture_transport_sqlite.reporter_balance_validee',
+                       side_effect=RuntimeError('panne transitoire AN')):
+                with self.assertRaisesRegex(RuntimeError, 'panne transitoire AN'):
+                    preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertFalse(nouveau.exists())
+            self.assertEqual([b['id'] for b in lire_catalogue(catalogue)], ['n'])
+
+            resultat = preparer_dossier_transport_sqlite(
+                catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertEqual(resultat['exercice_precedent'], 'n')
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertEqual(set(entrees), {'n', 'n1'})
+            self.assertTrue(entrees['n']['cloture'])
+            with connexion_sqlite(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2027',)])
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture "
+                    "WHERE origine='CLOTURE_ANNUELLE'"
+                ).fetchone()[0], 1)
+                montants = db.execute(
+                    'SELECT debit, credit FROM comptabilite_ligneecriture'
+                ).fetchall()
+                self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                 Decimal('125.50'))
+                self.assertEqual(sum(Decimal(str(c)) for _, c in montants),
+                                 Decimal('125.50'))
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 1)
+
+
 if __name__ == '__main__':
     unittest.main()
