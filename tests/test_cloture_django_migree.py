@@ -773,5 +773,46 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 ).fetchone()[0], 1)
 
 
+    def test_exercice_sans_mouvements_ouvre_n1_sans_piece_an(self):
+        """Une année sans écritures validées crée N+1 sans AN artificielle."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with connexion_sqlite(ancien) as db:
+                db.execute('DELETE FROM comptabilite_ligneecriture')
+                db.execute('DELETE FROM comptabilite_ecriture')
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+
+            resultat = preparer_dossier_transport_sqlite(
+                catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertEqual(resultat['exercice_precedent'], 'n')
+            with connexion_sqlite(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2027',)])
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM transport_gare'
+                ).fetchone()[0], 3)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM auth_user WHERE username='controle'"
+                ).fetchone()[0], 1)
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertEqual(set(entrees), {'n', 'n1'})
+            self.assertTrue(entrees['n']['cloture'])
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 0)
+
+
 if __name__ == '__main__':
     unittest.main()
