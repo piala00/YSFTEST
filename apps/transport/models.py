@@ -587,7 +587,8 @@ class Depart(models.Model):
             raise ValidationError(f"Ce départ est prévu le {self.date:%d/%m/%Y} : il ne peut pas être enregistré parti avant ce jour.")
         from django.conf import settings as reglages
 
-        avance = ParametresTransport.get().avance_depart_toleree
+        parametres = ParametresTransport.get()
+        avance = parametres.avance_depart_toleree
         if getattr(reglages, "CONTROLE_HEURE_DEPART", True) and self.heure and self.date == maintenant.date() and avance is not None:
             prevu = timezone.make_aware(datetime.datetime.combine(self.date, self.heure))
             if prevu - maintenant > datetime.timedelta(minutes=avance):
@@ -597,12 +598,12 @@ class Depart(models.Model):
         if en_route:
             raise ValidationError(f"Ce véhicule est encore sur la route (départ {en_route.numero}) : constatez d'abord son arrivée.")
         expires = [a for a in self.vehicule.alertes() if "expirée" in a]
-        if expires and ParametresTransport.get().bloquer_papiers_expires:
+        if expires and parametres.bloquer_papiers_expires:
             raise ValidationError(f"Départ refusé : {', '.join(expires)} ({self.vehicule.immatriculation}).")
         self.statut, self.parti_le = self.PARTI, timezone.now()
         self.save(update_fields=["statut", "parti_le"])
         if self.embarquement_valide_le:                # liste pointée : les non-cochés ne sont pas partis
-            report_auto = ParametresTransport.get().report_absent_automatique
+            report_auto = parametres.report_absent_automatique
             prochain = self.prochain_pour_report() if report_auto else None
             for t in self.troncons.filter(statut=Troncon.A_VOYAGER, embarque=False).select_related("billet"):
                 if prochain is not None and not t.billet.site_origine:    # report automatique vers le prochain départ
@@ -618,7 +619,6 @@ class Depart(models.Model):
         troncons = list(self.troncons.filter(statut=Troncon.A_VOYAGER).select_related("billet", "gare_depart", "gare_arrivee"))
         envois = list(self.colis.filter(statut=Colis.CHARGE, port=Colis.PAYE, recette_constatee=False, ecriture__isnull=False))
         local = _site_local()
-        parametres = ParametresTransport.get()
         # Résoudre une seule fois la section analytique du départ pour toutes les lignes de recettes.
         section_depart = self.ligne.gare_depart.section
         debits, lignes = {}, []
