@@ -93,4 +93,8 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
         if not publie:
             # Un échec ne doit pas effacer une base créée par un autre processus.
             # Ce fichier est réservé exclusivement par O_EXCL ci-dessus.
+            # Nettoyer les journaux SQLite apres fermeture des connexions :
+            # un echec de migration peut laisser WAL/SHM ou rollback journal.
             cible.unlink(missing_ok=True)
+            for suffixe in ("-wal", "-shm", "-journal"):
+                Path(str(cible) + suffixe).unlink(missing_ok=True)
