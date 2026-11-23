@@ -814,5 +814,68 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 ).fetchone()[0], 0)
 
 
+    def test_soldes_nuls_apres_mouvements_ouvrent_sans_an_fictive(self):
+        """Des mouvements valides soldés en N ne produisent aucune AN fictive."""
+        import uuid
+
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with connexion_sqlite(ancien) as db:
+                original = db.execute("""
+                    SELECT e.id, e.journal_id, e.exercice_id
+                    FROM comptabilite_ecriture e WHERE e.numero='OD-2026-1'
+                """).fetchone()
+                self.assertIsNotNone(original)
+                piece_initiale, journal, exercice = original
+                db.execute("""
+                    INSERT INTO comptabilite_ecriture
+                    (journal_id, exercice_id, numero, date, libelle, reference,
+                     statut, origine, source_cle, source_empreinte, uid,
+                     site_origine, cree_le)
+                    VALUES (?, ?, 'OD-2026-2', '2026-12-31',
+                            'Contrepassation totale', '', 'VALIDEE', '',
+                            '', '', ?, '', CURRENT_TIMESTAMP)
+                """, (journal, exercice, str(uuid.uuid4())))
+                contrepassation = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                db.execute("""
+                    INSERT INTO comptabilite_ligneecriture
+                    (ecriture_id, compte_id, tiers_id, section_id, vehicule_id,
+                     libelle, debit, credit, lettrage, source_cle)
+                    SELECT ?, compte_id, tiers_id, section_id, vehicule_id,
+                           'Contrepassation', credit, debit, '', ''
+                    FROM comptabilite_ligneecriture WHERE ecriture_id=?
+                """, (contrepassation, piece_initiale))
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 2)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+
+            preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            with connexion_sqlite(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2027',)])
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM transport_gare'
+                ).fetchone()[0], 3)
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 2)
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertTrue(entrees['n']['cloture'])
+            self.assertEqual(entrees['n1']['exercice_precedent'], 'n')
+
+
 if __name__ == '__main__':
     unittest.main()
