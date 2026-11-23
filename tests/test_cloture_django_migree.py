@@ -122,6 +122,11 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
             self.assertTrue(next(b for b in lire_catalogue(catalogue) if b['id'] == 'n')['cloture'])
             with connexion_sqlite(ancien) as source_db:
                 historique_source = source_db.execute('''SELECT gamme, debut FROM transport_changementgamme ORDER BY id''').fetchall()
+                # Le journal AN est déverrouillé uniquement dans N+1 :
+                # l'exercice historique N doit rester clôturé à sa date.
+                self.assertEqual(source_db.execute(
+                    "SELECT cloture_au FROM comptabilite_journal WHERE code='AN'"
+                ).fetchone()[0], '2026-12-31')
             with connexion_sqlite(nouveau) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
