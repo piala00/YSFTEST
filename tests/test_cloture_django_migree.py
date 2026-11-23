@@ -720,6 +720,9 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                         catalogue, 'n', nouveau, 'n1', 2027)
 
             self.assertFalse(nouveau.exists(), 'aucun dossier N+1 partiel ne doit subsister')
+            for suffixe in ('-wal', '-shm', '-journal'):
+                self.assertFalse(Path(str(nouveau) + suffixe).exists(),
+                                 f'journal SQLite résiduel après échec : {suffixe}')
             self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
             with connexion_sqlite(ancien) as db:
                 self.assertEqual(db.execute(
