@@ -884,7 +884,7 @@ class Billet(models.Model):
         destination = self.gare_arrivee or terminus
         if destination == origine:
             raise ValidationError("La destination doit être différente de la gare de départ.")
-        if destination in gares and not depart.ligne.dessert(origine, destination):
+        if destination in gares and gares.index(origine) >= gares.index(destination):
             raise ValidationError(f"{destination.ville} est avant {origine.ville} sur cette ligne.")
         correspondance = destination if destination in gares else terminus      # descente à un arrêt ou correspondance
         self.gare_montee = origine
@@ -900,7 +900,8 @@ class Billet(models.Model):
             segments.append((correspondance, destination, depart_correspondance, siege_correspondance))
         tarifs = [_tarif(a, b, d.ligne.gamme if d is not None else depart.ligne.gamme) for a, b, d, _ in segments]
         if self.prix is None:
-            direct = _tarif(origine, destination, depart.ligne.gamme)
+            # Sans correspondance, le tarif direct est exactement celui du segment déjà lu.
+            direct = tarifs[0] if len(segments) == 1 else _tarif(origine, destination, depart.ligne.gamme)
             if direct is not None:
                 self.prix = direct.prix_billet
             elif all(tarifs):
