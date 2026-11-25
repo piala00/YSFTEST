@@ -23,6 +23,7 @@ REFERENTIELS_OBLIGATOIRES = (
 REFERENTIELS_TRANSPORT = (
     "transport_gare", "transport_ligne", "transport_vehicule",
     "transport_arretligne", "transport_changementgamme", "transport_chauffeur",
+    "transport_parametrestransport",
 )
 
 
