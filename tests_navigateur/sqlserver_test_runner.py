@@ -239,7 +239,9 @@ def main():
     instrument_tests()
     instrument_database_lifecycle()
     partition_suite()
-    sys.argv = ["manage.py", "test", "--noinput", "-v2"]
+    # Preserve explicit Django test labels/options for targeted diagnosis.
+    # The default invocation still runs the complete assigned CI shard.
+    sys.argv = ["manage.py", "test", "--noinput", "-v2", *sys.argv[1:]]
     try:
         runpy.run_path(str(repository_root / "manage.py"), run_name="__main__")
     finally:
