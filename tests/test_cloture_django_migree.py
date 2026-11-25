@@ -60,6 +60,13 @@ ChangementGamme.objects.create(vehicule=vehicule, gamme='CLASSIQUE', debut=date(
 Chauffeur.objects.create(nom='Chauffeur de contrôle', permis='TEST-2026')
 c1 = Compte.objects.create(numero='411000', intitule='Clients')
 c2 = Compte.objects.create(numero='101000', intitule='Capital')
+from apps.transport.models import ParametresTransport
+ParametresTransport.objects.create(compte_billets=c1, compte_colis=c1,
+    compte_fret=c1, compte_contre_remboursement=c2,
+    compte_proprietaires=c2, sessions_caisse_obligatoires=True,
+    bloquer_papiers_expires=False, avance_depart_toleree=35,
+    plafond_depense_sans_autorisation=Decimal('25000'),
+    retenue_annulation=Decimal('7.50'), report_absent_automatique=True)
 Agence.objects.create(code='CTR', nom='Agence Centre', ville='Yaoundé', locale=True, compte_liaison=c2)
 Journal.objects.create(code='AN', intitule='A nouveaux', type_journal='AN', cloture_au=date(2026,12,31))
 j = Journal.objects.create(code='OD', intitule='Divers', type_journal='OD')
@@ -270,6 +277,16 @@ assert Agence.objects.get(code='CTR').compte_liaison.numero == '101000'
 assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
 assert Ligne.objects.get(code='YDE-DLA').gare_arrivee.code == 'DLA'
 assert Vehicule.objects.get(immatriculation='CE-123-AA').proprietaire.code == 'PROP-01'
+from apps.transport.models import ParametresTransport
+parametres = ParametresTransport.objects.get()
+assert parametres.compte_billets.numero == '411000'
+assert parametres.compte_proprietaires.numero == '101000'
+assert parametres.sessions_caisse_obligatoires
+assert not parametres.bloquer_papiers_expires
+assert parametres.avance_depart_toleree == 35
+assert parametres.plafond_depense_sans_autorisation == Decimal('25000')
+assert parametres.retenue_annulation == Decimal('7.50')
+assert parametres.report_absent_automatique
 piece = Ecriture.objects.get(exercice=exercice, origine='CLOTURE_ANNUELLE')
 lignes = list(LigneEcriture.objects.filter(ecriture=piece))
 assert len(lignes) == 2
