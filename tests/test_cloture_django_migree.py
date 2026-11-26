@@ -935,6 +935,34 @@ with patch('apps.core.poste.disponible', return_value=True), patch('apps.core.po
     response = cloture_exercice_annuel(request)
 assert response.status_code == 200
 assert 'Exercice 2027 créé' in response.content.decode(), response.content.decode()
+# Exercer la sélection réelle du catalogue. Seule la frontière du
+# lanceur natif est remplacée : aucun changement de connexion à chaud.
+import json
+import os
+from pathlib import Path
+from apps.core import poste
+from apps.core.catalogue_societes import lire_catalogue
+from apps.core.views_societes import choix_societe
+from django.conf import settings
+cible = next(b for b in lire_catalogue(os.environ['ERP_CATALOGUE_SOCIETES'])
+             if str(b['exercice']) == '2027')
+actions = []
+def configurer(configuration):
+    actions.append('configurer')
+    Path(os.environ['ERP_CATALOGUE_SOCIETES'] + '.restart.json').write_text(
+        json.dumps(configuration), encoding='utf-8')
+def redemarrer():
+    assert not ouverture.user.is_authenticated
+    actions.append('redemarrer')
+ouverture = RequestFactory().post('/societes/', {
+    'confirmation': 'OUVRIR', 'base_id': cible['id']}, REMOTE_ADDR='127.0.0.1')
+ouverture.user = admin
+SessionMiddleware(lambda req: None).process_request(ouverture)
+with patch.dict(poste.ACTIONS, {'configurer': configurer, 'redemarrer': redemarrer}, clear=True):
+    response = choix_societe(ouverture)
+assert response.status_code == 200
+assert actions == ['configurer', 'redemarrer'], response.content.decode()
+assert Path(settings.DATABASES['default']['NAME']).resolve() != Path(cible['base']).resolve()
 """
             resultat = subprocess.run(
                 [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', script],
@@ -945,6 +973,38 @@ assert 'Exercice 2027 créé' in response.content.decode(), response.content.dec
             self.assertTrue(entrees['n']['cloture'])
             suivante = next(b for b in entrees.values() if b['exercice'] == '2027')
             self.assertEqual(suivante['exercice_precedent'], 'n')
+            # Nouveau processus Django, configuré par le résultat de la sélection,
+            # et non par un chemin N+1 injecté directement dans le test.
+            configuration = json.loads(Path(str(catalogue) + '.restart.json').read_text(encoding='utf-8'))
+            self.assertEqual(Path(configuration['SQLITE_FICHIER']).resolve(),
+                             Path(suivante['base']).resolve())
+            for cle, valeur in configuration.items():
+                if valeur is None:
+                    env.pop(cle, None)
+                else:
+                    env[cle] = str(valeur)
+            verification = """
+from decimal import Decimal
+from django.contrib.auth import authenticate
+from apps.core.models import Exercice
+from apps.comptabilite.models import Ecriture, LigneEcriture
+from apps.transport.models import Gare, Vehicule
+assert authenticate(username='controle', password='test-local-only') is not None
+assert list(Exercice.objects.values_list('code', flat=True)) == ['2027']
+assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
+assert Vehicule.objects.get(immatriculation='CE-123-AA').proprietaire.code == 'PROP-01'
+piece = Ecriture.objects.get(origine='CLOTURE_ANNUELLE')
+lignes = list(LigneEcriture.objects.filter(ecriture=piece))
+assert sum((l.debit for l in lignes), Decimal('0')) == Decimal('125.50')
+assert sum((l.credit for l in lignes), Decimal('0')) == Decimal('125.50')
+assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
+"""
+            redemarrage = subprocess.run(
+                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', verification],
+                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(redemarrage.returncode, 0,
+                             redemarrage.stdout + redemarrage.stderr)
             with connexion_sqlite(suivante['base']) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(), [('2027',)])
