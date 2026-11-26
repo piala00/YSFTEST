@@ -902,5 +902,52 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
             self.assertEqual(entrees['n1']['exercice_precedent'], 'n')
 
 
+
+    def test_cloture_depuis_interface_sur_base_migree(self):
+        """Le POST administrateur doit créer réellement N+1 et ses à-nouveaux."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien = dossier / 'n.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0', ERP_LICENCE='0',
+                       RELAIS_ACTIF='0', ERP_CATALOGUE_SOCIETES=str(catalogue))
+            script = """
+from unittest.mock import patch
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory
+from apps.core.views_cloture import cloture_exercice_annuel
+admin = get_user_model().objects.get(username='controle')
+admin.is_superuser = True
+request = RequestFactory().post('/cloture/', {'confirmation': 'CLOTURER'})
+request.user = admin
+with patch('apps.core.poste.disponible', return_value=True), patch('apps.core.poste.local', return_value=True):
+    response = cloture_exercice_annuel(request)
+assert response.status_code == 200
+assert 'Exercice 2027 créé' in response.content.decode(), response.content.decode()
+"""
+            resultat = subprocess.run(
+                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', script],
+                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(resultat.returncode, 0, resultat.stdout + resultat.stderr)
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertTrue(entrees['n']['cloture'])
+            suivante = next(b for b in entrees.values() if b['exercice'] == '2027')
+            self.assertEqual(suivante['exercice_precedent'], 'n')
+            with connexion_sqlite(suivante['base']) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(), [('2027',)])
+                self.assertEqual(db.execute('SELECT SUM(debit), SUM(credit) FROM comptabilite_ligneecriture').fetchone(), (125.5, 125.5))
+
+
 if __name__ == '__main__':
     unittest.main()
