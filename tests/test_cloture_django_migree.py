@@ -929,6 +929,8 @@ admin = get_user_model().objects.get(username='controle')
 admin.is_superuser = True
 request = RequestFactory().post('/cloture/', {'confirmation': 'CLOTURER'})
 request.user = admin
+from django.contrib.sessions.middleware import SessionMiddleware
+SessionMiddleware(lambda req: None).process_request(request)
 with patch('apps.core.poste.disponible', return_value=True), patch('apps.core.poste.local', return_value=True):
     response = cloture_exercice_annuel(request)
 assert response.status_code == 200
