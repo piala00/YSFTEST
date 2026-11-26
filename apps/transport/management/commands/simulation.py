@@ -702,10 +702,16 @@ class Command(SimulationMetierMixin, BaseCommand):
             ("Produits analytiques affectés + non affectés = comptabilité", b["analytique"]["produits_gl"]
              == b["analytique"]["produits_affectes"] + b["analytique"]["produits_non_affectes"]),
         ]
+        complet = all(len(jm) == calendar.monthrange(jm[0].year, jm[0].month)[1] for jm in self.mois)
+        note_partielle = ([
+            "> ⚠ Période partielle : les charges mensuelles fixes (paie, cotisations) sont comptabilisées en entier,",
+            "> alors que les recettes ne couvrent que les jours simulés — le résultat n'est pas représentatif d'un mois complet.", ""]
+            if not complet else [])
         lignes = [
             "# Bilan de la simulation (données FICTIVES)", "",
-            f"Période simulée : {self.jours[0]:%d/%m/%Y} au {self.jours[-1]:%d/%m/%Y} ({len(self.mois)} mois) · échelle "
-            f"{o['echelle']} · graine {o['graine']}", "",
+            f"Période simulée : {self.jours[0]:%d/%m/%Y} au {self.jours[-1]:%d/%m/%Y} "
+            f"({len(self.mois)} mois, {len(self.jours)} jours simulés) · échelle {o['echelle']} · graine {o['graine']}", "",
+            *note_partielle,
             "| Mois | Voyages | Billets | Colis | Produits | Charges | Résultat |", "|---|---:|---:|---:|---:|---:|---:|",
             *[f"| {x['debut']:%m/%Y} | {x['voyages']} | {x['billets']} | {x['colis']} | {m(x['produits'])} | {m(x['charges'])} | "
               f"{m(x['produits'] - x['charges'])} |" for x in b["mensuel"]], "",

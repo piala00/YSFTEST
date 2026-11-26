@@ -151,3 +151,18 @@ class TerminerInterrompuTests(SimpleTestCase):
             d = ds.lire_json(dossier / ds.MANIFESTE)
             self.assertEqual(d["etat"], "erreur")
             self.assertFalse(d["interrompu"])
+
+
+class BilanPeriodeTests(TestCase):
+    """Le bilan est honnête sur une période partielle (charges mensuelles vs recettes de quelques jours)."""
+
+    def test_periode_partielle_signalee_et_jours_affiches(self):
+        from apps.transport.management.commands.simulation import Command
+
+        with tempfile.TemporaryDirectory() as tmp:
+            rapport = Path(tmp) / "BILAN.md"
+            call_command(Command(), mois="2026-09", jours=1, nombre_mois=1, vehicules=2, salaries=2,
+                         echelle=0.01, forcer=True, graine=1, rapport=str(rapport), stdout=io.StringIO())
+            texte = rapport.read_text(encoding="utf-8")
+        self.assertIn("jours simulés", texte)          # période exprimée en jours réels
+        self.assertIn("Période partielle", texte)       # avertissement : résultat non représentatif
