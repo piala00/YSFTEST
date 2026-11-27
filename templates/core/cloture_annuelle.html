@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 {% block title %}Clôturer l'exercice et ouvrir le suivant{% endblock %}
 {% block content %}
 <div class="page-title"><h1><i class="bi bi-calendar-check" style="color:var(--module)"></i> Clôturer l'exercice et ouvrir le suivant</h1></div>
@@ -22,7 +23,7 @@
       <tr><th>Société</th><td>{{ courante.societe }}</td></tr>
       <tr><th>Agence</th><td>{{ courante.agence }}</td></tr>
       <tr><th>Exercice en cours</th><td>{{ courante.exercice }}{% if courante.cloture %} <span class="badge bg-secondary">clôturé</span>{% endif %}</td></tr>
-      {% if annee_suivante %}<tr><th>Nouvel exercice</th><td><strong>{{ annee_suivante }}</strong></td></tr>{% endif %}
+      {% if annee_suivante %}<tr><th>Nouvel exercice</th><td><strong>{{ annee_suivante|unlocalize }}</strong></td></tr>{% endif %}
     </tbody></table>
 
     {% if courante.cloture %}
@@ -34,7 +35,7 @@
       <form method="post" class="d-flex flex-column gap-2" style="max-width:34rem">{% csrf_token %}
         <div class="alert alert-warning small mb-1">Terminez les saisies de l'exercice avant de clôturer. L'exercice en cours deviendra consultable seulement.</div>
         <input name="confirmation" class="form-control form-control-sm" placeholder="Tapez CLOTURER pour confirmer" autocomplete="off" required>
-        <button class="btn btn-primary"><i class="bi bi-calendar-check"></i> Clôturer {{ courante.exercice }} et créer {{ annee_suivante }}</button>
+        <button class="btn btn-primary"><i class="bi bi-calendar-check"></i> Clôturer {{ courante.exercice }} et créer {{ annee_suivante|unlocalize }}</button>
       </form>
     {% endif %}
   {% elif not erreur %}
