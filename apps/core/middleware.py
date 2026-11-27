@@ -1,3 +1,4 @@
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import render
 
 from . import droits as d
@@ -23,6 +24,47 @@ def chemin_titres(onglets, code):
         if trouve:
             return trouve
     return [code]
+
+
+
+class ArchiveLectureSeuleMiddleware:
+    """Interdit les mutations HTTP dans un exercice clôturé, tout en gardant la consultation.
+
+    L'authentification, la déconnexion et le changement de dossier restent possibles :
+    l'administrateur peut consulter l'archive puis revenir à l'exercice courant.
+    """
+
+    ACTIONS_AUTORISEES = {"login", "logout", "choix_societe"}
+    METHODES_SANS_MUTATION = {"GET", "HEAD", "OPTIONS", "TRACE"}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        if request.method in self.METHODES_SANS_MUTATION:
+            return None
+        nom = getattr(getattr(request, "resolver_match", None), "url_name", None)
+        if nom in self.ACTIONS_AUTORISEES:
+            return None
+        from .catalogue_societes import base_courante_cloturee
+
+        try:
+            archivee = base_courante_cloturee()
+        except (OSError, ValueError) as exc:
+            return HttpResponse(
+                "Catalogue des exercices indisponible : écriture refusée par sécurité. "
+                f"Vérifiez le catalogue avant de reprendre les saisies ({exc}).",
+                status=503,
+            )
+        if not archivee:
+            return None
+        return HttpResponseForbidden(
+            "Exercice clôturé : cette base historique est en consultation seule. "
+            "Ouvrez un exercice non clôturé pour effectuer une saisie."
+        )
 
 
 class AutorisationsMiddleware:
