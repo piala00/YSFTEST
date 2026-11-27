@@ -3,6 +3,7 @@ import http.cookiejar
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import shutil
 import socket
@@ -59,6 +60,12 @@ class ClientHTTP:
         if 'name="username"' in accueil and 'name="password"' in accueil:
             raise RuntimeError("Authentification EXE refusée : la page d'accueil redirige encore vers la connexion")
         return accueil
+
+
+def annee_presente(page, annee):
+    """Accepte les séparateurs de milliers Unicode ajoutés par la localisation française Django."""
+    texte = re.sub(r"[\\s\\u00a0\\u202f\\u2007]+", "", page)
+    return str(annee) in texte
 
 
 def port_libre():
@@ -253,7 +260,7 @@ Societe.objects.update(assistant_termine=True)
         (dossier_rapport / "accueil-apres-auth.html").write_text(accueil, encoding="utf-8")
         page = client1.get("/cloture-annuelle/")
         (dossier_rapport / "ecran-cloture-initial.html").write_text(page, encoding="utf-8")
-        if "2027" not in page or "Clôturer" not in page:
+        if not annee_presente(page, 2027) or "Clôturer" not in page:
             extrait = " ".join(page.split())[:1800]
             raise AssertionError(
                 "L'écran compilé ne présente pas l'exercice N+1 attendu. "
@@ -297,7 +304,7 @@ Societe.objects.update(assistant_termine=True)
         client2.connecter()
         page_n1 = client2.get("/cloture-annuelle/")
         (dossier_rapport / "ecran-cloture-n1.html").write_text(page_n1, encoding="utf-8")
-        if "2028" not in page_n1 or "2027" not in page_n1:
+        if not annee_presente(page_n1, 2028) or not annee_presente(page_n1, 2027):
             extrait = " ".join(page_n1.split())[:1800]
             raise AssertionError(
                 "Après redémarrage, l'EXE ne reconnaît pas l'exercice N+1. "
