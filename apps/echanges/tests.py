@@ -158,3 +158,51 @@ class PublicationSiteLocalCacheTests(TestCase):
             site_local()
         self.assertEqual(len(requetes), 2)
 
+class EcritureEmployeExchangeTests(TestCase):
+    """Une écriture relayée conserve l'identité du salarié sans partager son matricule local."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+
+    def test_import_cree_un_employe_reference_et_rattache_les_lignes(self):
+        import uuid
+        from datetime import date
+
+        from apps.comptabilite.models import Compte, Journal
+        from apps.comptabilite.services import creer_ecriture
+        from apps.core.models import Agence
+        from apps.personnel.models import Employe
+
+        local = Agence.objects.create(code="SIEGE", nom="Siège", role=Agence.SIEGE,
+                                      locale=True, uid=uuid.uuid4())
+        origine = Agence.objects.create(code="DLA", nom="Douala", role=Agence.AGENCE,
+                                        locale=False, uid=uuid.uuid4())
+        employe = Employe.objects.create(matricule="E001", nom="Chauffeur Douala",
+                                         service=Employe.CONDUITE, agence=origine)
+        piece = creer_ecriture(
+            Journal.objects.get(code="OD"), date.today(), "Paie de test",
+            [{"compte": Compte.objects.get(numero="661"), "debit": 150000, "employe": employe},
+             {"compte": Compte.objects.get(numero="422"), "credit": 150000, "employe": employe}],
+            reference="PAIE-TEST", valider=False,
+        )
+        piece.site_origine = origine.code
+        piece.save(update_fields=["site_origine"])
+
+        payload = contrats.ecriture(piece)
+        uid_recu = uuid.uuid4()
+        for ligne in payload["lignes"]:
+            if ligne["employe"]:
+                ligne["employe"]["uid"] = str(uid_recu)
+
+        contrats._ecriture(payload, origine, local)
+
+        copie = Employe.objects.get(uid=uid_recu)
+        self.assertEqual(copie.site_origine, "DLA")
+        self.assertTrue(copie.matricule.startswith("DLA-"))
+        self.assertEqual(copie.agence_id, origine.pk)
+        lignes = list(piece.lignes.select_related("employe"))
+        self.assertEqual(len(lignes), 2)
+        self.assertTrue(all(ligne.employe_id == copie.pk for ligne in lignes))
+        self.assertEqual(piece.statut, piece.STATUT_VALIDEE)
+        self.assertTrue(piece.equilibree)
