@@ -52,5 +52,53 @@ class SqlServerPartitionTests(unittest.TestCase):
             shard_for_class("apps.core.tests.Exemple", 0)
 
 
+class SqlServerMetricsTests(unittest.TestCase):
+    def test_agregation_des_durees_compte_maximum_erreurs_et_imbrication(self):
+        mesures = {}
+        MODULE._enregistrer_mesure(mesures, "atomic_scope", 1.25)
+        MODULE._enregistrer_mesure(mesures, "atomic_scope", 0.50, failed=True, nested=True)
+        self.assertEqual(mesures["atomic_scope"]["count"], 2)
+        self.assertAlmostEqual(mesures["atomic_scope"]["total"], 1.75)
+        self.assertAlmostEqual(mesures["atomic_scope"]["max"], 1.25)
+        self.assertEqual(mesures["atomic_scope"]["errors"], 1)
+        self.assertEqual(mesures["atomic_scope"]["nested"], 1)
+
+    def test_wrapper_preserve_le_retour_et_mesure_la_methode(self):
+        evenements = []
+
+        class Connexion:
+            alias = "default"
+
+        def enregistrer(receiver, operation, elapsed, failed=False):
+            evenements.append((receiver.alias, operation, elapsed, failed))
+
+        def originale(self, valeur):
+            return valeur + 1
+
+        mesuree = MODULE._emballer_methode(originale, "connect", enregistrer)
+        self.assertEqual(mesuree(Connexion(), 41), 42)
+        self.assertEqual(len(evenements), 1)
+        self.assertEqual(evenements[0][:2], ("default", "connect"))
+        self.assertGreaterEqual(evenements[0][2], 0)
+        self.assertFalse(evenements[0][3])
+
+    def test_wrapper_compte_les_erreurs_sans_les_masquer(self):
+        evenements = []
+
+        class Connexion:
+            alias = "sqlserver"
+
+        def enregistrer(receiver, operation, elapsed, failed=False):
+            evenements.append((receiver.alias, operation, failed))
+
+        def originale(self):
+            raise RuntimeError("échec de connexion simulé")
+
+        mesuree = MODULE._emballer_methode(originale, "connect", enregistrer)
+        with self.assertRaisesRegex(RuntimeError, "simulé"):
+            mesuree(Connexion())
+        self.assertEqual(evenements, [("sqlserver", "connect", True)])
+
+
 if __name__ == "__main__":
     unittest.main()
