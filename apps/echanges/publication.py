@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from django.db import transaction
 
 _import = contextvars.ContextVar("echanges_import", default=False)
+_site_local_cache = contextvars.ContextVar("echanges_site_local_cache", default=None)
 
 
 @contextmanager
@@ -31,10 +32,30 @@ def hors_import():
         _import.reset(jeton)
 
 
+@contextmanager
+def cache_site_local():
+    """Réutilise la gare locale pendant une opération composée sans cache global périmé."""
+    cache = _site_local_cache.get()
+    if cache is not None:
+        yield
+        return
+    jeton = _site_local_cache.set({})
+    try:
+        yield
+    finally:
+        _site_local_cache.reset(jeton)
+
+
 def site_local(using='default'):
+    cache = _site_local_cache.get()
+    if cache is not None and using in cache:
+        return cache[using]
     from apps.core.models import Agence
 
-    return Agence.objects.using(using).filter(locale=True, uid__isnull=False).first()
+    site = Agence.objects.using(using).filter(locale=True, uid__isnull=False).first()
+    if cache is not None:
+        cache[using] = site
+    return site
 
 
 def _sequence_suivante(using='default'):
