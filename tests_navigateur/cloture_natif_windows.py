@@ -187,9 +187,10 @@ def main():
         "migration_schema_n_plus_1": "non vérifiée",
         "cloture_http": "non vérifiée",
         "redemarrage_sur_n_plus_1": "non vérifié",
+        "archive_lecture_seule": "non vérifiée",
         "resultats": [],
     }
-    processus1 = flux1 = processus2 = flux2 = None
+    processus1 = flux1 = processus_archive = flux_archive = processus2 = flux2 = None
     try:
         environnement = {
             k: v for k, v in os.environ.items()
@@ -287,6 +288,40 @@ Societe.objects.update(assistant_termine=True)
         verifier_reports(base_n1, environnement)
         rapport["resultats"].append("N intacte ; N+1 vérifiée par ORM : gares, relations, comptes, tiers, véhicule, utilisateur et AN équilibrés")
 
+        # Ouvrir l'archive N doit rester possible pour consulter, mais aucun POST métier ne doit passer.
+        environnement_archive = dict(environnement)
+        environnement_archive.update(SQLITE_FICHIER=str(source), ERP_PORT=str(port2))
+        processus_archive, flux_archive, client_archive = demarrer(
+            exe, environnement_archive, port2, dossier_rapport / "serveur-archive-n.log"
+        )
+        client_archive.connecter()
+        page_archive = client_archive.get("/transport/billetterie/caisse/")
+        (dossier_rapport / "ecran-archive-n.html").write_text(page_archive, encoding="utf-8")
+        with closing(sqlite3.connect(source)) as db:
+            sessions_avant = db.execute("SELECT COUNT(*) FROM transport_sessioncaisse").fetchone()[0]
+            ecritures_avant = db.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0]
+        try:
+            client_archive.post("/transport/billetterie/caisse/", {
+                "action": "ouvrir", "caisse": "1", "fonds_initial": "0",
+            })
+        except urllib.error.HTTPError as exc:
+            contenu = exc.read().decode("utf-8", errors="replace")
+            if exc.code != 403 or "consultation seule" not in contenu:
+                raise AssertionError(
+                    f"L'archive N a renvoyé HTTP {exc.code} au lieu du refus lecture seule : {contenu[-1200:]}"
+                ) from exc
+        else:
+            raise AssertionError("Une mutation de caisse a été acceptée dans l'archive N")
+        with closing(sqlite3.connect(source)) as db:
+            if db.execute("SELECT COUNT(*) FROM transport_sessioncaisse").fetchone()[0] != sessions_avant:
+                raise AssertionError("La tentative de mutation a créé une session de caisse dans N")
+            if db.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0] != ecritures_avant:
+                raise AssertionError("La tentative de mutation a créé une écriture dans N")
+        rapport["archive_lecture_seule"] = "réussie"
+        rapport["resultats"].append("EXE sur N : consultation HTTP autorisée, ouverture de caisse POST refusée sans mouvement")
+        arreter(processus_archive, flux_archive)
+        processus_archive = flux_archive = None
+
         # Second démarrage : l'EXE doit réellement ouvrir N+1, retrouver son administrateur et son catalogue.
         environnement_n1 = dict(environnement)
         environnement_n1.update(SQLITE_FICHIER=str(base_n1), ERP_PORT=str(port2))
@@ -314,6 +349,7 @@ Societe.objects.update(assistant_termine=True)
         raise
     finally:
         arreter(processus1, flux1)
+        arreter(processus_archive, flux_archive)
         arreter(processus2, flux2)
         dossier_rapport.mkdir(parents=True, exist_ok=True)
         (dossier_rapport / "RESULTATS.json").write_text(
