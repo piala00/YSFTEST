@@ -64,7 +64,7 @@ class ClientHTTP:
 
 def annee_presente(page, annee):
     """Accepte les séparateurs de milliers Unicode ajoutés par la localisation française Django."""
-    texte = re.sub(r"[\\s\\u00a0\\u202f\\u2007]+", "", page)
+    texte = re.sub(r"[\s\u00a0\u202f\u2007]+", "", page)
     return str(annee) in texte
 
 
