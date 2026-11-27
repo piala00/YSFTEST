@@ -1,10 +1,9 @@
-# À chaque envoi : tests, puis publication sur GitHub Pages des simulateurs web et bureau et de l'explorateur
-# des menus, régénérés depuis le code envoyé (données de démonstration).
+# Aperçu GitHub Pages réservé à main : aucune publication automatique depuis une branche de travail.
 name: Aperçu de l'ERP
 
 on:
   push:
-    branches: [ccr-5592a371-fusjt2, main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,6 +17,7 @@ concurrency:
 
 jobs:
   construire:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
 
   publier:
     needs: construire
-    if: needs.construire.outputs.pages == 'success'
+    if: needs.construire.outputs.pages == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

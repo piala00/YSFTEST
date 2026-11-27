@@ -4,7 +4,7 @@
 <div class="page-title"><h1>{{ libelle }} <small class="text-muted fs-6">{{ titre_axe }} · du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1>
   <a class="small d-print-none" href="{% url 'analytique:axe' axe %}?{{ params_periode }}">← {{ titre_axe }}</a></div>
 {% url 'analytique:element' axe cle as url_el %}
-{% with export_url=url_el|add:"?"|add:params_periode|add:"&etat="|add:etat|add:"&axe2="|add:axe2|add:"&export=csv" %}{% include "comptabilite/_periode_analytique.html" %}{% endwith %}
+{% with export_url=url_el|add:"?"|add:params_periode|add:"&etat="|add:etat|add:"&axe2="|add:axe2|add:"&comparer="|add:comparer|add:"&export=csv" excel_url=url_el|add:"?"|add:params_periode|add:"&etat="|add:etat|add:"&axe2="|add:axe2|add:"&comparer="|add:comparer|add:"&export=xlsx" %}{% include "comptabilite/_periode_analytique.html" %}{% endwith %}
 
 {% if not total.lignes %}<div class="alert alert-secondary py-1 small">Aucune imputation validée pour cet élément sur la période : ce n'est pas un résultat nul définitif.</div>{% endif %}
 <div class="row g-2 mb-3">

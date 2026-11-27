@@ -1,5 +1,6 @@
 """Écrans du plan analytique : axes → éléments → états détaillés, sur une période choisie en un clic."""
 import csv
+from numbers import Number
 from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
@@ -44,6 +45,60 @@ def _csv(nom, entetes, lignes):
     return reponse
 
 
+def _xlsx(nom, entetes, lignes):
+    """Classeur Excel natif, avec filtres, en-têtes figés et valeurs numériques."""
+    from io import BytesIO
+
+    from django.utils.text import slugify
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    classeur = Workbook()
+    feuille = classeur.active
+    feuille.title = "Analytique"
+    feuille.sheet_view.showGridLines = False
+    feuille.append(entetes)
+    for ligne in lignes:
+        valeurs = []
+        for valeur in ligne:
+            # Ne jamais transformer un libellé métier en formule Excel.
+            if isinstance(valeur, str) and valeur.lstrip()[:1] in ("=", "+", "-", "@"):
+                valeur = "'" + valeur
+            valeurs.append(valeur)
+        feuille.append(valeurs)
+
+    for cellule in feuille[1]:
+        cellule.font = Font(bold=True, color="FFFFFF")
+        cellule.fill = PatternFill(fill_type="solid", fgColor="1F4E78")
+        cellule.alignment = Alignment(horizontal="center", vertical="center")
+    feuille.row_dimensions[1].height = 22
+    feuille.freeze_panes = "A2"
+    feuille.auto_filter.ref = feuille.dimensions
+    feuille.print_title_rows = "1:1"
+    feuille.page_setup.orientation = "landscape"
+    feuille.page_setup.fitToWidth = 1
+    feuille.page_setup.fitToHeight = 0
+    feuille.sheet_properties.pageSetUpPr.fitToPage = True
+
+    for index, cellules in enumerate(feuille.columns, start=1):
+        largeur = max((len(str(cellule.value)) if cellule.value is not None else 0) for cellule in cellules)
+        feuille.column_dimensions[get_column_letter(index)].width = min(max(largeur + 2, 12), 42)
+        for cellule in cellules[1:]:
+            if isinstance(cellule.value, Number) and not isinstance(cellule.value, bool):
+                cellule.number_format = '#,##0.00;[Red]-#,##0.00;0.00'
+
+    sortie = BytesIO()
+    classeur.save(sortie)
+    reponse = HttpResponse(
+        sortie.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    nom_sain = slugify(nom) or "analytique"
+    reponse["Content-Disposition"] = f'attachment; filename="{nom_sain}.xlsx"'
+    return reponse
+
+
 def _axe_ou_404(axe):
     titre = pa.titre_axe(axe)
     if titre is None:
@@ -67,11 +122,14 @@ def axe(request, axe):
     tri = request.GET.get("tri", "libelle")
     if tri in ("resultat", "produits", "charges"):                 # classement des éléments
         b["elements"].sort(key=lambda e: e[tri], reverse=True)
-    if request.GET.get("export") == "csv":
+    export = request.GET.get("export")
+    if export in ("csv", "xlsx"):
+        entetes = ["Élément", "Produits", "Charges", "Résultat", "Lignes"]
         lignes = [[e["libelle"], e["produits"], e["charges"], e["resultat"], e["lignes"]] for e in b["elements"]]
         lignes.append(["Non affecté", b["non_affecte"]["produits"], b["non_affecte"]["charges"], b["non_affecte"]["resultat"],
                        b["non_affecte"]["lignes"]])
-        return _csv(f"analytique-{axe}-{p['du']}-{p['au']}", ["Élément", "Produits", "Charges", "Résultat", "Lignes"], lignes)
+        nom = f"analytique-{axe}-{p['du']}-{p['au']}"
+        return _xlsx(nom, entetes, lignes) if export == "xlsx" else _csv(nom, entetes, lignes)
     return render(request, "comptabilite/analytique_axe.html", {**p, **b, "axe": axe, "titre_axe": titre, "tri": tri,
                                                                 "tris": TRIS, "non_affecte_cle": pa.NON_AFFECTE})
 
@@ -92,26 +150,30 @@ def element(request, axe, cle):
     comparer = "n1" if request.GET.get("comparer") == "n1" else "precedente"
     r = pa.etat_element(axe, cle_interne, etat, p["du"], p["au"], axe2=axe2, comparer=comparer)
     libelle = "Non affecté" if cle_interne is None else pa.libelles(axe, [cle_interne]).get(cle_interne, cle)
-    if request.GET.get("export") == "csv":
+    export = request.GET.get("export")
+    if export in ("csv", "xlsx"):
         nom = f"analytique-{axe}-{cle}-{etat}-{p['du']}-{p['au']}"
         if etat == "comptes":
-            return _csv(nom, ["Compte", "Intitulé", "Débit", "Crédit", "Lignes"],
-                        [[c["compte"], c["intitule"], c["debit"], c["credit"], c["lignes"]] for c in r["comptes"]])
-        if etat == "evolution":
-            return _csv(nom, ["Période", "Produits", "Charges", "Résultat"],
-                        [[s["periode"], s["produits"], s["charges"], s["resultat"]] for s in r["series"]])
-        if etat == "croise":
-            return _csv(nom, ["Élément", "Produits", "Charges", "Résultat"],
-                        [[g["libelle"], g["produits"], g["charges"], g["resultat"]] for g in r["croise"]])
-        if etat == "comparaison":
-            return _csv(nom, ["Compte", "Intitulé", "Période", "Période précédente", "Écart"],
-                        [[c["compte"], c["intitule"], c["actuel"], c["precedent"], c["ecart"]] for c in r["comparaison"]])
-        if etat == "journal":
-            return _csv(nom, ["Date", "Pièce", "Compte", "Libellé", "Montant"] + [t for _, t in r["journal_axes"]],
-                        [[f["date"], f["piece"], f["compte"], f["libelle"], f["montant"], *f["attributions"]]
-                         for f in r["journal"]])
-        return _csv(nom, ["Date", "Pièce", "Journal", "Compte", "Libellé", "Produit (+) / charge (−)"],
-                    [[f["date"], f["piece"], f["journal"], f["compte"], f["libelle"], f["montant"]] for f in r["lignes"]])
+            entetes = ["Compte", "Intitulé", "Débit", "Crédit", "Lignes"]
+            lignes = [[c["compte"], c["intitule"], c["debit"], c["credit"], c["lignes"]] for c in r["comptes"]]
+        elif etat == "evolution":
+            entetes = ["Période", "Produits", "Charges", "Résultat"]
+            lignes = [[s["periode"], s["produits"], s["charges"], s["resultat"]] for s in r["series"]]
+        elif etat == "croise":
+            entetes = ["Élément", "Produits", "Charges", "Résultat"]
+            lignes = [[g["libelle"], g["produits"], g["charges"], g["resultat"]] for g in r["croise"]]
+        elif etat == "comparaison":
+            entetes = ["Compte", "Intitulé", "Période", "Période précédente", "Écart"]
+            lignes = [[c["compte"], c["intitule"], c["actuel"], c["precedent"], c["ecart"]] for c in r["comparaison"]]
+        elif etat == "journal":
+            entetes = ["Date", "Pièce", "Compte", "Libellé", "Montant"] + [t for _, t in r["journal_axes"]]
+            lignes = [[f["date"], f["piece"], f["compte"], f["libelle"], f["montant"], *f["attributions"]]
+                      for f in r["journal"]]
+        else:
+            entetes = ["Date", "Pièce", "Journal", "Compte", "Libellé", "Produit (+) / charge (−)"]
+            lignes = [[f["date"], f["piece"], f["journal"], f["compte"], f["libelle"], f["montant"]]
+                      for f in r["lignes"]]
+        return _xlsx(nom, entetes, lignes) if export == "xlsx" else _csv(nom, entetes, lignes)
     lignes_gl = r["lignes"][:1000] if etat == "grand_livre" else []
     return render(request, "comptabilite/analytique_element.html", {
         **p, **r, "axe": axe, "titre_axe": titre, "cle": cle, "libelle": libelle, "etat": etat, "etats": pa.ETATS,
