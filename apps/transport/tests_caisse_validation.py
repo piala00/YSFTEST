@@ -106,6 +106,36 @@ class SessionsCaisseConcurrentesTests(DonneesSessionCaisse, TransactionTestCase)
         self.assertEqual(persistante.statut, SessionCaisse.FERMEE)
         self.assertEqual(persistante.montant_compte, 1000)
 
+    def test_ouverture_concurrente_ne_cree_qu_une_caisse(self):
+        barriere = Barrier(2, timeout=20)
+
+        def travail():
+            close_old_connections()
+            try:
+                connexion = connections["default"]
+                with connexion.cursor() as curseur:
+                    if connexion.vendor in ("microsoft", "mssql"):
+                        curseur.execute("SET LOCK_TIMEOUT 15000")
+                agent = get_user_model().objects.get(pk=self.agent.pk)
+                caisse = Journal.objects.get(pk=self.caisse.pk)
+                barriere.wait()
+                try:
+                    SessionCaisse.ouvrir(agent, caisse, fonds_initial=0)
+                    return "ok"
+                except ValidationError:
+                    return "refus"
+            finally:
+                connections["default"].close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futurs = [pool.submit(travail) for _ in range(2)]
+            resultats = [f.result(timeout=45) for f in futurs]
+        self.assertEqual(sorted(resultats), ["ok", "refus"])
+        self.assertEqual(
+            SessionCaisse.objects.filter(agent=self.agent, statut=SessionCaisse.OUVERTE).count(),
+            1,
+        )
+
     def test_approbation_concurrente_ne_publie_qu_un_ecart(self):
         session = self.session_avec_surplus()
         self._concurrents(session, lambda courant, chef: courant.approuver(chef))
