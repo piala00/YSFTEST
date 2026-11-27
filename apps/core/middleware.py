@@ -55,7 +55,7 @@ class ArchiveLectureSeuleMiddleware:
             archivee = base_courante_cloturee()
         except (OSError, ValueError) as exc:
             return HttpResponse(
-                "Catalogue des exercices indisponible : écriture refusée par sécurité. "
+                "Catalogue des exercices indisponible : saisie refusée ; écriture refusée par sécurité. "
                 f"Vérifiez le catalogue avant de reprendre les saisies ({exc}).",
                 status=503,
             )
