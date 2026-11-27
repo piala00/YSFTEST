@@ -201,6 +201,14 @@ def instrument_database_lifecycle():
 
 
 
+def _alias_pour_base(receiver):
+    """Résout l'alias Django, y compris Atomic(using=None) => default."""
+    alias = getattr(receiver, "alias", None)
+    if alias is None:
+        alias = getattr(receiver, "using", None)
+    return alias or "default"
+
+
 def _enregistrer_mesure(metrics, operation, elapsed, failed=False, nested=False):
     """Agrège une opération chronométrée sans conserver de données sensibles."""
     metric = metrics.setdefault(operation, {
@@ -247,7 +255,7 @@ def instrument_database_activity():
     etat = {"reported": False}
 
     def enregistrer(receiver, operation, elapsed, failed=False, nested=False):
-        alias = getattr(receiver, "alias", getattr(receiver, "using", "?"))
+        alias = _alias_pour_base(receiver)
         _enregistrer_mesure(par_alias.setdefault(alias, {}), operation, elapsed, failed, nested)
         test_name = _ACTIVE_TEST
         if test_name:
@@ -273,9 +281,10 @@ def instrument_database_activity():
         finally:
             enregistrer(self, "atomic_enter", time.monotonic() - started, failed)
         transactions = getattr(pile, "transactions", [])
-        nested = any(item["alias"] == self.using for item in transactions)
+        alias = _alias_pour_base(self)
+        nested = any(item["alias"] == alias for item in transactions)
         transactions.append({
-            "id": id(self), "alias": self.using,
+            "id": id(self), "alias": alias,
             "started": time.monotonic(), "nested": nested,
         })
         pile.transactions = transactions
@@ -309,10 +318,18 @@ def instrument_database_activity():
         if etat["reported"]:
             return
         etat["reported"] = True
+        try:
+            _reporter_interne()
+        except Exception as exc:
+            import traceback
+            print(f"[SQL-DB-REPORT-ERROR] {exc!r}", flush=True)
+            traceback.print_exc(file=sys.stderr)
+
+    def _reporter_interne():
         if not par_alias:
             print("[SQL-DB-SUMMARY] aucune opération de base observée", flush=True)
             return
-        for alias, operations in sorted(par_alias.items()):
+        for alias, operations in sorted(par_alias.items(), key=lambda item: str(item[0])):
             details = []
             for operation, metric in sorted(operations.items()):
                 details.append(
