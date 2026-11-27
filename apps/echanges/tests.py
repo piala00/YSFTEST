@@ -204,5 +204,6 @@ class EcritureEmployeExchangeTests(TestCase):
         lignes = list(piece.lignes.select_related("employe"))
         self.assertEqual(len(lignes), 2)
         self.assertTrue(all(ligne.employe_id == copie.pk for ligne in lignes))
+        piece.refresh_from_db()
         self.assertEqual(piece.statut, piece.STATUT_VALIDEE)
         self.assertTrue(piece.equilibree)
