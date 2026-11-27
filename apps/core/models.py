@@ -154,6 +154,17 @@ class Exercice(models.Model):
             raise ValidationError(f"Aucun exercice comptable ne couvre la date du {date:%d/%m/%Y}.")
         if exercice.cloture:
             raise ValidationError(f"L'exercice {exercice.code} est clôturé.")
+        from .catalogue_societes import base_courante_cloturee
+
+        try:
+            if base_courante_cloturee():
+                raise ValidationError(
+                    f"L'exercice {exercice.code} est clôturé : cette archive est en consultation seule."
+                )
+        except (OSError, ValueError) as exc:
+            raise ValidationError(
+                "Impossible de vérifier l'état de clôture du dossier."
+            ) from exc
         return exercice
 
     @classmethod
