@@ -292,6 +292,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
 from decimal import Decimal
 from django.contrib.auth.models import User
 from apps.core.models import Exercice, Agence
+from apps.personnel.models import Employe
 from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, ChangementGamme
 from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
 exercice = Exercice.objects.get(code='2027')
@@ -1023,6 +1024,7 @@ from django.contrib.auth import authenticate
 from apps.core.models import Exercice
 from apps.comptabilite.models import Ecriture, LigneEcriture
 from apps.transport.models import Gare, Vehicule
+from apps.personnel.models import Employe
 assert authenticate(username='controle', password='test-local-only') is not None
 assert list(Exercice.objects.values_list('code', flat=True)) == ['2027']
 assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
