@@ -3,7 +3,10 @@
 N reste en lecture seule. N+1 doit être migrée avec la même version de Django.
 Aucun document commercial, mouvement de stock ou voyage n'est recopié.
 """
+from contextlib import closing
 from datetime import date
+import sqlite3
+from pathlib import Path
 
 from apps.core.catalogue_societes import lire_catalogue
 
@@ -148,6 +151,7 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
         if len(exercices) != 1:
             raise ValueError("la base N doit contenir exactement un exercice")
         ancien_id, debut, fin, cloture = exercices[0]
+        etat["date_fin"] = fin
         if (date.fromisoformat(debut).year != annee - 1 or
                 date.fromisoformat(fin).year != annee - 1):
             raise ValueError("année N+1 non consécutive à N")
@@ -165,6 +169,34 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
         reporter_balance_validee(source, cible, etat["ancien_id"],
                                  etat["nouveau_id"], f"{annee}-01-01")
 
+    source_path = Path(entrees[0]["base"]).expanduser().resolve()
+
+    def finaliser_source():
+        """Verrouille N seulement après validation de N+1 ; les mouvements restent intacts."""
+        with closing(sqlite3.connect(str(source_path))) as db:
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                exercice = db.execute(
+                    "SELECT code, date_fin FROM core_exercice WHERE id=?",
+                    (etat["ancien_id"],),
+                ).fetchone()
+                if exercice != (str(annee - 1), etat["date_fin"]):
+                    raise ValueError("l'exercice source a changé pendant la clôture")
+                db.execute(
+                    "UPDATE core_exercice SET cloture=1 WHERE id=?",
+                    (etat["ancien_id"],),
+                )
+                db.execute(
+                    "UPDATE comptabilite_journal SET cloture_au="
+                    "CASE WHEN cloture_au IS NULL OR cloture_au < ? THEN ? ELSE cloture_au END",
+                    (etat["date_fin"], etat["date_fin"]),
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+
     return preparer_exercice_sqlite(catalogue, identifiant, destination,
                                    nouvel_identifiant, initialiser, reporter,
-                                   preparer_schema=migrer_cible)
+                                   preparer_schema=migrer_cible,
+                                   finaliser_source=finaliser_source)
