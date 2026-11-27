@@ -27,8 +27,8 @@ def _journal(code):
 def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", valider=True):
     """Crée une pièce comptable.
 
-    `lignes` : liste de dicts {compte, debit, credit, libelle?, tiers?}.
-    Les lignes de même compte / tiers / sens sont regroupées.
+    `lignes` : liste de dicts {compte, debit, credit, libelle?, tiers?, section?, vehicule?, employe?}.
+    Les lignes de même compte / tiers / section / véhicule / employé / sens sont regroupées.
     """
     exercice = Exercice.pour_date(date)
     exercice = Exercice.objects.select_for_update().get(pk=exercice.pk)
@@ -47,7 +47,8 @@ def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", val
         if not debit and not credit:
             continue
         cle = (ligne["compte"].pk, getattr(ligne.get("tiers"), "pk", None), getattr(ligne.get("section"), "pk", None),
-               getattr(ligne.get("vehicule"), "pk", None), "D" if debit else "C")
+               getattr(ligne.get("vehicule"), "pk", None), getattr(ligne.get("employe"), "pk", None),
+               "D" if debit else "C")
         if cle in regroupees:
             regroupees[cle]["debit"] += debit
             regroupees[cle]["credit"] += credit
@@ -66,7 +67,8 @@ def creer_ecriture(journal, date, libelle, lignes, reference="", origine="", val
     LigneEcriture.objects.bulk_create([
         LigneEcriture(
             ecriture=ecriture, compte=l["compte"], tiers=l.get("tiers"), section=l.get("section"), vehicule=l.get("vehicule"),
-            libelle=(l.get("libelle") or libelle)[:200], debit=l["debit"], credit=l["credit"],
+            employe=l.get("employe"), libelle=(l.get("libelle") or libelle)[:200],
+            debit=l["debit"], credit=l["credit"],
         )
         for l in regroupees.values()
     ])
