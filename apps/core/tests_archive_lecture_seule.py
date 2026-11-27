@@ -61,11 +61,31 @@ class ArchiveCatalogueTests(SimpleTestCase):
             self.assertFalse(base_courante_cloturee())
 
 
-class ArchiveLectureSeuleMiddlewareTests(ArchiveCatalogueTests):
+class ArchiveLectureSeuleMiddlewareTests(SimpleTestCase):
     def setUp(self):
-        super().setUp()
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        racine = Path(self.temp.name)
+        self.base = racine / "2026.sqlite3"
+        self.catalogue = racine / "societes.json"
+        self.configuration = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": str(self.base),
+            }
+        }
         self.factory = RequestFactory()
         self.middleware = ArchiveLectureSeuleMiddleware(lambda request: HttpResponse("OK"))
+
+    def ecrire_catalogue(self, cloture=True):
+        self.catalogue.write_text(json.dumps({
+            "version": 1,
+            "bases": [{
+                "id": "n", "societe": "Transport Centrale", "agence": "Centre",
+                "exercice": "2026", "moteur": "sqlite", "base": str(self.base),
+                "cloture": cloture,
+            }],
+        }), encoding="utf-8")
 
     def traiter(self, methode, nom_vue, cloture=True):
         self.ecrire_catalogue(cloture)
