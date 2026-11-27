@@ -63,6 +63,16 @@ class SqlServerMetricsTests(unittest.TestCase):
         self.assertEqual(mesures["atomic_scope"]["errors"], 1)
         self.assertEqual(mesures["atomic_scope"]["nested"], 1)
 
+    def test_alias_none_est_normalise_vers_default(self):
+        class AtomicSansAlias:
+            using = None
+
+        class ConnexionSqlServer:
+            alias = "sqlserver"
+
+        self.assertEqual(MODULE._alias_pour_base(AtomicSansAlias()), "default")
+        self.assertEqual(MODULE._alias_pour_base(ConnexionSqlServer()), "sqlserver")
+
     def test_wrapper_preserve_le_retour_et_mesure_la_methode(self):
         evenements = []
 
