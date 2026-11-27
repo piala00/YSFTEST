@@ -17,9 +17,9 @@ class SqlServerPartitionTests(unittest.TestCase):
         attendus = {
             "apps.transport.tests.SimulationPlusieursMoisTests": 0,
             "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
-            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
-            "apps.echanges.tests.ScenarioTroisDossiersTests": 1,
-            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 1,
+            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 0,
+            "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
+            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 0,
         }
         for classe, shard in attendus.items():
             with self.subTest(classe=classe):

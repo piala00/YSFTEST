@@ -184,17 +184,18 @@ def shard_for_class(key, count):
         raise ValueError("nombre de shards invalide")
     assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
     if count == 2:
-        # Run CI #545 (27/11/2026) : shard 0 = 580.429s, shard 1 = 344.870s.
-        # Mesures par classe : AdministrationOnglets 54.206s, ScenarioTroisDossiers
-        # 34.475s et SynchronisationRelaisInternet 24.838s. Leur déplacement
-        # équilibre les deux runners sans augmenter le délai ni omettre de tests.
-        # Les classes restent indivisibles pour préserver setUpClass/tearDownClass.
+        # Run CI #545 (27/11/2026) : shard 1 = 580.429s, shard 0 = 344.870s.
+        # Mesures par classe sur le shard 1 : AdministrationOnglets 54.206s,
+        # ScenarioTroisDossiers 34.475s et SynchronisationRelaisInternet 24.838s.
+        # Les déplacer vers le shard 0 équilibre les deux runners sans augmenter
+        # le délai ni omettre de tests. Les classes restent indivisibles pour
+        # préserver setUpClass/tearDownClass.
         overrides = {
             "apps.transport.tests.SimulationPlusieursMoisTests": 0,
             "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
-            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
-            "apps.echanges.tests.ScenarioTroisDossiersTests": 1,
-            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 1,
+            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 0,
+            "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
+            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 0,
         }
         assigned = overrides.get(key, assigned)
     return assigned
