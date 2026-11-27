@@ -8,6 +8,7 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import render
 
 from . import plan_analytique as pa
+from .pdf_analytique import generer_pdf
 
 PERIODES_RAPIDES = [("jour", "Aujourd'hui"), ("hier", "Hier"), ("semaine", "Cette semaine"), ("mois", "Ce mois"),
                     ("mois_precedent", "Mois précédent"), ("trimestre", "Ce trimestre"), ("annee", "Cette année"),
@@ -123,12 +124,22 @@ def axe(request, axe):
     if tri in ("resultat", "produits", "charges"):                 # classement des éléments
         b["elements"].sort(key=lambda e: e[tri], reverse=True)
     export = request.GET.get("export")
-    if export in ("csv", "xlsx"):
+    if export in ("csv", "xlsx", "pdf"):
         entetes = ["Élément", "Produits", "Charges", "Résultat", "Lignes"]
         lignes = [[e["libelle"], e["produits"], e["charges"], e["resultat"], e["lignes"]] for e in b["elements"]]
         lignes.append(["Non affecté", b["non_affecte"]["produits"], b["non_affecte"]["charges"], b["non_affecte"]["resultat"],
                        b["non_affecte"]["lignes"]])
         nom = f"analytique-{axe}-{p['du']}-{p['au']}"
+        if export == "pdf":
+            lignes_pdf = lignes[:-1] + [
+                ["Total des éléments", b["total_elements"]["produits"], b["total_elements"]["charges"],
+                 b["total_elements"]["resultat"], b["total_elements"]["lignes"]],
+                lignes[-1],
+                ["Comptabilité générale", b["gl"]["produits"], b["gl"]["charges"], b["gl"]["resultat"], b["gl"]["lignes"]],
+            ]
+            rapprochement = "Rapprochement avec la comptabilité générale : " + ("OK." if b["rapproche"] else "ÉCART À ANALYSER.")
+            return generer_pdf(nom, f"{_axe_ou_404(axe)} — Balance analytique", p["du"], p["au"],
+                               entetes, lignes_pdf, rapprochement)
         return _xlsx(nom, entetes, lignes) if export == "xlsx" else _csv(nom, entetes, lignes)
     return render(request, "comptabilite/analytique_axe.html", {**p, **b, "axe": axe, "titre_axe": titre, "tri": tri,
                                                                 "tris": TRIS, "non_affecte_cle": pa.NON_AFFECTE})
@@ -151,7 +162,7 @@ def element(request, axe, cle):
     r = pa.etat_element(axe, cle_interne, etat, p["du"], p["au"], axe2=axe2, comparer=comparer)
     libelle = "Non affecté" if cle_interne is None else pa.libelles(axe, [cle_interne]).get(cle_interne, cle)
     export = request.GET.get("export")
-    if export in ("csv", "xlsx"):
+    if export in ("csv", "xlsx", "pdf"):
         nom = f"analytique-{axe}-{cle}-{etat}-{p['du']}-{p['au']}"
         if etat == "comptes":
             entetes = ["Compte", "Intitulé", "Débit", "Crédit", "Lignes"]
@@ -173,6 +184,10 @@ def element(request, axe, cle):
             entetes = ["Date", "Pièce", "Journal", "Compte", "Libellé", "Produit (+) / charge (−)"]
             lignes = [[f["date"], f["piece"], f["journal"], f["compte"], f["libelle"], f["montant"]]
                       for f in r["lignes"]]
+        if export == "pdf":
+            note = "Montants issus des écritures générales validées ; aucune écriture n'est créée par cet export."
+            return generer_pdf(nom, f"{titre} — {libelle} — {dict(pa.ETATS)[etat]}", p["du"], p["au"],
+                               entetes, lignes, note)
         return _xlsx(nom, entetes, lignes) if export == "xlsx" else _csv(nom, entetes, lignes)
     lignes_gl = r["lignes"][:1000] if etat == "grand_livre" else []
     return render(request, "comptabilite/analytique_element.html", {
