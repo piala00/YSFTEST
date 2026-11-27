@@ -191,7 +191,11 @@ def shard_for_class(key, count):
         # le délai ni omettre de tests. Les classes restent indivisibles pour
         # préserver setUpClass/tearDownClass.
         overrides = {
-            "apps.transport.tests.SimulationPlusieursMoisTests": 0,
+            # CI #600 : le shard 0 a pris 591.088s contre 375.662s au shard 1 ;
+            # les deux tests de simulation multi-mois ont pris 150.784s au total.
+            # Les déplacer au shard 1 équilibre la charge observée sans toucher
+            # au nombre de tests ni au délai maximal.
+            "apps.transport.tests.SimulationPlusieursMoisTests": 1,
             "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
             "apps.core.tests_administration_onglets.AdministrationOngletsTests": 0,
             "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
