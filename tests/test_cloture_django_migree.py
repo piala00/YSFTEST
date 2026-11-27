@@ -41,7 +41,7 @@ from apps.core.models import Societe, Exercice, Agence
 from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
 from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, Chauffeur, ChangementGamme
 from apps.commercial.models import Tiers
-from apps.personnel.models import Employe
+from apps.personnel.models import Employe, RubriquePaie
 Societe.objects.create(raison_sociale='Transport Centrale', activite='TRANSPORT')
 Exercice.objects.create(code='2026', date_debut=date(2026,1,1), date_fin=date(2026,12,31))
 User.objects.create_user(username='controle', password='test-local-only')
@@ -71,6 +71,8 @@ ParametresTransport.objects.create(compte_billets=c1, compte_colis=c1,
 agence = Agence.objects.create(code='CTR', nom='Agence Centre', ville='Yaoundé', locale=True, compte_liaison=c2)
 employe = Employe.objects.create(matricule='EMP-01', nom='Chauffeur de contrôle', service='CONDUITE',
     agence=agence, vehicule=vehicule, chauffeur=chauffeur, salaire_base=Decimal('150000'))
+RubriquePaie.objects.create(code='PRIME', libelle='Prime de route', nature='GAIN',
+    valeur=Decimal('1000'), compte=c1)
 Journal.objects.create(code='AN', intitule='A nouveaux', type_journal='AN', cloture_au=date(2026,12,31))
 j = Journal.objects.create(code='OD', intitule='Divers', type_journal='OD')
 e = Ecriture.objects.create(journal=j, exercice=Exercice.objects.get(code='2026'),
@@ -179,6 +181,8 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_vehicule').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM personnel_employe').fetchone()[0], 1)
+                self.assertEqual(db.execute("SELECT code, libelle, valeur FROM personnel_rubriquepaie").fetchone(),
+                                 ('PRIME', 'Prime de route', '1000'))
                 self.assertEqual(db.execute("""SELECT matricule, nom, service, site_origine, agence.code
                     FROM personnel_employe AS employe
                     JOIN core_agence AS agence ON agence.id=employe.agence_id
@@ -292,7 +296,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
 from decimal import Decimal
 from django.contrib.auth.models import User
 from apps.core.models import Exercice, Agence
-from apps.personnel.models import Employe
+from apps.personnel.models import Employe, RubriquePaie
 from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, ChangementGamme
 from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
 exercice = Exercice.objects.get(code='2027')
@@ -310,6 +314,7 @@ assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
 assert Ligne.objects.get(code='YDE-DLA').gare_arrivee.code == 'DLA'
 assert Vehicule.objects.get(immatriculation='CE-123-AA').proprietaire.code == 'PROP-01'
 assert Employe.objects.get(matricule='EMP-01', agence__code='CTR').vehicule.immatriculation == 'CE-123-AA'
+assert RubriquePaie.objects.get(code='PRIME').compte.numero == '411000'
 from apps.transport.models import ParametresTransport
 parametres = ParametresTransport.objects.get()
 assert parametres.compte_billets.numero == '411000'
