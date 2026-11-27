@@ -30,7 +30,18 @@ def copie_synchronisee():
 
 
 def verifier_saisie(operation="cette opération"):
-    """Refuse une saisie dans l'ERP tant que la bascule n'est pas faite (copie synchronisée)."""
+    """Refuse la saisie en mode miroir ou dans une base annuelle clôturée."""
+    from .catalogue_societes import base_courante_cloturee
+
+    try:
+        if base_courante_cloturee():
+            raise ValidationError(
+                f"Exercice clôturé : {operation} est interdit dans cette archive en consultation seule."
+            )
+    except (OSError, ValueError) as exc:
+        raise ValidationError(
+            "Impossible de vérifier l'état de clôture du dossier : saisie refusée par sécurité."
+        ) from exc
     if not _en_cours.get() and copie_synchronisee():
         raise ValidationError(
             f"Synchronisation en cours avec l'ancien logiciel : {operation} se fait encore dans l'ancien logiciel. "
