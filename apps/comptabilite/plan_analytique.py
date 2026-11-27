@@ -251,6 +251,13 @@ class _Contexte:
         for c in (Colis.objects.filter(ecriture_livraison__date__range=(debut, fin))
                   .values("ecriture_livraison_id", "canal_vente")):
             self.canaux_par_ecriture[c["ecriture_livraison_id"]] = c["canal_vente"] or "GUICHET"
+        # Les identifiants d'écritures ne sont pas propagés entre agences : la référence de la pièce source l'est.
+        # On conserve donc aussi un index par numéro pour les retenues d'annulation et ports dus distants.
+        self.canaux_par_piece = {}
+        for b in (Billet.objects.filter(annule_le__date__range=(debut, fin)).values("numero", "canal_vente")):
+            self.canaux_par_piece[b["numero"]] = b["canal_vente"] or "GUICHET"
+        for c in (Colis.objects.filter(livre_le__date__range=(debut, fin)).values("numero", "canal_vente")):
+            self.canaux_par_piece[c["numero"]] = c["canal_vente"] or "GUICHET"
         self.gammes = {}
         from apps.partenaires.models import compte_remuneration
         from apps.transport.models import ParametresTransport
@@ -294,9 +301,11 @@ class _Contexte:
         resultat.append((cles[-1], reste))                       # le reste d'arrondi : rien ne se perd
         return [(g, m) for g, m in resultat if m]
 
-    def repartition_canaux(self, numero, depart_id, montant, ecriture_id=None):
-        """Ventile une recette sur son canal à partir des billets/colis sources ou de leur écriture dédiée."""
+    def repartition_canaux(self, numero, depart_id, montant, ecriture_id=None, reference=None, origine=None):
+        """Ventile depuis les billets/colis sources ; les références restent stables entre dossiers d'agences."""
         canal_direct = self.canaux_par_ecriture.get(ecriture_id)
+        if not canal_direct:
+            canal_direct = self.canaux_par_piece.get(reference) or self.canaux_par_piece.get(origine)
         if canal_direct:
             return [(canal_direct, montant)] if montant else None
         p = self.parametres
@@ -369,7 +378,8 @@ def faits(debut, fin, ctx=None):
                     if repartition:
                         repartitions["points_vente"] = repartition
                         point = repartition[0][0] if len(repartition) == 1 else point
-                repartition_canal = ctx.repartition_canaux(numero, dep_id, f["montant"], l["ecriture_id"])
+                repartition_canal = ctx.repartition_canaux(numero, dep_id, f["montant"], l["ecriture_id"],
+                                                           l["ecriture__reference"], l["ecriture__origine"])
                 if repartition_canal:
                     repartitions["canaux_vente"] = repartition_canal
                 if repartitions:

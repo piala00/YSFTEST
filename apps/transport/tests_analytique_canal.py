@@ -116,3 +116,35 @@ class CanalVenteAnalytiqueTests(TestCase):
         montants = {ligne["cle"]: ligne["produits"] for ligne in resultat["elements"]}
         self.assertEqual(montants["REVENDEUR"], Decimal("4500"))
         self.assertTrue(resultat["rapproche"])
+
+    def test_annulation_et_livraison_distantes_utilisent_la_reference_de_piece(self):
+        from apps.comptabilite.models import Journal
+        from apps.comptabilite.services import creer_ecriture
+        from apps.transport.models import ParametresTransport
+
+        depart = self.depart()
+        maintenant = timezone.now()
+        billet = Billet(numero="BIL-REMOTE-CAN", site_origine="DLA", depart=depart, voyageur="Billet annulé distant",
+                        prix=10000, retenue=1500, statut=Billet.ANNULE, annule_le=maintenant, canal_vente="APP")
+        billet.save()
+        colis = Colis(numero="COL-REMOTE-DU", site_origine="DLA", nature=Colis.COLIS, date=timezone.localdate(),
+                      gare_depart=self.dla, gare_arrivee=self.yde, expediteur="Agence DLA", destinataire="Client",
+                      prix=4500, port=Colis.DU, canal_vente="WEB", depart=depart, statut=Colis.LIVRE,
+                      livre_le=maintenant)
+        colis.save()
+        p = ParametresTransport.get()
+        journal = Journal.objects.get(code="OD")
+        creer_ecriture(journal, timezone.localdate(), "Retenue billet annulé distant",
+                       [{"compte": p.compte_billets_a_voyager, "debit": 1500},
+                        {"compte": p.compte_billets, "credit": 1500}],
+                       reference=billet.numero, origine=billet.numero)
+        creer_ecriture(journal, timezone.localdate(), "Port dû livré dans une agence distante",
+                       [{"compte": p.compte_colis_a_transporter, "debit": 4500},
+                        {"compte": p.compte_colis, "credit": 4500}],
+                       reference=colis.numero, origine=colis.numero)
+
+        resultat = self.balance()
+        montants = {ligne["cle"]: ligne["produits"] for ligne in resultat["elements"]}
+        self.assertEqual(montants["APP"], Decimal("1500"))
+        self.assertEqual(montants["WEB"], Decimal("4500"))
+        self.assertTrue(resultat["rapproche"])
