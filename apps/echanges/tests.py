@@ -125,3 +125,30 @@ class EcranEchangesTests(TestCase):
             page = self.client.post(url, {"action": "synchroniser"}, follow=True)
             self.assertContains(page, "1 lot(s) envoyé(s)")
             self.assertEqual(len(list(__import__("pathlib").Path(boite, "DLA").glob("*.erpx.chiffre"))), 1)
+
+class PublicationSiteLocalCacheTests(TestCase):
+    """Le cache de la gare locale est borné à une opération composée."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+
+    def test_une_lecture_dans_la_portee_et_relecture_apres(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        from .publication import cache_site_local, site_local
+
+        with CaptureQueriesContext(connection) as requetes:
+            with cache_site_local():
+                premier = site_local()
+                second = site_local()
+        self.assertIsNotNone(premier)
+        self.assertEqual(premier.pk, second.pk)
+        self.assertEqual(len(requetes), 1)
+
+        with CaptureQueriesContext(connection) as requetes:
+            site_local()
+            site_local()
+        self.assertEqual(len(requetes), 2)
+
