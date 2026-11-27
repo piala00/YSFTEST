@@ -27,6 +27,13 @@ from apps.core.models import Sequence
 
 ZERO = Decimal("0")
 
+CANAUX_VENTE = (
+    ("GUICHET", "Guichet"),
+    ("WEB", "Web"),
+    ("APP", "Application mobile"),
+    ("REVENDEUR", "Revendeur"),
+)
+
 
 def _arrondi(valeur):
     return Decimal(valeur).quantize(Decimal("1"), rounding=ROUND_HALF_UP)       # FCFA : pas de centimes
@@ -794,6 +801,7 @@ class Billet(models.Model):
     prix_bagages = models.DecimalField("Prix des bagages", max_digits=12, decimal_places=0, default=ZERO,
                                        help_text="Prix fixé pour les bagages ; 0 si rien à payer")
     paiement = models.CharField(max_length=15, choices=PAIEMENTS, default=ESPECES)
+    canal_vente = models.CharField("Canal de vente", max_length=12, choices=CANAUX_VENTE, default="GUICHET")
     caisse = models.ForeignKey("comptabilite.Journal", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
                                limit_choices_to={"type_journal": "TRESORERIE"})
     client = models.ForeignKey("commercial.Tiers", null=True, blank=True, on_delete=models.PROTECT, related_name="billets",
@@ -1172,6 +1180,7 @@ class Colis(models.Model):
     prix = models.DecimalField("Prix du transport", max_digits=12, decimal_places=0, null=True, blank=True,
                                help_text="Vide : tarif de la ligne (forfait ou prix au kg)")
     port = models.CharField(max_length=5, choices=PORTS, default=PAYE)
+    canal_vente = models.CharField("Canal de vente", max_length=12, choices=CANAUX_VENTE, default="GUICHET")
     contre_remboursement = models.DecimalField(
         "Contre-remboursement", max_digits=14, decimal_places=0, default=ZERO,
         help_text="Somme à encaisser auprès du destinataire pour le compte de l'expéditeur")

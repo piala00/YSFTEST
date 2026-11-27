@@ -146,7 +146,7 @@ class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
     mode = forms.ChoiceField(required=False, widget=forms.HiddenInput,
                              choices=[("direct", "Vente habituelle"), ("transit", "Montée intermédiaire"),
                                       ("correspondance", "Avec correspondance")])
-    rapides = ("telephone", "voyageur", "piece_identite", "siege", "prix", "paiement")
+    rapides = ("telephone", "voyageur", "piece_identite", "siege", "prix", "paiement", "canal_vente")
     complementaires = ("gare_arrivee", "gare_montee", "caisse", "client", "depart_correspondance", "siege_correspondance")
 
     @property
@@ -195,8 +195,8 @@ class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
 
     class Meta:
         model = Billet
-        fields = ("depart", "gare_montee", "gare_arrivee", "voyageur", "telephone", "piece_identite", "siege", "prix", "paiement", "caisse",
-                  "client", "bagages", "bagages_nombre", "bagages_poids", "prix_bagages")
+        fields = ("depart", "gare_montee", "gare_arrivee", "voyageur", "telephone", "piece_identite", "siege", "prix", "paiement",
+                  "canal_vente", "caisse", "client", "bagages", "bagages_nombre", "bagages_poids", "prix_bagages")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -240,7 +240,7 @@ class ColisForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
     personne_destinataire = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
     groupes_contacts = [("personne_expediteur", "expediteur", "tel_expediteur"),
                         ("personne_destinataire", "destinataire", "tel_destinataire")]
-    rapides = ("gare_depart", "gare_arrivee", "description", "prix", "port")
+    rapides = ("gare_depart", "gare_arrivee", "description", "prix", "port", "canal_vente")
     complementaires = ("nombre", "poids", "nature", "valeur_declaree", "contre_remboursement", "client")
 
     @property
@@ -258,7 +258,7 @@ class ColisForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Colis
         fields = ("nature", "gare_depart", "gare_arrivee", "expediteur", "tel_expediteur", "destinataire", "tel_destinataire",
-                  "description", "nombre", "poids", "valeur_declaree", "prix", "port", "contre_remboursement", "client")
+                  "description", "nombre", "poids", "valeur_declaree", "prix", "port", "canal_vente", "contre_remboursement", "client")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -40,6 +40,7 @@ AXES_TRANSPORT = [
     ("agences", "Agences", "Chaque agence (gare de départ) : départs, colis, loyers et frais, avec ses points de vente rattachés"),
     ("points_vente", "Points de vente", "Où les billets sont vendus : recette de chaque départ répartie selon le point de "
                                         "vente de chaque billet ; charges propres du point"),
+    ("canaux_vente", "Canaux de vente", "Guichet, Web, application mobile et revendeur ; ventilation des produits depuis les pièces sources, sans double comptage"),
     ("villes", "Villes", "Toutes les agences d'une même ville"),
     ("vehicules", "Véhicules", "Compte d'exploitation de chaque car et camion"),
     ("proprietaires", "Propriétaires", "Véhicules des partenaires selon le contrat en vigueur à la date"),
@@ -195,7 +196,7 @@ class _Contexte:
     def __init__(self, debut, fin):
         from apps.transport.analytique import _contrats_par_vehicule, _contrat_le
         from apps.transport.etats import _depart_des_pieces
-        from apps.transport.models import Depart, Gare, Vehicule
+        from apps.transport.models import Billet, Colis, Depart, Gare, Vehicule
 
         from .models import SectionAnalytique
 
@@ -225,11 +226,30 @@ class _Contexte:
 
         self.ventes = {}
         for t in (Troncon.objects.filter(depart_id__in=self.departs, statut=Troncon.EFFECTUE)
-                  .values("depart_id", "part", "part_bagages", "billet__gare_id", "depart__ligne__gare_depart_id")):
+                  .values("depart_id", "part", "part_bagages", "billet__gare_id", "billet__canal_vente",
+                          "depart__ligne__gare_depart_id")):
             g = t["billet__gare_id"] or t["depart__ligne__gare_depart_id"]
-            v = self.ventes.setdefault(t["depart_id"], {"billets": {}, "bagages": {}})
+            canal = t["billet__canal_vente"] or "GUICHET"
+            v = self.ventes.setdefault(t["depart_id"], {"billets": {}, "bagages": {},
+                                                        "canaux_billets": {}, "canaux_bagages": {}})
             v["billets"][g] = v["billets"].get(g, ZERO) + t["part"]
             v["bagages"][g] = v["bagages"].get(g, ZERO) + t["part_bagages"]
+            v["canaux_billets"][canal] = v["canaux_billets"].get(canal, ZERO) + t["part"]
+            v["canaux_bagages"][canal] = v["canaux_bagages"].get(canal, ZERO) + t["part_bagages"]
+        for c in (Colis.objects.filter(depart_id__in=self.departs, recette_constatee=True)
+                  .values("depart_id", "prix", "nature", "canal_vente")):
+            nature = "canaux_fret" if c["nature"] == Colis.FRET else "canaux_colis"
+            ventes = self.ventes.setdefault(c["depart_id"], {})
+            ventes.setdefault(nature, {})
+            canal = c["canal_vente"] or "GUICHET"
+            ventes[nature][canal] = ventes[nature].get(canal, ZERO) + c["prix"]
+        self.canaux_par_ecriture = {}
+        for b in (Billet.objects.filter(ecriture_annulation__date__range=(debut, fin))
+                  .values("ecriture_annulation_id", "canal_vente")):
+            self.canaux_par_ecriture[b["ecriture_annulation_id"]] = b["canal_vente"] or "GUICHET"
+        for c in (Colis.objects.filter(ecriture_livraison__date__range=(debut, fin))
+                  .values("ecriture_livraison_id", "canal_vente")):
+            self.canaux_par_ecriture[c["ecriture_livraison_id"]] = c["canal_vente"] or "GUICHET"
         self.gammes = {}
         from apps.partenaires.models import compte_remuneration
         from apps.transport.models import ParametresTransport
@@ -272,6 +292,28 @@ class _Contexte:
             reste -= m
         resultat.append((cles[-1], reste))                       # le reste d'arrondi : rien ne se perd
         return [(g, m) for g, m in resultat if m]
+
+    def repartition_canaux(self, numero, depart_id, montant, ecriture_id=None):
+        """Ventile une recette sur son canal à partir des billets/colis sources ou de leur écriture dédiée."""
+        canal_direct = self.canaux_par_ecriture.get(ecriture_id)
+        if canal_direct:
+            return [(canal_direct, montant)] if montant else None
+        p = self.parametres
+        nature = ("canaux_billets" if numero == getattr(p.compte_billets, "numero", None) else
+                  "canaux_bagages" if numero == getattr(p.compte_bagages, "numero", None) else
+                  "canaux_fret" if numero == getattr(p.compte_fret, "numero", None) else
+                  "canaux_colis" if numero == getattr(p.compte_colis, "numero", None) else None)
+        parts = self.ventes.get(depart_id, {}).get(nature) if depart_id and nature else None
+        base = sum(parts.values(), ZERO) if parts else ZERO
+        if not base:
+            return None
+        cles, resultat, reste = sorted(parts, key=str), [], montant
+        for canal in cles[:-1]:
+            part = (montant * parts[canal] / base).quantize(Decimal("0.01"))
+            resultat.append((canal, part))
+            reste -= part
+        resultat.append((cles[-1], reste))
+        return [(canal, part) for canal, part in resultat if part]
 
     def activite(self, numero, vehicule_id, depart_id):
         if not self.transport:
@@ -319,11 +361,18 @@ def faits(debut, fin, ctx=None):
             contrat = ctx._contrat_le(ctx.contrats, v, jour) if v else None
             agence = ctx.agence_de.get(gare)
             point = ctx.gare_de_section.get(l["section_id"])
-            if numero.startswith("7") and dep_id:
-                repartition = ctx.repartition_ventes(numero, dep_id, f["montant"])
-                if repartition:
-                    f["_parts"] = {"points_vente": repartition}
-                    point = repartition[0][0] if len(repartition) == 1 else point
+            if numero.startswith("7"):
+                repartitions = {}
+                if dep_id:
+                    repartition = ctx.repartition_ventes(numero, dep_id, f["montant"])
+                    if repartition:
+                        repartitions["points_vente"] = repartition
+                        point = repartition[0][0] if len(repartition) == 1 else point
+                repartition_canal = ctx.repartition_canaux(numero, dep_id, f["montant"], l["ecriture_id"])
+                if repartition_canal:
+                    repartitions["canaux_vente"] = repartition_canal
+                if repartitions:
+                    f["_parts"] = repartitions
             f.update({
                 "agences": agence, "villes": ctx.gares[agence].ville if agence else None, "points_vente": point,
                 "vehicules": v, "voyages": dep_id if depart else None, "lignes": depart.ligne_id if depart else None,
@@ -344,6 +393,11 @@ def libelles(axe, cles):
                 for g in Gare.objects.filter(pk__in=cles).select_related("rattachement")}
     if axe == "villes":
         return {c: c for c in cles}
+    if axe == "canaux_vente":
+        from apps.transport.models import CANAUX_VENTE
+
+        labels = dict(CANAUX_VENTE)
+        return {c: labels.get(c, c) for c in cles}
     if axe == "vehicules":
         from apps.transport.models import Vehicule
         return {v.pk: f"{v.immatriculation} — {v.designation}".rstrip(" —") for v in Vehicule.objects.filter(pk__in=cles)}
@@ -384,7 +438,7 @@ def cle_depuis_url(axe, valeur):
     """Clé d'élément lue dans l'URL (identifiant numérique, code de gamme ou d'activité, « aucun »)."""
     if valeur == NON_AFFECTE:
         return None
-    if axe in ("gammes", "activites", "services", "villes") or (axe == "proprietaires" and valeur == "societe"):
+    if axe in ("gammes", "activites", "services", "villes", "canaux_vente") or (axe == "proprietaires" and valeur == "societe"):
         return valeur
     try:
         return int(valeur)

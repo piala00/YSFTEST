@@ -87,7 +87,7 @@ def serialiser(o):
         return "billet", {"v": VERSION, "uid": str(o.uid), "numero": o.numero, "date_vente": _date(o.date_vente),
                           "gare": _uid(o.gare), "depart": _uid(o.depart), "voyageur": o.voyageur, "telephone": o.telephone,
                           "piece_identite": o.piece_identite, "siege": o.siege, "prix": _d(o.prix), "paiement": o.paiement,
-                          "client": o.client.code if o.client_id else None, "statut": o.statut, "retenue": _d(o.retenue),
+                          "canal_vente": o.canal_vente, "client": o.client.code if o.client_id else None, "statut": o.statut, "retenue": _d(o.retenue),
                           "vendu_par": str(o.vendu_par or ""), "annule_le": _date(o.annule_le),
                           "gare_arrivee": _uid(o.gare_arrivee), "gare_montee": _uid(o.gare_montee),
                           "remboursement": o.remboursement, "bagages": o.bagages, "bagages_nombre": o.bagages_nombre,
@@ -104,7 +104,7 @@ def serialiser(o):
                          "tel_expediteur": o.tel_expediteur, "destinataire": o.destinataire,
                          "tel_destinataire": o.tel_destinataire, "description": o.description, "nombre": o.nombre,
                          "poids": _d(o.poids), "valeur_declaree": _d(o.valeur_declaree), "prix": _d(o.prix), "port": o.port,
-                         "contre_remboursement": _d(o.contre_remboursement), "depart": _uid(o.depart), "statut": o.statut,
+                         "canal_vente": o.canal_vente, "contre_remboursement": _d(o.contre_remboursement), "depart": _uid(o.depart), "statut": o.statut,
                          "code_retrait": o.code_retrait, "livre_le": _date(o.livre_le), "retire_par": o.retire_par,
                          "livre_site": o.livre_site, "cr_reverse_le": _date(o.cr_reverse_le)}, o.date, o.cree_par or ""
     from apps.transport.models_suivi_colis import IncidentColis
@@ -319,6 +319,7 @@ def _billet(p, origine, local):
     b.depart, b.gare = _par_uid(Depart, p["depart"], "départ"), _par_uid(Gare, p.get("gare"), "gare", obligatoire=False)
     for champ in ("numero", "voyageur", "telephone", "piece_identite", "siege", "paiement", "statut"):
         setattr(b, champ, p.get(champ) if p.get(champ) is not None else ("" if champ not in ("siege",) else None))
+    b.canal_vente = p.get("canal_vente") or "GUICHET"  # compatibilité avec les lots antérieurs au champ canal
     b.date_vente, b.prix, b.retenue = datetime.date.fromisoformat(p["date_vente"]), Decimal(p["prix"]), Decimal(p["retenue"])
     b.client = Tiers.objects.filter(code=f"{origine.code}.{p['client']}"[:20]).first() if p.get("client") else None
     b.annule_le = parse_datetime(p["annule_le"]) if p.get("annule_le") else None
@@ -352,6 +353,7 @@ def _colis(p, origine, local):
     for champ in ("numero", "nature", "expediteur", "tel_expediteur", "destinataire", "tel_destinataire", "description",
                   "port", "code_retrait"):
         setattr(c, champ, p.get(champ) or "")
+    c.canal_vente = p.get("canal_vente") or "GUICHET"  # compatibilité avec les lots antérieurs au champ canal
     c.gare_depart, c.gare_arrivee, c.nombre = gd, ga, p.get("nombre") or 1
     c.date = datetime.date.fromisoformat(p["date"])
     c.poids, c.valeur_declaree = Decimal(p["poids"]), Decimal(p["valeur_declaree"])
