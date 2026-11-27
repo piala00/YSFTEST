@@ -24,7 +24,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: controle-${{ github.ref }}
+  # Un push et sa pull request portent la même branche : un seul contrôle complet
+  # évite deux conteneurs SQL Server simultanés et la contention qui ralentit les tests.
+  group: controle-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:

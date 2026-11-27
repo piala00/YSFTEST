@@ -301,7 +301,10 @@ class ChoixDeBaseALInstallationTests(SimpleTestCase):
         with tempfile.TemporaryDirectory() as donnees:
             Path(donnees, "installation-base.env").write_text(
                 "DB_ENGINE=mssql\nDB_HOST=127.0.0.1,1\nDB_NAME=ERP_INJOIGNABLE\nDB_USER=sa\nDB_PASSWORD=x\n"
-                "DB_PYTHON_DRIVER=mssql_python\n", encoding="utf-8")
+                "DB_PYTHON_DRIVER=mssql_python\n"
+                # Port local volontairement fermé : une tentative courte suffit à vérifier le repli SQLite.
+                "DB_CONNECTION_TIMEOUT=2\nDB_CONNECTION_RETRIES=0\nDB_CONNECTION_RETRY_BACKOFF_TIME=0\n",
+                encoding="utf-8")
             port = _port_libre()
             env = {k: v for k, v in os.environ.items() if not k.startswith(("SQLITE_", "DB_", "ERP_", "DJANGO_"))}
             env.update(ERP_DONNEES=donnees, ERP_PORT=str(port), ERP_SANS_NAVIGATEUR="1", ERP_RESEAU="0", ERP_EDITION="transport",

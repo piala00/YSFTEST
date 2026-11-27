@@ -147,12 +147,16 @@ elif DB_ENGINE == "mssql":
             "PASSWORD": env("DB_PASSWORD", ""),
             "HOST": env("DB_HOST", "localhost"),
             "PORT": env("DB_PORT", ""),               # vide : port de l'instance nommée
-            "OPTIONS": {k: v for k, v in {
-                # pyodbc avec le pilote ODBC 17/18 installé, ou « mssql_python » (pilote fourni, rien à installer)
+            "OPTIONS": {
+                # pyodbc avec ODBC 17/18, ou « mssql_python » (pilote fourni).
                 "python_driver": env("DB_PYTHON_DRIVER", ""),
                 "driver": env("DB_DRIVER", ""),
                 "extra_params": env("DB_EXTRA_PARAMS", "TrustServerCertificate=yes"),
-            }.items() if v},
+                # Délai/reprises configurables pour distinguer une indisponibilité réelle d'un test de repli.
+                "connection_timeout": int(env("DB_CONNECTION_TIMEOUT", "0")),
+                "connection_retries": int(env("DB_CONNECTION_RETRIES", "5")),
+                "connection_retry_backoff_time": int(env("DB_CONNECTION_RETRY_BACKOFF_TIME", "5")),
+            },
         }
     }
 else:

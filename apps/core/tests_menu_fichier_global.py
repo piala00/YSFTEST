@@ -2,6 +2,7 @@
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.urls import reverse
 
 from apps.core.navigation import MODULES, menu_fichier_global, structure_module
 
@@ -20,7 +21,12 @@ class MenuFichierGlobalTests(TestCase):
         codes = [element.code for element in menu.elements if not element.separateur]
         self.assertEqual(len(codes), len(set(codes)))
         self.assertNotIn("fichier.poste", codes)
-        for code in ("fichier.nouvelle_societe", "fichier.fermer_societe", "fichier.cloture_annuelle", "fichier.import_export"):
+        for code in ("fichier.nouvelle_societe", "fichier.fermer_societe", "fichier.import_export"):
             element = next(element for element in menu.elements if element.code == code)
             self.assertFalse(element.url)
             self.assertFalse(element.action)
+
+        cloture = next(element for element in menu.elements if element.code == "fichier.cloture_annuelle")
+        self.assertEqual(cloture.url, "core:cloture_exercice_annuel")
+        self.assertEqual(reverse(cloture.url), "/cloture-annuelle/")
+        self.assertFalse(cloture.action)
