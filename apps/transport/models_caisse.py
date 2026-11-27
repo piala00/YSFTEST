@@ -10,6 +10,7 @@ import uuid
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
@@ -104,7 +105,7 @@ class SessionCaisse(models.Model):
     def ouvrir(cls, agent, caisse, service=BILLETTERIE, gare=None, fonds_initial=ZERO):
         # Sérialiser les ouvertures d'un même agent. Sans ce verrou, deux requêtes
         # simultanées peuvent toutes deux constater l'absence de caisse ouverte.
-        agent = type(agent).objects.select_for_update().get(pk=agent.pk)
+        agent = get_user_model().objects.select_for_update().get(pk=agent.pk)
         if cls.ouverte_de(agent):
             raise ValidationError("Vous avez déjà une caisse ouverte : fermez-la d'abord.")
         if Decimal(fonds_initial) < 0:
