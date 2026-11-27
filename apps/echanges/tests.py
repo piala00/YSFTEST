@@ -131,7 +131,13 @@ class PublicationSiteLocalCacheTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        import uuid
+
+        from apps.core.models import Agence
+
         call_command("init_erp", "--activite", "transport", verbosity=0)
+        Agence.objects.create(code="CACHE", nom="Agence cache", ville="Yaoundé",
+                              locale=True, uid=uuid.uuid4())
 
     def test_une_lecture_dans_la_portee_et_relecture_apres(self):
         from django.db import connection
