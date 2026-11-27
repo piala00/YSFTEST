@@ -66,6 +66,30 @@ def lire_catalogue(fichier):
     return bases
 
 
+
+def base_courante_cloturee():
+    """Indique si la base SQLite Django active est une archive du catalogue.
+
+    Le catalogue est la source de vérité de la clôture annuelle : N reste
+    inchangée financièrement, mais ne doit plus accepter de saisies métier.
+    """
+    import os
+    from django.conf import settings
+
+    configuration = settings.DATABASES.get("default", {})
+    if not str(configuration.get("ENGINE", "")).endswith("sqlite3"):
+        return False
+    catalogue = os.environ.get("ERP_CATALOGUE_SOCIETES", "").strip()
+    nom = configuration.get("NAME")
+    if not catalogue or not nom:
+        return False
+    chemin = Path(str(nom)).expanduser().resolve()
+    for entree in lire_catalogue(catalogue):
+        if entree["moteur"] == "sqlite" and Path(entree["base"]).expanduser().resolve() == chemin:
+            return bool(entree["cloture"])
+    return False
+
+
 def regrouper(bases, recherche="", afficher_clotures=False):
     """Filtre puis regroupe Société → Agence → exercices (récents d'abord)."""
     terme = recherche.strip().casefold()
