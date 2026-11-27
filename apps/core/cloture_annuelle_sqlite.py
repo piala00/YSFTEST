@@ -18,13 +18,16 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
                             finaliser_source=None):
     """Crée N+1 puis publie le lien seulement après initialisation et reports.
 
-    initialiser(source, destination) doit créer le schéma et recopier uniquement
-    la configuration ; reporter(source, destination) écrit les soldes d'ouverture.
-    En cas d'échec avant publication, la nouvelle base est supprimée.
-    Les callbacks initialiser/reporter ne doivent pas modifier N : celui-ci est
-    ouvert en lecture seule. Le callback facultatif finaliser_source est exécuté
-    après validation physique de N+1 et avant la publication du catalogue ; il
-    est réservé à la finalisation métier de N et doit gérer sa propre transaction.
+    initialiser(source, destination) recopie uniquement les référentiels ;
+    reporter(source, destination) écrit les soldes d'ouverture.
+    Les migrations du schéma cible sont terminées avant de verrouiller N.
+    Un verrou SQLite BEGIN IMMEDIATE est ensuite pris sur N AVANT le snapshot :
+    il attend les écritures déjà engagées et empêche une nouvelle écriture de
+    se glisser entre la lecture des soldes et la clôture. Les callbacks de
+    reprise ne peuvent écrire dans N (connexion source en mode lecture seule).
+    finaliser_source(connexion_verrou) met à jour les marqueurs de clôture dans
+    la transaction du verrou. Si la publication du catalogue échoue, cette
+    transaction est annulée et N reste ouvert.
     """
     bases = lire_catalogue(catalogue)
     source = next((b for b in bases if b["id"] == identifiant), None)
@@ -36,6 +39,8 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
         raise TypeError("préparation du schéma invalide")
     if not callable(initialiser) or not callable(reporter):
         raise TypeError("initialisation et reports obligatoires")
+    if finaliser_source is not None and not callable(finaliser_source):
+        raise TypeError("finalisation de l'exercice source invalide")
     source_path = Path(verifier_base_sqlite(source["base"]))
     cible = Path(destination).expanduser().absolute()
     if cible == source_path or (cible.exists() and cible.samefile(source_path)):
@@ -49,54 +54,54 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
     os.close(descripteur)
     publie = False
     try:
-        # URI en lecture seule ; le service métier ne reçoit pas de connexion
-        # autorisant l'écriture dans N.
-        from urllib.parse import quote
-        uri = "file:" + quote(str(source_path), safe="/:") + "?mode=ro"
-        # sqlite3.Connection.__exit__ ne ferme PAS la connexion.
-        # closing garantit sa libération avant unlink, notamment sous Windows.
-        with closing(sqlite3.connect(uri, uri=True)) as origine:
-            origine.execute("PRAGMA query_only=ON")
-            with closing(sqlite3.connect(str(cible))) as nouvelle:
-                nouvelle.execute("PRAGMA foreign_keys=ON")
-                # Les migrations Django SQLite doivent désactiver les FK pendant
-                # leur schema_editor ; SQLite interdit ce PRAGMA dans BEGIN.
-                # Le fichier N+1 étant exclusif et supprimé sur échec, cette
-                # préparation hors transaction ne publie aucune donnée.
-                if preparer_schema is not None:
-                    nouvelle.execute("PRAGMA foreign_keys=OFF")
-                    try:
-                        preparer_schema(nouvelle)
-                        nouvelle.commit()
-                    finally:
+        # Les migrations Django de N+1 sont indépendantes de N : ne pas bloquer
+        # les utilisateurs de l'exercice courant pendant leur exécution.
+        if preparer_schema is not None:
+            with closing(sqlite3.connect(str(cible), timeout=30)) as schema:
+                schema.execute("PRAGMA foreign_keys=OFF")
+                try:
+                    preparer_schema(schema)
+                    schema.commit()
+                finally:
+                    schema.execute("PRAGMA foreign_keys=ON")
+                if schema.execute("PRAGMA foreign_key_check").fetchone():
+                    raise ValueError("schéma N+1 invalide après migrations")
+
+        # BEGIN IMMEDIATE, et non BEGIN lecteur : en mode WAL, un simple
+        # snapshot autorise un autre écrivain à valider des mouvements absents
+        # des reports. Le verrou est acquis avant le snapshot et gardé jusqu'à
+        # la publication du catalogue et la finalisation de N.
+        with closing(sqlite3.connect(str(source_path), timeout=30)) as verrou:
+            try:
+                verrou.execute("BEGIN IMMEDIATE")
+                from urllib.parse import quote
+                uri = "file:" + quote(str(source_path), safe="/:") + "?mode=ro"
+                with closing(sqlite3.connect(uri, uri=True, timeout=30)) as origine:
+                    origine.execute("PRAGMA query_only=ON")
+                    with closing(sqlite3.connect(str(cible), timeout=30)) as nouvelle:
                         nouvelle.execute("PRAGMA foreign_keys=ON")
-                    if nouvelle.execute("PRAGMA foreign_key_check").fetchone():
-                        raise ValueError("schéma N+1 invalide après migrations")
-                # Figer une vue cohérente de N pour les référentiels et les
-                # soldes : sans transaction de lecture, une saisie concurrente
-                # entre les deux étapes produirait un N+1 incohérent.
-                # Le premier SELECT matérialise le snapshot SQLite (BEGIN seul
-                # ne suffit pas). N reste strictement en lecture seule.
-                origine.execute("BEGIN")
-                origine.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
-                with nouvelle:
-                    # DDL SQLite est autrement susceptible de survivre à un
-                    # échec des callbacks en l'absence de BEGIN explicite.
-                    nouvelle.execute("BEGIN IMMEDIATE")
-                    initialiser(origine, nouvelle)
-                    reporter(origine, nouvelle)
-                    if nouvelle.execute("PRAGMA foreign_key_check").fetchone() is not None:
-                        raise ValueError("références invalides dans la base N+1")
-        verifier_base_sqlite(str(cible))
-        if finaliser_source is not None:
-            if not callable(finaliser_source):
-                raise TypeError("finalisation de l'exercice source invalide")
-            finaliser_source()
-        resultat = publier_exercice_sqlite_valide(
-            catalogue, identifiant, str(cible), nouvel_identifiant,
-        )
-        publie = True
-        return resultat
+                        with nouvelle:
+                            nouvelle.execute("BEGIN IMMEDIATE")
+                            initialiser(origine, nouvelle)
+                            reporter(origine, nouvelle)
+                            if nouvelle.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                                raise ValueError("références invalides dans la base N+1")
+                verifier_base_sqlite(str(cible))
+                if finaliser_source is not None:
+                    finaliser_source(verrou)
+                resultat = publier_exercice_sqlite_valide(
+                    catalogue, identifiant, str(cible), nouvel_identifiant,
+                )
+                # Dès que le catalogue est publié, ne jamais supprimer N+1,
+                # même si le commit final du verrou source signale une erreur :
+                # le catalogue reste alors le garde-fou lecture seule de N.
+                publie = True
+                verrou.commit()
+                return resultat
+            except Exception:
+                verrou.rollback()
+                raise
+
     finally:
         if not publie:
             # Un échec ne doit pas effacer une base créée par un autre processus.
