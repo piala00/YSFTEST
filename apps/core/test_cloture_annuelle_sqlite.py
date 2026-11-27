@@ -50,16 +50,43 @@ class ClotureAnnuelleSQLiteTests(TestCase):
         self.assertTrue(lire_catalogue(self.catalogue)[0]["cloture"])
 
     def test_echec_reports_ne_publie_pas(self):
+        finalisations = []
+
         def echec(origine, nouvelle):
             raise RuntimeError("échec des reports")
+
         avant = self.catalogue.read_bytes()
         with self.assertRaisesRegex(RuntimeError, "reports"):
             preparer_exercice_sqlite(
                 self.catalogue, "n", str(self.cible), "n1",
                 self.initialiser, echec,
+                finaliser_source=lambda: finalisations.append(True),
             )
         self.assertFalse(self.cible.exists())
         self.assertEqual(self.catalogue.read_bytes(), avant)
+        self.assertEqual(finalisations, [])
+
+    def test_finalisation_source_apres_validation_des_reports(self):
+        finalisations = []
+
+        def finaliser():
+            # Le callback ne doit être exécuté qu'après fermeture des connexions
+            # et validation physique de la base N+1 contenant les reports.
+            with sqlite3.connect(self.cible) as base:
+                self.assertEqual(
+                    base.execute("SELECT montant FROM report").fetchone(),
+                    (120,),
+                )
+            finalisations.append("N verrouillé")
+
+        preparer_exercice_sqlite(
+            self.catalogue, "n", str(self.cible), "n1",
+            self.initialiser, self.reporter,
+            finaliser_source=finaliser,
+        )
+        self.assertEqual(finalisations, ["N verrouillé"])
+        bases = lire_catalogue(self.catalogue)
+        self.assertTrue(next(base for base in bases if base["id"] == "n")["cloture"])
 
     def test_echec_apres_insertion_annule_la_publication_et_la_base(self):
         """Une erreur après écriture ne doit jamais publier un N+1 partiel."""
