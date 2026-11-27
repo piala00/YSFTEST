@@ -19,6 +19,7 @@
   <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
   {% if export_url %}<a class="btn btn-sm btn-outline-secondary" href="{{ export_url }}"><i class="bi bi-filetype-csv"></i> Exporter CSV</a>{% endif %}
   {% if excel_url %}<a class="btn btn-sm btn-outline-success" href="{{ excel_url }}"><i class="bi bi-file-earmark-spreadsheet"></i> Exporter Excel</a>{% endif %}
+  {% if pdf_url %}<a class="btn btn-sm btn-outline-danger" href="{{ pdf_url }}"><i class="bi bi-filetype-pdf"></i> Exporter PDF</a>{% endif %}
 </form>
 {% if erreur_periode %}<div class="alert alert-warning py-1 small">{{ erreur_periode }}</div>{% endif %}
 {% if provisoires %}<div class="alert alert-info py-1 small d-print-none">{{ provisoires }} écriture(s) de la période sont encore au brouillard :
