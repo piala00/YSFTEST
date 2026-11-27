@@ -51,3 +51,6 @@ L'audit `docs/retour/AUDIT_ECARTS.md` signale notamment les quotas de sièges in
 2. Comparer leurs totaux et leurs maxima avec les durées de tests/fixtures ; ne déplacer une classe que sur mesures.
 3. Garder P0.3/P0.4 verrouillés par les tests déjà présents.
 4. Choisir le prochain lot métier à partir des exigences validées, sans réintroduire un champ CAN redondant.
+## Référence technique officielle
+
+La documentation Django 6.1, consultée le 27/11/2026, confirme que `TestCase` enveloppe chaque test dans une transaction et que les blocs `atomic()` imbriqués utilisent des savepoints, libérés ou annulés à la sortie ; la transaction externe est ensuite validée ou annulée. L'instrumentation mesure donc les scopes `atomic`, leur imbrication, les savepoints et les opérations de commit/rollback séparément, sans changer la sémantique transactionnelle : https://docs.djangoproject.com/en/6.1/topics/db/transactions/ (sections « Controlling transactions explicitly », « Savepoints » et « Use in tests »).
