@@ -81,15 +81,21 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        # La source Django migrée et peuplée est immuable : la préparer une
-        # seule fois, puis isoler chaque scénario dans sa propre copie SQLite.
-        # Chaque N+1 continue d'être migrée réellement par le code métier.
+        # Un schéma vide est créé une fois par les vraies migrations Django.
+        # La source métier et les scénarios rapides sont des copies cohérentes de
+        # ce schéma. Deux parcours conservent la migration réelle de bout en bout :
+        # le test direct ci-dessous et le POST de clôture depuis l'interface.
         cls._fixture_temp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls._fixture_temp.cleanup)
+        cls._fixture_schema = Path(cls._fixture_temp.name) / 'schema-migre.sqlite3'
+        cls._fixture_schema.touch()
+        with closing(sqlite3.connect(cls._fixture_schema)) as db:
+            migrer_schema_django_sqlite(db)
         cls._fixture_source = Path(cls._fixture_temp.name) / 'source.sqlite3'
         cls._fixture_source.touch()
-        with closing(sqlite3.connect(cls._fixture_source)) as db:
-            migrer_schema_django_sqlite(db)
+        with closing(sqlite3.connect(cls._fixture_schema)) as schema:
+            with closing(sqlite3.connect(cls._fixture_source)) as source:
+                schema.backup(source)
         env = os.environ.copy()
         env.pop('DATABASE_URL', None)
         env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(cls._fixture_source),
@@ -110,6 +116,16 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
         with closing(sqlite3.connect(self._fixture_source)) as source:
             with closing(sqlite3.connect(chemin)) as cible:
                 source.backup(cible)
+
+    def _copier_schema_migre(self, cible):
+        """Copie le schéma issu des migrations réelles, sans données métier."""
+        with closing(sqlite3.connect(self._fixture_schema)) as schema:
+            schema.backup(cible)
+
+    def _preparer_dossier_transport_sqlite(self, *args, **kwargs):
+        """Les scénarios métier réutilisent le schéma migré; les tests de migration gardent le vrai callback."""
+        kwargs.setdefault("migrer_cible", self._copier_schema_migre)
+        return preparer_dossier_transport_sqlite(*args, **kwargs)
 
     def test_cloture_migrations_reelles_et_balance(self):
         with tempfile.TemporaryDirectory() as temporaire:
@@ -252,7 +268,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
                 'cloture': False,
             }]}), encoding='utf-8')
-            preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
             env = os.environ.copy()
             env.pop('DATABASE_URL', None)
             env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(nouveau),
@@ -383,7 +399,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
             }]}
             catalogue.write_text(json.dumps(original), encoding='utf-8')
             with self.assertRaisesRegex(ValueError, 'pièce validée déséquilibrée'):
-                preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+                self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
             self.assertFalse(nouveau.exists(), 'la base N+1 échouée doit être supprimée')
             self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
             with connexion_sqlite(ancien) as db:
@@ -434,7 +450,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
             }]}
             catalogue.write_text(json.dumps(original), encoding='utf-8')
             with self.assertRaisesRegex(ValueError, 'pièce validée déséquilibrée'):
-                preparer_dossier_transport_sqlite(
+                self._preparer_dossier_transport_sqlite(
                     catalogue, 'n', nouveau, 'n1', 2027)
             self.assertFalse(nouveau.exists())
             self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')),
@@ -533,7 +549,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
                 'cloture': False,
             }]}), encoding='utf-8')
-            preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
             with connexion_sqlite(nouveau) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute(
@@ -578,8 +594,8 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 'cloture': False,
             }]}), encoding='utf-8')
 
-            preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
-            preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
+            self._preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
 
             entrees = {b['id']: b for b in lire_catalogue(catalogue)}
             self.assertEqual(set(entrees), {'n', 'n1', 'n2'})
@@ -640,7 +656,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 'exercice': '2026', 'moteur': 'sqlite', 'base': str(n),
                 'cloture': False,
             }]}), encoding='utf-8')
-            preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
             with connexion_sqlite(n1) as db:
                 exercice = db.execute(
                     "SELECT id FROM core_exercice WHERE code='2027'"
@@ -673,7 +689,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 """, [(piece, client, '0.00', '25.00'),
                       (piece, capital, '25.00', '0.00')])
                 db.commit()
-            preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
+            self._preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
             with connexion_sqlite(n2) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute(
@@ -735,7 +751,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
             with patch('apps.core.adaptateur_cloture_transport_sqlite.reporter_balance_validee',
                        side_effect=interrompre_apres_reprise):
                 with self.assertRaisesRegex(RuntimeError, 'interruption volontaire des AN'):
-                    preparer_dossier_transport_sqlite(
+                    self._preparer_dossier_transport_sqlite(
                         catalogue, 'n', nouveau, 'n1', 2027)
 
             self.assertFalse(nouveau.exists(), 'aucun dossier N+1 partiel ne doit subsister')
@@ -769,11 +785,11 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
             with patch('apps.core.adaptateur_cloture_transport_sqlite.reporter_balance_validee',
                        side_effect=RuntimeError('panne transitoire AN')):
                 with self.assertRaisesRegex(RuntimeError, 'panne transitoire AN'):
-                    preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+                    self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
             self.assertFalse(nouveau.exists())
             self.assertEqual([b['id'] for b in lire_catalogue(catalogue)], ['n'])
 
-            resultat = preparer_dossier_transport_sqlite(
+            resultat = self._preparer_dossier_transport_sqlite(
                 catalogue, 'n', nouveau, 'n1', 2027)
             self.assertEqual(resultat['exercice_precedent'], 'n')
             entrees = {b['id']: b for b in lire_catalogue(catalogue)}
@@ -816,7 +832,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 'cloture': False,
             }]}), encoding='utf-8')
 
-            resultat = preparer_dossier_transport_sqlite(
+            resultat = self._preparer_dossier_transport_sqlite(
                 catalogue, 'n', nouveau, 'n1', 2027)
             self.assertEqual(resultat['exercice_precedent'], 'n')
             with connexion_sqlite(nouveau) as db:
@@ -884,7 +900,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 'cloture': False,
             }]}), encoding='utf-8')
 
-            preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
             with connexion_sqlite(nouveau) as db:
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
                 self.assertEqual(db.execute(

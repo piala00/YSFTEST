@@ -18,8 +18,9 @@ class SqlServerPartitionTests(unittest.TestCase):
             "apps.transport.tests.SimulationPlusieursMoisTests": 0,
             "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
             "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
-            "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
-            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 0,
+            "apps.echanges.tests.ScenarioTroisDossiersTests": 1,
+            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 1,
+            "apps.echanges.tests_imprevus_voyage.ImprevusTroisDossiersTests": 1,
         }
         for classe, shard in attendus.items():
             with self.subTest(classe=classe):
@@ -32,6 +33,7 @@ class SqlServerPartitionTests(unittest.TestCase):
             "apps.core.tests_administration_onglets.AdministrationOngletsTests",
             "apps.echanges.tests.ScenarioTroisDossiersTests",
             "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests",
+            "apps.echanges.tests_imprevus_voyage.ImprevusTroisDossiersTests",
             "apps.core.tests_reprise_sage.RepriseSageTests",
             "apps.transport.tests.PlanAnalytiqueCompletTests",
         ]

@@ -297,7 +297,11 @@ def instrument_tests():
             piles.pop(id(self), None)
         connexion = getattr(self, "connection", None)
         alias = f"{connexion.alias}/{connexion.vendor}" if connexion is not None else None
-        rollback = bool(getattr(connexion, "needs_rollback", False)) if connexion is not None else False
+        # Atomic.__exit__ annule aussi lorsque exc_type est défini, même si
+        # needs_rollback n'a pas encore été positionné. Ne pas sous-compter ces retours.
+        rollback = bool(exc_type is not None or (
+            connexion is not None and getattr(connexion, "needs_rollback", False)
+        ))
         try:
             return original_atomic_exit(self, exc_type, exc_value, traceback)
         finally:
@@ -348,19 +352,22 @@ def shard_for_class(key, count):
         raise ValueError("nombre de shards invalide")
     assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
     if count == 2:
-        # Mesure réelle CI #627 (27/11/2026) :
-        # shard 0 = 308 tests / 347.849s ; shard 1 = 494 tests / 668.259s.
-        # SimulationPlusieursMois a pris 166.595s sur le shard 1 ; la déplacer
-        # vers le shard 0 donne une charge estimée à 514.444s / 501.664s.
-        # Bascule SQL Server (51.110s) et AdministrationOnglets (50.127s)
-        # restent sur le shard 1. Les classes restent indivisibles pour
-        # préserver setUpClass/tearDownClass.
+        # Mesure réelle CI #669 (27/11/2026) :
+        # shard 0 = 313 tests / 541.010s ; shard 1 = 498 tests / 415.610s.
+        # Connexions ouvertes/fermées : 0.252/0.033s et 0.229/0.031s ;
+        # setup_databases : 19.538/19.144s ; teardown : 4.156/3.821s.
+        # Le déséquilibre vient surtout de trois scénarios multi-dossiers du shard 0 :
+        # ScenarioTroisDossiers 29.290s, SynchronisationRelaisInternet 20.779s,
+        # ImprevusTroisDossiers 13.297s. Les déplacer donne une charge estimée
+        # à 477.644s / 478.976s. Les classes restent indivisibles pour conserver
+        # setUpClass/tearDownClass. SimulationPlusieursMois (127.271s) reste au shard 0.
         overrides = {
             "apps.transport.tests.SimulationPlusieursMoisTests": 0,
             "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
             "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
-            "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
-            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 0,
+            "apps.echanges.tests.ScenarioTroisDossiersTests": 1,
+            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 1,
+            "apps.echanges.tests_imprevus_voyage.ImprevusTroisDossiersTests": 1,
         }
         assigned = overrides.get(key, assigned)
     return assigned
