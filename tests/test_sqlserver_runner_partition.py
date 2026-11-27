@@ -16,6 +16,8 @@ class SqlServerPartitionTests(unittest.TestCase):
     def test_classes_lentes_deplacees_vers_le_shard_le_moins_charge(self):
         attendus = {
             "apps.transport.tests.SimulationPlusieursMoisTests": 0,
+            "apps.core.tests_dossiers_parcours.DossierGenereReelTests": 1,
+            "apps.core.tests_base_donnees.BaseSQLiteTests": 1,
             "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
             "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
             "apps.echanges.tests.ScenarioTroisDossiersTests": 1,
@@ -29,6 +31,8 @@ class SqlServerPartitionTests(unittest.TestCase):
     def test_une_classe_est_affectee_a_un_seul_shard(self):
         classes = [
             "apps.transport.tests.SimulationPlusieursMoisTests",
+            "apps.core.tests_dossiers_parcours.DossierGenereReelTests",
+            "apps.core.tests_base_donnees.BaseSQLiteTests",
             "apps.core.tests_base_donnees.BaseSQLServerTests",
             "apps.core.tests_administration_onglets.AdministrationOngletsTests",
             "apps.echanges.tests.ScenarioTroisDossiersTests",
