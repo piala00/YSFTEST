@@ -53,7 +53,7 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
             _table(connexion, table)
     for connexion in (source, cible):
         colonnes = _colonnes(connexion, "comptabilite_ligneecriture")
-        if not {"tiers_id", "section_id", "vehicule_id", "debit", "credit", "compte_id", "ecriture_id"} <= colonnes:
+        if not {"tiers_id", "section_id", "vehicule_id", "employe_id", "debit", "credit", "compte_id", "ecriture_id"} <= colonnes:
             raise ValueError("schéma comptable incompatible")
     if not cible.execute("SELECT 1 FROM core_exercice WHERE id=? AND cloture=0",
                          (exercice_cible_id,)).fetchone():
@@ -96,7 +96,7 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
     soldes = defaultdict(lambda: Decimal("0.00"))
     gestion = defaultdict(lambda: Decimal("0.00"))
     lignes = source.execute("""
-        SELECT e.id, c.numero, l.tiers_id, l.section_id, l.vehicule_id,
+        SELECT e.id, c.numero, l.tiers_id, l.section_id, l.vehicule_id, l.employe_id,
                l.debit, l.credit
         FROM comptabilite_ecriture e
         LEFT JOIN comptabilite_ligneecriture l ON l.ecriture_id=e.id
@@ -104,7 +104,7 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
         WHERE e.exercice_id=? AND e.statut='VALIDEE'
         ORDER BY e.id, l.id
     """, (exercice_source_id,))
-    for piece_id, numero_compte, tiers_id, section_id, vehicule_id, debit, credit in lignes:
+    for piece_id, numero_compte, tiers_id, section_id, vehicule_id, employe_id, debit, credit in lignes:
         if piece_id != piece_courante:
             verifier_piece(piece_courante, debit_piece, credit_piece)
             piece_courante = piece_id
@@ -121,7 +121,7 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
         credit_piece += cr
         montant = d - cr
         if numero_compte[0] in "12345":
-            soldes[(numero_compte, tiers_id, section_id, vehicule_id)] += montant
+            soldes[(numero_compte, tiers_id, section_id, vehicule_id, employe_id)] += montant
         elif numero_compte[0] in "678":
             gestion[numero_compte] += montant
     verifier_piece(piece_courante, debit_piece, credit_piece)
@@ -145,6 +145,7 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
         ("tiers", "commercial_tiers", 1),
         ("section analytique", "comptabilite_sectionanalytique", 2),
         ("véhicule", "transport_vehicule", 3),
+        ("employé", "personnel_employe", 4),
     )
     identifiants = {}
     for libelle, table, position in references:
@@ -158,13 +159,13 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
                 raise ValueError(f"{libelle} manquant dans N+1 : {min(manquants)}")
         identifiants[libelle] = demandes
     insertions = []
-    for (numero_compte, tiers_id, section_id, vehicule_id), solde in soldes.items():
+    for (numero_compte, tiers_id, section_id, vehicule_id, employe_id), solde in soldes.items():
         if not solde:
             continue
         if numero_compte not in comptes:
             raise ValueError(f"compte manquant dans N+1 : {numero_compte}")
-        insertions.append((comptes[numero_compte], tiers_id, section_id, vehicule_id, str(max(solde, 0)),
-                           str(max(-solde, 0))))
+        insertions.append((comptes[numero_compte], tiers_id, section_id, vehicule_id, employe_id,
+                           str(max(solde, 0)), str(max(-solde, 0))))
     if not insertions:
         return 0
     # Le service appelant doit gérer la transaction ; SAVEPOINT permet
@@ -184,9 +185,9 @@ def reporter_balance_validee(source: sqlite3.Connection, cible: sqlite3.Connecti
         piece_id = cible.execute("SELECT last_insert_rowid()").fetchone()[0]
         cible.executemany("""
             INSERT INTO comptabilite_ligneecriture
-            (ecriture_id, compte_id, tiers_id, section_id, vehicule_id, libelle, debit, credit,
+            (ecriture_id, compte_id, tiers_id, section_id, vehicule_id, employe_id, libelle, debit, credit,
              lettrage, source_cle)
-            VALUES (?, ?, ?, ?, ?, 'Solde ouverture', ?, ?, '', '')
+            VALUES (?, ?, ?, ?, ?, ?, 'Solde ouverture', ?, ?, '', '')
         """, [(piece_id, *ligne) for ligne in insertions])
     except Exception:
         cible.execute("ROLLBACK TO SAVEPOINT reports_ouverture")
