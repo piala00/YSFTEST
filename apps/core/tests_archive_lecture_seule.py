@@ -139,7 +139,12 @@ class ArchiveServicesTests(TestCase):
                     "exercice": "2026", "moteur": "sqlite", "base": base, "cloture": True,
                 }],
             }), encoding="utf-8")
-            with mock.patch.dict(os.environ, {"ERP_CATALOGUE_SOCIETES": str(catalogue)}):
+            with mock.patch.dict(os.environ, {"ERP_CATALOGUE_SOCIETES": str(catalogue)}), mock.patch(
+                "apps.core.catalogue_societes.base_courante_cloturee", return_value=True
+            ):
+                # Le contrat métier est indépendant du moteur utilisé par la
+                # suite (SQLite ou SQL Server) : le catalogue désigne ici une
+                # archive et doit interdire les écritures dans les deux cas.
                 with self.assertRaisesMessage(ValidationError, "consultation seule"):
                     verifier_saisie("ouvrir une caisse")
                 with self.assertRaisesMessage(ValidationError, "consultation seule"):
