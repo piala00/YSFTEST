@@ -3,7 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
-from unittest import TestCase
+from unittest import TestCase, mock
 
 from apps.core.catalogue_societes import lire_catalogue
 from apps.core.cloture_annuelle_sqlite import preparer_exercice_sqlite
@@ -60,7 +60,7 @@ class ClotureAnnuelleSQLiteTests(TestCase):
             preparer_exercice_sqlite(
                 self.catalogue, "n", str(self.cible), "n1",
                 self.initialiser, echec,
-                finaliser_source=lambda: finalisations.append(True),
+                finaliser_source=lambda verrou: finalisations.append(True),
             )
         self.assertFalse(self.cible.exists())
         self.assertEqual(self.catalogue.read_bytes(), avant)
@@ -69,9 +69,10 @@ class ClotureAnnuelleSQLiteTests(TestCase):
     def test_finalisation_source_apres_validation_des_reports(self):
         finalisations = []
 
-        def finaliser():
-            # Le callback ne doit être exécuté qu'après fermeture des connexions
-            # et validation physique de la base N+1 contenant les reports.
+        def finaliser(verrou):
+            # Le callback reçoit la transaction de verrouillage de N, mais
+            # n'est appelé qu'après validation physique de N+1 et des reports.
+            self.assertEqual(verrou.execute("PRAGMA query_only").fetchone(), (0,))
             with sqlite3.connect(self.cible) as base:
                 self.assertEqual(
                     base.execute("SELECT montant FROM report").fetchone(),
@@ -114,6 +115,30 @@ class ClotureAnnuelleSQLiteTests(TestCase):
                 self.initialiser, self.reporter,
             )
         self.assertEqual(self.cible.read_bytes(), b"sentinelle")
+
+    def test_echec_publication_annule_la_finalisation_de_n(self):
+        with sqlite3.connect(self.source) as base:
+            base.execute("CREATE TABLE verrou_source (cloture INTEGER NOT NULL)")
+            base.execute("INSERT INTO verrou_source VALUES (0)")
+        avant = self.catalogue.read_bytes()
+
+        def finaliser(verrou):
+            verrou.execute("UPDATE verrou_source SET cloture=1")
+
+        with mock.patch(
+            "apps.core.cloture_annuelle_sqlite.publier_exercice_sqlite_valide",
+            side_effect=RuntimeError("publication impossible"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "publication impossible"):
+                preparer_exercice_sqlite(
+                    self.catalogue, "n", str(self.cible), "n1",
+                    self.initialiser, self.reporter,
+                    finaliser_source=finaliser,
+                )
+        self.assertFalse(self.cible.exists())
+        self.assertEqual(self.catalogue.read_bytes(), avant)
+        with sqlite3.connect(self.source) as base:
+            self.assertEqual(base.execute("SELECT cloture FROM verrou_source").fetchone(), (0,))
 
     def test_references_invalides_bloquent_publication(self):
         def initialiser_invalide(origine, nouvelle):
