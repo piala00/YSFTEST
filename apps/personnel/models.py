@@ -37,7 +37,7 @@ class Employe(models.Model):
     PAIEMENTS = [("ESPECES", "Espèces"), ("VIREMENT", "Virement"), ("MOBILE_MONEY", "Mobile Money")]
 
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    site_origine = models.CharField(max_length=10, blank=True, editable=False)
+    site_origine = models.CharField(max_length=10, blank=True, default="", editable=False)
     matricule = models.CharField(max_length=20, unique=True)
     nom = models.CharField("Nom et prénom", max_length=120)
     telephone = models.CharField("Téléphone", max_length=30, blank=True)
