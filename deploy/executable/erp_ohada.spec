@@ -28,9 +28,9 @@ except ImportError:
 modules = pilote_sql + (collect_submodules("apps") + collect_submodules("erp") + collect_submodules("django")
            + collect_submodules("rest_framework") + collect_submodules("whitenoise") + collect_submodules("waitress")
            + collect_submodules("cryptography") + collect_submodules("openpyxl")
-           + collect_submodules("et_xmlfile"))     # imports différés invisibles après compilation native
+           + collect_submodules("et_xmlfile") + collect_submodules("reportlab"))  # imports différés invisibles après compilation native
 donnees = (collect_data_files("apps", include_py_files=False) + collect_data_files("django")
-           + collect_data_files("rest_framework") + collect_data_files("tzdata")
+           + collect_data_files("rest_framework") + collect_data_files("tzdata") + collect_data_files("reportlab")
            + [(str(RACINE / "templates"), "templates"), (str(RACINE / "staticfiles"), "staticfiles"),
               (str(RACINE / "static"), "static"), (str(TRAVAIL / "edition.txt"), ".")])
 
