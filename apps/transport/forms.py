@@ -139,7 +139,22 @@ def recherche_depart(champ):
     champ.widget = SelectDepart(attrs={**champ.widget.attrs, "data-depart-select": "1"}, choices=champ.choices)
 
 
-class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
+class CanalVenteFormMixin:
+    """Le canal reste rétrocompatible avec les formulaires et clients antérieurs au champ."""
+
+    def preparer_canal_vente(self):
+        self.fields["canal_vente"].required = False
+        self.fields["canal_vente"].initial = "GUICHET"
+        if self.is_bound and "canal_vente" not in self.data:
+            donnees = self.data.copy()
+            donnees["canal_vente"] = "GUICHET"
+            self.data = donnees
+
+    def clean_canal_vente(self):
+        return self.cleaned_data.get("canal_vente") or "GUICHET"
+
+
+class BilletForm(CanalVenteFormMixin, CoordonneesMixin, BootstrapMixin, forms.ModelForm):
     cle_saisie = forms.CharField(required=False, widget=forms.HiddenInput)
     personne = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
     groupes_contacts = [("personne", "voyageur", "telephone")]
@@ -200,6 +215,7 @@ class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.preparer_canal_vente()
         programmes = Depart.objects.filter(statut=Depart.PROGRAMME, site_origine="").select_related("ligne", "vehicule").order_by("date", "heure")
         self.mode_vente = (self.data.get("mode") if self.is_bound else self.initial.get("mode")) or "direct"
         self.trajet = {"transit": ("gare_montee", "gare_arrivee"),
@@ -234,7 +250,7 @@ class BilletForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
         return self.cleaned_data.get("prix_bagages") or 0
 
 
-class ColisForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
+class ColisForm(CanalVenteFormMixin, CoordonneesMixin, BootstrapMixin, forms.ModelForm):
     cle_saisie = forms.CharField(required=False, widget=forms.HiddenInput)
     personne_expediteur = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
     personne_destinataire = forms.ModelChoiceField(queryset=PersonneGuichet.objects.all(), required=False, widget=forms.HiddenInput)
@@ -262,6 +278,7 @@ class ColisForm(CoordonneesMixin, BootstrapMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.preparer_canal_vente()
         for champ in ("gare_depart", "gare_arrivee"):
             self.fields[champ].queryset = Gare.objects.filter(actif=True)
         self.fields["client"].queryset = Tiers.objects.filter(type_tiers=Tiers.CLIENT, actif=True)

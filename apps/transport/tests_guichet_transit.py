@@ -91,7 +91,7 @@ class GuichetTransitTests(TestCase):
             # Saisie sur deux colonnes : la fenêtre est élargie pour tout afficher.
             self.assertContains(page, "--erp-largeur-fenetre:740")
             if mode == "direct":
-                self.assertEqual(parser.visibles, ["depart", "telephone", "voyageur", "piece_identite", "siege", "prix", "paiement"])
+                self.assertEqual(parser.visibles, ["depart", "telephone", "voyageur", "piece_identite", "siege", "prix", "paiement", "canal_vente"])
             elif mode == "transit":
                 self.assertIn("gare_montee", parser.visibles)
             else:

@@ -82,6 +82,8 @@ class CanalVenteAnalytiqueTests(TestCase):
                          "GUICHET")
         self.assertIn("canal_vente", BilletForm().fields)
         self.assertIn("canal_vente", ColisForm().fields)
+        self.assertFalse(BilletForm().fields["canal_vente"].required)
+        self.assertFalse(ColisForm().fields["canal_vente"].required)
 
     def test_serialisation_echanges_transporte_le_canal(self):
         from apps.echanges.contrats import serialiser
