@@ -5,7 +5,11 @@ from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import RequestFactory, SimpleTestCase
+from django.template import Context, Template
+from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.utils import timezone
+
+from apps.core.models import Agence
 from openpyxl import load_workbook
 
 from . import plan_analytique as pa
@@ -195,3 +199,55 @@ class ExportsAnalytiquesXlsxTests(SimpleTestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertTrue(response.content.startswith(b"%PDF-"))
         self.assertIn(b"%%EOF", response.content[-128:])
+
+
+class FraicheurAgencesAnalytiquesTests(TestCase):
+    """La direction voit la date réelle des derniers lots reçus, sans la confondre avec une présence réseau."""
+
+    @staticmethod
+    def rendre_indicateur():
+        return Template("{% load fraicheur %}{% fraicheur_agences %}").render(Context({}))
+
+    def test_siege_affiche_la_reception_et_la_sequence_de_chaque_agence_active(self):
+        from datetime import timedelta
+
+        recue = timezone.now() - timedelta(hours=2)
+        Agence.objects.create(
+            code="SIEGE", nom="Direction", locale=True, role=Agence.SIEGE,
+        )
+        # bulk_create évite volontairement la création automatique des comptes de liaison :
+        # cette recette porte sur la lecture des métadonnées de synchronisation.
+        Agence.objects.bulk_create([
+            Agence(code="DLA", nom="Douala", role=Agence.AGENCE,
+                   derniere_reception=recue, sequence_integree=42),
+            Agence(code="BTA", nom="Bertoua", role=Agence.AGENCE,
+                   derniere_reception=None, sequence_integree=0),
+            Agence(code="OLD", nom="Agence inactive", role=Agence.AGENCE, actif=False),
+        ])
+
+        html = self.rendre_indicateur()
+
+        self.assertIn("Fraîcheur des données reçues des agences", html)
+        self.assertIn("Douala", html)
+        self.assertIn("DLA", html)
+        self.assertIn("Dernier lot reçu", html)
+        self.assertIn("il y a", html)
+        self.assertIn("Séquence intégrée : 42", html)
+        self.assertIn("Bertoua", html)
+        self.assertIn("Aucun lot reçu enregistré", html)
+        self.assertNotIn("Agence inactive", html)
+        self.assertIn("ne constitue pas une mesure de connexion réseau", html)
+
+    def test_une_agence_locale_ne_recoit_pas_le_bandeau_de_consolidation(self):
+        Agence.objects.create(
+            code="DLA", nom="Douala", locale=True, role=Agence.AGENCE,
+        )
+        Agence.objects.bulk_create([
+            Agence(code="BTA", nom="Bertoua", role=Agence.AGENCE,
+                   derniere_reception=timezone.now(), sequence_integree=12),
+        ])
+
+        html = self.rendre_indicateur()
+
+        self.assertNotIn("Fraîcheur des données reçues des agences", html)
+        self.assertNotIn("Bertoua", html)

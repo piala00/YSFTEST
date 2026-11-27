@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Budgets{% endblock %}
+{% load fraicheur %}
 {% block content %}
 <div class="page-title"><h1>Budgets</h1></div>
+{% fraicheur_agences %}
 <p class="small text-muted">Un budget couvre un exercice, soit pour toute la société, soit pour les éléments d'un seul plan analytique (agences,
   véhicules, lignes…) : on ne mélange jamais deux plans. Le réel est lu dans les écritures validées, comme les états analytiques.</p>
 <div class="card mb-3"><table class="table table-sm table-hover mb-0 small">

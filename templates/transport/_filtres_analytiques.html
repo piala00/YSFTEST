@@ -1,3 +1,4 @@
+{% load fraicheur %}{% fraicheur_agences %}
 <form class="d-flex flex-wrap gap-2 align-items-end mb-3 d-print-none">
   <div><label class="form-label small mb-0" for="fa-du">Du</label><input type="date" id="fa-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
   <div><label class="form-label small mb-0" for="fa-au">Au</label><input type="date" id="fa-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
