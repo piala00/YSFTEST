@@ -379,6 +379,15 @@ jobs:
       - name: Vérifier la vraie fenêtre de nettoyage compilée sur ses propres fichiers fictifs
         shell: pwsh
         run: |
+          # La recette N→N+1 redémarre volontairement l'EXE en processus détaché.
+          # Elle doit arrêter tous ses processus avant de tester l'écran de nettoyage.
+          $nomProcessus = "ERP-OHADA-${{ matrix.nom }}"
+          $processusRestants = @(Get-Process -Name $nomProcessus -ErrorAction SilentlyContinue)
+          if ($processusRestants.Count -gt 0) {
+            $processusRestants | Select-Object Id, ProcessName, Path | Format-Table | Out-String | Write-Output
+            throw "Le test natif a laissé $($processusRestants.Count) processus $nomProcessus actifs."
+          }
+          Write-Output "Aucun processus ERP actif avant la recette de nettoyage."
           $p = Start-Process "dist-outils\ERP-Nettoyage.exe" -ArgumentList "--recette-fictive" -PassThru
           if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw "Interface nettoyage bloquée" }
           $p.WaitForExit()

@@ -1,4 +1,5 @@
 """Recette Windows du vrai EXE : clôture N→N+1 puis redémarrage sur la nouvelle base."""
+import csv
 import http.cookiejar
 import json
 import os
@@ -142,6 +143,46 @@ def arreter_port(port):
             ["taskkill", "/F", "/T", "/PID", pid],
             capture_output=True, check=False,
         )
+
+
+def _pids_par_image(nom):
+    """PID des processus portant exactement le nom de l'EXE testé (runner Windows isolé)."""
+    resultat = subprocess.run(
+        ["tasklist", "/FI", f"IMAGENAME eq {nom}", "/FO", "CSV", "/NH"],
+        capture_output=True, text=True, check=False,
+    )
+    pids = set()
+    for ligne in csv.reader(resultat.stdout.splitlines()):
+        if len(ligne) >= 2 and ligne[0].casefold() == nom.casefold() and ligne[1].isdigit():
+            pids.add(ligne[1])
+    return pids
+
+
+def arreter_processus_exe(exe):
+    """Arrête aussi les redémarrages détachés qui n'écoutent plus sur un port connu.
+
+    Le runner GitHub est dédié à cette recette : le nom de l'EXE correspond à
+    l'édition compilée du test, pas à un processus Windows générique.
+    """
+    if os.name != "nt":
+        return []
+    nom = Path(exe).name
+    termines = set()
+    for _ in range(5):
+        pids = _pids_par_image(nom)
+        if not pids:
+            return sorted(termines)
+        for pid in sorted(pids):
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", pid],
+                capture_output=True, text=True, check=False,
+            )
+            termines.add(pid)
+        time.sleep(0.5)
+    restants = _pids_par_image(nom)
+    if restants:
+        raise RuntimeError(f"Processus {nom} encore actifs après taskkill : {', '.join(sorted(restants))}")
+    return sorted(termines)
 
 
 def verifier_reports(base_n1, env):
@@ -528,10 +569,16 @@ Societe.objects.update(assistant_termine=True)
         arreter(processus2, flux2)
         arreter_port(port1)
         arreter_port(port2)
+        try:
+            rapport["processus_exe_termines"] = arreter_processus_exe(exe)
+        except Exception as erreur_nettoyage:
+            rapport["nettoyage_processus_erreur"] = f"{type(erreur_nettoyage).__name__}: {erreur_nettoyage}"
         dossier_rapport.mkdir(parents=True, exist_ok=True)
         (dossier_rapport / "RESULTATS.json").write_text(
             json.dumps(rapport, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        if rapport.get("etat") == "SUCCES" and rapport.get("nettoyage_processus_erreur"):
+            raise RuntimeError(rapport["nettoyage_processus_erreur"])
 
 
 if __name__ == "__main__":
