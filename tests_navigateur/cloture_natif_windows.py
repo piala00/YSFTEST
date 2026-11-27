@@ -214,6 +214,8 @@ def main():
         "selection_catalogue": "non vérifiée",
         "redemarrage_sur_n_plus_1": "non vérifié",
         "archive_lecture_seule": "non vérifiée",
+        "simulation_ouverture": "non vérifiée",
+        "simulation_retour": "non vérifié",
         "resultats": [],
     }
     processus1 = flux1 = processus_archive = flux_archive = processus2 = flux2 = None
@@ -413,6 +415,106 @@ Societe.objects.update(assistant_termine=True)
         rapport["redemarrage_sur_n_plus_1"] = "réussi"
         rapport["resultats"].append(
             "Nouveau processus EXE : reconnexion puis écran annuel 2027→2028 après sélection réelle du catalogue"
+        )
+
+        # P0.4 : ouvrir puis fermer un dossier de simulation dans le véritable EXE.
+        # La copie est préparée depuis N+1, mais son ouverture passe exclusivement par
+        # Fichier > Administration du poste > Simulation (POST + redémarrage du processus).
+        from apps.core import dossiers_simulation as ds
+
+        identifiant_simulation, dossier_simulation = ds.creer(donnees, "2027-01", "1")
+        ds.copier_base(base_n1, dossier_simulation / ds.BASE)
+        ds.terminer(dossier_simulation)
+        with closing(sqlite3.connect(base_n1)) as db:
+            ecritures_avant_simulation = db.execute(
+                "SELECT COUNT(*) FROM comptabilite_ecriture"
+            ).fetchone()[0]
+            departs_avant_simulation = db.execute(
+                "SELECT COUNT(*) FROM transport_depart"
+            ).fetchone()[0]
+
+        page_simulations = client2.get("/poste/?onglet=simulation")
+        (dossier_rapport / "ecran-simulations-avant.html").write_text(
+            page_simulations, encoding="utf-8"
+        )
+        if identifiant_simulation not in page_simulations or "Simulation 2027-01" not in page_simulations:
+            raise AssertionError("Le catalogue de simulation de l'EXE ne présente pas le dossier prêt à ouvrir")
+        reponse_ouverture_simulation = client2.post("/poste/?onglet=simulation", {
+            "action": "dossier_ouvrir",
+            "dossier": identifiant_simulation,
+            "confirmation": "OUVRIR",
+        }, timeout=60)
+        if "Redémarrage du logiciel" not in reponse_ouverture_simulation:
+            raise AssertionError("L'ouverture du dossier de simulation n'a pas demandé le redémarrage")
+
+        derniere_erreur = "aucune réponse du processus ouvert sur la simulation"
+        page_simulation_active = ""
+        echeance = time.monotonic() + 120
+        while time.monotonic() < echeance:
+            client2.cookies.clear()
+            try:
+                client2.connecter()
+                page_simulation_active = client2.get("/poste/?onglet=simulation")
+                (dossier_rapport / "ecran-simulation-active.html").write_text(
+                    page_simulation_active, encoding="utf-8"
+                )
+                if "Simulation 2027-01" in page_simulation_active and "Dossier ouvert" in page_simulation_active:
+                    break
+                derniere_erreur = "le serveur répond, mais le dossier n'est pas marqué comme ouvert"
+            except (OSError, urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+                derniere_erreur = f"{type(exc).__name__}: {exc}"
+            time.sleep(1)
+        else:
+            raise AssertionError("L'EXE n'a pas redémarré sur le dossier de simulation : " + derniere_erreur)
+        if ds.identifiant_actif(donnees) != identifiant_simulation:
+            raise AssertionError("Le marqueur du dossier actif ne correspond pas à la simulation sélectionnée")
+        rapport["simulation_ouverture"] = "réussie"
+        rapport["resultats"].append(
+            "EXE natif : dossier fictif ouvert depuis l'administration du poste, session recréée après redémarrage"
+        )
+
+        reponse_retour_simulation = client2.post("/poste/?onglet=simulation", {
+            "action": "dossier_revenir",
+            "confirmation": "OUVRIR",
+        }, timeout=60)
+        if "Redémarrage du logiciel" not in reponse_retour_simulation:
+            raise AssertionError("Le retour au dossier de la société n'a pas demandé le redémarrage")
+        derniere_erreur = "aucune réponse du processus revenu sur la société"
+        page_retour_simulation = ""
+        echeance = time.monotonic() + 120
+        while time.monotonic() < echeance:
+            client2.cookies.clear()
+            try:
+                client2.connecter()
+                page_retour_simulation = client2.get("/cloture-annuelle/")
+                (dossier_rapport / "ecran-apres-retour-simulation.html").write_text(
+                    page_retour_simulation, encoding="utf-8"
+                )
+                if "2028" in page_retour_simulation and "2027" in page_retour_simulation:
+                    break
+                derniere_erreur = "le processus répond, mais la société 2027 n'est pas restaurée"
+            except (OSError, urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+                derniere_erreur = f"{type(exc).__name__}: {exc}"
+            time.sleep(1)
+        else:
+            raise AssertionError("L'EXE n'est pas revenu sur N+1 après fermeture de la simulation : " + derniere_erreur)
+        if ds.identifiant_actif(donnees):
+            raise AssertionError("Le marqueur de simulation est resté actif après le retour à la société")
+        valeurs_configuration = {
+            ligne.split("=", 1)[0]: ligne.split("=", 1)[1]
+            for ligne in configuration.read_text(encoding="utf-8").splitlines()
+            if "=" in ligne and not ligne.lstrip().startswith("#")
+        }
+        if Path(valeurs_configuration.get("SQLITE_FICHIER", "")).resolve() != base_n1.resolve():
+            raise AssertionError("Le retour de simulation n'a pas restauré la base annuelle N+1")
+        with closing(sqlite3.connect(base_n1)) as db:
+            if db.execute("SELECT COUNT(*) FROM comptabilite_ecriture").fetchone()[0] != ecritures_avant_simulation:
+                raise AssertionError("L'ouverture de la simulation a modifié les écritures de la société")
+            if db.execute("SELECT COUNT(*) FROM transport_depart").fetchone()[0] != departs_avant_simulation:
+                raise AssertionError("L'ouverture de la simulation a modifié les voyages de la société")
+        rapport["simulation_retour"] = "réussi"
+        rapport["resultats"].append(
+            "EXE natif : retour à la société 2027 après redémarrage ; N+1 et ses mouvements sont restés inchangés"
         )
         rapport["etat"] = "SUCCES"
         print(json.dumps(rapport, ensure_ascii=False, indent=2))
