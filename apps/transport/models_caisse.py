@@ -65,6 +65,21 @@ class SessionCaisse(models.Model):
     def __str__(self):
         return f"{self.numero} {self.agent} {self.ouverte_le:%d/%m %H:%M}"
 
+    def _relire_sous_verrou(self):
+        """Recharge la session persistée et la verrouille dans la transaction appelante.
+
+        Une session conservée dans un ancien écran ne doit jamais autoriser une seconde
+        fermeture ou une seconde approbation financière.
+        """
+        if self.pk is None:
+            raise ValidationError("Enregistrez la session de caisse avant cette opération.")
+        if self._state.db not in (None, "default"):
+            raise ValidationError("Cette copie du dossier est réservée à la lecture. Ouvrez le dossier de saisie.")
+        try:
+            self.refresh_from_db(from_queryset=type(self).objects.select_for_update())
+        except type(self).DoesNotExist:
+            raise ValidationError("Cette session de caisse n'existe plus. Actualisez la liste.") from None
+
     @classmethod
     def ouverte_de(cls, utilisateur):
         if utilisateur is None or not getattr(utilisateur, "pk", None):
@@ -116,6 +131,7 @@ class SessionCaisse(models.Model):
 
     @transaction.atomic
     def fermer(self, montant_compte, justification="", remis_a=""):
+        self._relire_sous_verrou()
         if self.statut != self.OUVERTE:
             raise ValidationError("Cette caisse est déjà fermée.")
         montant_compte = Decimal(montant_compte)
@@ -131,12 +147,13 @@ class SessionCaisse(models.Model):
     @transaction.atomic
     def approuver(self, utilisateur, justification="", imputation=CHARGE, reverser_vers=None):
         """Le chef de gare contrôle et approuve ; l'écart éventuel est comptabilisé.
-        Il peut reverser la recette comptée vers une caisse encore ouverte (point de vente
-        qui reste ouvert) : l'écart étant comptabilisé d'abord, le solde du livre correspond
-        alors au montant compté, et le reversement part en transit (compte 585)."""
+        La session est relue sous verrou : deux écrans chargés avant la première approbation
+        ne peuvent pas publier deux écarts ni deux reversements.
+        """
         from apps.comptabilite.models import Journal
         from apps.comptabilite.services import creer_ecriture
 
+        self._relire_sous_verrou()
         if self.statut != self.FERMEE:
             raise ValidationError("Seule une caisse fermée peut être approuvée.")
         if utilisateur is not None and utilisateur.pk == self.agent_id and not utilisateur.is_superuser:
@@ -145,6 +162,8 @@ class SessionCaisse(models.Model):
             self.justification = justification.strip()
         if self.ecart and not self.justification:
             raise ValidationError("Justifiez l'écart de caisse avant de l'approuver.")
+        if self.ecart < 0 and imputation not in dict(self.IMPUTATIONS):
+            raise ValidationError("Choisissez une imputation valide pour le manquant de caisse.")
         if reverser_vers is not None and not isinstance(reverser_vers, Journal):
             reverser_vers = Journal.objects.get(pk=reverser_vers)
         if reverser_vers is not None:
