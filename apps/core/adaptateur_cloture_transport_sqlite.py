@@ -69,6 +69,7 @@ def migrer_schema_django_sqlite(cible):
     terminer avant la transaction de reprise et avant toute publication.
     """
     import os
+    import secrets
     import subprocess
     import sys
     import time
@@ -88,13 +89,23 @@ def migrer_schema_django_sqlite(cible):
         "ERP_LICENCE": "0",
         "RELAIS_ACTIF": "0",
     })
+    if getattr(sys, "frozen", False):
+        # Dans PyInstaller, sys.executable est l'ERP-OHADA-*.exe, pas python.exe.
+        # Le relancer avec manage.py faisait démarrer une seconde instance du serveur
+        # et pouvait donner un faux code 0 sans avoir migré N+1.
+        jeton = secrets.token_urlsafe(32)
+        environnement["ERP_INTERNAL_MIGRATION_TOKEN"] = jeton
+        commande = [sys.executable, "__erp_internal_migrate_sqlite__", jeton]
+        mode_migration = "exe-natif"
+    else:
+        commande = [sys.executable, "-u", str(racine / "manage.py"),
+                    "migrate", "--noinput", "--verbosity", "1"]
+        mode_migration = "python"
     debut_migration = time.monotonic()
-    print(f"[CLOTURE-MIGRATION-START] {Path(chemin).name}", flush=True)
+    print(f"[CLOTURE-MIGRATION-START] {Path(chemin).name} mode={mode_migration}", flush=True)
     try:
         resultat = subprocess.run(
-            [sys.executable, "-u", str(racine / "manage.py"),
-             "migrate", "--noinput", "--verbosity", "1"],
-            cwd=str(racine), env=environnement, capture_output=True,
+            commande, cwd=str(racine), env=environnement, capture_output=True,
             text=True, timeout=240, check=False,
         )
     except subprocess.TimeoutExpired as exc:

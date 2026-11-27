@@ -37,6 +37,8 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt tblib
+      - name: Vérifier l'affectation stable des classes SQL Server
+        run: python -m unittest tests.test_sqlserver_runner_partition -v
       - name: Tests (SQLite)
         run: python manage.py test --noinput --parallel 4 -v1
       - name: Métadonnées SQL Server groupées (tests unitaires sans serveur)
@@ -300,6 +302,18 @@ jobs:
           & $exe sauvegarder
           if ($LASTEXITCODE -ne 0) { throw "Sauvegarde à la demande en échec" }
           Write-Output "Programme Windows ${{ matrix.nom }} : compilé, démarré, page de connexion servie, sauvegardes faites."
+      - name: Clôture annuelle depuis l'EXE natif puis redémarrage sur N+1 (données fictives)
+        if: matrix.edition == 'transport'
+        shell: pwsh
+        run: |
+          python tests_navigateur/cloture_natif_windows.py "dist\ERP-OHADA-Transport\ERP-OHADA-Transport.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Clôture annuelle native N→N+1 ou redémarrage en échec" }
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.edition == 'transport'
+        with:
+          name: ERP-Cloture-Native-Transport
+          path: ${{ runner.temp }}/cloture-natif
+          retention-days: 7
       - name: Refuser les commandes de développement dans le programme client compilé
         shell: pwsh
         run: |

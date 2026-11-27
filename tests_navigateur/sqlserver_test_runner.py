@@ -178,6 +178,28 @@ def instrument_database_lifecycle():
         setattr(DiscoverRunner, phase, timed)
 
 
+def shard_for_class(key, count):
+    """Affectation stable d'une classe entière, ajustée avec les durées CI observées."""
+    if count < 1:
+        raise ValueError("nombre de shards invalide")
+    assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
+    if count == 2:
+        # Run CI #545 (27/11/2026) : shard 0 = 580.429s, shard 1 = 344.870s.
+        # Mesures par classe : AdministrationOnglets 54.206s, ScenarioTroisDossiers
+        # 34.475s et SynchronisationRelaisInternet 24.838s. Leur déplacement
+        # équilibre les deux runners sans augmenter le délai ni omettre de tests.
+        # Les classes restent indivisibles pour préserver setUpClass/tearDownClass.
+        overrides = {
+            "apps.transport.tests.SimulationPlusieursMoisTests": 0,
+            "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
+            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
+            "apps.echanges.tests.ScenarioTroisDossiersTests": 1,
+            "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 1,
+        }
+        assigned = overrides.get(key, assigned)
+    return assigned
+
+
 def partition_suite():
     """Partition stable par classe, sans dupliquer les fixtures Django."""
     shard = int(os.environ.get("SQL_TEST_SHARD", "0"))
@@ -201,21 +223,7 @@ def partition_suite():
         for test in walk(suite):
             cls = type(test)
             key = cls.__module__ + "." + cls.__qualname__
-            assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
-            # CI #461: shard 1 took 829s vs 440s on shard 0. The multi-month
-            # simulation class alone contained a 168s test. Move the entire
-            # class (not individual tests) to the lighter shard, preserving
-            # class fixtures and full coverage. Other shard counts keep hashing.
-            if count == 2:
-                # Mesures CI #44827169289 : shard 0 = 619.815s, shard 1 =
-                # 417.891s. La classe BaseSQLServerTests contient notamment
-                # une migration SQLite -> SQL Server de 54.258s. La placer
-                # sur le shard moins charge, sans scinder ses fixtures, reduit
-                # le desequilibre sans allonger le timeout ni omettre de tests.
-                if key == "apps.transport.tests.SimulationPlusieursMoisTests":
-                    assigned = 0
-                elif key == "apps.core.tests_base_donnees.BaseSQLServerTests":
-                    assigned = 1
+            assigned = shard_for_class(key, count)
             if assigned == shard:
                 selected.append(test)
         print(f"[SQL-SHARD] {shard + 1}/{count}: {len(selected)} tests", flush=True)

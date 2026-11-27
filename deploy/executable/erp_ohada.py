@@ -854,6 +854,31 @@ def main(argv):
     edition_ = edition()
     port = int(os.environ.get("ERP_PORT") or PORTS.get(edition_, 8000))
     action = argv[0] if argv else ""
+    if action == "__erp_internal_migrate_sqlite__":
+        # Sous-processus réservé au moteur de clôture N→N+1 du programme natif.
+        # Il ne reçoit aucune commande Python arbitraire : uniquement migrate sur
+        # le fichier SQLite explicitement configuré par le processus parent.
+        jeton_attendu = os.environ.pop("ERP_INTERNAL_MIGRATION_TOKEN", "")
+        jeton_fourni = argv[1] if len(argv) == 2 else ""
+        if (not getattr(sys, "frozen", False) or not jeton_attendu or
+                not secrets.compare_digest(jeton_attendu, jeton_fourni)):
+            print("Commande interne de migration refusée.")
+            return 2
+        base = Path(os.environ.get("SQLITE_FICHIER", ""))
+        if (os.environ.get("DB_ENGINE", "sqlite").lower() != "sqlite" or
+                not base.is_absolute() or not base.is_file()):
+            print("Migration interne : fichier SQLite absolu requis.")
+            return 2
+        os.environ["DJANGO_SETTINGS_MODULE"] = "erp.settings"
+        os.environ["ERP_ASSISTANT"] = "0"
+        os.environ["ERP_LICENCE"] = "0"
+        os.environ["MIROIR_DB_ENGINE"] = ""
+        os.environ.pop("ERP_DOSSIER_SIMULATION", None)
+        import django
+        django.setup()
+        from django.core.management import call_command
+        call_command("migrate", interactive=False, verbosity=1)
+        return 0
     if getattr(sys, "frozen", False) and action in ("manage", "simulation"):
         # L'entrée de maintenance Python permettrait sinon de lancer un serveur
         # de développement avant le contrôle de licence, ou d'exécuter du code.
