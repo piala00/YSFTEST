@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import close_old_connections, connections
 from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
+from django.utils.functional import SimpleLazyObject
 
 from apps.comptabilite.models import Ecriture, Journal
 
@@ -42,6 +43,11 @@ class SessionsCaisseInstancesPerimeesTests(DonneesSessionCaisse, TestCase):
         persistante = SessionCaisse.objects.get(pk=session.pk)
         self.assertEqual(persistante.montant_compte, 1000)
         self.assertEqual(persistante.statut, SessionCaisse.FERMEE)
+
+    def test_ouverture_accepte_utilisateur_lazy_du_middleware(self):
+        agent = SimpleLazyObject(lambda: self.agent)
+        session = SessionCaisse.ouvrir(agent, self.caisse, fonds_initial=0)
+        self.assertEqual(session.agent_id, self.agent.pk)
 
     def test_ancienne_instance_ne_peut_pas_comptabiliser_deux_ecarts(self):
         session = self.session_avec_surplus()
