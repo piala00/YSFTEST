@@ -6,8 +6,11 @@ from django.db import migrations, models
 def remplir_identifiants(apps, schema_editor):
     Employe = apps.get_model("personnel", "Employe")
     alias = schema_editor.connection.alias
-    for employe in Employe.objects.using(alias).filter(uid__isnull=True).only("pk").iterator():
-        Employe.objects.using(alias).filter(pk=employe.pk).update(uid=uuid.uuid4())
+    identifiants = list(
+        Employe.objects.using(alias).filter(uid__isnull=True).values_list("pk", flat=True)
+    )
+    for identifiant in identifiants:
+        Employe.objects.using(alias).filter(pk=identifiant).update(uid=uuid.uuid4())
 
 
 class Migration(migrations.Migration):
