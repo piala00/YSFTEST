@@ -64,6 +64,9 @@
   <div><label class="form-label small mb-0" for="axe2">Ventiler par</label><select id="axe2" name="axe2" class="form-select form-select-sm" onchange="this.form.submit()">
     {% for code, titre in autres_axes %}<option value="{{ code }}" {% if code == axe2 %}selected{% endif %}>{{ titre }}</option>{% endfor %}</select></div>
 </form>
+{% if not croise_disponible %}
+<div class="alert alert-warning small" role="status">{{ croise_message }}</div>
+{% else %}
 <div class="card mb-3"><table data-graphique="barres" data-colonnes="Produits,Charges,Résultat" class="table table-sm table-hover mb-0 small">
   <thead><tr><th>{{ titre_axe2 }}</th><th class="num">Produits</th><th class="num">Charges</th><th class="num">Résultat</th><th class="num">Lignes</th></tr></thead>
   <tbody>{% for g in croise %}<tr><td>{% if g.cle is None %}<span class="text-muted">Non affecté</span>{% else %}<a href="{% url 'analytique:element' axe2 g.cle %}?{{ params_periode }}">{{ g.libelle }}</a>{% endif %}</td>
@@ -71,6 +74,7 @@
   {% empty %}<tr><td colspan="5" class="text-muted text-center p-3">Aucun mouvement.</td></tr>{% endfor %}</tbody>
   <tfoot><tr class="total"><td>Total</td><td class="num">{{ total.produits|montant }}</td><td class="num">{{ total.charges|montant }}</td><td class="num">{{ total.resultat|montant }}</td><td class="num">{{ total.lignes }}</td></tr></tfoot>
 </table></div>
+{% endif %}
 
 {% elif etat == "comparaison" %}
 <form class="d-flex gap-2 align-items-end mb-2 d-print-none" method="get">

@@ -201,6 +201,94 @@ class ExportsAnalytiquesXlsxTests(SimpleTestCase):
         self.assertIn(b"%%EOF", response.content[-128:])
 
 
+
+class VentilationCroiseeExacteTests(SimpleTestCase):
+    def fait(self, conjointes=None):
+        fait = {
+            "montant": Decimal("100.00"),
+            "produit": True,
+            "_parts": {
+                "points_vente": [("PDV-1", Decimal("60.00")), ("PDV-2", Decimal("40.00"))],
+                "canaux_vente": [("WEB", Decimal("50.00")), ("APP", Decimal("50.00"))],
+            },
+        }
+        if conjointes is not None:
+            fait["_parts_croisees"] = conjointes
+        return fait
+
+    def test_matrice_conjointe_respectee_dans_les_deux_sens(self):
+        cellules = [
+            ("PDV-1", "WEB", Decimal("30.00")),
+            ("PDV-1", "APP", Decimal("30.00")),
+            ("PDV-2", "WEB", Decimal("20.00")),
+            ("PDV-2", "APP", Decimal("20.00")),
+        ]
+        fait = self.fait({
+            ("points_vente", "canaux_vente"): cellules,
+            ("canaux_vente", "points_vente"): [(canal, point, montant) for point, canal, montant in cellules],
+        })
+        par_point = pa._groupes_croises([fait], "points_vente", "PDV-1", "canaux_vente")
+        self.assertEqual(
+            {canal: sum((ligne["montant"] for ligne in lignes), Decimal("0")) for canal, lignes in par_point.items()},
+            {"WEB": Decimal("30.00"), "APP": Decimal("30.00")},
+        )
+        par_canal = pa._groupes_croises([fait], "canaux_vente", "APP", "points_vente")
+        self.assertEqual(
+            {point: sum((ligne["montant"] for ligne in lignes), Decimal("0")) for point, lignes in par_canal.items()},
+            {"PDV-1": Decimal("30.00"), "PDV-2": Decimal("20.00")},
+        )
+
+    def test_deux_marges_sans_matrice_conjointe_sont_refusees(self):
+        fait = self.fait()
+        self.assertIsNone(pa._groupes_croises([fait], "points_vente", "PDV-1", "canaux_vente"))
+
+    def test_un_seul_axe_fractionne_reste_croisable_sans_estimation(self):
+        fait = {
+            "montant": Decimal("100.00"),
+            "produit": True,
+            "canaux_vente": "WEB",
+            "_parts": {
+                "points_vente": [("PDV-1", Decimal("60.00")), ("PDV-2", Decimal("40.00"))],
+            },
+        }
+        groupes = pa._groupes_croises([fait], "points_vente", "PDV-1", "canaux_vente")
+        self.assertEqual(sum((ligne["montant"] for ligne in groupes["WEB"]), Decimal("0")), Decimal("60.00"))
+
+
+class CroiseExportProtectionTests(SimpleTestCase):
+    def test_export_refuse_une_matrice_sans_preuve_conjointe(self):
+        request = RequestFactory().get("/analytique/vehicules/1/", {
+            "du": "2026-01-01", "au": "2026-01-31", "etat": "croise", "axe2": "canaux_vente", "export": "csv",
+        })
+        request.user = SimpleNamespace(is_authenticated=True)
+        resultat = {
+            "croise_disponible": False,
+            "croise_message": "Ventilation croisée indisponible : preuve source absente.",
+            "croise": [],
+        }
+        with (
+            patch.object(vues, "_axe_ou_404", return_value="Véhicules"),
+            patch.object(vues, "_contexte_periode", return_value={"du": self.debut(), "au": self.fin()}),
+            patch.object(pa, "axes", return_value=[
+                ("vehicules", "Véhicules", ""), ("canaux_vente", "Canaux de vente", ""),
+            ]),
+            patch.object(pa, "cle_depuis_url", return_value=1),
+            patch.object(pa, "etat_element", return_value=resultat),
+            patch.object(pa, "libelles", return_value={1: "V1"}),
+        ):
+            response = vues.element(request, "vehicules", "1")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("preuve source absente", response.content.decode("utf-8"))
+
+    @staticmethod
+    def debut():
+        return datetime.date(2026, 1, 1)
+
+    @staticmethod
+    def fin():
+        return datetime.date(2026, 1, 31)
+
+
 class FraicheurAgencesAnalytiquesTests(TestCase):
     """La direction voit la date réelle des derniers lots reçus, sans la confondre avec une présence réseau."""
 

@@ -50,6 +50,35 @@ class CanalVenteAnalytiqueTests(TestCase):
         self.assertEqual(resultat["total_elements"]["produits"] + resultat["non_affecte"]["produits"],
                          resultat["gl"]["produits"])
 
+    def test_croisement_points_vente_canaux_reste_exact_sur_les_pieces_sources(self):
+        from apps.comptabilite.plan_analytique import etat_element
+
+        point = Gare.objects.create(
+            code="CAN-PDV", nom="Point de vente Douala", ville="Douala",
+            type_gare=Gare.POINT_VENTE, rattachement=self.dla,
+        )
+        depart = self.depart()
+        Billet(depart=depart, gare=self.dla, voyageur="Vente Web agence", prix=10000, canal_vente="WEB").vendre()
+        Billet(depart=depart, gare=point, voyageur="Vente application point", prix=20000, canal_vente="APP").vendre()
+        depart.partir()
+        jour = timezone.localdate()
+
+        par_point = etat_element("points_vente", point.pk, "croise", jour, jour, axe2="canaux_vente")
+        self.assertTrue(par_point["croise_disponible"])
+        self.assertEqual(
+            {ligne["cle"]: ligne["produits"] for ligne in par_point["croise"]},
+            {"APP": Decimal("20000")},
+        )
+        self.assertEqual(par_point["total"]["produits"], Decimal("20000"))
+
+        par_canal = etat_element("canaux_vente", "APP", "croise", jour, jour, axe2="points_vente")
+        self.assertTrue(par_canal["croise_disponible"])
+        self.assertEqual(
+            {ligne["cle"]: ligne["produits"] for ligne in par_canal["croise"]},
+            {point.pk: Decimal("20000")},
+        )
+        self.assertEqual(par_canal["total"]["produits"], Decimal("20000"))
+
     def test_port_du_a_la_livraison_conserve_le_canal_source(self):
         depart = self.depart()
         colis = Colis(gare_depart=self.dla, gare_arrivee=self.yde, expediteur="Expéditeur", destinataire="Destinataire",

@@ -163,6 +163,8 @@ def element(request, axe, cle):
     libelle = "Non affecté" if cle_interne is None else pa.libelles(axe, [cle_interne]).get(cle_interne, cle)
     export = request.GET.get("export")
     if export in ("csv", "xlsx", "pdf"):
+        if etat == "croise" and not r.get("croise_disponible", True):
+            return HttpResponse(r["croise_message"], status=409, content_type="text/plain; charset=utf-8")
         nom = f"analytique-{axe}-{cle}-{etat}-{p['du']}-{p['au']}"
         if etat == "comptes":
             entetes = ["Compte", "Intitulé", "Débit", "Crédit", "Lignes"]

@@ -231,11 +231,15 @@ class _Contexte:
             g = t["billet__gare_id"] or t["depart__ligne__gare_depart_id"]
             canal = t["billet__canal_vente"] or "GUICHET"
             v = self.ventes.setdefault(t["depart_id"], {"billets": {}, "bagages": {},
-                                                        "canaux_billets": {}, "canaux_bagages": {}})
+                                                        "canaux_billets": {}, "canaux_bagages": {},
+                                                        "croise_billets": {}, "croise_bagages": {}})
             v["billets"][g] = v["billets"].get(g, ZERO) + t["part"]
             v["bagages"][g] = v["bagages"].get(g, ZERO) + t["part_bagages"]
             v["canaux_billets"][canal] = v["canaux_billets"].get(canal, ZERO) + t["part"]
             v["canaux_bagages"][canal] = v["canaux_bagages"].get(canal, ZERO) + t["part_bagages"]
+            cle_croisee = (g, canal)
+            v["croise_billets"][cle_croisee] = v["croise_billets"].get(cle_croisee, ZERO) + t["part"]
+            v["croise_bagages"][cle_croisee] = v["croise_bagages"].get(cle_croisee, ZERO) + t["part_bagages"]
         for c in (Colis.objects.filter(depart_id__in=self.departs, port=Colis.PAYE,
                                        statut__in=(Colis.EN_ROUTE, Colis.ARRIVE, Colis.LIVRE))
                   .values("depart_id", "prix", "nature", "canal_vente")):
@@ -325,6 +329,18 @@ class _Contexte:
         resultat.append((cles[-1], reste))
         return [(canal, part) for canal, part in resultat if part]
 
+    def repartition_croisee(self, numero, depart_id, montant):
+        """Matrice exacte point de vente × canal, seulement si les tronçons prouvent le montant GL entier."""
+        p = self.parametres
+        nature = ("croise_billets" if numero == getattr(p.compte_billets, "numero", None) else
+                  "croise_bagages" if numero == getattr(p.compte_bagages, "numero", None) else None)
+        cellules = self.ventes.get(depart_id, {}).get(nature) if depart_id and nature else None
+        if not cellules or sum(cellules.values(), ZERO) != montant:
+            return None
+        return [(point, canal, valeur)
+                for (point, canal), valeur in sorted(cellules.items(), key=lambda item: (str(item[0][0]), item[0][1]))
+                if valeur]
+
     def activite(self, numero, vehicule_id, depart_id):
         if not self.transport:
             return None
@@ -384,6 +400,14 @@ def faits(debut, fin, ctx=None):
                     repartitions["canaux_vente"] = repartition_canal
                 if repartitions:
                     f["_parts"] = repartitions
+                repartition_croisee = ctx.repartition_croisee(numero, dep_id, f["montant"])
+                if repartition_croisee:
+                    f["_parts_croisees"] = {
+                        ("points_vente", "canaux_vente"): repartition_croisee,
+                        ("canaux_vente", "points_vente"): [
+                            (canal, point, montant) for point, canal, montant in repartition_croisee
+                        ],
+                    }
             f.update({
                 "agences": agence, "villes": ctx.gares[agence].ville if agence else None, "points_vente": point,
                 "vehicules": v, "voyages": dep_id if depart else None, "lignes": depart.ligne_id if depart else None,
@@ -470,6 +494,34 @@ def _sur_axe(lignes, axe):
             yield cle, (f if montant == f["montant"] else {**f, "montant": montant, "partiel": True})
 
 
+def _groupes_croises(lignes, axe, cle, axe2):
+    """Groupe l'axe secondaire sans croiser deux ventilations marginales indépendantes."""
+    groupes = OrderedDict()
+    for f in lignes:
+        principales = parts(f, axe)
+        if not any(element == cle for element, _ in principales):
+            continue
+        secondaires = parts(f, axe2)
+        if len(principales) > 1 and len(secondaires) > 1:
+            conjointes = f.get("_parts_croisees", {}).get((axe, axe2))
+            if not conjointes:
+                return None
+            for element1, element2, montant in conjointes:
+                if element1 == cle:
+                    ligne = f if montant == f["montant"] else {**f, "montant": montant, "partiel": True}
+                    groupes.setdefault(element2, []).append(ligne)
+            continue
+        for element1, montant1 in principales:
+            if element1 != cle:
+                continue
+            ligne_primaire = f if montant1 == f["montant"] else {**f, "montant": montant1, "partiel": True}
+            for element2, montant2 in parts(ligne_primaire, axe2):
+                ligne = (ligne_primaire if montant2 == ligne_primaire["montant"] else
+                         {**ligne_primaire, "montant": montant2, "partiel": True})
+                groupes.setdefault(element2, []).append(ligne)
+    return groupes
+
+
 def _somme(lignes):
     p = sum((f["montant"] for f in lignes if f["produit"]), ZERO)
     c = -sum((f["montant"] for f in lignes if not f["produit"]), ZERO)
@@ -532,7 +584,8 @@ def etat_element(axe, cle, etat, debut, fin, axe2="", comparer="precedente"):
     from .models import Compte
 
     ctx = _Contexte(debut, fin)
-    lignes = [f for c, f in _sur_axe(faits(debut, fin, ctx), axe) if c == cle]
+    faits_source = list(faits(debut, fin, ctx))
+    lignes = [f for c, f in _sur_axe(faits_source, axe) if c == cle]
     total = _somme(lignes)
     r = {"total": total, "lignes": lignes}
     if etat == "exploitation":
@@ -572,13 +625,21 @@ def etat_element(axe, cle, etat, debut, fin, axe2="", comparer="precedente"):
             g["resultat"] = g["produits"] - g["charges"]
         r["series"], r["par_jour"] = sorted(series.values(), key=lambda g: g["periode"]), par_jour
     elif etat == "croise":
-        groupes = OrderedDict()
-        for c, f in _sur_axe(lignes, axe2):
-            groupes.setdefault(c, []).append(f)
-        noms = libelles(axe2, list(groupes))
-        croise = [{"cle": c, "libelle": noms.get(c, str(c)) if c is not None else "Non affecté", **_somme(ls)}
-                  for c, ls in groupes.items()]
-        r["croise"] = sorted(croise, key=lambda g: (g["cle"] is None, g["libelle"]))
+        groupes = _groupes_croises(faits_source, axe, cle, axe2)
+        if groupes is None:
+            r["croise_disponible"] = False
+            r["croise_message"] = (
+                "Ventilation croisée indisponible : les deux axes répartissent certaines lignes séparément, "
+                "sans détail conjoint prouvé par les pièces sources. Aucun montant n'est estimé."
+            )
+            r["croise"] = []
+        else:
+            noms = libelles(axe2, list(groupes))
+            croise = [{"cle": c, "libelle": noms.get(c, str(c)) if c is not None else "Non affecté", **_somme(ls)}
+                      for c, ls in groupes.items()]
+            r["croise"] = sorted(croise, key=lambda g: (g["cle"] is None, g["libelle"]))
+            r["croise_disponible"] = True
+            r["croise_message"] = ""
     elif etat == "journal":
         noms = {code: libelles(code, list({f.get(code) for f in lignes})) for code, _, _ in axes() if code != axe}
         r["journal_axes"] = [(code, titre) for code, titre, _ in axes() if code != axe]
