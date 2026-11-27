@@ -3,9 +3,7 @@
 N reste en lecture seule. N+1 doit être migrée avec la même version de Django.
 Aucun document commercial, mouvement de stock ou voyage n'est recopié.
 """
-from contextlib import closing
 from datetime import date
-import sqlite3
 from pathlib import Path
 
 from apps.core.catalogue_societes import lire_catalogue
@@ -168,8 +166,6 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
     def reporter(source, cible):
         reporter_balance_validee(source, cible, etat["ancien_id"],
                                  etat["nouveau_id"], f"{annee}-01-01")
-
-    source_path = Path(entrees[0]["base"]).expanduser().resolve()
 
     def finaliser_source(verrou):
         """Verrouille N dans la transaction réservée avant le snapshot."""
