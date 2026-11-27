@@ -507,6 +507,16 @@ jobs:
           if ($LASTEXITCODE -eq 0) { throw "Règle du pare-feu restée après désinstallation" }
           $global:LASTEXITCODE = 0
           Write-Output "Installateur ${{ matrix.nom }} : service Windows installé, relancé seul, mis à jour, désinstallé ; données conservées."
+      - name: Supprimer le coffre fictif après recette
+        if: always() && env.ERP_DISTRIBUTION_FICTIVE == '1'
+        shell: pwsh
+        run: |
+          $dossier = "$env:RUNNER_TEMP\\activation-fictive"
+          foreach ($nom in @("coffre-fictif.dat", "parametres-fictif.dat", "machine-controle.txt")) {
+            $f = Join-Path $dossier $nom
+            if (Test-Path $f) { Remove-Item -Force $f }
+          }
+          Get-ChildItem $dossier -Filter "*.erpinst" -ErrorAction SilentlyContinue | Remove-Item -Force
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -518,6 +528,7 @@ jobs:
             ${{ runner.temp }}/NETTOYAGE-INTERFACE-*.json
             ${{ runner.temp }}/NETTOYAGE-INTERFACE-ERREUR.txt
             ${{ runner.temp }}/NETTOYAGE-DIAGNOSTIC-*.json
+            ${{ runner.temp }}/activation-fictive/autorisation-*-preuve.json
           if-no-files-found: warn
           retention-days: 7
       - name: Outil d'émission des licences (propriétaire, jamais livré aux clients)

@@ -58,6 +58,10 @@ def autorisation(controle, emetteur, edition):
         raise AssertionError("L'édition ou le serveur du .erpinst ne correspond pas à la demande.")
     subprocess.run(commande_controle + ["--verifier", str(fichier)],
                    check=True, capture_output=True, text=True)
+    # Le script Inno Setup consomme un nom stable, quel que soit le nom haché généré par l'outil.
+    fichier_attendu = dossier / f"autorisation-{edition}.erpinst"
+    fichier_attendu.write_bytes(fichier.read_bytes())
+    fichier = fichier_attendu
 
     cle_privee = serialization.load_der_private_key(
         coffre.read_bytes(), password=b"Fictif-CI-2026-Coffre"
