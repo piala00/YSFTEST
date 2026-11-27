@@ -236,6 +236,7 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT date FROM comptabilite_ecriture').fetchone()[0], '2026-12-31')
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+                self.assertEqual(db.execute('SELECT cloture FROM core_exercice WHERE code="2026"').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], '2026-12-31')
 
 
@@ -350,6 +351,7 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                                  Decimal('125.50'))
             with connexion_sqlite(ancien) as db:
                 self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+                self.assertEqual(db.execute('SELECT cloture FROM core_exercice WHERE code="2026"').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
             # Une seconde invocation ne doit ni rouvrir N, ni publier N+2,
             # ni modifier les écritures à nouveau déjà produites.
