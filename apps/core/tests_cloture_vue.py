@@ -1,6 +1,10 @@
-"""Écran « Clôturer l'exercice et ouvrir le suivant » + entrées de menu Fichier multi-sociétés."""
+"""Écran « Clôturer l'exercice et ouvrir le suivant » + entrées de menu Fichier multi-sociétés.
+
+Le moteur de clôture est couvert ailleurs (apps.core.test_cloture_annuelle_sqlite,
+tests/test_cloture_django_migree). Ici : droits, garde-fous et dégradation propre hors poste
+compilé / sans catalogue, et présence des commandes dans les menus.
+"""
 import json
-import os
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -10,7 +14,6 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.core import navigation as nav
-from apps.core import views_cloture
 
 
 class ClotureVueTests(TestCase):
@@ -30,6 +33,7 @@ class ClotureVueTests(TestCase):
         self.assertContains(reponse, "non configuré")
 
     def test_post_hors_poste_compile_refuse(self):
+        # Catalogue configuré mais pas de poste serveur compilé : la clôture est refusée (moteur non exécuté).
         self.client.force_login(self.admin)
         with tempfile.TemporaryDirectory() as dossier:
             catalogue = Path(dossier) / "societes.json"
@@ -41,34 +45,6 @@ class ClotureVueTests(TestCase):
                  mock.patch("apps.core.poste.disponible", return_value=False):
                 reponse = self.client.post(reverse("core:cloture_exercice_annuel"), {"confirmation": "CLOTURER"})
         self.assertEqual(reponse.status_code, 403)
-
-    def test_base_courante_reconnue_par_identite_physique_sqlite(self):
-        with tempfile.TemporaryDirectory() as dossier:
-            source = Path(dossier) / "source.sqlite3"
-            alias = Path(dossier) / "alias.sqlite3"
-            source.write_bytes(b"base de test")
-            try:
-                os.link(source, alias)
-            except (OSError, NotImplementedError):
-                self.skipTest("Les liens physiques ne sont pas disponibles sur ce système")
-
-            curseur = mock.MagicMock()
-            curseur.fetchall.return_value = [(0, "main", str(source))]
-            connexion = mock.MagicMock()
-            connexion.vendor = "sqlite"
-            connexion.settings_dict = {"NAME": str(source)}
-            connexion.cursor.return_value.__enter__.return_value = curseur
-            entree = {"id": "n", "moteur": "sqlite", "base": str(alias), "exercice": "2026", "cloture": False}
-            with mock.patch.object(views_cloture, "connection", connexion):
-                self.assertIs(views_cloture._entree_courante([entree]), entree)
-
-    def test_base_non_sqlite_ne_correspond_pas_au_catalogue_sqlite(self):
-        connexion = mock.MagicMock()
-        connexion.vendor = "microsoft"
-        with mock.patch.object(views_cloture, "connection", connexion):
-            self.assertIsNone(views_cloture._entree_courante([
-                {"id": "n", "moteur": "sqlite", "base": "n.sqlite3"}
-            ]))
 
 
 class MenuSocieteTests(TestCase):
