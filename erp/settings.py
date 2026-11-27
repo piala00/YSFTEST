@@ -82,6 +82,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.core.middleware.ArchiveLectureSeuleMiddleware",  # exercices clôturés : consultation seule
     "django.contrib.messages.middleware.MessageMiddleware",
     "apps.core.middleware.PremiereConfigurationMiddleware",  # premier démarrage du programme compilé
     "apps.licences.middleware.LicenceMiddleware",        # lecture seule après expiration, postes
