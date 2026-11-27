@@ -14,13 +14,17 @@ from apps.core.catalogue_societes import (
 
 
 def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identifiant,
-                            initialiser, reporter, preparer_schema=None):
+                            initialiser, reporter, preparer_schema=None,
+                            finaliser_source=None):
     """Crée N+1 puis publie le lien seulement après initialisation et reports.
 
     initialiser(source, destination) doit créer le schéma et recopier uniquement
     la configuration ; reporter(source, destination) écrit les soldes d'ouverture.
-    En cas d'échec, la nouvelle base est supprimée et N reste ouvert.
-    Les callbacks ne doivent pas modifier N : celui-ci est ouvert en lecture seule.
+    En cas d'échec avant publication, la nouvelle base est supprimée.
+    Les callbacks initialiser/reporter ne doivent pas modifier N : celui-ci est
+    ouvert en lecture seule. Le callback facultatif finaliser_source est exécuté
+    après validation physique de N+1 et avant la publication du catalogue ; il
+    est réservé à la finalisation métier de N et doit gérer sa propre transaction.
     """
     bases = lire_catalogue(catalogue)
     source = next((b for b in bases if b["id"] == identifiant), None)
