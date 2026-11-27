@@ -3,7 +3,7 @@ import tempfile
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 
-from . import lots, scenario
+from . import contrats, lots, scenario
 
 
 class ScenarioTroisDossiersTests(SimpleTestCase):
