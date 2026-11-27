@@ -171,30 +171,23 @@ def preparer_dossier_transport_sqlite(catalogue, identifiant, destination,
 
     source_path = Path(entrees[0]["base"]).expanduser().resolve()
 
-    def finaliser_source():
-        """Verrouille N seulement après validation de N+1 ; les mouvements restent intacts."""
-        with closing(sqlite3.connect(str(source_path))) as db:
-            try:
-                db.execute("BEGIN IMMEDIATE")
-                exercice = db.execute(
-                    "SELECT code, date_fin FROM core_exercice WHERE id=?",
-                    (etat["ancien_id"],),
-                ).fetchone()
-                if exercice != (str(annee - 1), etat["date_fin"]):
-                    raise ValueError("l'exercice source a changé pendant la clôture")
-                db.execute(
-                    "UPDATE core_exercice SET cloture=1 WHERE id=?",
-                    (etat["ancien_id"],),
-                )
-                db.execute(
-                    "UPDATE comptabilite_journal SET cloture_au="
-                    "CASE WHEN cloture_au IS NULL OR cloture_au < ? THEN ? ELSE cloture_au END",
-                    (etat["date_fin"], etat["date_fin"]),
-                )
-                db.commit()
-            except Exception:
-                db.rollback()
-                raise
+    def finaliser_source(verrou):
+        """Verrouille N dans la transaction réservée avant le snapshot."""
+        exercice = verrou.execute(
+            "SELECT code, date_fin FROM core_exercice WHERE id=?",
+            (etat["ancien_id"],),
+        ).fetchone()
+        if exercice != (str(annee - 1), etat["date_fin"]):
+            raise ValueError("l'exercice source a changé pendant la clôture")
+        verrou.execute(
+            "UPDATE core_exercice SET cloture=1 WHERE id=?",
+            (etat["ancien_id"],),
+        )
+        verrou.execute(
+            "UPDATE comptabilite_journal SET cloture_au="
+            "CASE WHEN cloture_au IS NULL OR cloture_au < ? THEN ? ELSE cloture_au END",
+            (etat["date_fin"], etat["date_fin"]),
+        )
 
     return preparer_exercice_sqlite(catalogue, identifiant, destination,
                                    nouvel_identifiant, initialiser, reporter,
