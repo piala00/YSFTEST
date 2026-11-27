@@ -41,6 +41,7 @@ from apps.core.models import Societe, Exercice, Agence
 from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
 from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, Chauffeur, ChangementGamme
 from apps.commercial.models import Tiers
+from apps.personnel.models import Employe
 Societe.objects.create(raison_sociale='Transport Centrale', activite='TRANSPORT')
 Exercice.objects.create(code='2026', date_debut=date(2026,1,1), date_fin=date(2026,12,31))
 User.objects.create_user(username='controle', password='test-local-only')
@@ -57,7 +58,7 @@ ArretLigne.objects.create(ligne=ligne, gare=pv, ordre=1)
 proprietaire = Tiers.objects.create(code='PROP-01', nom='Propriétaire contrôle', type_tiers='FOURNISSEUR')
 vehicule = Vehicule.objects.create(immatriculation='CE-123-AA', nombre_places=40, gamme='CLASSIQUE', proprietaire=proprietaire)
 ChangementGamme.objects.create(vehicule=vehicule, gamme='CLASSIQUE', debut=date(2026,1,1))
-Chauffeur.objects.create(nom='Chauffeur de contrôle', permis='TEST-2026')
+chauffeur = Chauffeur.objects.create(nom='Chauffeur de contrôle', permis='TEST-2026')
 c1 = Compte.objects.create(numero='411000', intitule='Clients')
 c2 = Compte.objects.create(numero='101000', intitule='Capital')
 from apps.transport.models import ParametresTransport
@@ -67,12 +68,15 @@ ParametresTransport.objects.create(compte_billets=c1, compte_colis=c1,
     bloquer_papiers_expires=False, avance_depart_toleree=35,
     plafond_depense_sans_autorisation=Decimal('25000'),
     retenue_annulation=Decimal('7.50'), report_absent_automatique=True)
-Agence.objects.create(code='CTR', nom='Agence Centre', ville='Yaoundé', locale=True, compte_liaison=c2)
+agence = Agence.objects.create(code='CTR', nom='Agence Centre', ville='Yaoundé', locale=True, compte_liaison=c2)
+employe = Employe.objects.create(matricule='EMP-01', nom='Chauffeur de contrôle', service='CONDUITE',
+    agence=agence, vehicule=vehicule, chauffeur=chauffeur, salaire_base=Decimal('150000'))
 Journal.objects.create(code='AN', intitule='A nouveaux', type_journal='AN', cloture_au=date(2026,12,31))
 j = Journal.objects.create(code='OD', intitule='Divers', type_journal='OD')
 e = Ecriture.objects.create(journal=j, exercice=Exercice.objects.get(code='2026'),
     numero='OD-2026-1', date=date(2026,12,31), libelle='Balance de clôture', statut='VALIDEE')
-LigneEcriture.objects.create(ecriture=e, compte=c1, tiers=proprietaire, section=g1.section, vehicule=vehicule, debit=Decimal('125.50'))
+LigneEcriture.objects.create(ecriture=e, compte=c1, tiers=proprietaire, section=g1.section, vehicule=vehicule,
+    employe=employe, debit=Decimal('125.50'))
 LigneEcriture.objects.create(ecriture=e, compte=c2, credit=Decimal('125.50'))
 """
 
@@ -174,6 +178,12 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_gare').fetchone()[0], 3)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_vehicule').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM personnel_employe').fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT matricule, nom, service, site_origine, agence.code
+                    FROM personnel_employe AS employe
+                    JOIN core_agence AS agence ON agence.id=employe.agence_id
+                    WHERE employe.matricule='EMP-01'""").fetchone(),
+                    ('EMP-01', 'Chauffeur de contrôle', 'CONDUITE', '', 'CTR'))
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_chauffeur').fetchone()[0], 1)
                 self.assertEqual(db.execute('''SELECT gamme, debut FROM transport_changementgamme ORDER BY id''').fetchall(), historique_source)
                 self.assertEqual(db.execute("""SELECT tiers.code FROM transport_vehicule AS veh
@@ -233,6 +243,10 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                     LEFT JOIN transport_vehicule AS v ON v.id=l.vehicule_id
                     WHERE c.numero='411000'""").fetchone()
                 self.assertEqual(axes, ('PROP-01', 'G-YDE', 'CE-123-AA'))
+                self.assertEqual(db.execute("""SELECT employe.matricule FROM comptabilite_ligneecriture AS l
+                    JOIN comptabilite_compte AS c ON c.id=l.compte_id
+                    JOIN personnel_employe AS employe ON employe.id=l.employe_id
+                    WHERE c.numero='411000'""").fetchone(), ('EMP-01',))
                 self.assertEqual(db.execute("""SELECT COUNT(*) FROM comptabilite_ligneecriture
                     WHERE tiers_id IS NOT NULL AND section_id IS NOT NULL
                       AND vehicule_id IS NOT NULL""").fetchone()[0], 1)
@@ -294,6 +308,7 @@ assert Agence.objects.get(code='CTR').compte_liaison.numero == '101000'
 assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
 assert Ligne.objects.get(code='YDE-DLA').gare_arrivee.code == 'DLA'
 assert Vehicule.objects.get(immatriculation='CE-123-AA').proprietaire.code == 'PROP-01'
+assert Employe.objects.get(matricule='EMP-01', agence__code='CTR').vehicule.immatriculation == 'CE-123-AA'
 from apps.transport.models import ParametresTransport
 parametres = ParametresTransport.objects.get()
 assert parametres.compte_billets.numero == '411000'
@@ -309,7 +324,8 @@ lignes = list(LigneEcriture.objects.filter(ecriture=piece))
 assert len(lignes) == 2
 assert sum((ligne.debit for ligne in lignes), Decimal('0')) == Decimal('125.50')
 assert sum((ligne.credit for ligne in lignes), Decimal('0')) == Decimal('125.50')
-assert any(ligne.tiers and ligne.section and ligne.vehicule for ligne in lignes)
+assert any(ligne.tiers and ligne.section and ligne.vehicule and ligne.employe
+           and ligne.employe.matricule == 'EMP-01' for ligne in lignes)
 assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
 """
             resultat = subprocess.run(
@@ -1011,6 +1027,7 @@ assert authenticate(username='controle', password='test-local-only') is not None
 assert list(Exercice.objects.values_list('code', flat=True)) == ['2027']
 assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
 assert Vehicule.objects.get(immatriculation='CE-123-AA').proprietaire.code == 'PROP-01'
+assert Employe.objects.get(matricule='EMP-01', agence__code='CTR').vehicule.immatriculation == 'CE-123-AA'
 piece = Ecriture.objects.get(origine='CLOTURE_ANNUELLE')
 lignes = list(LigneEcriture.objects.filter(ecriture=piece))
 assert sum((l.debit for l in lignes), Decimal('0')) == Decimal('125.50')
