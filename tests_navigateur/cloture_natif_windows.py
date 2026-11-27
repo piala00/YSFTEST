@@ -55,7 +55,10 @@ class ClientHTTP:
             "username": "controle",
             "password": "test-local-only",
         })
-        return self.get("/")
+        accueil = self.get("/")
+        if 'name="username"' in accueil and 'name="password"' in accueil:
+            raise RuntimeError("Authentification EXE refusée : la page d'accueil redirige encore vers la connexion")
+        return accueil
 
 
 def port_libre():
@@ -199,6 +202,7 @@ def main():
             ERP_DONNEES=str(donnees),
             ERP_DOSSIER_DONNEES=str(donnees),
             ERP_CATALOGUE_SOCIETES=str(catalogue),
+            ERP_TEST_CLOTURE_NATIVE="1",
             ERP_EDITION="transport",
             ERP_PORT=str(port1),
             ERP_SANS_NAVIGATEUR="1",
@@ -245,10 +249,17 @@ Societe.objects.update(assistant_termine=True)
         processus1, flux1, client1 = demarrer(
             exe, environnement, port1, dossier_rapport / "serveur-cloture.log"
         )
-        client1.connecter()
+        accueil = client1.connecter()
+        (dossier_rapport / "accueil-apres-auth.html").write_text(accueil, encoding="utf-8")
         page = client1.get("/cloture-annuelle/")
+        (dossier_rapport / "ecran-cloture-initial.html").write_text(page, encoding="utf-8")
         if "2027" not in page or "Clôturer" not in page:
-            raise AssertionError("L'écran compilé ne présente pas l'exercice N+1 attendu")
+            extrait = " ".join(page.split())[:1800]
+            raise AssertionError(
+                "L'écran compilé ne présente pas l'exercice N+1 attendu. "
+                "Consulter CLOTURE-NATIVE-DIAG et ecran-cloture-initial.html. "
+                f"Extrait HTML: {extrait}"
+            )
         resultat = client1.post(
             "/cloture-annuelle/", {"confirmation": "CLOTURER"}, timeout=300
         )
@@ -285,8 +296,13 @@ Societe.objects.update(assistant_termine=True)
         )
         client2.connecter()
         page_n1 = client2.get("/cloture-annuelle/")
+        (dossier_rapport / "ecran-cloture-n1.html").write_text(page_n1, encoding="utf-8")
         if "2028" not in page_n1 or "2027" not in page_n1:
-            raise AssertionError("Après redémarrage, l'EXE ne reconnaît pas l'exercice N+1")
+            extrait = " ".join(page_n1.split())[:1800]
+            raise AssertionError(
+                "Après redémarrage, l'EXE ne reconnaît pas l'exercice N+1. "
+                f"Extrait HTML: {extrait}"
+            )
         rapport["redemarrage_sur_n_plus_1"] = "réussi"
         rapport["resultats"].append("Deuxième processus EXE : authentification et écran annuel sur N+1 (prochain exercice 2028)")
         arreter(processus2, flux2)
