@@ -5,6 +5,7 @@ name and elapsed time of the last unfinished test in GitHub Actions logs.
 """
 import hashlib
 import atexit
+from functools import wraps
 import faulthandler
 import os
 import subprocess
@@ -214,6 +215,7 @@ def _enregistrer_mesure(metrics, operation, elapsed, failed=False, nested=False)
 
 def _emballer_methode(original, operation, enregistrer):
     """Décore une méthode de connexion sans modifier son retour ni ses exceptions."""
+    @wraps(original)
     def timed(self, *args, **kwargs):
         started = time.monotonic()
         failed = False
@@ -251,7 +253,8 @@ def instrument_database_activity():
         if test_name:
             _enregistrer_mesure(par_test.setdefault((test_name, alias), {}), operation, elapsed, failed, nested)
 
-    for operation in ("ensure_connection", "connect", "close", "commit", "rollback"):
+    for operation in ("ensure_connection", "connect", "close", "commit", "rollback",
+                      "set_autocommit", "savepoint", "savepoint_commit", "savepoint_rollback"):
         original = getattr(BaseDatabaseWrapper, operation, None)
         if original is not None:
             setattr(BaseDatabaseWrapper, operation, _emballer_methode(original, operation, enregistrer))
@@ -321,13 +324,20 @@ def instrument_database_activity():
         def score(item):
             operations = item[1]
             return sum(metric["total"] for name, metric in operations.items()
-                       if name in ("atomic_scope", "ensure_connection", "connect", "close", "commit", "rollback"))
+                       if name in ("atomic_scope", "ensure_connection", "connect", "close", "commit", "rollback",
+                                   "set_autocommit", "savepoint", "savepoint_commit", "savepoint_rollback"))
 
         for (test_name, alias), operations in sorted(par_test.items(), key=score, reverse=True)[:15]:
             tx = operations.get("atomic_scope", {})
             ensure = operations.get("ensure_connection", {})
             connect = operations.get("connect", {})
             close = operations.get("close", {})
+            commit = operations.get("commit", {})
+            rollback = operations.get("rollback", {})
+            savepoint = operations.get("savepoint", {})
+            savepoint_commit = operations.get("savepoint_commit", {})
+            savepoint_rollback = operations.get("savepoint_rollback", {})
+            autocommit = operations.get("set_autocommit", {})
             print(
                 f"[SQL-DB-TEST-TOP] {test_name} alias={alias} "
                 f"atomic={tx.get('count', 0)}/{tx.get('total', 0.0):.3f}s "
@@ -335,7 +345,13 @@ def instrument_database_activity():
                 f"nested={tx.get('nested', 0)} "
                 f"ensure={ensure.get('count', 0)}/{ensure.get('total', 0.0):.3f}s "
                 f"connect={connect.get('count', 0)}/{connect.get('total', 0.0):.3f}s "
-                f"close={close.get('count', 0)}/{close.get('total', 0.0):.3f}s",
+                f"close={close.get('count', 0)}/{close.get('total', 0.0):.3f}s "
+                f"commit={commit.get('count', 0)}/{commit.get('total', 0.0):.3f}s "
+                f"rollback={rollback.get('count', 0)}/{rollback.get('total', 0.0):.3f}s "
+                f"savepoint={savepoint.get('count', 0)}/{savepoint.get('total', 0.0):.3f}s "
+                f"savepoint_commit={savepoint_commit.get('count', 0)}/{savepoint_commit.get('total', 0.0):.3f}s "
+                f"savepoint_rollback={savepoint_rollback.get('count', 0)}/{savepoint_rollback.get('total', 0.0):.3f}s "
+                f"set_autocommit={autocommit.get('count', 0)}/{autocommit.get('total', 0.0):.3f}s",
                 flush=True,
             )
 
