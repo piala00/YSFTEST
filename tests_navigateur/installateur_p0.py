@@ -13,24 +13,103 @@ RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE))
 
 
-def autorisation(outil, edition):
+def autorisation(controle, emetteur, edition):
+    """Émet le .erpinst avec le vrai outil propriétaire et le coffre lié à l'EXE testé."""
     from apps.licences import format_cles as fc
+    from apps.licences.identite import lire_publique
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
     dossier = Path(os.environ["RUNNER_TEMP"]) / "activation-fictive"
+    coffre = dossier / "coffre-fictif.dat"
+    publique = dossier / "parametres-fictif.dat"
+    if not coffre.is_file() or not publique.is_file():
+        raise FileNotFoundError("Coffre fictif chiffré ou identité publique absente du runner.")
     rapport = dossier / "machine-controle.txt"
-    subprocess.run([str(Path(outil).resolve()), "--edition", edition, "--rapport", str(rapport)], check=True)
+    commande_controle = [str(Path(controle).resolve()), "--edition", edition,
+                         "--rapport", str(rapport)]
+    subprocess.run(commande_controle, check=True, capture_output=True, text=True)
     code = rapport.read_text(encoding="utf-8").strip()
-    privee = serialization.load_der_private_key((dossier / "privee-fictive.der").read_bytes(), password=None)
-    d = {"version": 1, "reference": fc.installation_courte_creer(), "edition": edition,
-         "machine": code[2:], "valable_jusqu_au": None, "key_id": hashlib.sha256(privee.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)).hexdigest().upper(),
-         "emise_le": datetime.date.today().isoformat()}
-    fichier = dossier / f"autorisation-{edition}.erpinst"
-    fichier.write_text(fc.autorisation_texte(d, privee.sign(fc.DOMAINE_AUTORISATION+fc.canonique(d))), encoding="utf-8")
-    subprocess.run([str(Path(outil).resolve()), "--edition", edition, "--rapport", str(rapport), "--verifier", str(fichier)], check=True)
-    d["machine"] = "AUTRE-PC"
-    faux = dossier / "autre-machine.erpinst"
-    faux.write_text(fc.autorisation_texte(d, privee.sign(fc.DOMAINE_AUTORISATION+fc.canonique(d))), encoding="utf-8")
-    r = subprocess.run([str(Path(outil).resolve()), "--edition", edition, "--rapport", str(rapport), "--verifier", str(faux)])
-    assert r.returncode == 2, "Le contrôle compilé a accepté une licence d'un autre PC."
+    prefixe = {"transport": "T-", "commerce": "C-"}.get(edition)
+    if not prefixe or not code.startswith(prefixe):
+        raise AssertionError(f"Code matériel incompatible avec l'édition {edition}: {code!r}")
+
+    environnement = os.environ.copy()
+    environnement["ERP_LICENCES_MDP"] = "Fictif-CI-2026-Coffre"
+    emission = subprocess.run([
+        str(Path(emetteur).resolve()), "autoriser-installation",
+        "--cle", str(coffre), "--code", code,
+        "--jusqu-au", (datetime.date.today() + datetime.timedelta(days=2)).isoformat(),
+        "--sortie", str(dossier),
+    ], check=True, capture_output=True, text=True, env=environnement)
+    chemins = [Path(ligne.strip()) for ligne in emission.stdout.splitlines()
+               if ligne.strip().lower().endswith(".erpinst")]
+    if not chemins:
+        raise AssertionError("L'outil propriétaire n'a retourné aucun fichier .erpinst.")
+    fichier = chemins[-1].resolve()
+    if fichier.parent != dossier.resolve() or not fichier.is_file():
+        raise AssertionError("Le fichier .erpinst émis est absent ou hors du dossier fictif.")
+
+    donnees, signature = fc.autorisation_lire(fichier.read_bytes())
+    cle_publique = lire_publique(publique.read_bytes())
+    empreinte = hashlib.sha256(cle_publique).hexdigest().upper()
+    if donnees.get("key_id") != empreinte:
+        raise AssertionError("Le .erpinst signé n'utilise pas l'identité publique gravée dans l'installateur.")
+    if donnees.get("edition") != edition or donnees.get("machine") != code[2:]:
+        raise AssertionError("L'édition ou le serveur du .erpinst ne correspond pas à la demande.")
+    subprocess.run(commande_controle + ["--verifier", str(fichier)],
+                   check=True, capture_output=True, text=True)
+
+    cle_privee = serialization.load_der_private_key(
+        coffre.read_bytes(), password=b"Fictif-CI-2026-Coffre"
+    )
+
+    def verifier_refus(libelle, contenu, signature_test):
+        candidat = dossier / f"refus-{edition}-{libelle}.erpinst"
+        candidat.write_text(fc.autorisation_texte(contenu, signature_test), encoding="utf-8")
+        try:
+            resultat = subprocess.run(
+                commande_controle + ["--verifier", str(candidat)],
+                capture_output=True, text=True, check=False,
+            )
+            if resultat.returncode != 2:
+                raise AssertionError(
+                    f"L'EXE de contrôle n'a pas refusé le cas {libelle} "
+                    f"(code {resultat.returncode}): {resultat.stdout}\n{resultat.stderr}"
+                )
+        finally:
+            candidat.unlink(missing_ok=True)
+
+    autre_machine = dict(donnees)
+    autre_machine["machine"] = "AUTRE-SERVEUR"
+    verifier_refus("autre-serveur", autre_machine,
+                   cle_privee.sign(fc.DOMAINE_AUTORISATION + fc.canonique(autre_machine)))
+
+    autre_edition = dict(donnees)
+    autre_edition["edition"] = "commerce" if edition == "transport" else "transport"
+    verifier_refus("autre-edition", autre_edition,
+                   cle_privee.sign(fc.DOMAINE_AUTORISATION + fc.canonique(autre_edition)))
+
+    mauvaise_cle = Ed25519PrivateKey.generate()
+    verifier_refus("autre-cle", dict(donnees),
+                   mauvaise_cle.sign(fc.DOMAINE_AUTORISATION + fc.canonique(donnees)))
+
+    signature_alteree = bytes([signature[0] ^ 1]) + signature[1:]
+    verifier_refus("fichier-altere", dict(donnees), signature_alteree)
+
+    preuve = {
+        "edition": edition,
+        "empreinte_publique": empreinte,
+        "key_id": donnees["key_id"],
+        "machine": code,
+        "emetteur": str(Path(emetteur).resolve()),
+        "installateur_controle": str(Path(controle).resolve()),
+        "resultat": "OK",
+        "cas_negatifs_refuses": ["autre-serveur", "autre-edition", "autre-cle", "fichier-altere"],
+    }
+    (dossier / f"autorisation-{edition}-preuve.json").write_text(
+        json.dumps(preuve, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(json.dumps(preuve, ensure_ascii=False))
 
 
 def verifier_emission(publique, fichier):
@@ -87,7 +166,7 @@ def nettoyer(programme, donnees, edition):
 
 if __name__ == "__main__":
     if sys.argv[1] == "autorisation":
-        autorisation(sys.argv[2], sys.argv[3])
+        autorisation(sys.argv[2], sys.argv[3], sys.argv[4])
     elif sys.argv[1] == "verifier-emission":
         verifier_emission(sys.argv[2], sys.argv[3])
     else:

@@ -1,6 +1,6 @@
 """Recette de l'EXE : licence fictive signée, deux démarrages, refus et aucun import public.
 
-preparer : crée une paire fictive dans RUNNER_TEMP, intègre SEULEMENT le public dans la copie CI.
+preparer : crée un coffre fictif chiffré dans RUNNER_TEMP et intègre SEULEMENT le public.
 verifier EXE EDITION : utilise le vrai serveur compilé, HTTP localhost, base jetable et privé hors artefacts.
 """
 import base64
@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE))
 DOSSIER = Path(os.environ["RUNNER_TEMP"]) / "activation-fictive"
+MOT_DE_PASSE_COFFRE = "Fictif-CI-2026-Coffre"
 
 
 def preparer():
@@ -31,9 +32,12 @@ def preparer():
 
     DOSSIER.mkdir(exist_ok=True)
     privee = Ed25519PrivateKey.generate()
-    (DOSSIER / "privee-fictive.der").write_bytes(privee.private_bytes(serialization.Encoding.DER,
-        serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    coffre = DOSSIER / "coffre-fictif.dat"
+    coffre.write_bytes(privee.private_bytes(serialization.Encoding.DER,
+        serialization.PrivateFormat.PKCS8,
+        serialization.BestAvailableEncryption(MOT_DE_PASSE_COFFRE.encode())))
     publique = privee.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    (DOSSIER / "parametres-fictif.dat").write_bytes(b"ERPID\x01" + publique)
     personnaliser(RACINE, b"ERPID\x01" + publique, empreinte(publique))
     print("Identité FICTIVE intégrée pour recette ; aucun exécutable de ce travail n'est distribué.")
 
@@ -81,7 +85,10 @@ def verifier(exe, edition):
         if f.is_file() and (f.name.lower() in ("coffre.dat", "cle-privee.pem", "cle_publique.txt", "cle-publique.txt") or f.suffix.lower() == ".erpinst"):
             raise AssertionError("Fichier d'émission ou autorisation à exclure du paquet client : " + str(f))
 
-    privee = serialization.load_der_private_key((DOSSIER / "privee-fictive.der").read_bytes(), password=None)
+    privee = serialization.load_der_private_key(
+        (DOSSIER / "coffre-fictif.dat").read_bytes(),
+        password=MOT_DE_PASSE_COFFRE.encode(),
+    )
     port = 18300 if edition == "commerce" else 18310
     data = DOSSIER / edition
     data.mkdir(exist_ok=True)

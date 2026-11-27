@@ -387,6 +387,12 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
           & $iscc /Q "/DEdition=${{ matrix.nom }}" "/DPort=${{ matrix.port }}" "/DVersion=1.0.${{ github.run_number }}" deploy\installateur\erp_ohada.iss
           if ($LASTEXITCODE -ne 0) { throw "Compilation de l'installateur en échec" }
+      - name: Compiler l'outil propriétaire pour la recette de signature
+        if: env.ERP_DISTRIBUTION_FICTIVE == '1'
+        shell: pwsh
+        run: |
+          python -m PyInstaller deploy/licences/licences.py --paths . --onefile --name ERP-OHADA-Licences --noconfirm --workpath build-licences --distpath dist-licences
+          if ($LASTEXITCODE -ne 0) { throw "Compilation de l'outil propriétaire en échec" }
       - name: Installer en service sans question, mettre à jour, désinstaller
         if: env.ERP_DISTRIBUTION_FICTIVE == '1'
         shell: pwsh
@@ -395,7 +401,7 @@ jobs:
           $dossier = "$env:RUNNER_TEMP\programme"
           $service = "ERP-OHADA-${{ matrix.nom }}"
           $donnees = "$env:ProgramData\ERP-OHADA\${{ matrix.nom }}"
-          python tests_navigateur/installateur_p0.py autorisation "dist-outils\ERP-Controle-Installation.exe" "${{ matrix.edition }}"
+          python tests_navigateur/installateur_p0.py autorisation "dist-outils\ERP-Controle-Installation.exe" "dist-licences\ERP-OHADA-Licences.exe" "${{ matrix.edition }}"
           if ($LASTEXITCODE -ne 0) { throw "Préparation autorisation fictive en échec" }
           $autorisation = "$env:RUNNER_TEMP\activation-fictive\autorisation-${{ matrix.edition }}.erpinst"
           function Attendre-Serveur {
@@ -518,8 +524,11 @@ jobs:
         if: matrix.edition == 'transport'
         shell: pwsh
         run: |
-          python -m PyInstaller deploy/licences/licences.py --paths . --onefile --name ERP-OHADA-Licences --noconfirm --workpath build-licences --distpath dist-licences
           $outil = "dist-licences\ERP-OHADA-Licences.exe"
+          if (-not (Test-Path $outil)) {
+            python -m PyInstaller deploy/licences/licences.py --paths . --onefile --name ERP-OHADA-Licences --noconfirm --workpath build-licences --distpath dist-licences
+            if ($LASTEXITCODE -ne 0) { throw "Compilation de l'outil propriétaire en échec" }
+          }
           $env:ERP_LICENCES_MDP = "Essai-CI-uniquement-2026"
           $cles = "$env:RUNNER_TEMP\cles-essai"
           & $outil cles --dossier $cles
