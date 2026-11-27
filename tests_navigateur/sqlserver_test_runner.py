@@ -184,14 +184,15 @@ def shard_for_class(key, count):
         raise ValueError("nombre de shards invalide")
     assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
     if count == 2:
-        # Mesure réelle CI #619 (27/11/2026) :
-        # shard 0 = 318 tests / 536.290s ; shard 1 = 483 tests / 419.633s.
-        # AdministrationOnglets a pris 53.456s sur le shard 0. Le déplacer
-        # vers le shard 1 donne une charge estimée à 482.834s / 473.089s.
-        # Simulation multi-mois et bascule SQL Server restent sur le shard 1.
-        # Les classes restent indivisibles pour préserver setUpClass/tearDownClass.
+        # Mesure réelle CI #627 (27/11/2026) :
+        # shard 0 = 308 tests / 347.849s ; shard 1 = 494 tests / 668.259s.
+        # SimulationPlusieursMois a pris 166.595s sur le shard 1 ; la déplacer
+        # vers le shard 0 donne une charge estimée à 514.444s / 501.664s.
+        # Bascule SQL Server (51.110s) et AdministrationOnglets (50.127s)
+        # restent sur le shard 1. Les classes restent indivisibles pour
+        # préserver setUpClass/tearDownClass.
         overrides = {
-            "apps.transport.tests.SimulationPlusieursMoisTests": 1,
+            "apps.transport.tests.SimulationPlusieursMoisTests": 0,
             "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
             "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
             "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
