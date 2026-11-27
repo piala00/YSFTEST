@@ -334,6 +334,11 @@ def administration_poste(request):
                 if action == "dossier_ouvrir" and not identifiant:
                     raise ValueError("choisissez le dossier fictif à ouvrir")
                 poste.appeler("dossier_ouvrir", identifiant, (request.user.username, request.user.password))
+                # redemarrage.html rend son bloc public uniquement si l'utilisateur est déconnecté.
+                # Invalider la session de N avant le redémarrage, comme pour le changement de société.
+                from django.contrib.auth import logout
+
+                logout(request)
                 poste.appeler("redemarrer")
                 return render(request, "core/redemarrage.html", {"titre": "Ouverture du dossier"})
             elif action == "demarrage_auto":
