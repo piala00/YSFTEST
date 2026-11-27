@@ -166,6 +166,14 @@ def modifier_configuration(donnees, valeurs):
             lignes[i] = f"# {cle}=" if valeur is None else f"{cle}={valeur}"
     lignes += [f"{cle}={valeur}" for cle, valeur in restantes.items() if valeur is not None]
     config.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+    # Le processus de redémarrage reçoit cette photographie d'environnement.
+    # La synchroniser avec la configuration persistée évite de relancer N
+    # lorsqu'une ancienne variable SQLITE_FICHIER/DB_* masque le choix N+1.
+    for cle, valeur in valeurs.items():
+        if valeur is None:
+            ENVIRONNEMENT_INITIAL.pop(cle, None)
+        else:
+            ENVIRONNEMENT_INITIAL[cle] = str(valeur)
     for cle, valeur in valeurs.items():                           # sauvegardes et vérifications : sans redémarrage
         if cle.startswith(("ERP_SAUVEGARDE_", "ERP_VERIFICATION_")):
             if valeur is None:

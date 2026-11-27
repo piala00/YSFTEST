@@ -90,6 +90,52 @@ class ProgrammeCompileTests(SimpleTestCase):
         self.assertEqual(seconde.name, "erp-20261027-075105-2.sqlite3")
 
 
+class ConfigurationRedemarrageTests(SimpleTestCase):
+    """Le redémarrage doit appliquer la base choisie dans le catalogue."""
+
+    def test_nouvelle_base_transmise_et_anciennes_variables_db_retirees(self):
+        with tempfile.TemporaryDirectory() as temporaire:
+            donnees = Path(temporaire)
+            nouvelle = donnees / "2027.sqlite3"
+            anciennes = {
+                "ERP_DONNEES": str(donnees),
+                "DB_ENGINE": "mssql",
+                "SQLITE_FICHIER": str(donnees / "2026.sqlite3"),
+                "DB_HOST": "SQL-ANCIEN",
+                "DB_NAME": "ERP_2026",
+                "DB_USER": "ancien",
+                "DB_PASSWORD": "secret-ancien",
+                "DB_PORT": "1433",
+                "MIROIR_DB_ENGINE": "mssql",
+            }
+            selection = {
+                "DB_ENGINE": "sqlite",
+                "SQLITE_FICHIER": str(nouvelle),
+                "DB_HOST": None,
+                "DB_NAME": None,
+                "DB_USER": None,
+                "DB_PASSWORD": None,
+                "DB_PORT": None,
+                "MIROIR_DB_ENGINE": None,
+            }
+            with mock.patch.dict(lanceur.ENVIRONNEMENT_INITIAL, anciennes, clear=True), \
+                 mock.patch.object(lanceur.subprocess, "Popen") as lancer, \
+                 mock.patch.object(lanceur.threading, "Timer"), \
+                 mock.patch.object(lanceur, "SIMULATION", {"processus": None}), \
+                 mock.patch.object(lanceur, "journal"), \
+                 mock.patch.dict(os.environ, {"ERP_SERVICE": ""}):
+                lanceur.modifier_configuration(donnees, selection)
+                lanceur.redemarrer(8100)
+
+            environnement_suivant = lancer.call_args.kwargs["env"]
+            self.assertEqual(environnement_suivant["DB_ENGINE"], "sqlite")
+            self.assertEqual(environnement_suivant["SQLITE_FICHIER"], str(nouvelle))
+            for cle in ("DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD", "DB_PORT", "MIROIR_DB_ENGINE"):
+                self.assertNotIn(cle, environnement_suivant)
+            self.assertIn("SQLITE_FICHIER=" + str(nouvelle),
+                          (donnees / "configuration.env").read_text(encoding="utf-8"))
+
+
 class OuvertureInterfaceTests(SimpleTestCase):
     """L'interface doit s'ouvrir de la même manière quel que soit le navigateur par défaut
     du poste (Windows 10, 11, Server) : sur Windows on force un Chromium récent en mode

@@ -122,6 +122,28 @@ def arreter(processus, flux):
         flux.close()
 
 
+def arreter_port(port):
+    """Arrête le processus EXE relancé et détaché qui écoute sur le port de recette."""
+    if os.name != "nt":
+        return
+    resultat = subprocess.run(
+        ["netstat", "-ano", "-p", "tcp"], capture_output=True,
+        text=True, check=False,
+    )
+    pids = set()
+    for ligne in resultat.stdout.splitlines():
+        colonnes = ligne.split()
+        if (len(colonnes) >= 5 and colonnes[0].upper() == "TCP"
+                and colonnes[1].endswith(f":{port}")
+                and colonnes[3].upper() == "LISTENING" and colonnes[4].isdigit()):
+            pids.add(colonnes[4])
+    for pid in pids:
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", pid],
+            capture_output=True, check=False,
+        )
+
+
 def verifier_reports(base_n1, env):
     controle = r'''
 from decimal import Decimal
@@ -180,12 +202,16 @@ def main():
     donnees.mkdir(parents=True, exist_ok=True)
     source = donnees / "2026.sqlite3"
     catalogue = donnees / "societes.json"
-    port1, port2 = port_libre(), port_libre()
+    port1 = port_libre()
+    port2 = port_libre()
+    while port2 == port1:
+        port2 = port_libre()
     rapport = {
         "executable": str(exe),
         "edition": "transport",
         "migration_schema_n_plus_1": "non vérifiée",
         "cloture_http": "non vérifiée",
+        "selection_catalogue": "non vérifiée",
         "redemarrage_sur_n_plus_1": "non vérifié",
         "archive_lecture_seule": "non vérifiée",
         "resultats": [],
@@ -322,25 +348,72 @@ Societe.objects.update(assistant_termine=True)
         arreter(processus_archive, flux_archive)
         processus_archive = flux_archive = None
 
-        # Second démarrage : l'EXE doit réellement ouvrir N+1, retrouver son administrateur et son catalogue.
-        environnement_n1 = dict(environnement)
-        environnement_n1.update(SQLITE_FICHIER=str(base_n1), ERP_PORT=str(port2))
+        # P0.4 : sélectionner N+1 dans le vrai catalogue Windows, sans injecter son chemin.
+        # Le second EXE démarre volontairement sur N : seul /choix-societe/ peut basculer vers N+1.
+        environnement_selection = dict(environnement)
+        environnement_selection.update(SQLITE_FICHIER=str(source), ERP_PORT=str(port2))
         processus2, flux2, client2 = demarrer(
-            exe, environnement_n1, port2, dossier_rapport / "serveur-redemarrage-n1.log"
+            exe, environnement_selection, port2, dossier_rapport / "serveur-selection-exercice.log"
         )
         client2.connecter()
-        page_n1 = client2.get("/cloture-annuelle/")
-        (dossier_rapport / "ecran-cloture-n1.html").write_text(page_n1, encoding="utf-8")
-        if "2028" not in page_n1 or "2027" not in page_n1:
-            extrait = " ".join(page_n1.split())[:1800]
+        page_choix = client2.get("/choix-societe/")
+        (dossier_rapport / "ecran-choix-societe.html").write_text(page_choix, encoding="utf-8")
+        identifiant_n1 = "transport-centrale-centre-2027"
+        if identifiant_n1 not in page_choix or "2027" not in page_choix:
             raise AssertionError(
-                "Après redémarrage, l'EXE ne reconnaît pas l'exercice N+1. "
-                f"Extrait HTML: {extrait}"
+                "Le catalogue Windows ne présente pas l'exercice N+1 ouvert. "
+                + " ".join(page_choix.split())[:1800]
+            )
+        reponse_selection = client2.post("/choix-societe/", {
+            "confirmation": "OUVRIR", "base_id": identifiant_n1,
+        }, timeout=60)
+        (dossier_rapport / "reponse-selection-exercice.html").write_text(
+            reponse_selection, encoding="utf-8"
+        )
+        if "Redémarrage du logiciel" not in reponse_selection:
+            raise AssertionError("La sélection N+1 n'a pas déclenché le redémarrage du programme")
+        configuration = donnees / "configuration.env"
+        valeurs_configuration = {
+            ligne.split("=", 1)[0]: ligne.split("=", 1)[1]
+            for ligne in configuration.read_text(encoding="utf-8").splitlines()
+            if "=" in ligne and not ligne.lstrip().startswith("#")
+        }
+        if Path(valeurs_configuration.get("SQLITE_FICHIER", "")).resolve() != base_n1.resolve():
+            raise AssertionError("Le choix du catalogue n'a pas persisté le chemin physique de N+1")
+        rapport["selection_catalogue"] = "réussie"
+        rapport["resultats"].append("N+1 sélectionnée depuis /choix-societe/ ; configuration persistée avant redémarrage")
+
+        try:
+            processus2.wait(timeout=20)
+        except subprocess.TimeoutExpired as exc:
+            raise AssertionError("L'ancien processus EXE ne s'est pas arrêté après le choix de N+1") from exc
+
+        # Le nouveau processus perd la session de N : il doit demander une nouvelle
+        # authentification, puis afficher 2027 et le prochain exercice 2028.
+        derniere_erreur = "aucune réponse du nouveau processus"
+        page_n1 = ""
+        echeance = time.monotonic() + 120
+        while time.monotonic() < echeance:
+            client2.cookies.clear()
+            try:
+                client2.connecter()
+                page_n1 = client2.get("/cloture-annuelle/")
+                (dossier_rapport / "ecran-cloture-n1.html").write_text(page_n1, encoding="utf-8")
+                if "2028" in page_n1 and "2027" in page_n1:
+                    break
+                derniere_erreur = "le serveur répond encore sur un exercice autre que N+1"
+            except (OSError, urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+                derniere_erreur = f"{type(exc).__name__}: {exc}"
+            time.sleep(1)
+        else:
+            raise AssertionError(
+                "Après sélection depuis le catalogue, le nouvel EXE ne reconnaît pas 2027→2028 : "
+                + derniere_erreur
             )
         rapport["redemarrage_sur_n_plus_1"] = "réussi"
-        rapport["resultats"].append("Deuxième processus EXE : authentification et écran annuel sur N+1 (prochain exercice 2028)")
-        arreter(processus2, flux2)
-        processus2 = flux2 = None
+        rapport["resultats"].append(
+            "Nouveau processus EXE : reconnexion puis écran annuel 2027→2028 après sélection réelle du catalogue"
+        )
         rapport["etat"] = "SUCCES"
         print(json.dumps(rapport, ensure_ascii=False, indent=2))
     except Exception as exc:
@@ -351,6 +424,8 @@ Societe.objects.update(assistant_termine=True)
         arreter(processus1, flux1)
         arreter(processus_archive, flux_archive)
         arreter(processus2, flux2)
+        arreter_port(port1)
+        arreter_port(port2)
         dossier_rapport.mkdir(parents=True, exist_ok=True)
         (dossier_rapport / "RESULTATS.json").write_text(
             json.dumps(rapport, ensure_ascii=False, indent=2), encoding="utf-8"
