@@ -14,6 +14,7 @@ import signal
 import sys
 import time
 import unittest
+from threading import Lock, local
 
 
 def instrument_tests():
@@ -22,6 +23,84 @@ def instrument_tests():
     durations = []
     body_durations = {}
     active = {"name": None, "started": None}
+    resources = {}
+    resource_lock = Lock()
+    atomic_local = local()
+
+    def _resource_record(name, kind, elapsed, alias=None, exceptional=False, rollback=False):
+        """Agrège les ouvertures/fermetures réelles et les blocs atomic, par test ou fixture."""
+        with resource_lock:
+            data = resources.setdefault(name, {
+                "connects": 0, "connect_seconds": 0.0, "connect_max": 0.0,
+                "closes": 0, "close_seconds": 0.0, "close_max": 0.0,
+                "atomic_blocks": 0, "atomic_seconds": 0.0, "atomic_max": 0.0,
+                "atomic_exceptions": 0, "atomic_rollbacks": 0, "aliases": set(),
+            })
+            if kind == "connect":
+                data["connects"] += 1
+                data["connect_seconds"] += elapsed
+                data["connect_max"] = max(data["connect_max"], elapsed)
+            elif kind == "close":
+                data["closes"] += 1
+                data["close_seconds"] += elapsed
+                data["close_max"] = max(data["close_max"], elapsed)
+            elif kind == "atomic":
+                data["atomic_blocks"] += 1
+                data["atomic_seconds"] += elapsed  # durée inclusive : les atomic imbriqués se recouvrent
+                data["atomic_max"] = max(data["atomic_max"], elapsed)
+                data["atomic_exceptions"] += int(exceptional)
+                data["atomic_rollbacks"] += int(rollback)
+            if alias:
+                data["aliases"].add(alias)
+
+    def report_resource(name):
+        with resource_lock:
+            data = resources.get(name)
+            if not data:
+                return
+            data = {**data, "aliases": sorted(data["aliases"])}
+        if not (data["connects"] or data["closes"] or data["atomic_blocks"]):
+            return
+        print(
+            f"[SQL-RESOURCE] {name} "
+            f"connects={data['connects']} connect={data['connect_seconds']:.3f}s max_connect={data['connect_max']:.3f}s "
+            f"closes={data['closes']} close={data['close_seconds']:.3f}s max_close={data['close_max']:.3f}s "
+            f"atomic={data['atomic_blocks']} atomic_inclusive={data['atomic_seconds']:.3f}s "
+            f"max_atomic={data['atomic_max']:.3f}s exceptions={data['atomic_exceptions']} "
+            f"rollbacks={data['atomic_rollbacks']} aliases={','.join(data['aliases']) or '-'}",
+            flush=True,
+        )
+
+    def report_resources():
+        with resource_lock:
+            items = [(name, {**data, "aliases": sorted(data["aliases"])}) for name, data in resources.items()]
+        if not items:
+            return
+        totals = {key: sum(data[key] for _, data in items) for key in (
+            "connects", "connect_seconds", "closes", "close_seconds", "atomic_blocks",
+            "atomic_seconds", "atomic_exceptions", "atomic_rollbacks")}
+        print(
+            f"[SQL-RESOURCE-SUMMARY] connections_opened={totals['connects']} "
+            f"open_seconds={totals['connect_seconds']:.3f} connections_closed={totals['closes']} "
+            f"close_seconds={totals['close_seconds']:.3f} atomic_blocks={totals['atomic_blocks']} "
+            f"atomic_inclusive_seconds={totals['atomic_seconds']:.3f} "
+            f"atomic_exceptions={totals['atomic_exceptions']} atomic_rollbacks={totals['atomic_rollbacks']}",
+            flush=True,
+        )
+        for name, data in sorted(items, key=lambda item: item[1]["atomic_max"], reverse=True)[:10]:
+            if data["atomic_blocks"]:
+                print(
+                    f"[SQL-RESOURCE-ATOMIC-TOP] max={data['atomic_max']:.3f}s "
+                    f"inclusive={data['atomic_seconds']:.3f}s blocks={data['atomic_blocks']} {name}",
+                    flush=True,
+                )
+        for name, data in sorted(items, key=lambda item: item[1]["connect_max"], reverse=True)[:10]:
+            if data["connects"]:
+                print(
+                    f"[SQL-RESOURCE-CONNECT-TOP] max={data['connect_max']:.3f}s "
+                    f"total={data['connect_seconds']:.3f}s opens={data['connects']} {name}",
+                    flush=True,
+                )
 
     def report_slowest():
         if not durations:
@@ -37,6 +116,7 @@ def instrument_tests():
             print(f"[SQL-TEST-OVERHEAD-TOP] {elapsed:.3f}s {name}", flush=True)
 
     atexit.register(report_slowest)
+    atexit.register(report_resources)
 
     # GNU timeout sends SIGTERM: atexit handlers do not run for this signal.
     # Preserve the original termination semantics while retaining diagnostics.
@@ -46,6 +126,7 @@ def instrument_tests():
             print(f"[SQL-TEST-INCOMPLETE] {elapsed:.3f}s {active['name']}", flush=True)
         print(f"[SQL-TEST-TERMINATED] signal={signum}", flush=True)
         report_slowest()
+        report_resources()
         faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
         signal.signal(signum, signal.SIG_DFL)
         os.kill(os.getpid(), signum)
@@ -66,6 +147,7 @@ def instrument_tests():
             durations.append((elapsed, test_name))
             marker = "SLOW" if elapsed >= threshold else "END"
             print(f"[SQL-TEST-{marker}] {elapsed:.3f}s {test_name}", flush=True)
+            report_resource(test_name)
 
     unittest.TestCase.run = timed_run
 
@@ -125,16 +207,17 @@ def instrument_tests():
         current = test.__class__
         if previous is current:
             return original_class_setup(self, test, result)
+        fixture_name = f"setUpClass {current.__module__}.{current.__qualname__}"
         started = time.monotonic()
         prior = (active["name"], active["started"])
-        active["name"], active["started"] = f"setUpClass {current.__module__}.{current.__qualname__}", started
-        print(f"[SQL-FIXTURE-START] setUpClass {current.__module__}.{current.__qualname__}", flush=True)
+        active["name"], active["started"] = fixture_name, started
+        print(f"[SQL-FIXTURE-START] {fixture_name}", flush=True)
         try:
             return original_class_setup(self, test, result)
         finally:
             active["name"], active["started"] = prior
-            print(f"[SQL-FIXTURE-END] setUpClass {current.__module__}.{current.__qualname__} "
-                  f"{time.monotonic() - started:.3f}s", flush=True)
+            print(f"[SQL-FIXTURE-END] {fixture_name} {time.monotonic() - started:.3f}s", flush=True)
+            report_resource(fixture_name)
 
     def timed_class_teardown(self, test, result):
         previous = getattr(result, "_previousTestClass", None)
@@ -152,9 +235,90 @@ def instrument_tests():
             active["name"], active["started"] = prior
             print(f"[SQL-FIXTURE-END] tearDownClass {name} "
                   f"{time.monotonic() - started:.3f}s", flush=True)
+            report_resource(f"tearDownClass {name}")
 
     unittest.TestSuite._handleClassSetUp = timed_class_setup
     unittest.TestSuite._tearDownPreviousClass = timed_class_teardown
+
+    # Mesurer les connexions réellement ouvertes/fermées et les blocs transaction.atomic.
+    # Les compteurs restent passifs : aucune politique de connexion ou de transaction ne change.
+    from django.db.backends.base.base import BaseDatabaseWrapper
+    from django.db.transaction import Atomic
+
+    original_connect = BaseDatabaseWrapper.connect
+    original_close = BaseDatabaseWrapper.close
+    original_atomic_enter = Atomic.__enter__
+    original_atomic_exit = Atomic.__exit__
+
+    def timed_connect(self):
+        deja_ouverte = self.connection is not None
+        started = time.monotonic()
+        try:
+            return original_connect(self)
+        finally:
+            elapsed = time.monotonic() - started
+            if not deja_ouverte and self.connection is not None:
+                nom = active["name"] or "[runner]"
+                alias = f"{self.alias}/{self.vendor}"
+                _resource_record(nom, "connect", elapsed, alias=alias)
+                if elapsed >= threshold:
+                    print(f"[SQL-CONNECTION-SLOW] open {elapsed:.3f}s {alias} {nom}", flush=True)
+
+    def timed_close(self):
+        etait_ouverte = self.connection is not None
+        started = time.monotonic()
+        try:
+            return original_close(self)
+        finally:
+            elapsed = time.monotonic() - started
+            if etait_ouverte and self.connection is None:
+                nom = active["name"] or "[runner]"
+                alias = f"{self.alias}/{self.vendor}"
+                _resource_record(nom, "close", elapsed, alias=alias)
+                if elapsed >= threshold:
+                    print(f"[SQL-CONNECTION-SLOW] close {elapsed:.3f}s {alias} {nom}", flush=True)
+
+    def timed_atomic_enter(self):
+        started = time.monotonic()
+        nom = active["name"] or "[runner]"
+        resultat = original_atomic_enter(self)
+        piles = getattr(atomic_local, "piles", None)
+        if piles is None:
+            piles = {}
+            atomic_local.piles = piles
+        piles.setdefault(id(self), []).append((started, nom))
+        return resultat
+
+    def timed_atomic_exit(self, exc_type, exc_value, traceback):
+        piles = getattr(atomic_local, "piles", {})
+        pile = piles.get(id(self), [])
+        entree = pile.pop() if pile else None
+        if not pile:
+            piles.pop(id(self), None)
+        connexion = getattr(self, "connection", None)
+        alias = f"{connexion.alias}/{connexion.vendor}" if connexion is not None else None
+        rollback = bool(getattr(connexion, "needs_rollback", False)) if connexion is not None else False
+        try:
+            return original_atomic_exit(self, exc_type, exc_value, traceback)
+        finally:
+            if entree is not None:
+                started, nom = entree
+                elapsed = time.monotonic() - started
+                _resource_record(
+                    nom, "atomic", elapsed, alias=alias,
+                    exceptional=exc_type is not None, rollback=rollback,
+                )
+                if elapsed >= threshold:
+                    print(
+                        f"[SQL-TRANSACTION-SLOW] atomic {elapsed:.3f}s "
+                        f"exception={exc_type is not None} rollback={rollback} {alias or '-'} {nom}",
+                        flush=True,
+                    )
+
+    BaseDatabaseWrapper.connect = timed_connect
+    BaseDatabaseWrapper.close = timed_close
+    Atomic.__enter__ = timed_atomic_enter
+    Atomic.__exit__ = timed_atomic_exit
 
 
 def instrument_database_lifecycle():
