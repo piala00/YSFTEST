@@ -209,7 +209,6 @@ def main():
             ERP_DONNEES=str(donnees),
             ERP_DOSSIER_DONNEES=str(donnees),
             ERP_CATALOGUE_SOCIETES=str(catalogue),
-            ERP_TEST_CLOTURE_NATIVE="1",
             ERP_EDITION="transport",
             ERP_PORT=str(port1),
             ERP_SANS_NAVIGATEUR="1",
@@ -264,7 +263,7 @@ Societe.objects.update(assistant_termine=True)
             extrait = " ".join(page.split())[:1800]
             raise AssertionError(
                 "L'écran compilé ne présente pas l'exercice N+1 attendu. "
-                "Consulter CLOTURE-NATIVE-DIAG et ecran-cloture-initial.html. "
+                "Consulter ecran-cloture-initial.html dans l'artefact de recette. "
                 f"Extrait HTML: {extrait}"
             )
         resultat = client1.post(
