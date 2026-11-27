@@ -7,6 +7,7 @@ sont des rubriques que la société paramètre avec son expert-comptable.
   Charges patronales : D compte de charge (664…) / C organisme (431…)
 Avance sur salaire : D 421 / C caisse. Paiement des salaires : D 422 / C caisse ou banque.
 """
+import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
@@ -35,6 +36,8 @@ class Employe(models.Model):
                 (CONDUITE, "Conduite (chauffeurs, convoyeurs)"), (ADMINISTRATION, "Administration, direction"), (AUTRE, "Autre")]
     PAIEMENTS = [("ESPECES", "Espèces"), ("VIREMENT", "Virement"), ("MOBILE_MONEY", "Mobile Money")]
 
+    uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    site_origine = models.CharField(max_length=10, blank=True, editable=False)
     matricule = models.CharField(max_length=20, unique=True)
     nom = models.CharField("Nom et prénom", max_length=120)
     telephone = models.CharField("Téléphone", max_length=30, blank=True)
@@ -170,7 +173,8 @@ class Avance(models.Model):
             raise ValidationError("Cette caisse n'a pas de compte de trésorerie.")
         self.save()
         self.ecriture = creer_ecriture(self.caisse, self.date, f"Avance sur salaire {self.employe.nom}",
-                                       [{"compte": _compte("421", "Personnel, avances et acomptes"), "debit": self.montant},
+                                       [{"compte": _compte("421", "Personnel, avances et acomptes"),
+                                         "debit": self.montant, "employe": self.employe},
                                         {"compte": self.caisse.compte_tresorerie, "credit": self.montant}],
                                        reference=self.employe.matricule)
         self.save(update_fields=["ecriture"])
@@ -240,10 +244,12 @@ class PeriodePaie(models.Model):
             def charges(compte, montant, libelle):
                 """Charge répartie sur les véhicules selon le mode d'imputation de l'employé ; sinon sur son service."""
                 if not repartition:
-                    return [{"compte": compte, "debit": montant, "section": service, "libelle": libelle}]
+                    return [{"compte": compte, "debit": montant, "section": service,
+                             "employe": b.employe, "libelle": libelle}]
                 parts = [_arrondi(montant * f) for _, f in repartition[:-1]]
                 parts.append(montant - sum(parts, ZERO))
-                return [{"compte": compte, "debit": m, "vehicule": v, "section": v.section, "libelle": libelle}
+                return [{"compte": compte, "debit": m, "vehicule": v, "section": v.section,
+                         "employe": b.employe, "libelle": libelle}
                         for (v, _), m in zip(repartition, parts) if m]
 
             lignes += charges(salaires, b.salaire_base, f"Salaire {b.employe.nom}")
@@ -252,13 +258,14 @@ class PeriodePaie(models.Model):
                 if r.nature == RubriquePaie.GAIN:
                     lignes += charges(r.compte, l.montant, f"{r.libelle} {b.employe.nom}")
                 elif r.nature == RubriquePaie.RETENUE:
-                    lignes.append({"compte": r.compte, "credit": l.montant})
+                    lignes.append({"compte": r.compte, "credit": l.montant, "employe": b.employe})
                 else:
                     lignes += charges(r.compte, l.montant, f"{r.libelle} {b.employe.nom}")
-                    lignes.append({"compte": r.compte_contrepartie, "credit": l.montant})
+                    lignes.append({"compte": r.compte_contrepartie, "credit": l.montant,
+                                   "employe": b.employe})
             if b.avances:
-                lignes.append({"compte": avances, "credit": b.avances})
-            lignes.append({"compte": net_du, "credit": b.net})
+                lignes.append({"compte": avances, "credit": b.avances, "employe": b.employe})
+            lignes.append({"compte": net_du, "credit": b.net, "employe": b.employe})
             b.avances_a_reprendre().update(bulletin=b)
         self.ecriture = creer_ecriture(Journal.objects.get(code="OD"), date or self.fin_de_mois, f"{self}", lignes,
                                        reference=f"PAIE{self.annee}{self.mois:02d}")
@@ -274,11 +281,16 @@ class PeriodePaie(models.Model):
             raise ValidationError("Validez la paie avant de la payer.")
         if not caisse.compte_tresorerie_id:
             raise ValidationError("Cette caisse ou banque n'a pas de compte de trésorerie.")
-        total = sum((b.net for b in self.bulletins.all()), ZERO)
-        self.ecriture_paiement = creer_ecriture(caisse, date or timezone.localdate(), f"Paiement des salaires {self.mois:02d}/{self.annee}",
-                                                [{"compte": _compte("422", "Personnel, rémunérations dues"), "debit": total},
-                                                 {"compte": caisse.compte_tresorerie, "credit": total}],
-                                                reference=f"PAIE{self.annee}{self.mois:02d}")
+        bulletins = list(self.bulletins.select_related("employe"))
+        total = sum((b.net for b in bulletins), ZERO)
+        lignes = [{"compte": _compte("422", "Personnel, rémunérations dues"),
+                   "debit": b.net, "employe": b.employe}
+                  for b in bulletins if b.net]
+        if total:
+            lignes.append({"compte": caisse.compte_tresorerie, "credit": total})
+        self.ecriture_paiement = creer_ecriture(
+            caisse, date or timezone.localdate(), f"Paiement des salaires {self.mois:02d}/{self.annee}",
+            lignes, reference=f"PAIE{self.annee}{self.mois:02d}")
         self.statut = self.PAYEE
         self.save(update_fields=["statut", "ecriture_paiement"])
         return self
