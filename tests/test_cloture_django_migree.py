@@ -181,8 +181,9 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_vehicule').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM personnel_employe').fetchone()[0], 1)
-                self.assertEqual(db.execute("SELECT code, libelle, valeur FROM personnel_rubriquepaie").fetchone(),
-                                 ('PRIME', 'Prime de route', '1000'))
+                rubrique = db.execute("SELECT code, libelle, valeur FROM personnel_rubriquepaie").fetchone()
+                self.assertEqual(rubrique[:2], ('PRIME', 'Prime de route'))
+                self.assertEqual(Decimal(str(rubrique[2])), Decimal('1000'))
                 self.assertEqual(db.execute("""SELECT matricule, nom, service, site_origine, agence.code
                     FROM personnel_employe AS employe
                     JOIN core_agence AS agence ON agence.id=employe.agence_id
