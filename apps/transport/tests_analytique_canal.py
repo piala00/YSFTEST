@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from apps.comptabilite.plan_analytique import balance_axe, axes
 from .models import Billet, Chauffeur, Colis, Depart, Gare, Ligne, Vehicule
@@ -21,11 +22,11 @@ class CanalVenteAnalytiqueTests(TestCase):
         cls.chauffeur = Chauffeur.objects.create(nom="Chauffeur CAN")
 
     def depart(self):
-        return Depart.objects.create(ligne=self.ligne, date=datetime.date.today(), heure=datetime.time(8, 0),
+        return Depart.objects.create(ligne=self.ligne, date=timezone.localdate(), heure=datetime.time(8, 0),
                                      vehicule=self.vehicule, chauffeur=self.chauffeur)
 
     def balance(self):
-        jour = datetime.date.today()
+        jour = timezone.localdate()
         return balance_axe("canaux_vente", jour, jour)
 
     def test_canaux_billets_et_colis_payes_ventiles_sans_double_comptage(self):
@@ -90,3 +91,26 @@ class CanalVenteAnalytiqueTests(TestCase):
                       canal_vente="REVENDEUR").enregistrer()
         self.assertEqual(serialiser(billet)[1]["canal_vente"], "WEB")
         self.assertEqual(serialiser(colis)[1]["canal_vente"], "REVENDEUR")
+
+    def test_colis_paye_recu_d_une_agence_est_ventile_meme_sans_flag_local(self):
+        from apps.comptabilite.models import Journal
+        from apps.comptabilite.services import creer_ecriture
+        from apps.transport.models import ParametresTransport
+
+        depart = self.depart()
+        colis = Colis(numero="COL-REMOTE-CAN", site_origine="DLA", nature=Colis.COLIS, date=timezone.localdate(),
+                      gare_depart=self.dla, gare_arrivee=self.yde, expediteur="Agence DLA", destinataire="Client",
+                      prix=4500, port=Colis.PAYE, canal_vente="REVENDEUR", depart=depart,
+                      statut=Colis.EN_ROUTE, recette_constatee=False)
+        colis.save()
+        p = ParametresTransport.get()
+        creer_ecriture(Journal.objects.get(code="OD"), timezone.localdate(), "Recette colis départ distant",
+                       [{"compte": p.compte_colis_a_transporter, "debit": 4500},
+                        {"compte": p.compte_colis, "credit": 4500, "vehicule": self.vehicule,
+                         "section": self.dla.section}],
+                       reference=depart.numero, origine=depart.numero)
+
+        resultat = self.balance()
+        montants = {ligne["cle"]: ligne["produits"] for ligne in resultat["elements"]}
+        self.assertEqual(montants["REVENDEUR"], Decimal("4500"))
+        self.assertTrue(resultat["rapproche"])

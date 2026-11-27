@@ -236,7 +236,8 @@ class _Contexte:
             v["bagages"][g] = v["bagages"].get(g, ZERO) + t["part_bagages"]
             v["canaux_billets"][canal] = v["canaux_billets"].get(canal, ZERO) + t["part"]
             v["canaux_bagages"][canal] = v["canaux_bagages"].get(canal, ZERO) + t["part_bagages"]
-        for c in (Colis.objects.filter(depart_id__in=self.departs, recette_constatee=True)
+        for c in (Colis.objects.filter(depart_id__in=self.departs, port=Colis.PAYE,
+                                       statut__in=(Colis.EN_ROUTE, Colis.ARRIVE, Colis.LIVRE))
                   .values("depart_id", "prix", "nature", "canal_vente")):
             nature = "canaux_fret" if c["nature"] == Colis.FRET else "canaux_colis"
             ventes = self.ventes.setdefault(c["depart_id"], {})
