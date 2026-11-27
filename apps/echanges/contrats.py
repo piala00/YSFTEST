@@ -47,8 +47,12 @@ def ecriture(e):
                         "section": ({"code": l.section.code, "intitule": l.section.intitule, "plan": l.section.plan}
                                     if l.section_id else None),
                         "vehicule": str(l.vehicule.uid) if l.vehicule_id else None,
+                        "employe": ({"uid": str(l.employe.uid), "matricule": l.employe.matricule,
+                                     "nom": l.employe.nom, "service": l.employe.service,
+                                     "agence": _uid(l.employe.agence)} if l.employe_id else None),
                         "libelle": l.libelle, "debit": _d(l.debit), "credit": _d(l.credit), "lettrage": l.lettrage}
-                       for l in e.lignes.select_related("compte", "tiers", "section", "vehicule").order_by("pk")]}
+                       for l in e.lignes.select_related("compte", "tiers", "section", "vehicule",
+                                                        "employe", "employe__agence").order_by("pk")]}
 
 
 def serialiser(o):
@@ -499,7 +503,8 @@ def _ecriture(p, origine, local):
     """Consolidation au siège : l'écriture de l'agence est reprise telle quelle, dans un journal propre au site."""
     from apps.commercial.models import Tiers
     from apps.comptabilite.models import Compte, Ecriture, Journal, LigneEcriture, SectionAnalytique
-    from apps.core.models import Exercice
+    from apps.core.models import Agence, Exercice
+    from apps.personnel.models import Employe
     from apps.transport.models import Vehicule
 
     if local.role != local.SIEGE:
@@ -539,8 +544,30 @@ def _ecriture(p, origine, local):
         section = (SectionAnalytique.objects.get_or_create(code=l["section"]["code"], defaults={
             "plan": l["section"]["plan"], "intitule": l["section"]["intitule"]})[0] if l.get("section") else section_site)
         vehicule = Vehicule.objects.filter(uid=l["vehicule"]).first() if l.get("vehicule") else None
+        employe = None
+        if l.get("employe"):
+            source_employe = l["employe"]
+            employe = Employe.objects.filter(uid=source_employe["uid"]).first()
+            agence_employe = (_par_uid(Agence, source_employe.get("agence"), "agence", obligatoire=False)
+                              if source_employe.get("agence") else None)
+            if source_employe.get("agence") and agence_employe is None:
+                raise Attente(f"agence de l'employé {source_employe['matricule']} pas encore reçue")
+            if employe is None:
+                matricule = (f"{origine.code[:5]}-{source_employe['matricule'][:7]}-"
+                             f"{str(source_employe['uid']).replace('-', '')[:6]}")[:20]
+                employe = Employe(
+                    uid=source_employe["uid"], site_origine=origine.code, matricule=matricule,
+                    nom=source_employe["nom"], service=source_employe["service"], agence=agence_employe,
+                )
+                _enregistrer(employe, "Matricule employé", matricule)
+            elif employe.site_origine and employe.site_origine != origine.code:
+                raise Conflit("identifiant d'employé déjà utilisé par un autre site")
+            elif employe.site_origine == origine.code:
+                employe.nom, employe.service, employe.agence = (
+                    source_employe["nom"], source_employe["service"], agence_employe)
+                employe.save(update_fields=["nom", "service", "agence"])
         lignes.append(LigneEcriture(ecriture=e, compte=compte, tiers=tiers, section=section, vehicule=vehicule,
-                                    libelle=(l.get("libelle") or "")[:200],
+                                    employe=employe, libelle=(l.get("libelle") or "")[:200],
                                     debit=Decimal(l["debit"]), credit=Decimal(l["credit"]), lettrage=l.get("lettrage") or ""))
     LigneEcriture.objects.bulk_create(lignes)
     if sum(l.debit for l in lignes) != sum(l.credit for l in lignes):
