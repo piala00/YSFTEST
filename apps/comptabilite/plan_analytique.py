@@ -45,6 +45,7 @@ AXES_TRANSPORT = [
     ("vehicules", "Véhicules", "Compte d'exploitation de chaque car et camion"),
     ("proprietaires", "Propriétaires", "Véhicules des partenaires selon le contrat en vigueur à la date"),
     ("services", "Services", "Billetterie, colis, conduite, garage, administration : produits et coûts de chaque service"),
+    ("employes", "Employés", "Charges de personnel rattachées au salarié sur chaque ligne comptable de paie"),
     ("activites", "Activités", "Voyageurs, bagages, colis et fret, autres produits ; charges des véhicules et de structure"),
     ("gammes", "Gammes (Classique / VIP)", "Flottes distinctes Classique et VIP"),
     ("lignes", "Lignes (itinéraires)", "Résultat de chaque itinéraire"),
@@ -361,7 +362,8 @@ def faits(debut, fin, ctx=None):
     ctx = ctx or _Contexte(debut, fin)
     qs = (LigneEcriture.objects.filter(ecriture__statut=Ecriture.STATUT_VALIDEE, ecriture__date__range=(debut, fin))
           .filter(Q(compte__numero__startswith="6") | Q(compte__numero__startswith="7"))
-          .values("id", "debit", "credit", "libelle", "vehicule_id", "section_id", "compte__numero", "compte__intitule",
+          .values("id", "debit", "credit", "libelle", "vehicule_id", "employe_id", "section_id",
+                  "compte__numero", "compte__intitule",
                   "ecriture_id", "ecriture__date", "ecriture__numero", "ecriture__reference", "ecriture__libelle",
                   "ecriture__origine", "ecriture__journal__code", "ecriture__site_origine")
           .order_by("ecriture__date", "ecriture__numero", "id"))
@@ -370,7 +372,8 @@ def faits(debut, fin, ctx=None):
         f = {"id": l["id"], "date": l["ecriture__date"], "piece": l["ecriture__numero"], "ecriture_id": l["ecriture_id"],
              "journal": l["ecriture__journal__code"], "libelle": l["libelle"] or l["ecriture__libelle"],
              "compte": numero, "compte_intitule": l["compte__intitule"], "produit": numero.startswith("7"),
-             "montant": l["credit"] - l["debit"], "site": l["ecriture__site_origine"]}
+             "montant": l["credit"] - l["debit"], "site": l["ecriture__site_origine"],
+             "employes": l["employe_id"]}
         section = ctx.sections.get(l["section_id"])
         if section:
             f[ctx.slug_plan[section["plan"]]] = section["id"]
@@ -459,6 +462,9 @@ def libelles(axe, cles):
     if axe == "services":
         from apps.personnel.models import Employe
         return {c: dict(Employe.SERVICES).get(c, c) for c in cles}
+    if axe == "employes":
+        from apps.personnel.models import Employe
+        return {e.pk: f"{e.matricule} — {e.nom}" for e in Employe.objects.filter(pk__in=cles)}
     if axe == "contrats":
         from apps.partenaires.models import ContratPartenaire
         return {c.pk: f"{c.numero} v{c.version} — {c.partenaire.nom} — {c.vehicule.immatriculation}"
