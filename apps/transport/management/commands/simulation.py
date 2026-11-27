@@ -71,6 +71,7 @@ class Command(SimulationMetierMixin, BaseCommand):
         p.add_argument("--forcer", action="store_true", help="Lever les contrôles de dossier (tests automatiques seulement)")
 
     def handle(self, *a, **o):
+        from apps.echanges.publication import cache_site_local
         from apps.transport.models import Depart
 
         base = connection.settings_dict
@@ -139,6 +140,13 @@ class Command(SimulationMetierMixin, BaseCommand):
             for jour in jours:
                 avant_jour = dict(self.compteurs)
                 chrono = time.perf_counter()
+
+                def executer_journee():
+                    # Une journée ne change pas l'agence locale ; les événements
+                    # publiés partagent donc la même lecture de référentiel.
+                    with cache_site_local():
+                        self.journee(jour)
+
                 # Profil SQL facultatif : identifier les requêtes réellement lentes
                 # sans modifier les transactions ni allonger le timeout CI.
                 if diagnostic_sql:
@@ -174,7 +182,7 @@ class Command(SimulationMetierMixin, BaseCommand):
                                 requetes["lentes"].append((ecoule, empreinte))
 
                     with sql_connection.execute_wrapper(mesurer_requete):
-                        self.journee(jour)
+                        executer_journee()
                     import hashlib
                     top_cumules = sorted(requetes["par_sql"].items(),
                                         key=lambda item: item[1][1], reverse=True)[:5]
@@ -207,7 +215,7 @@ class Command(SimulationMetierMixin, BaseCommand):
                           f'slowest={sorted(requetes["lentes"], reverse=True)[:5]} '
                           f'top_cumulative={top_cumules}', flush=True)
                 else:
-                    self.journee(jour)
+                    executer_journee()
                 if diagnostic_sql:
                     stats_caisse = getattr(self, "_diagnostic_caisse", None)
                     if stats_caisse:
@@ -223,8 +231,9 @@ class Command(SimulationMetierMixin, BaseCommand):
                 self.stdout.write(f"{jour:%d/%m/%Y} : {self.compteurs['voyages']} voyages, {self.compteurs['billets']} billets")
             self.moment(jours[-1], 22)
             debut_phase = time.perf_counter()
-            with horloge(self.maintenant):
-                self.fin_de_mois(jours[0], jours[-1])
+            with cache_site_local():
+                with horloge(self.maintenant):
+                    self.fin_de_mois(jours[0], jours[-1])
             trace_phase(f'fin_de_mois {jours[0]:%Y-%m}', debut_phase)
             self.par_mois.append((jours[0], jours[-1], {k: self.compteurs[k] - avant[k] for k in self.compteurs}))
             # Arrêt propre demandé à l'écran : la tranche (ce mois) est terminée et consultable ;
