@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-title"><h1>{{ titre_axe }} <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1>
   <a class="small d-print-none" href="{% url 'analytique:plan' %}?{{ params_periode }}">← Plan analytique</a></div>
-{% url 'analytique:axe' axe as url_axe %}{% with export_url=url_axe|add:"?"|add:params_periode|add:"&tri="|add:tri|add:"&export=csv" excel_url=url_axe|add:"?"|add:params_periode|add:"&tri="|add:tri|add:"&export=xlsx" %}{% include "comptabilite/_periode_analytique.html" %}{% endwith %}
+{% url 'analytique:axe' axe as url_axe %}{% with export_url=url_axe|add:"?"|add:params_periode|add:"&tri="|add:tri|add:"&export=csv" excel_url=url_axe|add:"?"|add:params_periode|add:"&tri="|add:tri|add:"&export=xlsx" pdf_url=url_axe|add:"?"|add:params_periode|add:"&tri="|add:tri|add:"&export=pdf" %}{% include "comptabilite/_periode_analytique.html" %}{% endwith %}
 <form class="d-flex gap-2 align-items-end mb-2 d-print-none" method="get">
   <input type="hidden" name="du" value="{{ du|date:'Y-m-d' }}"><input type="hidden" name="au" value="{{ au|date:'Y-m-d' }}">
   <div><label class="form-label small mb-0" for="tri">Classer par</label><select id="tri" name="tri" class="form-select form-select-sm" onchange="this.form.submit()">
