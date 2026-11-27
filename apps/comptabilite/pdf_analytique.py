@@ -85,7 +85,6 @@ def generer_pdf(nom, titre, debut, fin, entetes, lignes, note=""):
         bottomMargin=16 * mm,
         title=titre,
         author="ERP Transport Afrique Centrale",
-        subject=f"{titre} — {periode}",
     )
     styles = {
         "titre": ParagraphStyle(
@@ -162,6 +161,9 @@ def generer_pdf(nom, titre, debut, fin, entetes, lignes, note=""):
 
     def pied_page(canvas, doc):
         canvas.saveState()
+        canvas.setTitle(titre)
+        canvas.setAuthor("ERP Transport Afrique Centrale")
+        canvas.setSubject(f"{titre} — {periode}")
         canvas.setFont(police, 7)
         canvas.setFillColor(colors.HexColor("#64748B"))
         canvas.drawString(doc.leftMargin, 7 * mm, f"{titre} — {periode}")
