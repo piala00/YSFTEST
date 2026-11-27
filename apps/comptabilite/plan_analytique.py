@@ -45,7 +45,6 @@ AXES_TRANSPORT = [
     ("vehicules", "Véhicules", "Compte d'exploitation de chaque car et camion"),
     ("proprietaires", "Propriétaires", "Véhicules des partenaires selon le contrat en vigueur à la date"),
     ("services", "Services", "Billetterie, colis, conduite, garage, administration : produits et coûts de chaque service"),
-    ("employes", "Employés", "Charges de personnel rattachées au salarié sur chaque ligne comptable de paie"),
     ("activites", "Activités", "Voyageurs, bagages, colis et fret, autres produits ; charges des véhicules et de structure"),
     ("gammes", "Gammes (Classique / VIP)", "Flottes distinctes Classique et VIP"),
     ("lignes", "Lignes (itinéraires)", "Résultat de chaque itinéraire"),
