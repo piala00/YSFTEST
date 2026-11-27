@@ -49,7 +49,8 @@ def ecriture(e):
                         "vehicule": str(l.vehicule.uid) if l.vehicule_id else None,
                         "employe": ({"uid": str(l.employe.uid), "matricule": l.employe.matricule,
                                      "nom": l.employe.nom, "service": l.employe.service,
-                                     "agence": _uid(l.employe.agence)} if l.employe_id else None),
+                                     "agence": (str(l.employe.agence.uid) if l.employe.agence_id and l.employe.agence.uid else None)}
+                                     if l.employe_id else None),
                         "libelle": l.libelle, "debit": _d(l.debit), "credit": _d(l.credit), "lettrage": l.lettrage}
                        for l in e.lignes.select_related("compte", "tiers", "section", "vehicule",
                                                         "employe", "employe__agence").order_by("pk")]}
