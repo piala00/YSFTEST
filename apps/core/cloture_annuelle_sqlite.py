@@ -84,6 +84,10 @@ def preparer_exercice_sqlite(catalogue, identifiant, destination, nouvel_identif
                     if nouvelle.execute("PRAGMA foreign_key_check").fetchone() is not None:
                         raise ValueError("références invalides dans la base N+1")
         verifier_base_sqlite(str(cible))
+        if finaliser_source is not None:
+            if not callable(finaliser_source):
+                raise TypeError("finalisation de l'exercice source invalide")
+            finaliser_source()
         resultat = publier_exercice_sqlite_valide(
             catalogue, identifiant, str(cible), nouvel_identifiant,
         )
