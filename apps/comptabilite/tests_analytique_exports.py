@@ -251,3 +251,32 @@ class FraicheurAgencesAnalytiquesTests(TestCase):
 
         self.assertNotIn("Fraîcheur des données reçues des agences", html)
         self.assertNotIn("Bertoua", html)
+
+
+    def test_bandeau_ne_recharge_pas_les_agences_dans_la_meme_requete(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        Agence.objects.create(
+            code="SIEGE", nom="Direction", locale=True, role=Agence.SIEGE,
+        )
+        Agence.objects.bulk_create([
+            Agence(code="DLA", nom="Douala", role=Agence.AGENCE,
+                   derniere_reception=timezone.now(), sequence_integree=42),
+        ])
+        modele = Template(
+            "{% load fraicheur %}{% fraicheur_agences %}{% fraicheur_agences %}"
+        )
+        requete = RequestFactory().get("/analytique/")
+
+        with CaptureQueriesContext(connection) as requetes:
+            html = modele.render(Context({"request": requete}))
+
+        self.assertEqual(len(requetes), 1)
+        self.assertEqual(html.count("Douala"), 2)
+        self.assertEqual(html.count("Séquence intégrée : 42"), 2)
+
+        # Le cache ne dépasse pas la requête : le prochain écran voit la nouvelle réception.
+        Agence.objects.filter(code="DLA").update(sequence_integree=43)
+        nouvel_html = modele.render(Context({"request": RequestFactory().get("/analytique/")}))
+        self.assertIn("Séquence intégrée : 43", nouvel_html)
