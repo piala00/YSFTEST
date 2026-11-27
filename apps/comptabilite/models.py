@@ -320,6 +320,8 @@ class LigneEcriture(models.Model):
     vehicule = models.ForeignKey("transport.Vehicule", null=True, blank=True, on_delete=models.PROTECT,
                                  related_name="lignes_ecriture", verbose_name="Véhicule",
                                  help_text="Compte du véhicule : ses recettes et ses dépenses (grand livre et balance des véhicules)")
+    employe = models.ForeignKey("personnel.Employe", null=True, blank=True, on_delete=models.PROTECT,
+                                related_name="lignes_ecriture", verbose_name="Employé")
     date_pointage = models.DateField("Pointé le", null=True, blank=True,
                                      help_text="Rapprochement bancaire : date du relevé sur lequel la ligne figure")
 
