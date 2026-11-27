@@ -184,20 +184,16 @@ def shard_for_class(key, count):
         raise ValueError("nombre de shards invalide")
     assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
     if count == 2:
-        # Run CI #545 (27/11/2026) : shard 1 = 580.429s, shard 0 = 344.870s.
-        # Mesures par classe sur le shard 1 : AdministrationOnglets 54.206s,
-        # ScenarioTroisDossiers 34.475s et SynchronisationRelaisInternet 24.838s.
-        # Les déplacer vers le shard 0 équilibre les deux runners sans augmenter
-        # le délai ni omettre de tests. Les classes restent indivisibles pour
-        # préserver setUpClass/tearDownClass.
+        # Mesure réelle CI #619 (27/11/2026) :
+        # shard 0 = 318 tests / 536.290s ; shard 1 = 483 tests / 419.633s.
+        # AdministrationOnglets a pris 53.456s sur le shard 0. Le déplacer
+        # vers le shard 1 donne une charge estimée à 482.834s / 473.089s.
+        # Simulation multi-mois et bascule SQL Server restent sur le shard 1.
+        # Les classes restent indivisibles pour préserver setUpClass/tearDownClass.
         overrides = {
-            # CI #600 : le shard 0 a pris 591.088s contre 375.662s au shard 1 ;
-            # les deux tests de simulation multi-mois ont pris 150.784s au total.
-            # Les déplacer au shard 1 équilibre la charge observée sans toucher
-            # au nombre de tests ni au délai maximal.
             "apps.transport.tests.SimulationPlusieursMoisTests": 1,
             "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
-            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 0,
+            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
             "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
             "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 0,
         }
