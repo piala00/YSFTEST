@@ -50,12 +50,23 @@ class AdministrationOngletsTests(TestCase):
 
     def test_colonne_absente_signalee_sans_recreation(self):
         originale = connection.introspection.get_table_description
+        presentes = set(connection.introspection.table_names())
+        # Conserver la lecture groupée SQL Server pour toutes les tables, sauf
+        # Societe : le test force le chemin de repli sur une seule table au lieu
+        # de refaire une introspection coûteuse pour tout le schéma.
+        colonnes_groupees = structure_base._colonnes_sql_server(presentes)
+        colonnes_groupees.pop(Societe._meta.db_table, None)
+        tables_replues = []
+
         def description(cur, table):
+            tables_replues.append(table)
             champs = originale(cur, table)
             return [c for c in champs if not (table == Societe._meta.db_table and c.name == "raison_sociale")]
+
         with mock.patch.object(connection.introspection, "get_table_description", side_effect=description), \
-                mock.patch.object(structure_base, "_colonnes_sql_server", return_value={}):
+                mock.patch.object(structure_base, "_colonnes_sql_server", return_value=colonnes_groupees):
             diagnostic = structure_base.analyser()
+        self.assertIn(Societe._meta.db_table, tables_replues)
         self.assertFalse(diagnostic["ok"])
         self.assertIn(f"Colonne absente : {Societe._meta.db_table}.raison_sociale.", diagnostic["anomalies"])
 
