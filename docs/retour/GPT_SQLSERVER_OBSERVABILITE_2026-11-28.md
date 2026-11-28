@@ -86,3 +86,37 @@ Deuxième précision : une exception propagée dans le contexte de `Atomic.__exi
 Tests ajoutés : attribution explicite à `setUpClass`, distinction erreur SQL/contexte d'exception, et transmission du propriétaire du scope transactionnel. Le timeout GNU de 16 minutes, le comportement transactionnel Django et le code métier ne changent pas.
 
 Référence officielle : Django 6.1.3, documentation « Testing tools » — `TestCase` enveloppe la classe entière et chaque test dans deux blocs `atomic()` imbriqués : https://docs.djangoproject.com/en/6.1/topics/testing/tools/#testcase
+
+
+## Validation du correctif transactionnel — run #805, 28/11/2026
+
+Le run [#805](https://github.com/piala00/YSFTEST/actions/runs/46106549509) a terminé avec **9 jobs sur 9 en succès**. Les deux shards SQL Server ont émis leurs marqueurs de synthèse et archivé leurs journaux.
+
+| Mesure du run #805 | Shard 0 | Shard 1 |
+|---|---:|---:|
+| Tests | 317 | 505 |
+| `run_suite` | 318,925 s | 690,866 s |
+| `setup_databases` | 12,350 s | 25,031 s |
+| `teardown_databases` | 4,834 s | 3,886 s |
+| Ouverture des connexions (cumul) | 0,158 s | 0,278 s |
+| Fermeture des connexions (cumul) | 0,024 s | 0,044 s |
+| Appels `cursor_execute` | 330 160 | 256 756 |
+| Temps `cursor_execute` cumulé | 139,698 s | 250,503 s |
+
+Les durées `atomic_scope` sont inclusives et imbriquées : 922,171 s sur le shard 0 et 1 211,123 s sur le shard 1. Elles ne sont pas additionnables au temps mural. Le test de simulation le plus long du shard 0 est `test_jusqu_a_une_date_le_dernier_mois_s_arrete_a_ce_jour` (91,714 s selon `TestCase.run`). Le journal du shard 1 montre notamment des fixtures de classe coûteuses : AdministrationOnglets (63,524 s inclusifs), PagesEtApi (54,827 s) et PlanAnalytiqueComplet (60,395 s).
+
+La suite SQLite a exécuté 822 tests en 133,993 s (18 ignorés). La recette P0.3 sur deux bases Django réellement migrées a exécuté 14 tests en 51,369 s. Les deux shards SQL Server, les deux recettes Windows, l'activation compilée, le guichet, les licences et la simulation volume sont en succès. Le délai GNU de 16 minutes n'a pas été modifié.
+
+## Séparer les métriques du runner du profil SQL exhaustif de simulation
+
+La lecture du code de `apps/transport/management/commands/simulation.py` a montré que `SQL_TEST_TIMINGS=1`, posé par le runner CI, activait aussi un `connection.execute_wrapper` dans chaque journée simulée. Ce profil détaillé conserve les formes SQL, agrège chaque requête et calcule des empreintes SHA-256. Il est utile pour une enquête ciblée, mais ne doit pas être activé implicitement pendant toute la suite.
+
+Correction proposée et publiée dans le commit suivant la validation #805 :
+- `SQL_TEST_TIMINGS` conserve les mesures générales du runner SQL Server (test, corps, fixtures, connexions, curseurs et transactions).
+- Le profil exhaustif de la commande de simulation dépend désormais de `SIMULATION_SQL_DIAGNOSTIC=1` (valeurs explicites acceptées : `1`, `true`, `yes`, `on`).
+- Les mesures quotidiennes métier `self.mesures` restent présentes ; seule l'instrumentation SQL détaillée est opt-in.
+- Le calcul de trésorerie ne déclenche plus son sous-profileur lorsque seul le runner CI est actif.
+
+Tests ciblés ajoutés : `DiagnosticSqlSimulationTests` vérifie que `SQL_TEST_TIMINGS` seul n'active pas le profileur, que la variable dédiée l'active, et que les valeurs désactivantes le maintiennent éteint. Le workflow exécute ce groupe séparément avant la suite SQLite. Le comparatif de performance A/B reste à obtenir dans le run qui suit ce commit ; aucun gain n'est revendiqué avant cette mesure.
+
+Aucun changement de logique comptable, de transactions, de scénario métier ou de délai d'exécution n'est introduit par cette séparation.
