@@ -1,4 +1,4 @@
-"""SQL Server CI runner: per-test timing and periodic stack diagnostics.
+"""SQL Server CI runner: per-test timing and per-test stack diagnostics.
 
 The duration log is flushed immediately so a global timeout still leaves the
 name and elapsed time of the last unfinished test in GitHub Actions logs.
@@ -26,6 +26,15 @@ def instrument_tests():
     resources = {}
     resource_lock = Lock()
     atomic_local = local()
+    traceback_seconds = max(0.0, float(os.environ.get("SQL_TEST_TRACEBACK_SECONDS", "180")))
+
+    def arm_traceback_dump():
+        if traceback_seconds:
+            faulthandler.cancel_dump_traceback_later()
+            faulthandler.dump_traceback_later(traceback_seconds, repeat=False, file=sys.stderr)
+
+    def cancel_traceback_dump():
+        faulthandler.cancel_dump_traceback_later()
 
     def _resource_record(name, kind, elapsed, alias=None, exceptional=False, rollback=False):
         """Agrège les ouvertures/fermetures réelles et les blocs atomic, par test ou fixture."""
@@ -139,9 +148,11 @@ def instrument_tests():
         started = time.monotonic()
         active["name"], active["started"] = test_name, started
         print(f"[SQL-TEST-START] {test_name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_run(self, result)
         finally:
+            cancel_traceback_dump()
             elapsed = time.monotonic() - started
             active["name"], active["started"] = None, None
             durations.append((elapsed, test_name))
@@ -212,9 +223,11 @@ def instrument_tests():
         prior = (active["name"], active["started"])
         active["name"], active["started"] = fixture_name, started
         print(f"[SQL-FIXTURE-START] {fixture_name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_class_setup(self, test, result)
         finally:
+            cancel_traceback_dump()
             active["name"], active["started"] = prior
             print(f"[SQL-FIXTURE-END] {fixture_name} {time.monotonic() - started:.3f}s", flush=True)
             report_resource(fixture_name)
@@ -229,9 +242,11 @@ def instrument_tests():
         prior = (active["name"], active["started"])
         active["name"], active["started"] = f"tearDownClass {name}", started
         print(f"[SQL-FIXTURE-START] tearDownClass {name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_class_teardown(self, test, result)
         finally:
+            cancel_traceback_dump()
             active["name"], active["started"] = prior
             print(f"[SQL-FIXTURE-END] tearDownClass {name} "
                   f"{time.monotonic() - started:.3f}s", flush=True)
@@ -417,7 +432,8 @@ def main():
     os.chdir(repository_root)
     os.environ.setdefault("SQL_TEST_TIMINGS", "1")
     faulthandler.enable(all_threads=True)
-    faulthandler.dump_traceback_later(120, repeat=True, file=sys.stderr)
+    # Le watchdog est armé autour de chaque test/fixture, pas depuis le démarrage
+    # global : un test rapide ne doit pas recevoir un faux « Timeout (0:02:00) ».
     instrument_tests()
     instrument_database_lifecycle()
     partition_suite()
