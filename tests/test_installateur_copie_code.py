@@ -36,6 +36,18 @@ class CopieCodeInstallateurTests(unittest.TestCase):
         confirmation = procedure.index("BoutonCopierCode.Caption := 'Code copié !'")
         self.assertLess(verification, confirmation)
 
+    def test_focus_utilise_les_api_win32_disponibles_dans_pascal_script(self):
+        self.assertIn("function DefinirFocus(Fenetre: HWND): HWND;", SOURCE)
+        self.assertIn("external 'SetFocus@user32.dll stdcall';", SOURCE)
+        self.assertIn("function ObtenirFocus: HWND;", SOURCE)
+        self.assertIn("external 'GetFocus@user32.dll stdcall';", SOURCE)
+        self.assertNotIn("ChampCodeInstallation.SetFocus", SOURCE)
+        debut = SOURCE.index("procedure CopierCodeInstallation")
+        fin = SOURCE.index("\\nprocedure InitializeWizard", debut)
+        procedure = SOURCE[debut:fin]
+        self.assertIn("DefinirFocus(ChampCodeInstallation.Handle);", procedure)
+        self.assertIn("ObtenirFocus() <> ChampCodeInstallation.Handle", procedure)
+
     def test_les_formats_windows_utilises_sont_cf_text_et_cf_unicodetext(self):
         self.assertIn("FormatPressePapiersTexte = 1;", SOURCE)
         self.assertIn("FormatPressePapiersUnicode = 13;", SOURCE)
