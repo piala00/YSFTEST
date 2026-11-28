@@ -13,6 +13,8 @@ $Installateur = (Resolve-Path -LiteralPath $Installateur).Path
 $journal = Join-Path $env:RUNNER_TEMP "wizard-copie-code-$Edition.log"
 $processus = $null
 $wizard = [IntPtr]::Zero
+$processusSnapshot = @()
+$processIds = @()
 $preuve = [ordered]@{
     edition = $Edition
     resultat = "ECHEC"
@@ -36,6 +38,7 @@ public sealed class InnoWindowInfo
     public string ClassName { get; set; }
     public bool Visible { get; set; }
     public bool Enabled { get; set; }
+    public int ProcessId { get; set; }
 }
 
 public static class InnoUiNative
@@ -100,24 +103,56 @@ public static class InnoUiNative
         return value.ToString();
     }
 
-    public static IntPtr FindMainWindow(int processId)
+    public static InnoWindowInfo[] WindowsForProcesses(int[] processIds)
     {
-        IntPtr found = IntPtr.Zero;
+        HashSet<int> owners = new HashSet<int>(processIds ?? new int[0]);
+        List<InnoWindowInfo> result = new List<InnoWindowInfo>();
         EnumWindowsProc callback = delegate(IntPtr hWnd, IntPtr lParam)
         {
             uint owner;
             GetWindowThreadProcessId(hWnd, out owner);
-            if (owner == (uint)processId && IsWindowVisible(hWnd) &&
-                !String.IsNullOrWhiteSpace(Text(hWnd)))
+            if (owners.Count == 0 || owners.Contains((int)owner))
             {
-                found = hWnd;
-                return false;
+                result.Add(new InnoWindowInfo {
+                    Handle = hWnd,
+                    ProcessId = (int)owner,
+                    Text = Text(hWnd),
+                    ClassName = ClassName(hWnd),
+                    Visible = IsWindowVisible(hWnd),
+                    Enabled = IsWindowEnabled(hWnd)
+                });
             }
             return true;
         };
         EnumWindows(callback, IntPtr.Zero);
         GC.KeepAlive(callback);
-        return found;
+        return result.ToArray();
+    }
+
+    public static IntPtr FindMainWindow(int[] processIds)
+    {
+        InnoWindowInfo[] windows = WindowsForProcesses(processIds);
+        IntPtr fallback = IntPtr.Zero;
+        foreach (InnoWindowInfo window in windows)
+        {
+            if (!window.Visible)
+                continue;
+            if (window.ClassName == "TWizardForm")
+                return window.Handle;
+            if (fallback == IntPtr.Zero && !String.IsNullOrWhiteSpace(window.Text))
+                fallback = window.Handle;
+        }
+
+        // UseSetupLdr may run the extracted setup copy from TEMP. If Windows
+        // detached that process from the original launcher PID, identify only
+        // the unique Inno wizard for this product (the CI job runs one setup).
+        foreach (InnoWindowInfo window in WindowsForProcesses(new int[0]))
+        {
+            if (window.Visible && window.ClassName == "TWizardForm" &&
+                window.Text.IndexOf("ERP OHADA", StringComparison.OrdinalIgnoreCase) >= 0)
+                return window.Handle;
+        }
+        return fallback;
     }
 
     public static InnoWindowInfo[] Children(IntPtr parent)
@@ -184,6 +219,35 @@ function Find-Control([string]$Pattern) {
     Get-VisibleControls | Where-Object { $_.Text -match $Pattern } | Select-Object -First 1
 }
 
+function Get-InstallerProcessSnapshot {
+    try {
+        return @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop |
+            Select-Object ProcessId, ParentProcessId, Name, ExecutablePath)
+    }
+    catch {
+        # Le PID initial reste exploitable si CIM/WMI est restreint. Le repli
+        # global TWizardForm/ERP OHADA est alors utilisé par FindMainWindow.
+        return @()
+    }
+}
+
+function Get-InstallerProcessIds([int]$RootProcessId, [object[]]$Snapshot) {
+    $ids = [System.Collections.Generic.HashSet[int]]::new()
+    [void]$ids.Add($RootProcessId)
+    $changed = $true
+    while ($changed) {
+        $changed = $false
+        foreach ($item in $Snapshot) {
+            $pidEnfant = [int]$item.ProcessId
+            $pidParent = [int]$item.ParentProcessId
+            if ($ids.Contains($pidParent) -and $ids.Add($pidEnfant)) {
+                $changed = $true
+            }
+        }
+    }
+    return ,([int[]]@($ids))
+}
+
 function Wait-Control([string]$Pattern, [int]$TimeoutSeconds = 12) {
     $limite = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
@@ -211,16 +275,34 @@ try {
     $processus = Start-Process -FilePath $Installateur -ArgumentList @("/LOG=$journal") -PassThru
     $limiteFenetre = [DateTime]::UtcNow.AddSeconds(60)
     do {
-        if ($processus.HasExited) {
-            throw "L'installateur s'est fermé avant l'ouverture du wizard (code $($processus.ExitCode))."
-        }
-        $wizard = [InnoUiNative]::FindMainWindow($processus.Id)
+        # Avec le Setup Loader, l'interface peut appartenir à la copie temporaire
+        # lancée depuis TEMP, et non au PID du lanceur retourné par Start-Process.
+        # On suit donc l'arbre des processus à chaque sondage, même si le lanceur
+        # initial s'est déjà terminé.
+        $processusSnapshot = @(Get-InstallerProcessSnapshot)
+        $processIds = @(Get-InstallerProcessIds -RootProcessId $processus.Id -Snapshot $processusSnapshot)
+        $wizard = [InnoUiNative]::FindMainWindow([int[]]$processIds)
         if ($wizard -ne [IntPtr]::Zero) { break }
         Start-Sleep -Milliseconds 300
     } while ([DateTime]::UtcNow -lt $limiteFenetre)
 
     if ($wizard -eq [IntPtr]::Zero) {
-        throw "Fenêtre principale Inno Setup introuvable pour le processus $($processus.Id)."
+        $fenetres = @([InnoUiNative]::WindowsForProcesses([int[]]$processIds) |
+            Where-Object { $_.Visible } |
+            ForEach-Object {
+                [pscustomobject]@{
+                    pid = $_.ProcessId
+                    classe = $_.ClassName
+                    titre = $_.Text
+                    actif = $_.Enabled
+                }
+            })
+        $preuve.processus = @($processusSnapshot |
+            Where-Object { $processIds -contains [int]$_.ProcessId } |
+            Select-Object ProcessId, ParentProcessId, Name, ExecutablePath)
+        $preuve.fenetres = $fenetres
+        $preuve.journal_setup = $journal
+        throw "Fenêtre principale Inno Setup introuvable après suivi du lanceur et de ses descendants (PID suivis : $($processIds -join ', '))."
     }
 
     [InnoUiNative]::SetForegroundWindow($wizard) | Out-Null
@@ -315,7 +397,13 @@ catch {
     throw
 }
 finally {
-    if ($null -ne $processus -and -not $processus.HasExited) {
-        & taskkill.exe /F /T /PID $processus.Id | Out-Null
+    if ($null -ne $processus) {
+        $nettoyageSnapshot = @(Get-InstallerProcessSnapshot)
+        $nettoyageIds = @(Get-InstallerProcessIds -RootProcessId $processus.Id -Snapshot $nettoyageSnapshot)
+        foreach ($pidActuel in $nettoyageIds) {
+            if (Get-Process -Id $pidActuel -ErrorAction SilentlyContinue) {
+                & taskkill.exe /F /T /PID $pidActuel 2>$null | Out-Null
+            }
+        }
     }
 }
