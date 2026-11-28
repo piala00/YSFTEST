@@ -173,6 +173,20 @@ jobs:
           timeout --verbose --signal=TERM --kill-after=30s 16m python -u tests_navigateur/sqlserver_test_runner.py 2>&1 | tee "$log_file"
           grep -q '^\[SQL-DB-SUMMARY\]' "$log_file"
           grep -q '^\[SQL-DB-TEST-TOP\]' "$log_file"
+      - name: Profil SQL ciblé — simulation multi-mois (shard 0)
+        if: matrix.shard == 0
+        timeout-minutes: 8
+        env:
+          SIMULATION_SQL_DIAGNOSTIC: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_file="${RUNNER_TEMP}/sqlserver-simulation-profile.log"
+          # Profiler uniquement le scénario de 61 journées : le profil SQL exhaustif
+          # reste opt-in et n'alourdit pas les 800+ tests du shard.
+          timeout --verbose --signal=TERM --kill-after=30s 7m python -u tests_navigateur/sqlserver_test_runner.py apps.transport.tests.SimulationPlusieursMoisTests.test_jusqu_a_une_date_le_dernier_mois_s_arrete_a_ce_jour 2>&1 | tee "$log_file"
+          grep -q '^\\[SIM-SQL-ETAPE\\]' "$log_file"
+          grep -q '^\\[SIM-SQL-SIGNATURE\\]' "$log_file"
       - name: Diagnostic SQL Server apres echec ou timeout
         if: failure()
         shell: bash
@@ -189,7 +203,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ERP-SQLServer-Diagnostics-${{ matrix.shard }}
-          path: ${{ runner.temp }}/sqlserver-shard-${{ matrix.shard }}.log
+          path: |
+            ${{ runner.temp }}/sqlserver-shard-${{ matrix.shard }}.log
+            ${{ runner.temp }}/sqlserver-simulation-profile.log
           if-no-files-found: warn
           retention-days: 7
 
