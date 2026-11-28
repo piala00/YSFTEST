@@ -487,9 +487,27 @@ finally {
         $idsArbre = @(Get-InstallerProcessIds -RootProcessId $processus.Id -Snapshot $nettoyageSnapshot)
         $nettoyageIds = @($processIds + $idsArbre) | Sort-Object -Unique
         foreach ($pidActuel in $nettoyageIds) {
-            if (Get-Process -Id $pidActuel -ErrorAction SilentlyContinue) {
-                & taskkill.exe /F /T /PID $pidActuel 2>$null | Out-Null
+            # Ne jamais arrêter le shell qui exécute la recette.
+            if ($pidActuel -le 0 -or $pidActuel -eq $PID) { continue }
+            try {
+                $cible = Get-Process -Id $pidActuel -ErrorAction SilentlyContinue
+                if ($null -ne $cible -and -not $cible.HasExited) {
+                    Stop-Process -Id $pidActuel -Force -ErrorAction Stop
+                }
+            }
+            catch {
+                # Le wizard peut se fermer entre l'instantané et l'arrêt.
+                # Une disparition concurrente est normale ; un processus encore
+                # vivant après l'échec d'arrêt reste une vraie erreur de nettoyage.
+                if (Get-Process -Id $pidActuel -ErrorAction SilentlyContinue) {
+                    throw
+                }
             }
         }
     }
+
+    # Le shell pwsh intégré de GitHub Actions propage LASTEXITCODE en fin de step.
+    # Le nettoyage est désormais fait par cmdlets : aucun code natif résiduel
+    # ne doit transformer une copie vérifiée en échec de job.
+    $global:LASTEXITCODE = 0
 }
