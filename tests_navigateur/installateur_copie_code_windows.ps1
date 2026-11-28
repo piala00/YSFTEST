@@ -15,6 +15,7 @@ $processus = $null
 $wizard = [IntPtr]::Zero
 $processusSnapshot = @()
 $processIds = @()
+$pidFenetre = 0
 $preuve = [ordered]@{
     edition = $Edition
     resultat = "ECHEC"
@@ -101,6 +102,13 @@ public static class InnoUiNative
         StringBuilder value = new StringBuilder(256);
         GetClassName(hWnd, value, value.Capacity);
         return value.ToString();
+    }
+
+    public static int ProcessIdForWindow(IntPtr hWnd)
+    {
+        uint owner;
+        GetWindowThreadProcessId(hWnd, out owner);
+        return (int)owner;
     }
 
     public static InnoWindowInfo[] WindowsForProcesses(int[] processIds)
@@ -245,7 +253,7 @@ function Get-InstallerProcessIds([int]$RootProcessId, [object[]]$Snapshot) {
             }
         }
     }
-    return ,([int[]]@($ids))
+    return [int[]]@($ids)
 }
 
 function Wait-Control([string]$Pattern, [int]$TimeoutSeconds = 12) {
@@ -303,6 +311,11 @@ try {
         $preuve.fenetres = $fenetres
         $preuve.journal_setup = $journal
         throw "Fenêtre principale Inno Setup introuvable après suivi du lanceur et de ses descendants (PID suivis : $($processIds -join ', '))."
+    }
+
+    $pidFenetre = [InnoUiNative]::ProcessIdForWindow($wizard)
+    if ($pidFenetre -gt 0 -and $processIds -notcontains $pidFenetre) {
+        $processIds += $pidFenetre
     }
 
     [InnoUiNative]::SetForegroundWindow($wizard) | Out-Null
@@ -399,7 +412,8 @@ catch {
 finally {
     if ($null -ne $processus) {
         $nettoyageSnapshot = @(Get-InstallerProcessSnapshot)
-        $nettoyageIds = @(Get-InstallerProcessIds -RootProcessId $processus.Id -Snapshot $nettoyageSnapshot)
+        $idsArbre = @(Get-InstallerProcessIds -RootProcessId $processus.Id -Snapshot $nettoyageSnapshot)
+        $nettoyageIds = @($processIds + $idsArbre) | Sort-Object -Unique
         foreach ($pidActuel in $nettoyageIds) {
             if (Get-Process -Id $pidActuel -ErrorAction SilentlyContinue) {
                 & taskkill.exe /F /T /PID $pidActuel 2>$null | Out-Null
