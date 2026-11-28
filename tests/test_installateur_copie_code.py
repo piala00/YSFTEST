@@ -65,6 +65,18 @@ class CopieCodeInstallateurTests(unittest.TestCase):
         self.assertIn("ProcessIdForWindow($wizard)", script)
         self.assertNotIn("$processus.HasExited", script)
 
+    def test_le_wizard_est_identifie_strictement_et_le_bouton_suivant_est_secouru(self):
+        script = (ROOT / "tests_navigateur" / "installateur_copie_code_windows.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('window.ClassName == "TWizardForm"', script)
+        self.assertIn("return IntPtr.Zero;", script)
+        self.assertNotIn("return fallback;", script)
+        self.assertIn("Find-NextButtonByPosition", script)
+        self.assertIn("GetWindowRect", script)
+        self.assertIn("$preuve.controles_suivant = @(Get-ControlSnapshot)", script)
+        self.assertIn("rangée inférieure, deuxième bouton depuis la droite", script)
+
     def test_journal_inno_setup_et_diagnostic_processus_sont_conserves(self):
         script = (ROOT / "tests_navigateur" / "installateur_copie_code_windows.ps1").read_text(
             encoding="utf-8"
