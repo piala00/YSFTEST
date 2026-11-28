@@ -68,6 +68,7 @@ class SqlServerMetricsTests(unittest.TestCase):
         self.assertAlmostEqual(mesures["atomic_scope"]["max"], 1.25)
         self.assertEqual(mesures["atomic_scope"]["errors"], 1)
         self.assertEqual(mesures["atomic_scope"]["nested"], 1)
+        self.assertEqual(mesures["atomic_scope"]["exceptions"], 0)
 
     def test_alias_none_et_alias_de_creation_sont_normalises(self):
         class AtomicSansAlias:
@@ -160,6 +161,46 @@ class SqlServerMetricsTests(unittest.TestCase):
         self.assertEqual(evenements, [("default", "cursor_execute", False)])
 
 
+
+
+    def test_contexte_exceptionnel_ne_compte_pas_comme_erreur_de_methode_sql(self):
+        mesures = {}
+        MODULE._enregistrer_mesure(
+            mesures, "atomic_exit", 0.002, failed=False, exceptional=True
+        )
+        self.assertEqual(mesures["atomic_exit"]["errors"], 0)
+        self.assertEqual(mesures["atomic_exit"]["exceptions"], 1)
+
+    def test_duree_atomic_attribuee_au_contexte_qui_a_ouvert_la_transaction(self):
+        alias, par_test = {}, {}
+        MODULE._enregistrer_mesure_par_test(
+            alias, par_test, "default", "setUpClass ExempleTests",
+            "atomic_scope", 186.461, failed=False, nested=False,
+        )
+        self.assertIn(("setUpClass ExempleTests", "default"), par_test)
+        self.assertNotIn(("tearDownClass ExempleTests", "default"), par_test)
+        self.assertEqual(
+            par_test[("setUpClass ExempleTests", "default")]["atomic_scope"]["max"],
+            186.461,
+        )
+
+    def test_atomic_scope_transmet_explicitement_le_proprietaire(self):
+        evenements = []
+
+        def enregistrer(receiver, operation, elapsed, failed=False, nested=False,
+                        test_name_override=None, exceptional=False):
+            evenements.append((operation, test_name_override, elapsed, nested, exceptional))
+
+        transaction = {
+            "id": 1, "alias": "default", "started": 0.0,
+            "nested": True, "test_name": "setUpClass ExempleTests",
+        }
+        MODULE._enregistrer_atomic_scope(
+            enregistrer, object(), transaction, 2.5, failed=False, exceptional=True
+        )
+        self.assertEqual(evenements, [
+            ("atomic_scope", "setUpClass ExempleTests", 2.5, True, True)
+        ])
 
 
 if __name__ == "__main__":
