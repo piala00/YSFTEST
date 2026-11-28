@@ -468,8 +468,9 @@ def instrument_database_activity():
     # des bases de test. Les durées sont inclusives : create_test_db comprend
     # notamment les migrations, et destroy_test_db comprend la fermeture.
     for operation in (
-        "create_test_db", "destroy_test_db", "clone_test_db",
-        "serialize_db_to_string", "deserialize_db_from_string",
+        "create_test_db", "_create_test_db", "destroy_test_db", "_destroy_test_db",
+        "clone_test_db", "_clone_test_db", "serialize_db_to_string",
+        "deserialize_db_from_string",
     ):
         original = getattr(BaseDatabaseCreation, operation, None)
         if original is not None:
