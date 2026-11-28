@@ -386,7 +386,7 @@ begin
   else
   begin
     BoutonCopierCode.Caption := 'Copie impossible';
-    ChampCodeInstallation.SetFocus;
+    DefinirFocus(ChampCodeInstallation.Handle);
     SendMessage(ChampCodeInstallation.Handle, $00B1, 0, -1); { EM_SETSEL }
     MsgBox('La copie n''a pas abouti. Le code reste sélectionné : appuyez sur Ctrl+C, puis collez-le dans votre message à l''éditeur.', mbError, MB_OK);
   end;
