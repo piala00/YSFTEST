@@ -1433,11 +1433,11 @@ def main(argv):
             )
             texte = json.dumps(resultat, ensure_ascii=False, indent=2)
             if a.rapport:
-                Path(a.rapport).write_text(texte + "\\n", encoding="utf-8")
+                Path(a.rapport).write_text(texte + "\n", encoding="utf-8")
             print(texte)
             return 0 if resultat["ok"] else 2
         except OSError as exc:
-            p.exit(2, f"Diagnostic impossible : {exc}\\n")
+            p.exit(2, f"Diagnostic impossible : {exc}\n")
     else:
         verifier(a.fichier, a.publique)
     return 0
