@@ -1404,6 +1404,12 @@ def main(argv):
     v = s.add_parser("verifier")
     v.add_argument("fichier")
     v.add_argument("--publique", required=True)
+    di = s.add_parser("diagnostiquer-installation", help="diagnostic hors ligne d'un .erpinst ; n'autorise pas l'installation")
+    di.add_argument("--fichier", required=True, help="autorisation .erpinst à analyser")
+    di.add_argument("--publique", required=True, help="clé publique parametres.dat ou ancien texte base64")
+    di.add_argument("--edition", required=True, choices=("transport", "commerce"))
+    di.add_argument("--code", help="code T-/C-/M- affiché par l'installateur ; sans lui, empreinte de cette machine")
+    di.add_argument("--rapport", help="chemin facultatif du rapport JSON")
     a = p.parse_args(argv)
     if a.commande == "cles":
         creer_cles(a.dossier, noms_neutres=a.noms_neutres, role=a.role)
@@ -1415,6 +1421,23 @@ def main(argv):
         emettre_developpeur(a)
     elif a.commande == "autoriser-installation":
         print(creer_autorisation_installation(charger_cle(a.cle), a.code, a.reference, a.jusqu_au, a.sortie))
+    elif a.commande == "diagnostiquer-installation":
+        from apps.licences.installation import diagnostiquer
+
+        try:
+            resultat = diagnostiquer(
+                Path(a.fichier).read_bytes(),
+                a.edition,
+                publique=Path(a.publique).read_bytes(),
+                code=a.code,
+            )
+            texte = json.dumps(resultat, ensure_ascii=False, indent=2)
+            if a.rapport:
+                Path(a.rapport).write_text(texte + "\n", encoding="utf-8")
+            print(texte)
+            return 0 if resultat["ok"] else 2
+        except OSError as exc:
+            p.exit(2, f"Diagnostic impossible : {exc}\n")
     else:
         verifier(a.fichier, a.publique)
     return 0

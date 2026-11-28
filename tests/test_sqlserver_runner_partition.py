@@ -58,5 +58,151 @@ class SqlServerPartitionTests(unittest.TestCase):
             shard_for_class("apps.core.tests.Exemple", 0)
 
 
+class SqlServerMetricsTests(unittest.TestCase):
+    def test_agregation_compte_durees_maximum_erreurs_et_imbrication(self):
+        mesures = {}
+        MODULE._enregistrer_mesure(mesures, "atomic_scope", 1.25)
+        MODULE._enregistrer_mesure(mesures, "atomic_scope", 0.50, failed=True, nested=True)
+        self.assertEqual(mesures["atomic_scope"]["count"], 2)
+        self.assertAlmostEqual(mesures["atomic_scope"]["total"], 1.75)
+        self.assertAlmostEqual(mesures["atomic_scope"]["max"], 1.25)
+        self.assertEqual(mesures["atomic_scope"]["errors"], 1)
+        self.assertEqual(mesures["atomic_scope"]["nested"], 1)
+        self.assertEqual(mesures["atomic_scope"]["exceptions"], 0)
+
+    def test_alias_none_et_alias_de_creation_sont_normalises(self):
+        class AtomicSansAlias:
+            using = None
+
+        class ConnexionSqlServer:
+            alias = "sqlserver"
+
+        class CreationBase:
+            connection = ConnexionSqlServer()
+
+        self.assertEqual(MODULE._alias_pour_base(AtomicSansAlias()), "default")
+        self.assertEqual(MODULE._alias_pour_base(CreationBase()), "sqlserver")
+
+    def test_wrapper_preserve_le_retour_et_mesure_la_methode(self):
+        evenements = []
+
+        class Connexion:
+            alias = "default"
+
+        def enregistrer(receiver, operation, elapsed, failed=False, nested=False):
+            evenements.append((receiver.alias, operation, elapsed, failed, nested))
+
+        def originale(self, valeur):
+            return valeur + 1
+
+        mesuree = MODULE._emballer_methode(originale, "commit", enregistrer)
+        self.assertEqual(mesuree(Connexion(), 41), 42)
+        self.assertEqual(len(evenements), 1)
+        self.assertEqual(evenements[0][:2], ("default", "commit"))
+        self.assertGreaterEqual(evenements[0][2], 0)
+        self.assertFalse(evenements[0][3])
+
+    def test_wrapper_compte_les_erreurs_sans_les_masquer(self):
+        evenements = []
+
+        class Connexion:
+            alias = "sqlserver"
+
+        def enregistrer(receiver, operation, elapsed, failed=False, nested=False):
+            evenements.append((receiver.alias, operation, failed))
+
+        def originale(self):
+            raise RuntimeError("échec de connexion simulé")
+
+        mesuree = MODULE._emballer_methode(originale, "rollback", enregistrer)
+        with self.assertRaisesRegex(RuntimeError, "simulé"):
+            mesuree(Connexion())
+        self.assertEqual(evenements, [("sqlserver", "rollback", True)])
+
+    def test_lifecycle_base_est_mesure_comme_une_operation(self):
+        evenements = []
+
+        class Creation:
+            alias = "default"
+
+        def enregistrer(receiver, operation, elapsed, failed=False, nested=False):
+            evenements.append((receiver.alias, operation, failed))
+
+        def originale(self, keepdb=False):
+            return "test_erp"
+
+        mesuree = MODULE._emballer_methode(originale, "create_test_db", enregistrer)
+        self.assertEqual(mesuree(Creation(), keepdb=True), "test_erp")
+        self.assertEqual(evenements, [("default", "create_test_db", False)])
+
+    def test_alias_cursor_wrapper_utilise_la_connexion_db(self):
+        class ConnexionSqlServer:
+            alias = "sqlserver"
+
+        class Curseur:
+            db = ConnexionSqlServer()
+
+        self.assertEqual(MODULE._alias_pour_base(Curseur()), "sqlserver")
+
+    def test_wrapper_cursor_preserve_resultat_et_params(self):
+        evenements = []
+
+        class Curseur:
+            db = type("Connexion", (), {"alias": "default"})()
+
+        def enregistrer(receiver, operation, elapsed, failed=False, nested=False):
+            evenements.append((receiver.db.alias, operation, failed))
+
+        def execute(self, sql, params=None):
+            return len(sql) + len(params or ())
+
+        mesuree = MODULE._emballer_methode(execute, "cursor_execute", enregistrer)
+        self.assertEqual(mesuree(Curseur(), "SELECT ?", [1]), 9)
+        self.assertEqual(evenements, [("default", "cursor_execute", False)])
+
+
+
+
+    def test_contexte_exceptionnel_ne_compte_pas_comme_erreur_de_methode_sql(self):
+        mesures = {}
+        MODULE._enregistrer_mesure(
+            mesures, "atomic_exit", 0.002, failed=False, exceptional=True
+        )
+        self.assertEqual(mesures["atomic_exit"]["errors"], 0)
+        self.assertEqual(mesures["atomic_exit"]["exceptions"], 1)
+
+    def test_duree_transaction_classe_distincte_de_setUpClass(self):
+        alias, par_test = {}, {}
+        MODULE._enregistrer_mesure_par_test(
+            alias, par_test, "default", "transaction_classe ExempleTests",
+            "atomic_scope", 186.461, failed=False, nested=False,
+        )
+        self.assertIn(("transaction_classe ExempleTests", "default"), par_test)
+        self.assertNotIn(("tearDownClass ExempleTests", "default"), par_test)
+        self.assertNotIn(("setUpClass ExempleTests", "default"), par_test)
+        self.assertEqual(
+            par_test[("transaction_classe ExempleTests", "default")]["atomic_scope"]["max"],
+            186.461,
+        )
+
+    def test_atomic_scope_transmet_explicitement_le_proprietaire(self):
+        evenements = []
+
+        def enregistrer(receiver, operation, elapsed, failed=False, nested=False,
+                        test_name_override=None, exceptional=False):
+            evenements.append((operation, test_name_override, elapsed, nested, exceptional))
+
+        transaction = {
+            "id": 1, "alias": "default", "started": 0.0,
+            "nested": True, "test_name": "setUpClass ExempleTests",
+        }
+        MODULE._enregistrer_atomic_scope(
+            enregistrer, object(), transaction, 2.5, failed=False, exceptional=True
+        )
+        self.assertEqual(evenements, [
+            ("atomic_scope", "transaction_classe ExempleTests", 2.5, True, True)
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()
