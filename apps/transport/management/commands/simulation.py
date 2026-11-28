@@ -78,6 +78,20 @@ def _cumuler_phase_sql(agregats, phase, secondes):
     return mesure
 
 
+def _cumuler_detail_simulation(agregats, phase, secondes):
+    """Agrège les sous-phases métier sans activer le profileur SQL exhaustif."""
+    if agregats is None:
+        return None
+    mesure = agregats.setdefault(
+        str(phase), {"appels": 0, "secondes": 0.0, "max": 0.0}
+    )
+    duree = max(0.0, float(secondes))
+    mesure["appels"] += 1
+    mesure["secondes"] += duree
+    mesure["max"] = max(mesure["max"], duree)
+    return mesure
+
+
 SAISON = {1: 0.85, 2: 0.9, 7: 1.05, 8: 1.12, 12: 1.15}                    # remplissage relatif (fictif)
 ARTICLES = [("FILT", "Filtre à huile", "PIECE", 100, 5000), ("PLAQ", "Plaquettes de frein", "PIECE", 60, 8000),
             ("PNEU", "Pneu 315/80", "PNEU", 40, 110000), ("HUIL", "Huile moteur (litre)", "LUBRIFIANT", 200, 3500),
@@ -168,6 +182,7 @@ class Command(SimulationMetierMixin, BaseCommand):
         # Les totaux légers sont disponibles avec SQL_TEST_TIMINGS ; ils ne
         # déclenchent jamais execute_wrapper ni le profilage SQL exhaustif.
         self._sim_phases_cumulees = {} if phases_actives else None
+        self._sim_detail_cumulees = {} if phases_actives else None
 
         def trace_phase(phase, debut):
             secondes = tracer_phase_sql(phase, debut, active=phases_actives)
@@ -304,6 +319,14 @@ class Command(SimulationMetierMixin, BaseCommand):
                 appels = mesure["appels"]
                 secondes = mesure["secondes"]
                 print(f"[SIM-PHASE-TOTAL] phase={phase} appels={appels} "
+                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f} "
+                      f"max_s={mesure['max']:.3f}", flush=True)
+            for phase, mesure in sorted(
+                    self._sim_detail_cumulees.items(),
+                    key=lambda item: item[1]["secondes"], reverse=True):
+                appels = mesure["appels"]
+                secondes = mesure["secondes"]
+                print(f"[SIM-DETAIL-TOTAL] phase={phase} appels={appels} "
                       f"total_s={secondes:.3f} avg_s={secondes/appels:.3f} "
                       f"max_s={mesure['max']:.3f}", flush=True)
         if o["rapport"]:
@@ -461,13 +484,18 @@ class Command(SimulationMetierMixin, BaseCommand):
         r = self.r
         colis_avant_jour = self.compteurs['colis']
         diagnostic_sql = diagnostic_sql_actif()
+        phases_actives = traces_phases_actives()
         debut_etape = time.perf_counter()
 
         def mesurer_etape(nom):
             nonlocal debut_etape
             maintenant = time.perf_counter()
-            if diagnostic_sql:
-                print(f'[SIM-JOUR] {jour} {nom} {maintenant - debut_etape:.3f}s', flush=True)
+            duree = maintenant - debut_etape
+            if phases_actives:
+                print(f'[SIM-JOURNEE-PHASE] {jour} {nom} {duree:.3f}s', flush=True)
+                _cumuler_detail_simulation(
+                    self._sim_detail_cumulees, f"journee.{nom}", duree
+                )
             # Le chronomètre clôt la phase « nom » ; les requêtes suivantes
             # appartiennent à la phase suivante, et non à celle qui vient de finir.
             phase_suivante = {
@@ -503,13 +531,17 @@ class Command(SimulationMetierMixin, BaseCommand):
         vente_stats = {nom: [0, 0.0] for nom in ("billet_vendre", "colis_enregistrer", "colis_charger", "transaction_depart")}
 
         def chronometrer_vente(nom, debut):
-            if diagnostic_sql:
+            if phases_actives and debut is not None:
+                duree = time.perf_counter() - debut
                 vente_stats[nom][0] += 1
-                vente_stats[nom][1] += time.perf_counter() - debut
+                vente_stats[nom][1] += duree
+                _cumuler_detail_simulation(
+                    self._sim_detail_cumulees, f"vente.{nom}", duree
+                )
 
         departs = []
         for c, ligne, heure in self.plan_journee(jour):
-            debut_transaction = time.perf_counter() if diagnostic_sql else None
+            debut_transaction = time.perf_counter() if phases_actives else None
             with horloge(self.moment(jour, max(heure - 3, 0))), transaction.atomic():
                 d = Depart.objects.create(ligne=ligne, date=jour, heure=datetime.time(heure), vehicule=c["vehicule"],
                                           chauffeur=c["chauffeur"])
@@ -519,7 +551,7 @@ class Command(SimulationMetierMixin, BaseCommand):
                     reserve = self.reserve_scenarios(c, heure, jour)
                     for k in range(min(voyageurs, d.places - reserve)):
                         bagages = r.random() < 0.15
-                        debut_vente = time.perf_counter() if diagnostic_sql else None
+                        debut_vente = time.perf_counter() if phases_actives else None
                         Billet(depart=d, voyageur=f"Voyageur {k + 1} (fictif)",
                                paiement=Billet.MOBILE_MONEY if r.random() < (0.05 if self.profil_complet else 0.2) else Billet.ESPECES,
                                bagages="1 colis encombrant" if bagages else "", bagages_nombre=1 if bagages else 0,
@@ -529,11 +561,11 @@ class Command(SimulationMetierMixin, BaseCommand):
                         self.compteurs["bagages"] += bagages
                 nb_colis = max(0, int(r.randint(0, 3 if not c.get("courrier") else 12) * max(self.echelle, 0.25)))
                 for k in range(nb_colis):
-                    debut_colis = time.perf_counter() if diagnostic_sql else None
+                    debut_colis = time.perf_counter() if phases_actives else None
                     colis = Colis(gare_depart=ligne.gare_depart, gare_arrivee=ligne.gare_arrivee, expediteur="Expéditeur (fictif)",
                                   destinataire="Destinataire (fictif)", poids=Decimal(r.randint(2, 40)), description="Carton").enregistrer()
                     chronometrer_vente("colis_enregistrer", debut_colis)
-                    debut_chargement = time.perf_counter() if diagnostic_sql else None
+                    debut_chargement = time.perf_counter() if phases_actives else None
                     colis.charger(d)
                     chronometrer_vente("colis_charger", debut_chargement)
                     self.compteurs["colis"] += 1
@@ -552,27 +584,31 @@ class Command(SimulationMetierMixin, BaseCommand):
             "depart", "incidents_en_route", "carburant_et_caisse", "arrivee", "incidents_apres_arrivee")}
 
         def chronometrer_sous_phase(nom, debut):
-            if diagnostic_sql:
+            if phases_actives and debut is not None:
                 stats = sous_phases[nom]
                 stats[0] += 1
                 elapsed = time.perf_counter() - debut
                 stats[1] += elapsed
-                cumul = self._sim_phases_cumulees.setdefault(nom, [0, 0.0])
-                cumul[0] += 1
-                cumul[1] += elapsed
+                _cumuler_detail_simulation(
+                    self._sim_detail_cumulees, f"transport.{nom}", elapsed
+                )
+                if diagnostic_sql:
+                    cumul = self._sim_phases_cumulees.setdefault(nom, [0, 0.0])
+                    cumul[0] += 1
+                    cumul[1] += elapsed
 
         for d, c, heure in departs:
             with horloge(self.moment(jour, heure, 5)), transaction.atomic():
-                debut_operation = time.perf_counter() if diagnostic_sql else None
+                debut_operation = time.perf_counter() if phases_actives else None
                 if self.profil_complet and d.pk in (getattr(self, '_depart_scenario', None), getattr(self, '_depart_suite_scenario', None)):
                     self.tracer_scenario('Transport', 'Départ : reconnaissance des produits de cette portion, sans nouvel encaissement', d.partir)
                 else:
                     d.partir()
                 chronometrer_sous_phase("depart", debut_operation)
-                debut_operation = time.perf_counter() if diagnostic_sql else None
+                debut_operation = time.perf_counter() if phases_actives else None
                 self.scenarios_en_route(jour, d)
                 chronometrer_sous_phase("incidents_en_route", debut_operation)
-                debut_operation = time.perf_counter() if diagnostic_sql else None
+                debut_operation = time.perf_counter() if phases_actives else None
                 litres = Decimal(c["km"] * 35 // 100)
                 PleinCarburant(vehicule=c["vehicule"], depart=d, litres=litres, prix_litre=PRIX_LITRE,
                                caisse=self.caisse_pour(litres * PRIX_LITRE, jour), date=jour).enregistrer()
@@ -582,10 +618,10 @@ class Command(SimulationMetierMixin, BaseCommand):
             arrivee_jour = jour + datetime.timedelta(days=(heure+6)//24) if self.departs_jour else jour
             arrivee_heure = (heure+6)%24 if self.departs_jour else min(heure+6,23)
             with horloge(self.moment(arrivee_jour, arrivee_heure)), transaction.atomic():
-                debut_operation = time.perf_counter() if diagnostic_sql else None
+                debut_operation = time.perf_counter() if phases_actives else None
                 d.arriver()
                 chronometrer_sous_phase("arrivee", debut_operation)
-                debut_operation = time.perf_counter() if diagnostic_sql else None
+                debut_operation = time.perf_counter() if phases_actives else None
                 self.scenarios_apres_arrivee(jour, d)
                 chronometrer_sous_phase("incidents_apres_arrivee", debut_operation)
         if diagnostic_sql:
