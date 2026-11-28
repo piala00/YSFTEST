@@ -135,5 +135,30 @@ class SqlServerMetricsTests(unittest.TestCase):
         self.assertEqual(evenements, [("default", "create_test_db", False)])
 
 
+    def test_alias_cursor_wrapper_utilise_la_connexion_db(self):
+        class ConnexionSqlServer:
+            alias = "sqlserver"
+
+        class Curseur:
+            db = ConnexionSqlServer()
+
+        self.assertEqual(MODULE._alias_pour_base(Curseur()), "sqlserver")
+
+    def test_wrapper_cursor_preserve_resultat_et_params(self):
+        evenements = []
+
+        class Curseur:
+            db = type("Connexion", (), {"alias": "default"})()
+
+        def enregistrer(receiver, operation, elapsed, failed=False, nested=False):
+            evenements.append((receiver.db.alias, operation, failed))
+
+        def execute(self, sql, params=None):
+            return len(sql) + len(params or ())
+
+        mesuree = MODULE._emballer_methode(execute, "cursor_execute", enregistrer)
+        self.assertEqual(mesuree(Curseur(), "SELECT ?", [1]), 8)
+        self.assertEqual(evenements, [("default", "cursor_execute", False)])
+
 if __name__ == "__main__":
     unittest.main()
