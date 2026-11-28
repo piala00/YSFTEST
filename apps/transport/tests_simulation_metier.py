@@ -153,7 +153,7 @@ class DiagnosticSqlSimulationTests(SimpleTestCase):
                 patch("sys.stdout", sortie):
             tracer_phase_sql("journee 2026-11-28", 10.0)
 
-        self.assertEqual(sortie.getvalue(), "[SIM-PHASE] journee 2026-11-28 2.500s\\n")
+        self.assertEqual(sortie.getvalue(), "[SIM-PHASE] journee 2026-11-28 2.500s\n")
 
     def test_trace_de_phase_absente_hors_instrumentation(self):
         from .management.commands.simulation import tracer_phase_sql
