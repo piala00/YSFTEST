@@ -43,7 +43,7 @@ class CopieCodeInstallateurTests(unittest.TestCase):
         self.assertIn("external 'GetFocus@user32.dll stdcall';", SOURCE)
         self.assertNotIn("ChampCodeInstallation.SetFocus", SOURCE)
         debut = SOURCE.index("procedure CopierCodeInstallation")
-        fin = SOURCE.index("\\nprocedure InitializeWizard", debut)
+        fin = SOURCE.index("\nprocedure InitializeWizard", debut)
         procedure = SOURCE[debut:fin]
         self.assertIn("DefinirFocus(ChampCodeInstallation.Handle);", procedure)
         self.assertIn("ObtenirFocus() <> ChampCodeInstallation.Handle", procedure)
