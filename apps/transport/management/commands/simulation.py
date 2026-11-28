@@ -592,10 +592,9 @@ class Command(SimulationMetierMixin, BaseCommand):
                 _cumuler_detail_simulation(
                     self._sim_detail_cumulees, f"transport.{nom}", elapsed
                 )
-                if diagnostic_sql:
-                    cumul = self._sim_phases_cumulees.setdefault(nom, [0, 0.0])
-                    cumul[0] += 1
-                    cumul[1] += elapsed
+                # L'agrégat détaillé est distinct des phases globales :
+                # ne pas mélanger les dictionnaires (appels/secondes/max) et
+                # les anciennes listes, ce qui cassait le mode SQL exhaustif.
 
         for d, c, heure in departs:
             with horloge(self.moment(jour, heure, 5)), transaction.atomic():
