@@ -36,6 +36,17 @@ ROUTES = [("DLA", "YDE", 240, 6000, 10000), ("DLA", "BFS", 280, 5000, 9000), ("Y
           ("YDE", "NGD", 620, 10000, 15000), ("NGD", "GAR", 290, 6000, 9000), ("DLA", "KRI", 170, 4000, 7000),
           ("YDE", "EBW", 160, 3500, 6000), ("YDE", "BFS", 300, 5000, 8000)]
 PRIX_LITRE = Decimal("840")
+
+
+def diagnostic_sql_actif(environ=None):
+    """Active le profil SQL exhaustif uniquement sur demande explicite.
+
+    SQL_TEST_TIMINGS appartient au runner CI : il mesure les tests et les
+    accès DB sans activer un execute_wrapper coûteux dans chaque journée.
+    """
+    variables = os.environ if environ is None else environ
+    valeur = str(variables.get("SIMULATION_SQL_DIAGNOSTIC", "")).strip().lower()
+    return valeur in {"1", "true", "yes", "on"}
 SAISON = {1: 0.85, 2: 0.9, 7: 1.05, 8: 1.12, 12: 1.15}                    # remplissage relatif (fictif)
 ARTICLES = [("FILT", "Filtre à huile", "PIECE", 100, 5000), ("PLAQ", "Plaquettes de frein", "PIECE", 60, 8000),
             ("PNEU", "Pneu 315/80", "PNEU", 40, 110000), ("HUIL", "Huile moteur (litre)", "LUBRIFIANT", 200, 3500),
@@ -121,7 +132,7 @@ class Command(SimulationMetierMixin, BaseCommand):
         self.jours = [j for jours in self.mois for j in jours]
         # La CI capture stdout des commandes dans les tests. Ces traces
         # facultatives restent visibles directement dans les logs GitHub.
-        diagnostic_sql = bool(os.environ.get('SQL_TEST_TIMINGS'))
+        diagnostic_sql = diagnostic_sql_actif()
         def trace_phase(phase, debut):
             if diagnostic_sql:
                 print(f'[SIM-PHASE] {phase} {time.perf_counter() - debut:.3f}s', flush=True)
@@ -277,7 +288,7 @@ class Command(SimulationMetierMixin, BaseCommand):
             return self.assurer_especes(montant, jour)
         # Mesurer séparément les recalculs du solde, suspects de croître avec
         # l'historique des écritures. Ne pas mettre en cache un solde mutable.
-        diagnostic = bool(os.environ.get("SQL_TEST_TIMINGS"))
+        diagnostic = diagnostic_sql_actif()
         debut = time.perf_counter() if diagnostic else None
         try:
             solde = solde_tresorerie(self.ca.compte_tresorerie, jour)
@@ -410,7 +421,7 @@ class Command(SimulationMetierMixin, BaseCommand):
 
         r = self.r
         colis_avant_jour = self.compteurs['colis']
-        diagnostic_sql = bool(os.environ.get('SQL_TEST_TIMINGS'))
+        diagnostic_sql = diagnostic_sql_actif()
         debut_etape = time.perf_counter()
 
         def mesurer_etape(nom):
