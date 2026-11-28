@@ -30,7 +30,7 @@ Les blocs `atomic` sont inclusifs et imbriqués. Les durées des opérations son
 
 ## Instrumentation ajoutée dans ce lot
 
-Le runner conserve les chronométrages existants de chaque test, de son corps, des fixtures, des connexions ouvertes/fermées et des phases du runner. Il complète ces mesures par :
+Le runner conserve les chronométrages existants de chaque test, de son corps, des fixtures, des connexions ouvertes/fermées et des phases du runner. Le dump de pile est armé individuellement pour chaque test ou fixture (180 s par défaut via `SQL_TEST_TRACEBACK_SECONDS`), puis annulé à sa fin ; le timer global périodique de 120 s est supprimé. Il complète ces mesures par :
 
 - `ensure_connection`, `connect`, `close`, `commit`, `rollback`, `set_autocommit` ;
 - `savepoint`, `savepoint_commit`, `savepoint_rollback` ;
