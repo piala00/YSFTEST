@@ -21,6 +21,7 @@ class InstallationTests(SimpleTestCase):
         self.privee = Ed25519PrivateKey.generate()
         publique = self.privee.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         self.publique = publique
+        self.publique_fichier = b"ERPID\x01" + publique
         self.key_id = hashlib.sha256(publique).hexdigest().upper()
         p = mock.patch.object(l, "cles_publiques", return_value=[base64.b64encode(publique).decode()])
         p.start()
@@ -59,7 +60,7 @@ class InstallationTests(SimpleTestCase):
 
     def test_diagnostic_hors_ligne_valide_le_format_la_cle_et_la_signature(self):
         rapport = diagnostiquer(
-            self.fichier(), "transport", publique=self.publique,
+            self.fichier(), "transport", publique=self.publique_fichier,
             code="T-MACHINE-FICTIVE", jour=datetime.date(2026, 11, 28),
         )
         self.assertTrue(rapport["ok"], rapport)
@@ -74,7 +75,7 @@ class InstallationTests(SimpleTestCase):
             serialization.Encoding.Raw, serialization.PublicFormat.Raw
         )
         mauvais_key = diagnostiquer(
-            self.fichier(), "transport", publique=autre, code="T-MACHINE-FICTIVE"
+            self.fichier(), "transport", publique=b"ERPID\x01" + autre, code="T-MACHINE-FICTIVE"
         )
         self.assertFalse(mauvais_key["etapes"]["identite_publique"]["ok"])
         self.assertIn("Non vérifiée", mauvais_key["etapes"]["signature"]["message"])
@@ -83,21 +84,21 @@ class InstallationTests(SimpleTestCase):
         signature_alteree = bytes([signature[0] ^ 1]) + signature[1:]
         fichier_altere = l.fc.autorisation_texte(donnees, signature_alteree).encode()
         mauvaise_signature = diagnostiquer(
-            fichier_altere, "transport", publique=self.publique, code="T-MACHINE-FICTIVE"
+            fichier_altere, "transport", publique=self.publique_fichier, code="T-MACHINE-FICTIVE"
         )
         self.assertTrue(mauvaise_signature["etapes"]["identite_publique"]["ok"])
         self.assertFalse(mauvaise_signature["etapes"]["signature"]["ok"])
 
     def test_diagnostic_isole_machine_edition_et_expiration(self):
         machine = diagnostiquer(
-            self.fichier(), "transport", publique=self.publique,
+            self.fichier(), "transport", publique=self.publique_fichier,
             code="T-AUTRE-MACHINE", jour=datetime.date(2026, 11, 28),
         )
         self.assertTrue(machine["etapes"]["signature"]["ok"])
         self.assertFalse(machine["etapes"]["machine"]["ok"])
 
         edition = diagnostiquer(
-            self.fichier(edition="commerce"), "transport", publique=self.publique,
+            self.fichier(edition="commerce"), "transport", publique=self.publique_fichier,
             code="T-MACHINE-FICTIVE", jour=datetime.date(2026, 11, 28),
         )
         self.assertTrue(edition["etapes"]["signature"]["ok"])
@@ -105,14 +106,14 @@ class InstallationTests(SimpleTestCase):
 
         expiree = diagnostiquer(
             self.fichier(valable_jusqu_au="2020-01-01"), "transport",
-            publique=self.publique, code="T-MACHINE-FICTIVE",
+            publique=self.publique_fichier, code="T-MACHINE-FICTIVE",
             jour=datetime.date(2026, 11, 28),
         )
         self.assertFalse(expiree["etapes"]["expiration"]["ok"])
 
     def test_diagnostic_refuse_un_format_illisible_sans_lever(self):
         rapport = diagnostiquer(
-            b"faux", "transport", publique=self.publique, code="T-MACHINE-FICTIVE"
+            b"faux", "transport", publique=self.publique_fichier, code="T-MACHINE-FICTIVE"
         )
         self.assertFalse(rapport["ok"])
         self.assertFalse(rapport["etapes"]["format"]["ok"])
@@ -125,7 +126,7 @@ class InstallationTests(SimpleTestCase):
             publique = Path(dossier) / "parametres.dat"
             rapport = Path(dossier) / "diagnostic.json"
             fichier.write_bytes(self.fichier())
-            publique.write_bytes(b"ERPID\x01" + self.publique)
+            publique.write_bytes(self.publique_fichier)
             code = outil([
                 "diagnostiquer-installation", "--fichier", str(fichier),
                 "--publique", str(publique), "--edition", "transport",
