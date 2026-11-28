@@ -52,3 +52,19 @@ Après la recherche du wizard, le script récupère aussi le PID propriétaire d
 Le retour de `Get-InstallerProcessIds` est un tableau d'entiers directement énuméré par PowerShell ; le script évite un tableau imbriqué. Le nettoyage couvre l'arbre du lanceur et le PID propriétaire du wizard.
 
 Référence Microsoft : https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid
+
+
+## Échec #863 après copie réellement vérifiée
+
+Dans les deux jobs Windows du run #863, le script a atteint la page d'autorisation, cliqué « Copier le code », lu le presse-papiers et comparé exactement sa valeur au code affiché. Les journaux contiennent chacun la ligne « Copie interactive vérifiée ... », puis GitHub marque immédiatement le step en échec avec le code 1.
+
+Le script terminait son bloc `finally` par l'appel natif `taskkill.exe /F /T`. Une course est possible entre l'instantané des processus et leur arrêt : si Setup s'est déjà fermé, `taskkill.exe` peut retourner un code non nul. GitHub documente que son shell intégré `pwsh` ajoute en fin de step `exit $LASTEXITCODE`; Microsoft documente que cette variable conserve le code de sortie du dernier programme natif. Cela explique l'échec après la preuve fonctionnelle, sans invalider la comparaison du presse-papiers.
+
+Correctif : remplacement de `taskkill.exe` par le cmdlet `Stop-Process`, gestion de la disparition concurrente des processus, exclusion du PID du shell courant, et remise à zéro explicite de `$global:LASTEXITCODE` en fin de nettoyage. Une erreur d'arrêt reste propagée si le processus est toujours vivant.
+
+Références officielles :
+- GitHub Actions — shells intégrés et propagation de `LASTEXITCODE` : https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsshell
+- Microsoft Learn — `$LASTEXITCODE` : https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_automatic_variables
+- Microsoft Learn — erreurs des programmes natifs : https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_error_handling
+
+La preuve interactive #863 est positive pour le clic et l'égalité du presse-papiers dans les deux éditions ; le statut du job restait négatif à cause du code de sortie final. La nouvelle CI doit confirmer le correctif du nettoyage.
