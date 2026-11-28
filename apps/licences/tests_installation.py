@@ -2,6 +2,7 @@
 import base64
 import datetime
 import hashlib
+import json
 from pathlib import Path
 import tempfile
 from unittest import mock
@@ -11,7 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from django.test import SimpleTestCase
 
 from . import licence as l
-from .installation import autoriser
+from .installation import autoriser, diagnostiquer
 from deploy.installateur.controle import main
 
 
@@ -19,6 +20,7 @@ class InstallationTests(SimpleTestCase):
     def setUp(self):
         self.privee = Ed25519PrivateKey.generate()
         publique = self.privee.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        self.publique = publique
         self.key_id = hashlib.sha256(publique).hexdigest().upper()
         p = mock.patch.object(l, "cles_publiques", return_value=[base64.b64encode(publique).decode()])
         p.start()
@@ -54,6 +56,85 @@ class InstallationTests(SimpleTestCase):
         d = {"version": 1, "numero": "LIC-2026-0001", "edition": "transport", "machine": "MACHINE-FICTIVE"}
         with self.assertRaisesRegex(l.LicenceInvalide, "licence d'exploitation"):
             autoriser(l.ecrire(d, self.privee.sign(l.canonique(d))).encode(), "transport")
+
+    def test_diagnostic_hors_ligne_valide_le_format_la_cle_et_la_signature(self):
+        rapport = diagnostiquer(
+            self.fichier(), "transport", publique=self.publique,
+            code="T-MACHINE-FICTIVE", jour=datetime.date(2026, 11, 28),
+        )
+        self.assertTrue(rapport["ok"], rapport)
+        self.assertTrue(rapport["etapes"]["signature"]["ok"])
+        self.assertTrue(rapport["etapes"]["machine"]["ok"])
+        self.assertTrue(rapport["etapes"]["edition"]["ok"])
+        self.assertEqual(rapport["mode"], "diagnostic-seulement")
+        self.assertIn("n'autorise jamais une installation", rapport["avertissement"])
+
+    def test_diagnostic_distingue_une_mauvaise_cle_d_une_signature_alteree(self):
+        autre = Ed25519PrivateKey.generate().public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
+        )
+        mauvais_key = diagnostiquer(
+            self.fichier(), "transport", publique=autre, code="T-MACHINE-FICTIVE"
+        )
+        self.assertFalse(mauvais_key["etapes"]["identite_publique"]["ok"])
+        self.assertIn("Non vérifiée", mauvais_key["etapes"]["signature"]["message"])
+
+        donnees, signature = l.fc.autorisation_lire(self.fichier())
+        signature_alteree = bytes([signature[0] ^ 1]) + signature[1:]
+        fichier_altere = l.fc.autorisation_texte(donnees, signature_alteree).encode()
+        mauvaise_signature = diagnostiquer(
+            fichier_altere, "transport", publique=self.publique, code="T-MACHINE-FICTIVE"
+        )
+        self.assertTrue(mauvaise_signature["etapes"]["identite_publique"]["ok"])
+        self.assertFalse(mauvaise_signature["etapes"]["signature"]["ok"])
+
+    def test_diagnostic_isole_machine_edition_et_expiration(self):
+        machine = diagnostiquer(
+            self.fichier(), "transport", publique=self.publique,
+            code="T-AUTRE-MACHINE", jour=datetime.date(2026, 11, 28),
+        )
+        self.assertTrue(machine["etapes"]["signature"]["ok"])
+        self.assertFalse(machine["etapes"]["machine"]["ok"])
+
+        edition = diagnostiquer(
+            self.fichier(edition="commerce"), "transport", publique=self.publique,
+            code="T-MACHINE-FICTIVE", jour=datetime.date(2026, 11, 28),
+        )
+        self.assertTrue(edition["etapes"]["signature"]["ok"])
+        self.assertFalse(edition["etapes"]["edition"]["ok"])
+
+        expiree = diagnostiquer(
+            self.fichier(valable_jusqu_au="2020-01-01"), "transport",
+            publique=self.publique, code="T-MACHINE-FICTIVE",
+            jour=datetime.date(2026, 11, 28),
+        )
+        self.assertFalse(expiree["etapes"]["expiration"]["ok"])
+
+    def test_diagnostic_refuse_un_format_illisible_sans_lever(self):
+        rapport = diagnostiquer(
+            b"faux", "transport", publique=self.publique, code="T-MACHINE-FICTIVE"
+        )
+        self.assertFalse(rapport["ok"])
+        self.assertFalse(rapport["etapes"]["format"]["ok"])
+
+    def test_commande_diagnostic_ecrit_un_rapport_json_sans_coffre_prive(self):
+        from deploy.licences.licences import main as outil
+
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier) / "autorisation.erpinst"
+            publique = Path(dossier) / "parametres.dat"
+            rapport = Path(dossier) / "diagnostic.json"
+            fichier.write_bytes(self.fichier())
+            publique.write_bytes(b"ERPID\\\\x01" + self.publique)
+            code = outil([
+                "diagnostiquer-installation", "--fichier", str(fichier),
+                "--publique", str(publique), "--edition", "transport",
+                "--code", "T-MACHINE-FICTIVE", "--rapport", str(rapport),
+            ])
+            self.assertEqual(code, 0)
+            resultat = json.loads(rapport.read_text(encoding="utf-8"))
+            self.assertTrue(resultat["ok"])
+            self.assertEqual(resultat["mode"], "diagnostic-seulement")
 
     def test_identite_du_generateur_differente_de_celle_de_l_installateur(self):
         # Une autorisation correctement signée par un autre éditeur reste refusée.
