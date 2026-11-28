@@ -26,7 +26,7 @@ Tests les plus longs observés :
 
 La simulation multi-mois est le premier coût métier à examiner. Les ouvertures et fermetures de connexion mesurées sont inférieures à une seconde cumulée par shard ; elles n'expliquent pas les durées de plusieurs minutes.
 
-Les blocs `atomic` sont inclusifs et imbriqués : ne pas additionner leurs durées pour calculer un temps mural. Les transactions de classe `TestCase` enveloppent les transactions de test.
+Les durées des opérations sont imbriquées : `ensure_connection` inclut `connect`, `atomic_scope` inclut les commits/savepoints de son bloc, et `create_test_db` inclut `_create_test_db` puis les migrations. Ne pas additionner ces totaux pour calculer un temps mural. Le classement des tests utilise le plus grand total d'une opération, pas la somme de toutes les opérations. Les transactions de classe `TestCase` enveloppent les transactions de test.
 
 ## Instrumentation ajoutée dans ce lot
 
@@ -37,7 +37,7 @@ Le runner conserve les chronométrages existants de chaque test, de son corps, d
 - scopes `transaction.atomic`, profondeur d'imbrication, exceptions et durée inclusive ;
 - `create_test_db` et `_create_test_db`, `destroy_test_db` et `_destroy_test_db`, `clone_test_db` et `_clone_test_db`, sérialisation et désérialisation des bases de test. Les méthodes internes de création sont mesurées lorsqu'elles sont héritées/appelées par le backend ; la méthode publique mesure toujours le cycle complet.
 
-Les résultats sont agrégés par alias et par test dans `[SQL-DB-SUMMARY]` et `[SQL-DB-TEST-TOP]`. Aucun SQL, paramètre, montant, nom de client ou donnée métier n'est journalisé. Les wrappers conservent les retours et propagent les exceptions originales.
+Les résultats sont agrégés par alias et par test dans `[SQL-DB-SUMMARY]` et `[SQL-DB-TEST-TOP]`. Aucun SQL, paramètre, montant, nom de client ou donnée métier n'est journalisé. Les marqueurs historiques `[SQL-RESOURCE]` restent également disponibles. Les wrappers conservent les retours et propagent les exceptions originales.
 
 Les durées de `create_test_db` incluent notamment les migrations Django ; `destroy_test_db` inclut la fermeture de connexion. Ces mesures sont des durées globales de méthode, pas un chronométrage isolé de chaque instruction DDL du backend.
 
