@@ -171,16 +171,17 @@ class SqlServerMetricsTests(unittest.TestCase):
         self.assertEqual(mesures["atomic_exit"]["errors"], 0)
         self.assertEqual(mesures["atomic_exit"]["exceptions"], 1)
 
-    def test_duree_atomic_attribuee_au_contexte_qui_a_ouvert_la_transaction(self):
+    def test_duree_transaction_classe_distincte_de_setUpClass(self):
         alias, par_test = {}, {}
         MODULE._enregistrer_mesure_par_test(
-            alias, par_test, "default", "setUpClass ExempleTests",
+            alias, par_test, "default", "transaction_classe ExempleTests",
             "atomic_scope", 186.461, failed=False, nested=False,
         )
-        self.assertIn(("setUpClass ExempleTests", "default"), par_test)
+        self.assertIn(("transaction_classe ExempleTests", "default"), par_test)
         self.assertNotIn(("tearDownClass ExempleTests", "default"), par_test)
+        self.assertNotIn(("setUpClass ExempleTests", "default"), par_test)
         self.assertEqual(
-            par_test[("setUpClass ExempleTests", "default")]["atomic_scope"]["max"],
+            par_test[("transaction_classe ExempleTests", "default")]["atomic_scope"]["max"],
             186.461,
         )
 
@@ -199,7 +200,7 @@ class SqlServerMetricsTests(unittest.TestCase):
             enregistrer, object(), transaction, 2.5, failed=False, exceptional=True
         )
         self.assertEqual(evenements, [
-            ("atomic_scope", "setUpClass ExempleTests", 2.5, True, True)
+            ("atomic_scope", "transaction_classe ExempleTests", 2.5, True, True)
         ])
 
 

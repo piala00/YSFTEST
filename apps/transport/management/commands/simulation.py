@@ -57,11 +57,25 @@ def traces_phases_actives(environ=None):
 
 
 def tracer_phase_sql(phase, debut, active=None):
-    """Trace une phase sans activer l'instrumentation SQL coûteuse."""
+    """Trace une phase sans activer l'instrumentation SQL coûteuse et retourne sa durée."""
     if active is None:
         active = traces_phases_actives()
-    if active:
-        print(f"[SIM-PHASE] {phase} {time.perf_counter() - debut:.3f}s", flush=True)
+    if not active:
+        return None
+    secondes = time.perf_counter() - debut
+    print(f"[SIM-PHASE] {phase} {secondes:.3f}s", flush=True)
+    return secondes
+
+
+def _cumuler_phase_sql(agregats, phase, secondes):
+    """Regroupe les phases datées par famille sans instrumentation des requêtes SQL."""
+    famille = str(phase).split(" ", 1)[0]
+    mesure = agregats.setdefault(famille, {"appels": 0, "secondes": 0.0, "max": 0.0})
+    duree = max(0.0, float(secondes))
+    mesure["appels"] += 1
+    mesure["secondes"] += duree
+    mesure["max"] = max(mesure["max"], duree)
+    return mesure
 
 
 SAISON = {1: 0.85, 2: 0.9, 7: 1.05, 8: 1.12, 12: 1.15}                    # remplissage relatif (fictif)
@@ -151,10 +165,14 @@ class Command(SimulationMetierMixin, BaseCommand):
         # reste réservé à SIMULATION_SQL_DIAGNOSTIC.
         diagnostic_sql = diagnostic_sql_actif()
         phases_actives = traces_phases_actives()
+        # Les totaux légers sont disponibles avec SQL_TEST_TIMINGS ; ils ne
+        # déclenchent jamais execute_wrapper ni le profilage SQL exhaustif.
+        self._sim_phases_cumulees = {} if phases_actives else None
+
         def trace_phase(phase, debut):
-            tracer_phase_sql(phase, debut, active=phases_actives)
-        # Cumuler les sous-phases pour repérer les coûts dominants sur plusieurs mois.
-        self._sim_phases_cumulees = {} if diagnostic_sql else None
+            secondes = tracer_phase_sql(phase, debut, active=phases_actives)
+            if secondes is not None and self._sim_phases_cumulees is not None:
+                _cumuler_phase_sql(self._sim_phases_cumulees, phase, secondes)
         debut_phase = time.perf_counter()
         self.exercices()
         self.moment(self.jours[0], 6)
@@ -279,11 +297,15 @@ class Command(SimulationMetierMixin, BaseCommand):
         texte = self.texte_bilan(bilan, o)
         trace_phase('bilan_et_controles', debut_phase)
         self.stdout.write(texte)
-        if diagnostic_sql:
-            for phase, (appels, secondes) in sorted(
-                    self._sim_phases_cumulees.items(), key=lambda item: item[1][1], reverse=True):
+        if phases_actives:
+            for phase, mesure in sorted(
+                    self._sim_phases_cumulees.items(),
+                    key=lambda item: item[1]["secondes"], reverse=True):
+                appels = mesure["appels"]
+                secondes = mesure["secondes"]
                 print(f"[SIM-PHASE-TOTAL] phase={phase} appels={appels} "
-                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f}", flush=True)
+                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f} "
+                      f"max_s={mesure['max']:.3f}", flush=True)
         if o["rapport"]:
             with open(o["rapport"], "w", encoding="utf-8") as f:
                 f.write(texte)

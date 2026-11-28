@@ -429,11 +429,17 @@ def _enregistrer_mesure_par_test(par_alias, par_test, alias, test_name, operatio
 
 def _enregistrer_atomic_scope(enregistrer, receiver, transaction, elapsed,
                               failed=False, exceptional=False):
-    """Attribue la durée d'un atomic au test/fixture qui l'a ouvert, pas à celui qui le ferme."""
+    """Attribue l'atomic à son propriétaire ; une transaction TestCase couvre toute la classe."""
+    proprietaire = transaction["test_name"]
+    if proprietaire.startswith("setUpClass "):
+        # Django ouvre ici la transaction de classe de TestCase. Elle reste
+        # active pendant les tests et se ferme dans tearDownClass : ce n'est
+        # pas une durée de setUpClass.
+        proprietaire = "transaction_classe " + proprietaire[len("setUpClass "):]
     enregistrer(
         receiver, "atomic_scope", elapsed, failed=failed,
         nested=transaction["nested"],
-        test_name_override=transaction["test_name"],
+        test_name_override=proprietaire,
         exceptional=exceptional,
     )
 
@@ -480,6 +486,15 @@ def instrument_database_activity():
             par_alias, par_test, alias, test_name, operation, elapsed,
             failed=failed, nested=nested, exceptional=exceptional,
         )
+        # Une exception SQL peut être attendue et interceptée par un test.
+        # L'identifier sans SQL ni paramètres permet de retrouver son propriétaire.
+        if failed:
+            print(
+                f"[SQL-DB-EXCEPTION] operation={operation} alias={alias} "
+                f"elapsed={elapsed:.3f}s test={test_name or '[runner]'} "
+                f"exception_context={int(exceptional)}",
+                flush=True,
+            )
         if elapsed >= slow_seconds:
             print(
                 f"[SQL-DB-SLOW] operation={operation} alias={alias} "

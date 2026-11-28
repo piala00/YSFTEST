@@ -154,6 +154,22 @@ class DiagnosticSqlSimulationTests(SimpleTestCase):
             tracer_phase_sql("journee 2026-11-28", 10.0)
 
         self.assertEqual(sortie.getvalue(), "[SIM-PHASE] journee 2026-11-28 2.500s\n")
+        self.assertEqual(tracer_phase_sql("journee 2026-11-28", 10.0), 2.5)
+
+    def test_les_temps_de_phase_s_agregent_sans_profileur_sql_exhaustif(self):
+        from .management.commands.simulation import _cumuler_phase_sql, diagnostic_sql_actif
+
+        environnement = {"SQL_TEST_TIMINGS": "1"}
+        self.assertFalse(diagnostic_sql_actif(environnement))
+        mesures = {}
+        _cumuler_phase_sql(mesures, "journee 2026-01-01", 1.25)
+        _cumuler_phase_sql(mesures, "journee 2026-01-02", 2.75)
+        _cumuler_phase_sql(mesures, "fin_de_mois 2026-01", 0.5)
+
+        self.assertEqual(mesures["journee"]["appels"], 2)
+        self.assertEqual(mesures["journee"]["secondes"], 4.0)
+        self.assertEqual(mesures["journee"]["max"], 2.75)
+        self.assertEqual(mesures["fin_de_mois"]["appels"], 1)
 
     def test_trace_de_phase_absente_hors_instrumentation(self):
         from .management.commands.simulation import tracer_phase_sql
