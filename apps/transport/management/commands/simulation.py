@@ -47,6 +47,23 @@ def diagnostic_sql_actif(environ=None):
     variables = os.environ if environ is None else environ
     valeur = str(variables.get("SIMULATION_SQL_DIAGNOSTIC", "")).strip().lower()
     return valeur in {"1", "true", "yes", "on"}
+
+
+def traces_phases_actives(environ=None):
+    """Temps de phase légers du runner, distincts du profileur SQL exhaustif."""
+    variables = os.environ if environ is None else environ
+    valeur = str(variables.get("SQL_TEST_TIMINGS", "")).strip().lower()
+    return valeur in {"1", "true", "yes", "on"} or diagnostic_sql_actif(variables)
+
+
+def tracer_phase_sql(phase, debut, active=None):
+    """Trace une phase sans activer l'instrumentation SQL coûteuse."""
+    if active is None:
+        active = traces_phases_actives()
+    if active:
+        print(f"[SIM-PHASE] {phase} {time.perf_counter() - debut:.3f}s", flush=True)
+
+
 SAISON = {1: 0.85, 2: 0.9, 7: 1.05, 8: 1.12, 12: 1.15}                    # remplissage relatif (fictif)
 ARTICLES = [("FILT", "Filtre à huile", "PIECE", 100, 5000), ("PLAQ", "Plaquettes de frein", "PIECE", 60, 8000),
             ("PNEU", "Pneu 315/80", "PNEU", 40, 110000), ("HUIL", "Huile moteur (litre)", "LUBRIFIANT", 200, 3500),
@@ -130,12 +147,12 @@ class Command(SimulationMetierMixin, BaseCommand):
             nb_jours = min(o["jours"] or 31, calendar.monthrange(a, m)[1])
             self.mois.append([d for d in (datetime.date(a, m, j) for j in range(1, nb_jours + 1)) if fin is None or d <= fin])
         self.jours = [j for jours in self.mois for j in jours]
-        # La CI capture stdout des commandes dans les tests. Ces traces
-        # facultatives restent visibles directement dans les logs GitHub.
+        # SQL_TEST_TIMINGS active les traces légères ; le profileur SQL exhaustif
+        # reste réservé à SIMULATION_SQL_DIAGNOSTIC.
         diagnostic_sql = diagnostic_sql_actif()
+        phases_actives = traces_phases_actives()
         def trace_phase(phase, debut):
-            if diagnostic_sql:
-                print(f'[SIM-PHASE] {phase} {time.perf_counter() - debut:.3f}s', flush=True)
+            tracer_phase_sql(phase, debut, active=phases_actives)
         # Cumuler les sous-phases pour repérer les coûts dominants sur plusieurs mois.
         self._sim_phases_cumulees = {} if diagnostic_sql else None
         debut_phase = time.perf_counter()
