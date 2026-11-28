@@ -151,10 +151,10 @@ class DiagnosticSqlSimulationTests(SimpleTestCase):
         with patch.dict(os.environ, {"SQL_TEST_TIMINGS": "1"}, clear=True), \
                 patch("apps.transport.management.commands.simulation.time.perf_counter", return_value=12.5), \
                 patch("sys.stdout", sortie):
-            tracer_phase_sql("journee 2026-11-28", 10.0)
+            secondes = tracer_phase_sql("journee 2026-11-28", 10.0)
 
         self.assertEqual(sortie.getvalue(), "[SIM-PHASE] journee 2026-11-28 2.500s\n")
-        self.assertEqual(tracer_phase_sql("journee 2026-11-28", 10.0), 2.5)
+        self.assertEqual(secondes, 2.5)
 
     def test_les_temps_de_phase_s_agregent_sans_profileur_sql_exhaustif(self):
         from .management.commands.simulation import _cumuler_phase_sql, diagnostic_sql_actif
