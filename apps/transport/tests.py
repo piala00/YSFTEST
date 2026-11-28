@@ -1331,10 +1331,19 @@ class SimulationPlusieursMoisTests(TestCase):
 
         from .management.commands.simulation import Command
 
-        commande = Command()
-        call_command(commande, mois="2026-12", nombre_mois=2, jours=2, vehicules=8, salaries=25, echelle=0.1, forcer=True,
-                     stdout=io.StringIO())
+        from contextlib import redirect_stdout
+        from unittest.mock import patch
+
+        commande, sortie_trace = Command(), io.StringIO()
+        with patch.dict("os.environ", {"SQL_TEST_TIMINGS": "1"}, clear=False):
+            with redirect_stdout(sortie_trace):
+                call_command(commande, mois="2026-12", nombre_mois=2, jours=2,
+                             vehicules=8, salaries=25, echelle=0.1, forcer=True,
+                             stdout=io.StringIO())
         self.assertTrue(all(ok for _, ok in commande.controles), commande.controles)
+        self.assertIn("[SIM-DETAIL-TOTAL] phase=journee.", sortie_trace.getvalue())
+        self.assertIn("[SIM-DETAIL-TOTAL] phase=vente.billet_vendre", sortie_trace.getvalue())
+        self.assertIn("[SIM-DETAIL-TOTAL] phase=transport.depart", sortie_trace.getvalue())
         self.assertEqual(sorted(PeriodePaie.objects.values_list("annee", "mois")), [(2026, 12), (2027, 1)])
         self.assertTrue({"2026", "2027"} <= set(Exercice.objects.values_list("code", flat=True)))
         self.assertEqual(Decompte.objects.count(), 2 * ContratPartenaire.objects.count())     # un décompte par mois
