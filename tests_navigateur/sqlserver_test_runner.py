@@ -399,16 +399,43 @@ def _alias_pour_base(receiver):
     return alias or "default"
 
 
-def _enregistrer_mesure(metrics, operation, elapsed, failed=False, nested=False):
-    """Agrège une durée sans conserver SQL, paramètres ni données métier."""
+def _enregistrer_mesure(metrics, operation, elapsed, failed=False, nested=False, exceptional=False):
+    """Agrège une durée en séparant les erreurs réelles du contexte d'exception attendu."""
     metric = metrics.setdefault(operation, {
-        "count": 0, "total": 0.0, "max": 0.0, "errors": 0, "nested": 0,
+        "count": 0, "total": 0.0, "max": 0.0,
+        "errors": 0, "exceptions": 0, "nested": 0,
     })
     metric["count"] += 1
     metric["total"] += elapsed
     metric["max"] = max(metric["max"], elapsed)
     metric["errors"] += int(failed)
+    metric["exceptions"] += int(exceptional)
     metric["nested"] += int(nested)
+
+
+def _enregistrer_mesure_par_test(par_alias, par_test, alias, test_name, operation,
+                                  elapsed, failed=False, nested=False, exceptional=False):
+    """Conserve l'alias global et attribue la mesure au contexte qui l'a réellement ouverte."""
+    _enregistrer_mesure(
+        par_alias.setdefault(alias, {}), operation, elapsed,
+        failed=failed, nested=nested, exceptional=exceptional,
+    )
+    if test_name:
+        _enregistrer_mesure(
+            par_test.setdefault((test_name, alias), {}), operation, elapsed,
+            failed=failed, nested=nested, exceptional=exceptional,
+        )
+
+
+def _enregistrer_atomic_scope(enregistrer, receiver, transaction, elapsed,
+                              failed=False, exceptional=False):
+    """Attribue la durée d'un atomic au test/fixture qui l'a ouvert, pas à celui qui le ferme."""
+    enregistrer(
+        receiver, "atomic_scope", elapsed, failed=failed,
+        nested=transaction["nested"],
+        test_name_override=transaction["test_name"],
+        exceptional=exceptional,
+    )
 
 
 def _emballer_methode(original, operation, enregistrer):
@@ -445,21 +472,19 @@ def instrument_database_activity():
     etat = {"reported": False}
     slow_seconds = max(0.0, float(os.environ.get("SQL_DB_SLOW_SECONDS", "5")))
 
-    def enregistrer(receiver, operation, elapsed, failed=False, nested=False):
+    def enregistrer(receiver, operation, elapsed, failed=False, nested=False,
+                    test_name_override=None, exceptional=False):
         alias = _alias_pour_base(receiver)
-        _enregistrer_mesure(
-            par_alias.setdefault(alias, {}), operation, elapsed, failed, nested
+        test_name = _ACTIVE_TEST if test_name_override is None else test_name_override
+        _enregistrer_mesure_par_test(
+            par_alias, par_test, alias, test_name, operation, elapsed,
+            failed=failed, nested=nested, exceptional=exceptional,
         )
-        test_name = _ACTIVE_TEST
-        if test_name:
-            _enregistrer_mesure(
-                par_test.setdefault((test_name, alias), {}),
-                operation, elapsed, failed, nested,
-            )
         if elapsed >= slow_seconds:
             print(
                 f"[SQL-DB-SLOW] operation={operation} alias={alias} "
                 f"elapsed={elapsed:.3f}s error={int(failed)} "
+                f"exception_context={int(exceptional)} "
                 f"test={test_name or '[runner]'}",
                 flush=True,
             )
@@ -505,6 +530,7 @@ def instrument_database_activity():
 
     def timed_atomic_enter(self):
         started = time.monotonic()
+        test_name = _ACTIVE_TEST or "[runner]"
         failed = False
         try:
             result = original_enter(self)
@@ -512,12 +538,16 @@ def instrument_database_activity():
             failed = True
             raise
         finally:
-            enregistrer(self, "atomic_enter", time.monotonic() - started, failed)
+            enregistrer(
+                self, "atomic_enter", time.monotonic() - started,
+                failed, test_name_override=test_name,
+            )
         transactions = getattr(pile, "transactions", [])
         alias = _alias_pour_base(self)
         nested = any(item["alias"] == alias for item in transactions)
         transactions.append({
-            "id": id(self), "alias": alias, "started": started, "nested": nested,
+            "id": id(self), "alias": alias, "started": started,
+            "nested": nested, "test_name": test_name,
         })
         pile.transactions = transactions
         return result
@@ -533,7 +563,7 @@ def instrument_database_activity():
         finally:
             enregistrer(
                 self, "atomic_exit", time.monotonic() - started,
-                failed or exc_type is not None,
+                failed, exceptional=exc_type is not None,
             )
             transactions = getattr(pile, "transactions", [])
             index = next(
@@ -543,11 +573,10 @@ def instrument_database_activity():
             )
             if index is not None:
                 transaction = transactions.pop(index)
-                enregistrer(
-                    self, "atomic_scope",
+                _enregistrer_atomic_scope(
+                    enregistrer, self, transaction,
                     time.monotonic() - transaction["started"],
-                    failed or exc_type is not None,
-                    transaction["nested"],
+                    failed=failed, exceptional=exc_type is not None,
                 )
                 pile.transactions = transactions
 
@@ -567,7 +596,8 @@ def instrument_database_activity():
                 for operation, metric in sorted(operations.items()):
                     details.append(
                         f"{operation}:n={metric['count']},total={metric['total']:.3f}s,"
-                        f"max={metric['max']:.3f}s,err={metric['errors']},nested={metric['nested']}"
+                        f"max={metric['max']:.3f}s,err={metric['errors']},"
+                        f"exception_context={metric['exceptions']},nested={metric['nested']}"
                     )
                 print(f"[SQL-DB-SUMMARY] alias={alias} " + " ".join(details), flush=True)
 
@@ -585,6 +615,7 @@ def instrument_database_activity():
                 details = " ".join(
                     f"{name}={metric['count']}/{metric['total']:.3f}s"
                     f"/max:{metric['max']:.3f}s/err:{metric['errors']}"
+                    f"/exception_context:{metric['exceptions']}"
                     for name, metric in sorted(operations.items())
                 )
                 print(
