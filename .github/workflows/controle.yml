@@ -43,6 +43,8 @@ jobs:
         run: python -m unittest tests.test_sqlserver_runner_partition -v
       - name: Vérifier la copie contrôlée du code dans l'installateur Windows
         run: python -m unittest tests.test_installateur_copie_code -v
+      - name: Tests ciblés — diagnostic hors ligne .erpinst
+        run: python manage.py test apps.licences.tests_installation --noinput -v2
       - name: Tests ciblés — profil SQL de simulation sur activation explicite
         run: python manage.py test apps.transport.tests_simulation_metier.DiagnosticSqlSimulationTests --noinput -v2
       - name: Tests ciblés — canaux de vente et ventilation analytique
