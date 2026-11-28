@@ -2,6 +2,8 @@
 import datetime
 import io
 import random
+import os
+from unittest.mock import patch
 from decimal import Decimal
 from types import SimpleNamespace
 from django.contrib.auth import get_user_model
@@ -133,6 +135,37 @@ class DiagnosticSqlSimulationTests(SimpleTestCase):
                     "SQL_TEST_TIMINGS": "1",
                     "SIMULATION_SQL_DIAGNOSTIC": valeur,
                 }))
+
+    def test_le_runner_active_les_temps_de_phase_sans_profileur_exhaustif(self):
+        from .management.commands.simulation import diagnostic_sql_actif, traces_phases_actives
+
+        environnement = {"SQL_TEST_TIMINGS": "1"}
+        self.assertTrue(traces_phases_actives(environnement))
+        self.assertFalse(diagnostic_sql_actif(environnement))
+        self.assertFalse(traces_phases_actives({"SQL_TEST_TIMINGS": "0"}))
+
+    def test_trace_de_phase_visible_dans_la_sortie_du_runner(self):
+        from .management.commands.simulation import tracer_phase_sql
+
+        sortie = io.StringIO()
+        with patch.dict(os.environ, {"SQL_TEST_TIMINGS": "1"}, clear=True), \
+                patch("apps.transport.management.commands.simulation.time.perf_counter", return_value=12.5), \
+                patch("sys.stdout", sortie):
+            tracer_phase_sql("journee 2026-11-28", 10.0)
+
+        self.assertEqual(sortie.getvalue(), "[SIM-PHASE] journee 2026-11-28 2.500s\\n")
+
+    def test_trace_de_phase_absente_hors_instrumentation(self):
+        from .management.commands.simulation import tracer_phase_sql
+
+        sortie = io.StringIO()
+        with patch.dict(os.environ, {"SQL_TEST_TIMINGS": "0", "SIMULATION_SQL_DIAGNOSTIC": "0"}, clear=True), \
+                patch("apps.transport.management.commands.simulation.time.perf_counter") as chrono, \
+                patch("sys.stdout", sortie):
+            tracer_phase_sql("initialisation", 10.0)
+
+        chrono.assert_not_called()
+        self.assertEqual(sortie.getvalue(), "")
 
 
 class SimulationMetierIntegreeTests(TestCase):
