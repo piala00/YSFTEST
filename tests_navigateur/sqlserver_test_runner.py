@@ -31,6 +31,17 @@ def instrument_tests():
     resources = {}
     resource_lock = Lock()
     atomic_local = local()
+    traceback_seconds = max(0.0, float(os.environ.get("SQL_TEST_TRACEBACK_SECONDS", "180")))
+
+    def arm_traceback_dump():
+        if traceback_seconds:
+            faulthandler.cancel_dump_traceback_later()
+            faulthandler.dump_traceback_later(
+                traceback_seconds, repeat=False, file=sys.stderr
+            )
+
+    def cancel_traceback_dump():
+        faulthandler.cancel_dump_traceback_later()
 
     def _resource_record(name, kind, elapsed, alias=None, exceptional=False, rollback=False):
         """Agrège les ouvertures/fermetures réelles et les blocs atomic, par test ou fixture."""
@@ -152,9 +163,11 @@ def instrument_tests():
         started = time.monotonic()
         active["name"], active["started"] = test_name, started
         print(f"[SQL-TEST-START] {test_name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_run(self, result)
         finally:
+            cancel_traceback_dump()
             elapsed = time.monotonic() - started
             active["name"], active["started"] = None, None
             _ACTIVE_TEST = previous_test
@@ -229,9 +242,11 @@ def instrument_tests():
         _ACTIVE_TEST = fixture_name
         active["name"], active["started"] = fixture_name, started
         print(f"[SQL-FIXTURE-START] {fixture_name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_class_setup(self, test, result)
         finally:
+            cancel_traceback_dump()
             active["name"], active["started"] = prior
             _ACTIVE_TEST = prior_test
             print(f"[SQL-FIXTURE-END] {fixture_name} {time.monotonic() - started:.3f}s", flush=True)
@@ -250,9 +265,11 @@ def instrument_tests():
         _ACTIVE_TEST = f"tearDownClass {name}"
         active["name"], active["started"] = f"tearDownClass {name}", started
         print(f"[SQL-FIXTURE-START] tearDownClass {name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_class_teardown(self, test, result)
         finally:
+            cancel_traceback_dump()
             active["name"], active["started"] = prior
             _ACTIVE_TEST = prior_test
             print(f"[SQL-FIXTURE-END] tearDownClass {name} "
@@ -655,7 +672,6 @@ def main():
     os.chdir(repository_root)
     os.environ.setdefault("SQL_TEST_TIMINGS", "1")
     faulthandler.enable(all_threads=True)
-    faulthandler.dump_traceback_later(120, repeat=True, file=sys.stderr)
     instrument_tests()
     instrument_database_lifecycle()
     instrument_database_activity()
