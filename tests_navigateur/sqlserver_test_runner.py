@@ -451,8 +451,8 @@ def instrument_database_activity():
                 operation, elapsed, failed, nested,
             )
 
-    # Les connexions ouvertes/fermées sont déjà mesurées par instrument_tests().
-    # On complète avec les attentes de connexion et les opérations transactionnelles.
+    # Les marqueurs [SQL-RESOURCE] historiques restent disponibles.
+    # Ce registre ajoute un agrégat commun par alias/test pour connexions et transactions.
     for operation in (
         "ensure_connection", "connect", "close", "commit", "rollback",
         "set_autocommit", "savepoint", "savepoint_commit", "savepoint_rollback",
