@@ -131,3 +131,62 @@ pas la limite de 16 minutes du runner complet.
 
 Les artefacts Windows sont des paquets de recette à identité fictive, pas une distribution
 personnalisée avec l'identité propriétaire réelle.
+
+
+## Run #886 — profil SQL détaillé et défaut du profileur, 28/11/2026
+
+Le commit direct sur la branche demandée `ccr-5592a371-fusjt2` a déclenché le run
+[#886](https://github.com/piala00/YSFTEST/actions/runs/46149002985). Les jobs Linux, SQLite,
+P0.3, SQL Server shard 1, Windows Transport, licences, activation, simulation-volume et guichet
+ont réussi. Le shard 0 a échoué **dans l'étape de diagnostic ajoutée**, avant de lancer le runner
+complet ; le runner SQL Server shard 1 a, lui, terminé 505 tests en 495,396 s, sous la limite
+inchangée de 16 minutes.
+
+Le test de diagnostic multi-mois a exécuté les 61 jours jusqu'au bilan, puis a levé :
+`TypeError: list indices must be integers or slices, not str` dans le résumé final des phases.
+Cause exacte : `_sim_phases_cumulees` était utilisé à la fois comme dictionnaire de mesures
+(`{"appels", "secondes", "max"}`) et comme dictionnaire de sous-phases transport
+(`[appels, secondes]`). Les opérations métier avaient terminé ; seule l'agrégation de diagnostic
+échouait à la fin. Ce défaut est réel et corrigé en séparant les deux agrégats.
+
+### Mesures issues des 61 jours (profil exhaustif SQL Server)
+
+| Phase | Appels SQL | Temps SQL cumulé |
+|---|---:|---:|
+| Départs, carburant et arrivées | 54 835 | 35,046 s |
+| Billets et colis | 41 290 | 25,707 s |
+| Opérations de fin de journée | 10 611 | 7,210 s |
+| Préparation et achats | 1 906 | 1,239 s |
+| Scénarios avant départ | 122 | 0,061 s |
+
+Durée murale des phases journalières : 147,257 s pour 61 jours, soit 2,414 s par jour en moyenne.
+Sous-phases transport : départ 574 appels / 40,304 s ; carburant et caisse 574 / 31,645 s ;
+arrivée 574 / 1,901 s ; incidents en route/après arrivée 0 s dans ce scénario.
+
+Signatures SQL cumulées les plus fréquentes/coûteuses :
+- `SELECT @@TRANCOUNT` : 13 428 appels / 5,651 s (origine backend/driver probable, à confirmer).
+- INSERT `core_journalevenement` : 4 265 / 5,156 s.
+- INSERT `comptabilite_ligneecriture` : 2 063 / 3,634 s.
+- SELECT de lignes `comptabilite_ligneecriture` : 2 132 / 3,427 s.
+- Agrégat débit/crédit : 360 / 1,829 s.
+- INSERT `comptabilite_ecriture` : 1 103 / 1,503 s.
+
+Aucune requête individuelle n'a franchi le seuil « lente » configuré : le coût vient du volume
+d'opérations quotidiennes et des transactions métier, pas d'une connexion SQL qui attend ou d'une
+requête unique bloquée. Le runner garde son timeout à 16 minutes et le partitionnement reste actif.
+
+La CI suivante remplace le profilage exhaustif 61 jours (utile ponctuellement mais trop coûteux
+pour chaque push) par un test de régression SQL ciblé sur une journée, qui active explicitement
+`SIMULATION_SQL_DIAGNOSTIC` et vérifie les agrégats `SIM-PHASE-TOTAL` et
+`SIM-TRANSPORT-TOTAL`. Le runner complet continue de mesurer chaque test sans activer le
+profileur exhaustif.
+
+### P0.3 — preuve et couverture renforcée
+
+Le run #886 a réussi la clôture N→N+1 sur deux bases Django réellement migrées :
+14 tests en 59,622 s. Le test est étendu sur la révision suivante pour vérifier également toutes
+les références permanentes de `ParametresTransport` (comptes billets/colis/fret/bagages,
+billets à voyager, colis à transporter, remboursements, propriétaires, carburant, pièces,
+main-d'œuvre, taxes billets/colis), la banque/caisse et les champs carte grise, mise en service,
+assurance et visite technique du véhicule. Cette extension renforce la preuve de copie complète
+sans changer le moteur métier de clôture.

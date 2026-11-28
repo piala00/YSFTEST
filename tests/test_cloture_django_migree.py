@@ -35,10 +35,11 @@ def connexion_sqlite(chemin):
 RACINE = Path(__file__).resolve().parents[1]
 SEED = """
 from datetime import date
+from datetime import date
 from decimal import Decimal
 from django.contrib.auth.models import User, Group, Permission
 from apps.core.models import Societe, Exercice, Agence
-from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
+from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture, Taxe, Banque, Taxe, Banque
 from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, Chauffeur, ChangementGamme
 from apps.commercial.models import Tiers
 from apps.personnel.models import Employe, RubriquePaie
@@ -56,17 +57,32 @@ pv = Gare.objects.create(code='PVY', nom='Point de vente', ville='Yaoundé', typ
 ligne = Ligne.objects.create(code='YDE-DLA', gare_depart=g1, gare_arrivee=g2, prix_billet=5000)
 ArretLigne.objects.create(ligne=ligne, gare=pv, ordre=1)
 proprietaire = Tiers.objects.create(code='PROP-01', nom='Propriétaire contrôle', type_tiers='FOURNISSEUR')
-vehicule = Vehicule.objects.create(immatriculation='CE-123-AA', nombre_places=40, gamme='CLASSIQUE', proprietaire=proprietaire)
+vehicule = Vehicule.objects.create(
+    immatriculation='CE-123-AA', nombre_places=40, gamme='CLASSIQUE', proprietaire=proprietaire,
+    carte_grise='CG-TEST-2026', mise_en_service=date(2024,5,1),
+    assurance_echeance=date(2027,1,31), visite_technique_echeance=date(2026,12,31))
 ChangementGamme.objects.create(vehicule=vehicule, gamme='CLASSIQUE', debut=date(2026,1,1))
 chauffeur = Chauffeur.objects.create(nom='Chauffeur de contrôle', permis='TEST-2026')
 c1 = Compte.objects.create(numero='411000', intitule='Clients')
 c2 = Compte.objects.create(numero='101000', intitule='Capital')
+taxe_billets = Taxe.objects.create(code='TVA-BIL', intitule='TVA billets',
+    sens=Taxe.COLLECTEE, taux=Decimal('19.25'), compte=c2)
+taxe_colis = Taxe.objects.create(code='TVA-COL', intitule='TVA colis et fret',
+    sens=Taxe.COLLECTEE, taux=Decimal('17.50'), compte=c2)
+caisse = Journal.objects.create(code='CA', intitule='Caisse principale',
+    type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie=c2)
+Banque.objects.create(code='BTA', intitule='Banque principale', domiciliation='Bertoua',
+    rib='CM-TEST-0001', journal=caisse)
 from apps.transport.models import ParametresTransport
-ParametresTransport.objects.create(compte_billets=c1, compte_colis=c1,
-    compte_fret=c1, compte_contre_remboursement=c2,
-    compte_proprietaires=c2, sessions_caisse_obligatoires=True,
-    bloquer_papiers_expires=False, avance_depart_toleree=35,
-    plafond_depense_sans_autorisation=Decimal('25000'),
+ParametresTransport.objects.create(
+    compte_billets=c1, compte_colis=c1, compte_fret=c1,
+    compte_bagages=c2, compte_contre_remboursement=c2,
+    compte_billets_a_voyager=c1, compte_colis_a_transporter=c2,
+    taxe_billets=taxe_billets, taxe_colis=taxe_colis,
+    compte_remboursements=c1, compte_proprietaires=c2,
+    compte_carburant=c2, compte_pieces=c1, compte_main_oeuvre=c2,
+    sessions_caisse_obligatoires=True, bloquer_papiers_expires=False,
+    avance_depart_toleree=35, plafond_depense_sans_autorisation=Decimal('25000'),
     retenue_annulation=Decimal('7.50'), report_absent_automatique=True)
 agence = Agence.objects.create(code='CTR', nom='Agence Centre', ville='Yaoundé', locale=True, compte_liaison=c2)
 employe = Employe.objects.create(matricule='EMP-01', nom='Chauffeur de contrôle', service='CONDUITE',
@@ -307,20 +323,43 @@ assert utilisateur.groups.filter(name='Guichet').exists()
 assert utilisateur.user_permissions.filter(codename='view_user', content_type__app_label='auth').exists()
 assert utilisateur.groups.get(name='Guichet').permissions.filter(codename='view_user', content_type__app_label='auth').exists()
 assert Journal.objects.get(code='AN').cloture_au is None
+assert Journal.objects.get(code='CA').cloture_au is None
+assert Journal.objects.get(code='CA').compte_tresorerie.numero == '101000'
 assert Journal.objects.filter(code='OD').exists()
+banque = Banque.objects.get(code='BTA')
+assert banque.journal.code == 'CA'
+assert banque.rib == 'CM-TEST-0001'
 assert set(Compte.objects.values_list('numero', flat=True)) == {'101000', '411000'}
 assert ArretLigne.objects.get(ligne__code='YDE-DLA').gare.code == 'PVY'
 assert ChangementGamme.objects.filter(vehicule__immatriculation='CE-123-AA', gamme='CLASSIQUE').exists()
 assert Agence.objects.get(code='CTR').compte_liaison.numero == '101000'
 assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
 assert Ligne.objects.get(code='YDE-DLA').gare_arrivee.code == 'DLA'
-assert Vehicule.objects.get(immatriculation='CE-123-AA').proprietaire.code == 'PROP-01'
+vehicule = Vehicule.objects.get(immatriculation='CE-123-AA')
+assert vehicule.proprietaire.code == 'PROP-01'
+assert vehicule.carte_grise == 'CG-TEST-2026'
+assert vehicule.mise_en_service == date(2024,5,1)
+assert vehicule.assurance_echeance == date(2027,1,31)
+assert vehicule.visite_technique_echeance == date(2026,12,31)
 assert Employe.objects.get(matricule='EMP-01', agence__code='CTR').vehicule.immatriculation == 'CE-123-AA'
 assert RubriquePaie.objects.get(code='PRIME').compte.numero == '411000'
 from apps.transport.models import ParametresTransport
 parametres = ParametresTransport.objects.get()
 assert parametres.compte_billets.numero == '411000'
+assert parametres.compte_colis.numero == '411000'
+assert parametres.compte_fret.numero == '411000'
+assert parametres.compte_bagages.numero == '101000'
+assert parametres.compte_billets_a_voyager.numero == '411000'
+assert parametres.compte_colis_a_transporter.numero == '101000'
+assert parametres.taxe_billets.code == 'TVA-BIL'
+assert parametres.taxe_billets.taux == Decimal('19.25')
+assert parametres.taxe_colis.code == 'TVA-COL'
+assert parametres.taxe_colis.taux == Decimal('17.50')
+assert parametres.compte_remboursements.numero == '411000'
 assert parametres.compte_proprietaires.numero == '101000'
+assert parametres.compte_carburant.numero == '101000'
+assert parametres.compte_pieces.numero == '411000'
+assert parametres.compte_main_oeuvre.numero == '101000'
 assert parametres.sessions_caisse_obligatoires
 assert not parametres.bloquer_papiers_expires
 assert parametres.avance_depart_toleree == 35

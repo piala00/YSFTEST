@@ -168,6 +168,9 @@ class Command(SimulationMetierMixin, BaseCommand):
         # Les totaux légers sont disponibles avec SQL_TEST_TIMINGS ; ils ne
         # déclenchent jamais execute_wrapper ni le profilage SQL exhaustif.
         self._sim_phases_cumulees = {} if phases_actives else None
+        # Les sous-phases transport détaillées ont une structure [appels, secondes] ;
+        # ne pas les mélanger aux agrégats de phases murales (dict de mesures).
+        self._sim_transport_cumulees = {} if diagnostic_sql else None
 
         def trace_phase(phase, debut):
             secondes = tracer_phase_sql(phase, debut, active=phases_actives)
@@ -306,6 +309,12 @@ class Command(SimulationMetierMixin, BaseCommand):
                 print(f"[SIM-PHASE-TOTAL] phase={phase} appels={appels} "
                       f"total_s={secondes:.3f} avg_s={secondes/appels:.3f} "
                       f"max_s={mesure['max']:.3f}", flush=True)
+        if diagnostic_sql and self._sim_transport_cumulees:
+            for phase, (appels, secondes) in sorted(
+                    self._sim_transport_cumulees.items(),
+                    key=lambda item: item[1][1], reverse=True):
+                print(f"[SIM-TRANSPORT-TOTAL] phase={phase} appels={appels} "
+                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f}", flush=True)
         if o["rapport"]:
             with open(o["rapport"], "w", encoding="utf-8") as f:
                 f.write(texte)
@@ -557,7 +566,7 @@ class Command(SimulationMetierMixin, BaseCommand):
                 stats[0] += 1
                 elapsed = time.perf_counter() - debut
                 stats[1] += elapsed
-                cumul = self._sim_phases_cumulees.setdefault(nom, [0, 0.0])
+                cumul = self._sim_transport_cumulees.setdefault(nom, [0, 0.0])
                 cumul[0] += 1
                 cumul[1] += elapsed
 

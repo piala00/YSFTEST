@@ -184,6 +184,29 @@ class DiagnosticSqlSimulationTests(SimpleTestCase):
         self.assertEqual(sortie.getvalue(), "")
 
 
+class DiagnosticSqlSimulationExecutionTests(TestCase):
+    """Le profil SQL exhaustif et les temps de phase doivent coexister sans collision."""
+
+    def test_profile_sql_exhaustif_et_temps_transport_separes(self):
+        from .management.commands.simulation import Command
+
+        commande = Command()
+        sortie = io.StringIO()
+        with patch.dict(os.environ, {"SIMULATION_SQL_DIAGNOSTIC": "1"}, clear=False), \
+                patch("sys.stdout", sortie):
+            call_command(
+                commande, mois="2026-09", jours=1, vehicules=4, salaries=5,
+                echelle=0.01, departs_jour=2, forcer=True, stdout=io.StringIO(),
+            )
+
+        self.assertTrue(all(ok for _, ok in commande.controles), commande.controles)
+        self.assertIn("[SIM-SQL-ETAPE]", sortie.getvalue())
+        self.assertIn("[SIM-PHASE-TOTAL]", sortie.getvalue())
+        self.assertIn("[SIM-TRANSPORT-TOTAL]", sortie.getvalue())
+        self.assertIsInstance(commande._sim_phases_cumulees["journee"], dict)
+        self.assertIsInstance(commande._sim_transport_cumulees["depart"], list)
+
+
 class SimulationMetierIntegreeTests(TestCase):
     def test_scenarios_complets_et_rapprochements_gl_stock(self):
         from .management.commands.simulation import Command
