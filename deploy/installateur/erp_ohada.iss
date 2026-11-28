@@ -324,6 +324,12 @@ function FermerPressePapiers: BOOL;
   external 'CloseClipboard@user32.dll stdcall';
 function FormatPressePapiersDisponible(Format: UINT): BOOL;
   external 'IsClipboardFormatAvailable@user32.dll stdcall';
+{ TWinControl de Pascal Script n'expose pas de méthode SetFocus.
+  Utiliser les API Win32 sur le handle du champ. }
+function DefinirFocus(Fenetre: HWND): HWND;
+  external 'SetFocus@user32.dll stdcall';
+function ObtenirFocus: HWND;
+  external 'GetFocus@user32.dll stdcall';
 
 procedure CopierCodeInstallation(Sender: TObject);
 var
@@ -357,8 +363,16 @@ begin
     exit;
   end;
 
-  { Le champ natif sélectionne exactement le code affiché puis exécute WM_COPY. }
-  ChampCodeInstallation.SetFocus;
+  { Le champ natif sélectionne exactement le code affiché puis exécute WM_COPY.
+    Le focus est défini par l'API Win32 : TWinControl n'expose pas SetFocus
+    dans le moteur Pascal Script d'Inno Setup. }
+  DefinirFocus(ChampCodeInstallation.Handle);
+  if ObtenirFocus() <> ChampCodeInstallation.Handle then
+  begin
+    BoutonCopierCode.Caption := 'Copie impossible';
+    MsgBox('Windows n''a pas pu donner le focus au champ du code. Sélectionnez le code puis faites Ctrl+C.', mbError, MB_OK);
+    exit;
+  end;
   SendMessage(ChampCodeInstallation.Handle, $00B1, 0, -1); { EM_SETSEL }
   SendMessage(ChampCodeInstallation.Handle, $0301, 0, 0);  { WM_COPY }
 
