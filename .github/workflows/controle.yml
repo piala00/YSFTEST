@@ -185,8 +185,8 @@ jobs:
           # Profiler uniquement le scénario de 61 journées : le profil SQL exhaustif
           # reste opt-in et n'alourdit pas les 800+ tests du shard.
           timeout --verbose --signal=TERM --kill-after=30s 7m python -u tests_navigateur/sqlserver_test_runner.py apps.transport.tests.SimulationPlusieursMoisTests.test_jusqu_a_une_date_le_dernier_mois_s_arrete_a_ce_jour 2>&1 | tee "$log_file"
-          grep -q '^\\[SIM-SQL-ETAPE\\]' "$log_file"
-          grep -q '^\\[SIM-SQL-SIGNATURE\\]' "$log_file"
+          grep -q '^\[SIM-SQL-ETAPE\]' "$log_file"
+          grep -q '^\[SIM-SQL-SIGNATURE\]' "$log_file"
       - name: Diagnostic SQL Server apres echec ou timeout
         if: failure()
         shell: bash
