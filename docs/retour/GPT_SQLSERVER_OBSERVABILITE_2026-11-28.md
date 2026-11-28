@@ -33,11 +33,12 @@ Les durées des opérations sont imbriquées : `ensure_connection` inclut `conne
 Le runner conserve les chronométrages existants de chaque test, de son corps, des fixtures, des connexions ouvertes/fermées et des phases du runner. Il complète ces mesures par :
 
 - `ensure_connection`, `connect`, `close`, `commit`, `rollback`, `set_autocommit` ;
+- `CursorWrapper.execute`, `executemany` et `callproc`, agrégés sans journaliser le SQL ni les paramètres ;
 - `savepoint`, `savepoint_commit`, `savepoint_rollback` ;
 - scopes `transaction.atomic`, profondeur d'imbrication, exceptions et durée inclusive ;
 - `create_test_db` et `_create_test_db`, `destroy_test_db` et `_destroy_test_db`, `clone_test_db` et `_clone_test_db`, sérialisation et désérialisation des bases de test. Les méthodes internes de création sont mesurées lorsqu'elles sont héritées/appelées par le backend ; la méthode publique mesure toujours le cycle complet.
 
-Les résultats sont agrégés par alias et par test dans `[SQL-DB-SUMMARY]` et `[SQL-DB-TEST-TOP]`. Aucun SQL, paramètre, montant, nom de client ou donnée métier n'est journalisé. Les marqueurs historiques `[SQL-RESOURCE]` restent également disponibles. Les wrappers conservent les retours et propagent les exceptions originales.
+Les résultats sont agrégés par alias et par test dans `[SQL-DB-SUMMARY]` et `[SQL-DB-TEST-TOP]`. Toute opération dépassant `SQL_DB_SLOW_SECONDS` (5 s par défaut) émet immédiatement `[SQL-DB-SLOW]`, avec opération, alias, durée et test, sans SQL ni paramètre. Aucun montant, nom de client ou donnée métier n'est journalisé. Les marqueurs historiques `[SQL-RESOURCE]` restent également disponibles. Les wrappers conservent les retours et propagent les exceptions originales.
 
 Les durées de `create_test_db` incluent notamment les migrations Django ; `destroy_test_db` inclut la fermeture de connexion. Ces mesures sont des durées globales de méthode, pas un chronométrage isolé de chaque instruction DDL du backend.
 
@@ -51,6 +52,6 @@ Cette inspection justifie de mesurer les méthodes publiques héritées pour obt
 
 ## Validation attendue
 
-Le test unitaire `tests.test_sqlserver_runner_partition` couvre l'agrégateur, les alias, la conservation du retour, la propagation des exceptions et la mesure d'une méthode de cycle de vie. La CI complète doit ensuite montrer les nouveaux marqueurs `[SQL-DB-SUMMARY]` et `[SQL-DB-TEST-TOP]` dans les deux shards SQL Server.
+Le test unitaire `tests.test_sqlserver_runner_partition` couvre l'agrégateur, les alias des connexions et curseurs, la conservation du retour et des paramètres, la propagation des exceptions et la mesure d'une méthode de cycle de vie. La CI complète doit ensuite montrer les nouveaux marqueurs `[SQL-DB-SUMMARY]` et `[SQL-DB-TEST-TOP]` dans les deux shards SQL Server.
 
 La limite GNU `timeout ... 16m` reste inchangée. Aucun timeout n'est allongé ; aucune fusion, aucun déploiement et aucune donnée réelle ne sont autorisés.
