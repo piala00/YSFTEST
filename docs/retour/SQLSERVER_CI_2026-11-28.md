@@ -9,6 +9,18 @@
 - Commit testé : `67b52c563153fa1c14d9494fd755e4149e064da6`
 - Moteur : SQL Server 2022, un conteneur jetable par shard.
 
+## Relecture du timeout historique #381
+
+Le journal original du job `128230852957` a été récupéré et relu, pas seulement son résumé GitHub.
+
+- La commande démarre à `00:11:49.628Z`.
+- `timeout` envoie TERM à `00:27:49.648Z`, soit exactement la limite de 16 minutes.
+- Le dernier test affiché démarre à `00:27:45.381Z` : `ChoixDeBaseALInstallationTests.test_sqlserver_injoignable_retour_sur_sqlite`. Il n'a donc que 4,3 secondes d'exécution avant l'arrêt ; le journal ne prouve pas qu'il soit lui-même lent ou bloqué.
+- Un dump de pile à `00:23:49.674Z` montre la simulation multi-mois dans `simulation.py:124`, au traitement de fin de mois (`fin_de_mois`), puis `Decompte.calculer` → `Decompte.evaluer` → `ParametresTransport.get` → `mssql_python.cursor.execute`. Le test concerné termine ensuite à `00:23:58.955Z` : ce dump est un instantané d'un scénario coûteux, pas la preuve d'une requête bloquée.
+- Le serveur SQL poursuit ses opérations de démarrage, sauvegarde et restauration ; aucune erreur SQL Server n'explique le code 124 dans ce journal.
+
+Conclusion étayée : #381 est d'abord un dépassement **cumulatif** de la suite monolithique de 16 minutes. Le dernier test est seulement celui qui était en cours à l'échéance. La simulation multi-mois et plusieurs scénarios d'intégration consomment une part importante du budget. La séparation en deux conteneurs/shards et l'équilibrage des classes traitent cette cause sans masquer l'échec ni relever le timeout.
+
 ## Mesures des deux shards
 
 | Mesure | Shard 0 | Shard 1 |
