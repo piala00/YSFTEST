@@ -390,7 +390,9 @@ def _alias_pour_base(receiver):
     if alias is None:
         alias = getattr(receiver, "using", None)
     if alias is None:
-        connexion = getattr(receiver, "connection", None)
+        connexion = getattr(receiver, "db", None)
+        if connexion is None:
+            connexion = getattr(receiver, "connection", None)
         alias = getattr(connexion, "alias", None)
     return alias or "default"
 
@@ -432,12 +434,14 @@ def instrument_database_activity():
 
     from django.db.backends.base.base import BaseDatabaseWrapper
     from django.db.backends.base.creation import BaseDatabaseCreation
+    from django.db.backends.utils import CursorWrapper
     from django.db.transaction import Atomic
 
     par_alias = {}
     par_test = {}
     pile = local()
     etat = {"reported": False}
+    slow_seconds = max(0.0, float(os.environ.get("SQL_DB_SLOW_SECONDS", "5")))
 
     def enregistrer(receiver, operation, elapsed, failed=False, nested=False):
         alias = _alias_pour_base(receiver)
@@ -449,6 +453,13 @@ def instrument_database_activity():
             _enregistrer_mesure(
                 par_test.setdefault((test_name, alias), {}),
                 operation, elapsed, failed, nested,
+            )
+        if elapsed >= slow_seconds:
+            print(
+                f"[SQL-DB-SLOW] operation={operation} alias={alias} "
+                f"elapsed={elapsed:.3f}s error={int(failed)} "
+                f"test={test_name or '[runner]'}",
+                flush=True,
             )
 
     # Les marqueurs [SQL-RESOURCE] historiques restent disponibles.
@@ -462,6 +473,16 @@ def instrument_database_activity():
             setattr(
                 BaseDatabaseWrapper, operation,
                 _emballer_methode(original, operation, enregistrer),
+            )
+
+    # CursorWrapper permet de distinguer une requête lente d'un test métier lent.
+    # On mesure execute/executemany sans journaliser le SQL ni ses paramètres.
+    for operation in ("execute", "executemany", "callproc"):
+        original = getattr(CursorWrapper, operation, None)
+        if original is not None:
+            setattr(
+                CursorWrapper, operation,
+                _emballer_methode(original, f"cursor_{operation}", enregistrer),
             )
 
     # Django appelle ces méthodes autour de la création/migration/destruction
