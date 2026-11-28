@@ -53,5 +53,29 @@ class CopieCodeInstallateurTests(unittest.TestCase):
         self.assertIn("FormatPressePapiersUnicode = 13;", SOURCE)
 
 
+    def test_recette_interactive_suit_le_processus_temporaire_inno_setup(self):
+        script = (ROOT / "tests_navigateur" / "installateur_copie_code_windows.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Get-CimInstance -ClassName Win32_Process", script)
+        self.assertIn("Get-InstallerProcessIds", script)
+        self.assertIn("FindMainWindow([int[]]processIds)", script)
+        self.assertIn('window.ClassName == "TWizardForm"', script)
+        self.assertIn('window.Text.IndexOf("ERP OHADA"', script)
+        self.assertNotIn("$processus.HasExited", script)
+
+    def test_journal_inno_setup_et_diagnostic_processus_sont_conserves(self):
+        script = (ROOT / "tests_navigateur" / "installateur_copie_code_windows.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("$preuve.processus =", script)
+        self.assertIn("$preuve.fenetres =", script)
+        self.assertIn("$preuve.journal_setup = $journal", script)
+        workflow = (ROOT / ".github" / "workflows" / "controle.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("wizard-copie-code-*.log", workflow)
+
+
 if __name__ == "__main__":
     unittest.main()
