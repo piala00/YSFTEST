@@ -55,3 +55,33 @@ Cette inspection justifie de mesurer les méthodes publiques héritées pour obt
 Le test unitaire `tests.test_sqlserver_runner_partition` couvre l'agrégateur, les alias des connexions et curseurs, la conservation du retour et des paramètres, la propagation des exceptions et la mesure d'une méthode de cycle de vie. La CI complète doit ensuite montrer les nouveaux marqueurs `[SQL-DB-SUMMARY]` et `[SQL-DB-TEST-TOP]` dans les deux shards SQL Server.
 
 La limite GNU `timeout ... 16m` reste inchangée. Aucun timeout n'est allongé ; aucune fusion, aucun déploiement et aucune donnée réelle ne sont autorisés.
+
+
+## Relecture complémentaire des journaux CI #797 — 28/11/2026
+
+Le run [#797](https://github.com/piala00/YSFTEST/actions/runs/46103205466) a terminé avec **9 jobs sur 9 en succès**. Les deux shards SQL Server 2022 ont terminé sous le timeout inchangé de 16 minutes :
+
+| Mesure observée | Shard 0 | Shard 1 |
+|---|---:|---:|
+| Tests exécutés | 317 | 505 |
+| Durée de suite | 542,524 s | 522,821 s |
+| Création de la base de test | 21,458 s | 18,323 s |
+| Destruction de la base | 3,595 s | 3,866 s |
+| Connexions ouvertes (durée cumulée) | 0,262 s | 0,210 s |
+| Connexions fermées (durée cumulée) | 0,039 s | 0,033 s |
+
+Les journaux confirment que les connexions ne sont pas le coût dominant. La simulation multi-mois et les fixtures de classe restent les principaux consommateurs de temps. Les requêtes lentes sont identifiables par durée, alias et test, sans SQL ni paramètres journalisés.
+
+La même CI confirme la suite SQLite (**822 tests**, 205,127 s, 18 ignorés) et la recette P0.3 sur deux bases Django réellement migrées (**14 tests**, 65,358 s). Les deux jobs Windows Transport et Commerce ont également terminé en succès ; leurs artefacts sont archivés dans le run #797.
+
+## Correction de l'attribution des transactions — 28/11/2026
+
+La relecture a révélé un défaut de diagnostic, pas un défaut métier : la durée d'un bloc `atomic()` ouvert pendant `setUpClass()` était étiquetée avec le contexte actif au moment de sa fermeture (`tearDownClass()`). Django 6.1.3 documente que `TestCase` conserve un bloc transactionnel pour toute la classe et un second par test. La durée de l'atomic de classe doit donc rester attribuée à son contexte d'ouverture, et ne pas être présentée comme un coût de teardown.
+
+Correction : le runner mémorise désormais le nom du test/fixture à l'entrée de chaque `Atomic`, puis réutilise ce propriétaire lors de l'agrégation de sa durée totale. Le temps propre de `atomic_exit` reste, lui, attribué au contexte de fermeture.
+
+Deuxième précision : une exception propagée dans le contexte de `Atomic.__exit__` déclenche normalement un rollback attendu. Elle ne signifie pas que la méthode SQL a elle-même échoué. Les métriques séparent maintenant `err` (exception réellement levée par l'opération instrumentée) et `exception_context` (exception présente dans le bloc, souvent attendue par le test).
+
+Tests ajoutés : attribution explicite à `setUpClass`, distinction erreur SQL/contexte d'exception, et transmission du propriétaire du scope transactionnel. Le timeout GNU de 16 minutes, le comportement transactionnel Django et le code métier ne changent pas.
+
+Référence officielle : Django 6.1.3, documentation « Testing tools » — `TestCase` enveloppe la classe entière et chaque test dans deux blocs `atomic()` imbriqués : https://docs.djangoproject.com/en/6.1/topics/testing/tools/#testcase
