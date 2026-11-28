@@ -32,10 +32,10 @@ Les blocs `atomic` sont inclusifs et imbriqués : ne pas additionner leurs duré
 
 Le runner conserve les chronométrages existants de chaque test, de son corps, des fixtures, des connexions ouvertes/fermées et des phases du runner. Il complète ces mesures par :
 
-- `ensure_connection`, `commit`, `rollback`, `set_autocommit` ;
+- `ensure_connection`, `connect`, `close`, `commit`, `rollback`, `set_autocommit` ;
 - `savepoint`, `savepoint_commit`, `savepoint_rollback` ;
 - scopes `transaction.atomic`, profondeur d'imbrication, exceptions et durée inclusive ;
-- `create_test_db`, `destroy_test_db`, `clone_test_db`, sérialisation et désérialisation des bases de test.
+- `create_test_db` et `_create_test_db`, `destroy_test_db` et `_destroy_test_db`, `clone_test_db` et `_clone_test_db`, sérialisation et désérialisation des bases de test. Les méthodes internes de création sont mesurées lorsqu'elles sont héritées/appelées par le backend ; la méthode publique mesure toujours le cycle complet.
 
 Les résultats sont agrégés par alias et par test dans `[SQL-DB-SUMMARY]` et `[SQL-DB-TEST-TOP]`. Aucun SQL, paramètre, montant, nom de client ou donnée métier n'est journalisé. Les wrappers conservent les retours et propagent les exceptions originales.
 
