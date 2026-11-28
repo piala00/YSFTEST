@@ -157,7 +157,7 @@ class SqlServerMetricsTests(unittest.TestCase):
             return len(sql) + len(params or ())
 
         mesuree = MODULE._emballer_methode(execute, "cursor_execute", enregistrer)
-        self.assertEqual(mesuree(Curseur(), "SELECT ?", [1]), 8)
+        self.assertEqual(mesuree(Curseur(), "SELECT ?", [1]), 9)
         self.assertEqual(evenements, [("default", "cursor_execute", False)])
 
 if __name__ == "__main__":
