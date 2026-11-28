@@ -418,6 +418,13 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
           & $iscc /Q "/DEdition=${{ matrix.nom }}" "/DPort=${{ matrix.port }}" "/DVersion=1.0.${{ github.run_number }}" deploy\installateur\erp_ohada.iss
           if ($LASTEXITCODE -ne 0) { throw "Compilation de l'installateur en échec" }
+      - name: Vérifier le vrai clic « Copier le code » dans le wizard Inno Setup
+        shell: pwsh
+        run: |
+          & .\tests_navigateur\installateur_copie_code_windows.ps1 `
+            -Installateur "dist\ERP-OHADA-${{ matrix.nom }}-Installation.exe" `
+            -Edition "${{ matrix.edition }}" `
+            -Rapport "$env:RUNNER_TEMP\copie-code-interactive-${{ matrix.edition }}.json"
       - name: Compiler l'outil propriétaire pour la recette de signature
         if: env.ERP_DISTRIBUTION_FICTIVE == '1'
         shell: pwsh
@@ -559,6 +566,7 @@ jobs:
             ${{ runner.temp }}/NETTOYAGE-INTERFACE-*.json
             ${{ runner.temp }}/NETTOYAGE-INTERFACE-ERREUR.txt
             ${{ runner.temp }}/NETTOYAGE-DIAGNOSTIC-*.json
+            ${{ runner.temp }}/copie-code-interactive-*.json
             ${{ runner.temp }}/activation-fictive/autorisation-*-preuve.json
           if-no-files-found: warn
           retention-days: 7
