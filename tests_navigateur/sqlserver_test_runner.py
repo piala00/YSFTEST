@@ -551,8 +551,14 @@ def instrument_database_activity():
                 print(f"[SQL-DB-SUMMARY] alias={alias} " + " ".join(details), flush=True)
 
             def score(item):
+                # Les durées sont imbriquées (ensure/connect, atomic/commit,
+                # create_test_db/_create_test_db) : classer sur le plus grand
+                # total d'une opération évite de les additionner artificiellement.
                 operations = item[1]
-                return sum(metric["total"] for metric in operations.values())
+                return max(
+                    (metric["total"] for metric in operations.values()),
+                    default=0.0,
+                )
 
             for (test_name, alias), operations in sorted(
                 par_test.items(), key=score, reverse=True
