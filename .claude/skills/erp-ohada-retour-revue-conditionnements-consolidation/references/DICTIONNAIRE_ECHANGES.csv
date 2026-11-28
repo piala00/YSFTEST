@@ -1,0 +1,21 @@
+niveau;champ_ou_groupe;type;presence;controle_propose
+manifest;protocol/schema_version;chaîne/entier;obligatoire;"Identifie le contrat et sa version ; rejeter version inconnue."
+manifest;package_uuid;UUID;obligatoire;"Un lot est immuable ; même UUID et empreinte différente = conflit."
+manifest;societe_uuid/source_site_uuid;UUID;obligatoire;"Vérifier contre identité authentifiée ; ne pas se fier aux noms."
+manifest;destination;identifiant de destinataire;obligatoire;Central ou site précis autorisé.
+manifest;stream_uuid/sequence_from/sequence_to;UUID/entiers;obligatoire;"Flux continu ; bornes et nombre d’événements cohérents."
+manifest;created_at_utc/business_timezone;ISO-8601/chaîne;obligatoire;Date d’émission et fuseau métier distincts.
+manifest;event_count/files;entier/liste;obligatoire;"Nom, taille et SHA256 de chaque fichier ; pas de chemin arbitraire."
+auth;algorithm/key_id/mac;chaînes;obligatoire;"MAC sur manifeste exact ; clé absente du lot ; pas un chiffrement."
+event;event_uuid/sequence;UUID/entier;obligatoire;Identité et ordre de transport du flux.
+event;entity_type/entity_uuid/revision;chaîne/UUID/entier;obligatoire;Identité métier et révision indépendante du paquet.
+event;operation;énumération versionnée;obligatoire;"Création, validation, correction, contrepassation selon contrat ; pas de SQL libre."
+event;business_date/occurred_at_utc;date/horodatage;obligatoire;Date métier distincte de réception centrale.
+event;origin_actor_uuid/origin_actor_label;UUID nullable/chaîne;obligatoire;"Auteur inconnu explicite pour reprise ; automate distingué ; aucune réattribution à l’importateur."
+event;dependencies/payload_version/payload;liste/entier/objet;obligatoire;"Références explicites ; dépendance manquante en attente."
+document_line;presentation_uuid/factor_snapshot/entered_quantity/base_quantity;UUID/chaînes décimales;si conditionnement;"Facteur historique et unités ; ne pas recalculer depuis tarif actuel."
+payment;physical_payment_uuid/collector_site/beneficiary_site;UUID;obligatoire pour liaison;Identifie le paiement externe unique et ses représentations locales.
+allocation;invoice_uuid/payment_uuid/amount;UUID/chaîne décimale;pour règlement définitif;Facture cible, absence de double affectation et reste disponible.
+stock;movement_uuid/article_uuid/depot_uuid/quantity_base;UUID/chaîne décimale;pour mouvement;"Mouvement local déjà produit ; ne pas revalider la pièce au central."
+transfer;transfer_uuid/dispatch_event/receipt_event/quantity;UUID/références/décimal;pour transfert;"Suivre partiels, transit et ordre ; relier aux mouvements existants."
+ack;package_uuid/event_uuid/status/committed_at;UUID/chaîne/horodatage;obligatoire;"Statut technique séparé du rapprochement comptable ; réémissible sans effet métier."

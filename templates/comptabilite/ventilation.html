@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Saisie analytique{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Saisie des écritures analytiques</h1></div>
+<form class="card card-body mb-3"><div class="row g-2 align-items-end">
+  {% for field in form %}<div class="col-md-2"><label class="form-label small mb-0">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+  <div class="col-md-auto form-check ms-2"><input class="form-check-input" type="checkbox" name="tout" value="1" id="tout" {% if request.GET.tout == "1" %}checked{% endif %}><label class="form-check-label small" for="tout">Inclure les lignes déjà ventilées</label></div>
+  <div class="col-md-auto"><button class="btn btn-primary btn-sm">Afficher</button></div></div></form>
+{% if not sections %}<div class="alert alert-warning">Aucune section : créez-les dans Structure › Plan analytique.</div>{% endif %}
+<form method="post">{% csrf_token %}<div class="card"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>Date</th><th>Jnl</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th><th>Section</th></tr></thead><tbody>
+{% for l in lignes %}<tr><td>{{ l.ecriture.date|date:"d/m/Y" }}</td><td>{{ l.ecriture.journal.code }}</td><td>{{ l.ecriture.numero }}</td><td>{{ l.compte.numero }}</td><td>{{ l.libelle }}</td><td class="num">{{ l.debit|montant_ou_vide }}</td><td class="num">{{ l.credit|montant_ou_vide }}</td>
+<td><select name="section_{{ l.pk }}" class="form-select form-select-sm"><option value="">—</option>{% for s in sections %}<option value="{{ s.pk }}" {% if s.pk == l.section_id %}selected{% endif %}>{{ s.code }}</option>{% endfor %}</select></td></tr>
+{% empty %}<tr><td colspan="8" class="text-muted text-center p-4">Aucune ligne de charge ou de produit à ventiler.</td></tr>{% endfor %}
+</tbody></table></div><div class="mt-3"><button class="btn btn-success">Enregistrer la ventilation</button></div></form>
+{% endblock %}

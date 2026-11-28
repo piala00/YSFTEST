@@ -1,0 +1,21 @@
+﻿id,domaine,table,colonnes_pertinentes,regle,page_pdf_0_ou_reference,nature
+RGX001,STOCK,F_ARTSTOCK,AS_QteSto;AS_QteRes;AS_QteCom;AS_QtePrepa,"Les quantités stock, réservées, commandées et préparées sont distinctes. Ne pas les additionner mécaniquement pour un stock disponible.",220,LECTURE_ET_RAPPROCHEMENT
+RGX002,STOCK,F_ARTSTOCK,AS_QteMini;AS_QteMaxi;AS_Emplacement,Les seules modifications admises par la couche Sage sur cette table sont explicitement limitées selon le manuel; ne jamais en déduire un droit SQL direct.,221,NE_PAS_ECRIRE
+RGX003,STOCK,F_ARTSTOCKEMPL,AR_Ref;DE_No;DP_No,"Granularité article + dépôt + emplacement, table annoncée en lecture seule par le driver.",221,LECTURE
+RGX004,STOCK,F_GAMSTOCK,AR_Ref;AG_No1;AG_No2;DE_No,Granularité des quantités et valeurs par énumérés de gamme.,222,CARDINALITE
+RGX005,ARTICLE,F_ARTICLE,AR_Ref;AR_Design;FA_CodeFamille;AR_UniteVen,Champs exigés lors de la création dans le manuel; aucune insertion SQL métier autorisée dans notre Skill.,210,REGLE_DOCUMENTAIRE
+RGX006,ARTICLE,F_ARTICLE,AR_SuiviStock;AR_Gamme1;AR_Gamme2;AR_Condition,"Restrictions de modification conditionnelles en présence de mouvements, gammes ou conditionnements.",210-211,REGLE_DOCUMENTAIRE
+RGX007,ARTICLE,F_FAMILLE,FA_SuiviStock;FA_CodeFamille,La famille fournit des valeurs par défaut à la fiche article.,195-196,REGLE_DOCUMENTAIRE
+RGX008,DEPOT,F_DEPOT,DE_Principal,Le manuel impose un seul dépôt principal dans la liste de dépôts.,234,CONTROLE_UNICITE_METIER
+RGX009,DEPOT,F_DEPOT,DE_No;DP_NoDefaut,"Avec multi-emplacements, Sage crée un emplacement par défaut lors de la création du dépôt.",234,REGLE_DOCUMENTAIRE
+RGX010,DOCUMENT,F_DOCLIGNE,DL_MontantHT;DL_MontantTTC,Ne jamais conclure que toutes les lignes servent au chiffre d’affaires : contrôler les types et la provenance.,260,RISQUE_ERP
+RGX011,DOCUMENT,F_DOCLIGNE,DL_Valorise;DL_NonLivre,Une ligne peut ne pas être valorisée ou ne pas être livrée; maintenir ces distinctions.,260,REGLE_DOCUMENTAIRE
+RGX012,DOCUMENT,F_DOCLIGNE,DL_CodeTaxe1;DL_CodeTaxe2;DL_CodeTaxe3,Les codes taxe ligne doivent être reliés au paramétrage des taxes et catégories applicables.,261,REGLE_DOCUMENTAIRE
+RGX013,REGLEMENT,F_DOCREGL,DR_No;DR_Equil,La ligne d’équilibrage est unique et gérée par le driver selon Sage.,275-276,NE_PAS_ECRIRE
+RGX014,REGLEMENT,F_DOCREGL,DR_Pourcent;DR_Montant,"Pour certaines saisies, choisir montant OU pourcentage; ne pas traiter simultanément les deux comme montants à sommer.",276,REGLE_DOCUMENTAIRE
+RGX015,REGLEMENT,F_REGLECH,RG_No;DR_No,Liaison règlement-échéance créée par le driver Sage; ne pas déduire règlement imputé à partir du seul enregistrement F_CREGLEMENT.,415,REGLE_DOCUMENTAIRE
+RGX016,RELATION,F_DOCLIGNE,DO_Type;DO_Piece,Sage décrit une liaison documentaire avec entête sur les champs type et pièce; tester unicité réelle avant tout agrégat.,410,CARDINALITE
+RGX017,RELATION,F_PROJETLIGNE,PF_Type;PF_Num,"Lien composite type+numéro avec les projets fabrication, vérifier avant jointures.",418,CARDINALITE
+RGX018,INTEGRATION,sys.foreign_keys,name;object_id,Les liens du manuel sont documentaires; les FK réelles doivent être trouvées dans le catalogue SQL.,MS,PRUDENCE
+RGX019,INTEGRATION,sys.indexes,name;index_id,Les index décrits dans le manuel ne prouvent pas leur matérialisation identique sur toutes les installations.,MS,PRUDENCE
+RGX020,SECURITE,Sage SQL Server,-,Ne jamais écrire INSERT/UPDATE/DELETE dans la base métier Sage; préférer API/Objets Métiers version compatible pour toute action autorisée.,POLITIQUE,NE_PAS_ECRIRE

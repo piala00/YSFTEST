@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Paie{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Paie du mois</h1></div>
+<form method="post" class="d-flex gap-2 align-items-end mb-3">{% csrf_token %}<div><label class="form-label small mb-0" for="p-mois">Mois</label>
+  <input type="month" id="p-mois" name="mois" value="{{ mois }}" class="form-control form-control-sm" required></div>
+  <button class="btn btn-sm btn-primary">Ouvrir / préparer la paie</button></form>
+<div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>Mois</th><th>Statut</th><th class="num">Bulletins</th></tr></thead>
+<tbody>{% for p in periodes %}<tr><td><a href="{% url 'personnel:paie' p.pk %}">{{ p.mois|stringformat:"02d" }}/{{ p.annee }}</a></td><td>{{ p.get_statut_display }}</td><td class="num">{{ p.bulletins.count }}</td></tr>
+{% empty %}<tr><td colspan="3" class="text-muted text-center p-4">Aucune paie.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

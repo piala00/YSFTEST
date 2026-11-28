@@ -1,0 +1,209 @@
+import tempfile
+
+from django.core.management import call_command
+from django.test import SimpleTestCase, TestCase
+
+from . import contrats, lots, scenario
+
+
+class ScenarioTroisDossiersTests(SimpleTestCase):
+    """Siège, Douala et Yaoundé : trois bases distinctes qui ne communiquent que par fichiers .erpx."""
+
+    def test_billets_colis_entre_agences_et_consolidation(self):
+        with tempfile.TemporaryDirectory() as travail:
+            r = scenario.executer(travail)
+        self.assertEqual(r["dla_referentiels"]["gares"], 4)                    # référentiels reçus du siège
+        self.assertEqual(r["dla_referentiels"]["arrets_dla_gbl"], ["DLA", "BTA", "GBL"])  # avec les arrêts des lignes
+        self.assertEqual(r["dla_referentiels"]["liaisons"], ["1850100", "1850300", "1850400"])  # même compte = même agence partout
+        self.assertIn("rejetés : 0", r["siege_import1"])
+        self.assertIn("déjà reçu", r["siege_rejeu"])                          # rejeu sans effet
+        self.assertEqual(r["yde_remise"]["avant"], "EN_ROUTE")                 # colis relayé, car parti
+        self.assertEqual(r["yde_remise"]["statut"], "LIVRE")
+        self.assertEqual(r["yde_remise"]["compte_cr"], "1850200")                # dû à Douala
+        self.assertEqual(r["yde_remise"]["billets_ici"], 0)                    # les billets restent au siège
+        self.assertEqual({k: r["dla_reversement"][k] for k in ("statut", "livre_site", "compte")},
+                         {"statut": "LIVRE", "livre_site": "YDE", "compte": "1850300"})
+        # Correspondance à Bertoua : la part du tronçon va au car de Bertoua, qui la doit à Douala
+        self.assertEqual(r["dla_vente"]["parts"], ["7333", "3667"])
+        self.assertEqual(r["bta_correspondance"]["lignes"], {"1850200": ["3667.00", "0.00", None],
+                                                             "7061100": ["0.00", "3667.00", "EN 202 BB"]})
+        self.assertEqual(r["dla_reversement"]["troncon2"], ["EFFECTUE", "EN 202 BB", "BTA"])
+        self.assertNotIn("manquants", r["dla_import2"])
+        # Dépenses autorisées par le siège ; Douala paie le loyer de Bertoua (liaisons compensées au siège)
+        self.assertEqual(r["siege_demandes"], ["DEMANDEE", "DEMANDEE"])
+        self.assertEqual(r["dla_depenses"]["statuts"], ["AUTORISEE", "AUTORISEE"])
+        self.assertEqual(r["dla_depenses"]["lignes"], {"DLA": ["5711000", "6222000"], "BTA": ["1850400", "5711000"]})
+        self.assertEqual(r["bta_regularisation"], [["1850200", "0.00", "100000.00"], ["6222000", "100000.00", "0.00"]])
+        self.assertEqual(r["siege_depenses"], {"loyers": "120000.00", "liaisons_185": "0.00", "loyer_BTA": "100000.00"})
+        c = r["siege_consolide"]
+        self.assertEqual(c["ecritures"], 10)                                   # + le plein de Bertoua
+        self.assertEqual(c["journaux"], ["CA-BTA", "CA-DLA", "CA-YDE", "OD-BTA", "OD-DLA"])
+        self.assertEqual(c["liaisons_185"], "0.00")                            # liaisons neutralisées
+        self.assertEqual(c["billets_a_voyager"], "0.00")                       # tous les voyages faits
+        self.assertEqual((c["recette_LT101"], c["recette_LT303"], c["recette_EN202"]), ("12000.00", "7333.00", "3667.00"))
+        self.assertEqual((c["produits_70611"], c["produits_70612"], c["caisse"]), ("-23000.00", "-2000.00", "-101000.00"))
+        self.assertEqual(c["billets"], 3)
+        self.assertEqual(c["carburant_EN202"], "126000.00")                    # plein de Bertoua sur son car, au siège
+        self.assertEqual(c["pleins"], ["150.00"])
+        self.assertIn("abîmé", r["altere"])
+
+
+class LotsTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+
+    def test_agence_non_configuree(self):
+        from apps.core.models import Agence
+
+        a = Agence.objects.create(code="X", nom="X")
+        with self.assertRaisesMessage(lots.LotInvalide, "pas encore configuré"):
+            lots.exporter(a)
+
+    def test_signature_et_destination(self):
+        from apps.core.models import Agence
+
+        lots.configurer_siege("SIEGE", "Siège")
+        dla = lots.ajouter_agence("DLA", "Douala")
+        yde = lots.ajouter_agence("YDE", "Yaoundé")
+        nom, octets = lots.exporter(dla)
+        with self.assertRaisesMessage(lots.LotInvalide, "destiné à DLA"):        # au siège, un lot pour Douala est refusé
+            lots.importer(octets)
+        with self.assertRaisesMessage(lots.LotInvalide, "pas un lot d'échange"):
+            lots.importer(b"bonjour")
+        self.assertEqual(Agence.objects.get(code="YDE").compte_liaison.numero, "1850300")
+        with self.assertRaisesMessage(lots.LotInvalide, "fichier d'installation"):
+            lots.importer(lots.fichier_installation(yde)[1])
+
+
+class EcranEchangesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+
+    def test_configurer_siege_declarer_agence_et_fichiers(self):
+        from django.contrib.auth import get_user_model
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.urls import reverse
+
+        from apps.core.models import Agence
+
+        url = reverse("transport:echanges") + "?seul=1"
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "", "x"))
+        self.assertContains(self.client.get(url), "Ce poste est le siège")
+        self.client.post(url, {"action": "siege", "code": "siege", "nom": "Siège"})
+        self.client.post(url, {"action": "agence", "code": "dla", "nom": "Agence de Douala"})
+        dla = Agence.objects.get(code="DLA")
+        page = self.client.get(url)
+        self.assertContains(page, "Agence de Douala")
+        self.assertContains(page, "1850200")
+        reponse = self.client.post(url, {"action": "installation", "agence": dla.pk})
+        self.assertIn("ERP-INSTALLATION-SIEGE-vers-DLA", reponse["Content-Disposition"])
+        reponse = self.client.post(url, {"action": "exporter", "destination": dla.pk})
+        self.assertIn(".erpx", reponse["Content-Disposition"])
+        page = self.client.post(url, {"action": "importer", "fichiers": [SimpleUploadedFile("x.erpx", b"abc")]}, follow=True)
+        self.assertContains(page, "refusé")
+        for module in ("commercial", "comptabilite"):
+            self.assertEqual(self.client.get(reverse(f"{module}:echanges")).status_code, 200)
+
+    def test_synchroniser_maintenant(self):
+        import tempfile
+        from unittest import mock
+
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        url = reverse("transport:echanges") + "?seul=1"
+        self.client.force_login(get_user_model().objects.create_superuser("admin", "", "x"))
+        self.client.post(url, {"action": "siege", "code": "SIEGE", "nom": "Siège"})
+        self.client.post(url, {"action": "agence", "code": "DLA", "nom": "Agence de Douala"})
+        with mock.patch.dict("os.environ", {"ECHANGES_RELAIS_URL": "", "ECHANGES_DOSSIER_PARTAGE": ""}):
+            self.assertContains(self.client.get(url), "non configurés")
+            self.assertContains(self.client.post(url, {"action": "synchroniser"}, follow=True), "aucune boîte")
+        with tempfile.TemporaryDirectory() as boite, mock.patch.dict("os.environ", {"ECHANGES_DOSSIER_PARTAGE": boite}):
+            self.assertContains(self.client.get(url), "Synchroniser maintenant")
+            page = self.client.post(url, {"action": "synchroniser"}, follow=True)
+            self.assertContains(page, "1 lot(s) envoyé(s)")
+            self.assertEqual(len(list(__import__("pathlib").Path(boite, "DLA").glob("*.erpx.chiffre"))), 1)
+
+class PublicationSiteLocalCacheTests(TestCase):
+    """Le cache de la gare locale est borné à une opération composée."""
+
+    @classmethod
+    def setUpTestData(cls):
+        import uuid
+
+        from apps.core.models import Agence
+
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+        Agence.objects.create(code="CACHE", nom="Agence cache", ville="Yaoundé",
+                              locale=True, uid=uuid.uuid4())
+
+    def test_une_lecture_dans_la_portee_et_relecture_apres(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        from .publication import cache_site_local, site_local
+
+        with CaptureQueriesContext(connection) as requetes:
+            with cache_site_local():
+                premier = site_local()
+                second = site_local()
+        self.assertIsNotNone(premier)
+        self.assertEqual(premier.pk, second.pk)
+        self.assertEqual(len(requetes), 1)
+
+        with CaptureQueriesContext(connection) as requetes:
+            site_local()
+            site_local()
+        self.assertEqual(len(requetes), 2)
+
+class EcritureEmployeExchangeTests(TestCase):
+    """Une écriture relayée conserve l'identité du salarié sans partager son matricule local."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+
+    def test_import_cree_un_employe_reference_et_rattache_les_lignes(self):
+        import uuid
+        from datetime import date
+
+        from apps.comptabilite.models import Compte, Journal
+        from apps.comptabilite.services import creer_ecriture
+        from apps.core.models import Agence
+        from apps.personnel.models import Employe
+
+        local = Agence.objects.create(code="SIEGE", nom="Siège", role=Agence.SIEGE,
+                                      locale=True, uid=uuid.uuid4())
+        origine = Agence.objects.create(code="DLA", nom="Douala", role=Agence.AGENCE,
+                                        locale=False, uid=uuid.uuid4())
+        employe = Employe.objects.create(matricule="E001", nom="Chauffeur Douala",
+                                         service=Employe.CONDUITE, agence=origine)
+        piece = creer_ecriture(
+            Journal.objects.get(code="OD"), date.today(), "Paie de test",
+            [{"compte": Compte.objects.get(numero="661"), "debit": 150000, "employe": employe},
+             {"compte": Compte.objects.get(numero="422"), "credit": 150000, "employe": employe}],
+            reference="PAIE-TEST", valider=False,
+        )
+        piece.site_origine = origine.code
+        piece.save(update_fields=["site_origine"])
+
+        payload = contrats.ecriture(piece)
+        uid_recu = uuid.uuid4()
+        for ligne in payload["lignes"]:
+            if ligne["employe"]:
+                ligne["employe"]["uid"] = str(uid_recu)
+
+        contrats._ecriture(payload, origine, local)
+
+        copie = Employe.objects.get(uid=uid_recu)
+        self.assertEqual(copie.site_origine, "DLA")
+        self.assertTrue(copie.matricule.startswith("DLA-"))
+        self.assertEqual(copie.agence_id, origine.pk)
+        lignes = list(piece.lignes.select_related("employe"))
+        self.assertEqual(len(lignes), 2)
+        self.assertTrue(all(ligne.employe_id == copie.pk for ligne in lignes))
+        piece.refresh_from_db()
+        self.assertEqual(piece.statut, piece.STATUT_VALIDEE)
+        self.assertTrue(piece.equilibree)

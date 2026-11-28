@@ -1,0 +1,19 @@
+id;scenario;resultat_attendu;statut_execution
+X01;Premier lot puis rejeu identique;Une intégration, second accusé identique, aucun effet métier supplémentaire.;PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X02;Même package_uuid et contenu différent;Conflit, aucun écrasement.;PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X03;Même événement dans deux lots;Un seul événement et une seule projection.;PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X04;Deux imports concurrents;Contraintes et transaction empêchent le doublon.;PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X05;Crash après commit avant accusé reçu;Rejeu reconnu comme déjà intégré.;PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X06;Règlement reçu avant facture;"Attente de dépendance ; aucune facture artificielle ni affectation hasardeuse.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X07;"Société ou site non autorisé ; MAC invalide";Lot rejeté sans écriture métier.;PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X08;Trou de séquence et révision concurrente;"Curseur contigu ne masque pas le manque ; conflit de révision explicite.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X09;Versement hors-recettes 100000 et représentation bénéficiaire;"Une entrée externe 100000 ; réduction de créance unique ; liaisons rapprochées.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X10;Reçu déjà saisi manuellement avant synchronisation;"Correspondance de reprise ; aucune seconde réduction de créance.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X11;"Expédition 10 puis réception 4 ; ordre inversé des lots";"6 en transit après rapprochement ; pas de double stock ; dépendances traitées.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X12;Présentation carton 15 L modifiée ensuite à 12 L;"Ligne historique reste selon facteur 15 ; central conserve les deux versions.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X13;Restauration d’une agence avant/après accusé;Identité préservée, événements réconciliés et aucun rejeu financier.;PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X14;Agence déconnectée plusieurs jours;"Travail local possible ; global étiquette fraîcheur et manque de couverture.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X15;Ouverture importée puis mouvements déjà contenus dans photo;"Frontière de reprise contrôlée ; aucune addition double.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X16;Auteur ancien inconnu et auteur nommé d’un autre site;"Identités/provenance conservées ; compte technique non substitué.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X17;ZIP avec chemin traversant, poids décompressé excessif ou NaN;"Validation rejette avant intégration ; aucune exécution de code.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE
+X18;Règlement daté J reçu au central J+2;"Rapport métier J et date de réception distincts ; clôture/version explicites.";PROPOSE_NON_EXECUTE_MOTEUR_NON_LIVRE

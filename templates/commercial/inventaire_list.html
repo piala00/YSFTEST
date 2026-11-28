@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Saisie d'inventaire{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Saisie d'inventaire</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'commercial:inventaire_create' %}"><i class="bi bi-plus"></i> Nouvel inventaire</a></div>
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead><tr><th>N°</th><th>Date</th><th>Dépôt</th><th>Famille</th><th class="num">Écart valorisé</th><th>Statut</th></tr></thead><tbody>
+{% for i in object_list %}<tr><td><a href="{% url 'commercial:inventaire_detail' i.pk %}">{{ i.numero }}</a></td><td>{{ i.date|date:"d/m/Y" }}</td><td>{{ i.depot }}</td>
+<td>{{ i.famille|default:"Toutes" }}</td><td class="num">{{ i.ecart_valeur|montant }}</td>
+<td>{% if i.statut == "VALIDE" %}<span class="badge badge-VALIDE">Validé</span>{% else %}<span class="badge bg-warning text-dark">En cours de saisie</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="6" class="text-muted text-center p-4">Aucun inventaire.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

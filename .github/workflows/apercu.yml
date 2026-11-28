@@ -1,0 +1,62 @@
+# Aperçu GitHub Pages réservé à main : aucune publication automatique depuis une branche de travail.
+name: Aperçu de l'ERP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construire:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Tests
+        run: python manage.py test -v1
+      - name: Simulateurs et explorateur
+        run: |
+          rm -f db.sqlite3
+          python manage.py migrate --noinput -v0
+          python manage.py init_erp --demo -v0
+          mkdir -p _site
+          python manage.py simulateur --dossier _site
+          python manage.py explorateur_menus --autonome --sortie _site/explorateur-menus.html
+          sed -e "s/{{COMMIT}}/${GITHUB_SHA::7}/" -e "s/{{DATE}}/$(TZ=Africa/Douala date '+%d\/%m\/%Y %H:%M')/" \
+              deploy/apercu_index.html > _site/index.html
+      # GitHub Pages doit être activé une fois par le propriétaire (docs/VERSION_EN_LIGNE.md) ; tant qu'il ne l'est pas,
+      # la publication est sautée sans marquer le contrôle en échec (les tests ci-dessus, eux, doivent passer)
+      - id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+      - if: steps.pages.outcome == 'success'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+    outputs:
+      pages: ${{ steps.pages.outcome }}
+
+  publier:
+    needs: construire
+    if: needs.construire.outputs.pages == 'success' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - id: deploiement
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Dépenses de fonctionnement{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Dépenses de fonctionnement (autorisation du siège)</h1></div>
+<form method="post" class="card card-body mb-3">{% csrf_token %}
+  <div class="row g-2 align-items-end">
+    <div class="col-md-2"><label class="form-label small mb-0" for="d-n">Nature</label><select id="d-n" name="nature" class="form-select form-select-sm">{% for c, l in natures %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-label small mb-0" for="d-l">Libellé</label><input id="d-l" name="libelle" required class="form-control form-control-sm" placeholder="Loyer de la gare, mois de…"></div>
+    <div class="col-md-2"><label class="form-label small mb-0" for="d-b">Payé à</label><input id="d-b" name="beneficiaire" class="form-control form-control-sm"></div>
+    <div class="col-md-1"><label class="form-label small mb-0" for="d-m">Montant</label><input id="d-m" name="montant" type="number" min="1" required class="form-control form-control-sm"></div>
+    <div class="col-md-2"><label class="form-label small mb-0" for="d-a">Dépense de l'agence</label><select id="d-a" name="agence" class="form-select form-select-sm">
+      <option value="">{% if local %}{{ local.code }} (ici){% else %}Ce dossier{% endif %}</option>{% for a in agences %}{% if not local or a.code != local.code %}<option value="{{ a.code }}">{{ a.code }} — {{ a.nom }}</option>{% endif %}{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label small mb-0" for="d-v">Véhicule (si concerné)</label><select id="d-v" name="vehicule" class="form-select form-select-sm"><option value="">—</option>{% for v in vehicules %}<option value="{{ v.pk }}">{{ v.immatriculation }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="mt-2"><button class="btn btn-sm btn-primary" name="action" value="demander">Demander</button>
+    <span class="form-text">{% if decision_ici %}La décision se prend ici{% if not local %} (par un autre utilisateur que le demandeur){% endif %}.{% else %}La demande part au siège avec le fichier d'échange ; sa décision revient avec le fichier du siège.{% endif %}
+    {% if plafond %} Dépenses jusqu'à {{ plafond|montant }} FCFA autorisées d'office.{% endif %}
+    Une dépense peut être payée par n'importe quelle agence : si elle appartient à une autre agence, l'écriture passe par le compte de liaison et l'agence concernée enregistre sa charge à la réception.</span></div>
+</form>
+<form class="d-flex gap-2 mb-2"><select name="statut" class="form-select form-select-sm w-auto" aria-label="Statut"><option value="">Toutes</option>{% for c, l in statuts %}<option value="{{ c }}" {% if c == statut %}selected{% endif %}>{{ l }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-secondary">Filtrer</button></form>
+<div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>N°</th><th>Date</th><th>Origine</th><th>Agence</th><th>Nature / libellé</th><th>Payé à</th><th class="num">Montant</th><th>Statut</th><th></th></tr></thead>
+<tbody>{% for d in demandes %}<tr><td>{{ d.numero }}</td><td>{{ d.date|date:"d/m/Y" }}</td><td>{{ d.site_origine|default:"ici" }}</td><td>{{ d.agence|default:"—" }}</td>
+  <td>{{ d.get_nature_display }} — {{ d.libelle }}{% if d.vehicule %} · {{ d.vehicule.immatriculation }}{% endif %}</td><td>{{ d.beneficiaire }}</td><td class="num">{{ d.montant|montant }}</td>
+  <td>{{ d.get_statut_display }}{% if d.decision_par %}<div class="text-muted">{{ d.decision_par }}{% if d.motif %} : {{ d.motif }}{% endif %}</div>{% endif %}{% if d.payeur %}<div class="text-muted">payée par {{ d.payeur }} le {{ d.paye_le|date:"d/m" }}</div>{% endif %}</td>
+  <td><form method="post" class="d-flex flex-wrap gap-1">{% csrf_token %}<input type="hidden" name="demande" value="{{ d.pk }}">
+    {% if d.statut == "DEMANDEE" and decision_ici %}<button class="btn btn-sm btn-outline-success py-0" name="action" value="autoriser">Autoriser</button>
+      <input name="motif" class="form-control form-control-sm py-0" style="width:9em" placeholder="Motif du refus" aria-label="Motif"><button class="btn btn-sm btn-outline-danger py-0" name="action" value="refuser">Refuser</button>{% endif %}
+    {% if d.statut == "AUTORISEE" and not d.site_origine %}<select name="caisse" class="form-select form-select-sm py-0 w-auto" aria-label="Caisse">{% for c in caisses %}<option value="{{ c.pk }}">{{ c.code }}</option>{% endfor %}</select>
+      <button class="btn btn-sm btn-primary py-0" name="action" value="payer">Payer</button>{% endif %}
+    {% if d.statut in "DEMANDEE AUTORISEE" and not d.site_origine %}<button class="btn btn-sm btn-outline-secondary py-0" name="action" value="annuler" onclick="return confirm('Annuler cette demande ?')">Annuler</button>{% endif %}
+  </form></td></tr>
+{% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucune demande.</td></tr>{% endfor %}</tbody></table></div>
+<p class="small text-muted mt-2">Comptes proposés par nature (loyer 6222, eau et électricité 605, téléphone 628, entretien 624, impôts 64, autre 658) : à valider par l'expert-comptable.</p>
+{% endblock %}

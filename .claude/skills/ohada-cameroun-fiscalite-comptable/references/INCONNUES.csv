@@ -1,0 +1,22 @@
+sujet;question;pistes;impact
+R6-PLAN;Nomenclature finale complète des classes 1 à 9 et intitulés exacts;"JO OHADA final annexe non obtenu ; copie PROJET analysée mais rejetée comme norme";"PLAN_SYSCOHADA est un extrait ; candidats interdits en import automatique"
+R6-COMPTE-412;Deux intitulés sous le même numéro dans le projet;ANOMALIES_PLAN_CANDIDAT.csv et JO final;Ne pas remplacer un compte client par un organisme international
+R6-COMPTE-907;Le projet répète 907 pour deux rubriques et ne donne pas le parent908;"JO final ; ne pas corriger à partir du seul préfixe enfant";Créer un parent deviné est interdit
+R6-PLAGES;Développement des plages 911–914 et 915–918;"JO final ; la plage seule ne donne pas chaque intitulé";Aucune expansion inventée
+R7-MAPPINGS;Correspondance finale postes comptes débit crédit et formules par rubrique;"JO final ; mappings du projet en quarantaine seulement";Les états livrés ne constituent pas un moteur de calcul certifié
+R7-FLUX;Calcul CAFG variations BF et flux réels détaillés;"Guide de calcul et comptes auxiliaires ; mouvements hors trésorerie à exclure";Une simple différence de soldes ne suffit pas
+R7-CODES;Différences BG/BC et DV/DY entre sources;DGI modèle 2021 et JO final;Versionner le modèle et interdire mélange des codes
+R7-NOTE36;Table des codes et note36 complète dans le jeu 2026;"Guide O03 p.355 ; modèles du portail actuel";Absence d’une feuille autonome ne prouve pas absence d’obligation
+R5-BASE-PRECOMPTE;Assiette détaillée locale et articulation prix et précompte dans chaque cas;CGI21(3), circulaires et avis DGI;Taux connu ne suffit pas à produire une ligne de facture
+R5-BASE-AIR;Assiette de retenue par opération et gestion des cas sectoriels;"CGI21,92bis ; arrêté2026 et textes d’application";Pas de formule universelle AIR sur TTC ou HT affirmée ici
+R5-NONASSUJETTI;Mention obligatoire littérale de facture pour non-assujetti;"Texte réglementaire DGI ; art150 ne suffit pas à prouver une formule unique";Ne pas présenter une mention commerciale proposée comme texte légal
+R5-TIMBRE-FACTURE;Régime propre à une facture selon sa qualification;Distinguer facture quittance reçu contrat et acte enregistré;Aucun timbre forfaitaire universel codé
+R5-EFACTURE;Arrêté opérationnel calendrier par secteur schéma API et homologation;"L8bis et DGI ; pas de calendrier universel vérifié";PDF de facture ≠ preuve de conformité électronique
+R5-CAC;Application des exceptions de CAC dans tous les impôts sectoriels;"C83 ; règles spécifiques à dater";Ne pas ajouter 10 % à tous les prélèvements
+R5-ARRONDI;Granularité et ordre d’arrondi par facture ligne déclaration et CAC;"Article141 ; doctrine opérationnelle à confirmer";Ne pas arrondir chaque ligne au millier par simple extrapolation
+R5-EXONERATIONS;Liste exhaustive datée des biens exonérés et positions tarifaires;CGI128 et annexes plus LF2026;Aucune exemption par simple nom commercial d’article
+R5-COLLECTEURS;Annexe nominative actuelle et évolutions d’habilitation RTS;Arrêté05/01/2026 et décisions ultérieures DGI;Pas de liste d’entreprises copiée ni de déduction automatique par taille
+R5-RESIDUS;Mentions résiduelles de régime simplifié dans le CGI compilé;"Confronter LF2026 et circulaire ; ne pas généraliser les anciennes annexes";Statuts historiques à conserver séparément
+R8-MODELE2026;Fichier de téléversement exact servi au contribuable en campagne2026;"Portail DGI connecté du contribuable ; modèles publics2021 insuffisants pour certification";Ne pas garantir un import2026 à partir de ce paquet
+R8-EXERCICE;Différence exercice fiscal année de dépôt et année choisie sur portail;Guide2026 et dossier propre du contribuable;Ne pas associer automatiquement dépôt2026 à exercice2026
+R8-ANNEXES;Visa pièces jointes et conditions par régime ou secteur;Guide campagne courante et centre gestionnaire;Les pages bancaires assurance OBNL ne sont pas traitées ici

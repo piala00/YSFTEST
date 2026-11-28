@@ -1,0 +1,329 @@
+"""Premier démarrage du programme compilé (assistant dans le navigateur) et Fichier › Administration du poste."""
+import http.cookiejar
+import os
+import re
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from unittest import mock
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
+
+from . import poste
+from .models import Societe
+
+
+@override_settings(ERP_ASSISTANT=True)
+class AssistantTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+        Societe.objects.update(assistant_termine=False)
+
+    def test_societe_role_puis_compte_a_la_fin(self):
+        # Logiciel vide : toute page mène à l'accueil « créer / restaurer une société ».
+        self.assertRedirects(self.client.get("/"), reverse("core:demarrage"), fetch_redirect_response=False)
+        self.assertRedirects(self.client.get("/connexion/"), reverse("core:demarrage"), fetch_redirect_response=False)
+        self.assertContains(self.client.get(reverse("core:demarrage")), "Créer une société")
+        inst = reverse("core:installation")
+        # L'assistant est accessible sans connexion depuis le serveur ; refusé depuis un autre poste.
+        self.assertEqual(self.client.get(inst, REMOTE_ADDR="192.168.1.20").status_code, 403)
+        # 1. identité — aucun administrateur encore
+        self.assertRedirects(self.client.post(inst, {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"}),
+                             inst + "?etape=role", fetch_redirect_response=False)
+        self.assertFalse(get_user_model().objects.filter(is_superuser=True).exists())
+        # 2. rôle
+        self.assertContains(self.client.get(inst + "?etape=role"), "Direction (siège)")
+        self.client.post(inst + "?etape=role", {"role": "siege", "code": "si ege"})   # code refusé
+        self.assertFalse(Societe.get().assistant_termine)
+        self.assertRedirects(self.client.post(inst + "?etape=role", {"role": "siege", "code": "SIEGE", "nom": "Direction"}),
+                             inst + "?etape=compte", fetch_redirect_response=False)
+        self.assertFalse(Societe.get().assistant_termine)                 # toujours pas terminé : l'admin vient à la fin
+        # 3. compte administrateur À LA FIN → crée l'admin + la base + termine
+        self.assertContains(self.client.get(inst + "?etape=compte"), "administrateur")
+        self.client.post(inst + "?etape=compte", {"identifiant": "chef", "mot_de_passe": "court", "confirmation": "court"})
+        self.assertFalse(get_user_model().objects.filter(is_superuser=True).exists())   # mot de passe trop court
+        reponse = self.client.post(inst + "?etape=compte",
+                                   {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok", "confirmation": "Chef-2026-ok"})
+        self.assertRedirects(reponse, reverse("core:portail"), fetch_redirect_response=False)
+        societe = Societe.get()
+        self.assertTrue(societe.assistant_termine)
+        self.assertEqual(societe.raison_sociale, "Transports Essai SA")
+        self.assertTrue(get_user_model().objects.get(username="chef").is_superuser)
+        from apps.echanges.publication import site_local
+
+        self.assertEqual(site_local().code, "SIEGE")
+        self.assertContains(self.client.get("/"), "Administration du poste")
+
+    def test_un_seul_site(self):
+        inst = reverse("core:installation")
+        self.client.post(inst, {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"})
+        self.assertRedirects(self.client.post(inst + "?etape=role", {"role": "seul"}),
+                             inst + "?etape=compte", fetch_redirect_response=False)
+        self.assertFalse(Societe.get().assistant_termine)
+        self.client.post(inst + "?etape=compte", {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok", "confirmation": "Chef-2026-ok"})
+        self.assertTrue(Societe.get().assistant_termine)
+        self.assertEqual(self.client.get("/").status_code, 200)
+
+    def test_role_choisi_dans_l_installateur(self):
+        inst = reverse("core:installation")
+        self.client.post(inst, {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"})
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier, "installation-agence.erpx")
+            fichier.write_bytes(b"pas un vrai fichier")
+            with mock.patch.dict(poste.ACTIONS, {"installation_prevue": lambda: {"role": "agence", "fichier_agence": fichier}}):
+                page = self.client.get(inst + "?etape=role")
+                self.assertContains(page, "Choisi à l'installation : <strong>Agence</strong>")
+                self.assertContains(page, "installation-agence.erpx")
+                page = self.client.post(inst + "?etape=role", {"role": "agence", "fichier_prevu": "1"}, follow=True)
+                self.assertContains(page, "Impossible")                  # le fichier préparé a bien été lu (et refusé)
+        self.assertFalse(Societe.get().assistant_termine)
+        self.assertFalse(get_user_model().objects.filter(is_superuser=True).exists())
+
+    @override_settings(ERP_ASSISTANT=False)
+    def test_hors_programme_compile_rien_ne_change(self):
+        self.assertRedirects(self.client.get("/"), "/connexion/?next=/", fetch_redirect_response=False)
+
+
+class AdministrationPosteTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+        cls.admin = get_user_model().objects.create_superuser("chef", "", "Chef-2026-ok")
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+        self.url = reverse("core:poste") + "?seul=1"
+
+    def test_sans_programme_compile(self):
+        self.assertContains(self.client.get(self.url), "programme")
+
+    def test_reserve_a_l_administrateur(self):
+        self.client.force_login(get_user_model().objects.create_user("caissier", "", "Caisse-2026-ok"))
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_actions(self):
+        appels = []
+        etat = {"edition": "transport", "port": 8100, "donnees": "C:/ProgramData/ERP-OHADA/Transport", "base": "erp.sqlite3",
+                "taille_base": 1024, "windows": True, "demarrage_auto": False, "sauvegarde_heures": "4",
+                "sauvegarde_garder": "60", "sauvegarde_copie": "", "restauration_prevue": "", "mois_courant": "2026-10",
+                "sauvegardes": [{"nom": "erp-20261027-100000.sqlite3", "taille": 1024, "date": None}],
+                "simulation": {"etat": "absente", "port": 8101, "journal": ""}}
+        actions = {"etat": lambda: etat, "sauvegarder": lambda: appels.append("sauvegarder") or "erp-x.sqlite3",
+                   "restaurer_au_demarrage": lambda nom: appels.append(("restaurer", nom)),
+                   "simulation_creer": lambda debut, duree: appels.append(("simulation", debut, duree)),
+                   "simulation_supprimer": lambda: appels.append("supprimer"),
+                   "demarrage_auto_basculer": lambda: appels.append("auto") or "ok"}
+        with mock.patch.dict(poste.ACTIONS, actions):
+            page = self.client.get(self.url)
+            self.assertContains(page, "Démarrer le logiciel à l'ouverture de session")
+            self.assertContains(self.client.get(self.url + "&onglet=simulation"), "Créer la simulation")
+            self.client.post(self.url, {"action": "sauvegarder"})
+            self.client.post(self.url, {"action": "restaurer", "fichier": "erp-20261027-100000.sqlite3", "confirmation": "non"})
+            self.client.post(self.url, {"action": "restaurer", "fichier": "erp-20261027-100000.sqlite3", "confirmation": "RESTAURER"})
+            self.client.post(self.url, {"action": "simulation_creer", "debut": "2026-13", "duree": "2"})          # refusé
+            self.client.post(self.url, {"action": "simulation_creer", "debut": "2026-01", "duree": "aujourdhui"})
+            self.client.post(self.url, {"action": "simulation_supprimer", "confirmation": "SUPPRIMER"})
+            self.client.post(self.url, {"action": "demarrage_auto"})
+            etat["simulation"] = {"etat": "prete", "port": 8101, "journal": ""}
+            self.assertNotContains(self.client.get(self.url + "&onglet=simulation"), "http://testserver:8101/")
+            self.assertContains(self.client.get(self.url + "&onglet=simulation"), "Importer comme dossier séparé")
+        self.assertEqual(appels, ["sauvegarder", ("restaurer", "erp-20261027-100000.sqlite3"),
+                                  ("simulation", "2026-01", "aujourdhui"), "supprimer", "auto"])
+
+    def test_effacer_societe(self):
+        with mock.patch.dict(poste.ACTIONS, {"etat": lambda: {}}, clear=False), \
+             mock.patch("django.core.management.call_command") as commande:
+            self.client.post(self.url, {"action": "effacer_societe", "confirmation": "non"})
+            commande.assert_not_called()                           # sans confirmation : rien n'est effacé
+            reponse = self.client.post(self.url, {"action": "effacer_societe", "confirmation": "EFFACER"})
+            self.assertRedirects(reponse, reverse("core:demarrage"), fetch_redirect_response=False)
+            commande.assert_called_once_with("flush", "--no-input")
+
+
+class RestaurationPremierDemarrageTests(TestCase):
+    """D4 : restaurer une société existante dès le premier démarrage (sans en créer une)."""
+
+    def test_restaurer_une_societe(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from apps.core import sauvegarde as sv
+
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+        Societe.objects.update(raison_sociale="Société Restaurée SA", assistant_termine=True)
+        get_user_model().objects.create_superuser("chefresto", "", "Chef-2026-ok")
+        contenu = sv.sauvegarder()
+        Societe.objects.update(raison_sociale="Autre chose")      # on modifie pour prouver la restauration
+        fichier = SimpleUploadedFile("sauvegarde.json", contenu.encode("utf-8"), content_type="application/json")
+        reponse = self.client.post(reverse("core:restaurer_societe"), {"action": "restaurer", "fichier": fichier})
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, "restaurée")
+        self.assertEqual(Societe.get().raison_sociale, "Société Restaurée SA")
+        self.assertTrue(get_user_model().objects.filter(username="chefresto").exists())
+
+
+def _port_libre():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def arreter_programmes(donnees):
+    """Arrête les programmes lancés pour l'essai, reconnus à leur dossier de données (jamais un autre processus)."""
+    for _ in range(3):
+        for environ in Path("/proc").glob("[0-9]*/environ"):
+            try:
+                contenu = environ.read_bytes()
+                if (f"ERP_DONNEES={donnees}\0".encode() in contenu
+                        or f"ERP_PARENT_DONNEES={donnees}\0".encode() in contenu):
+                    os.kill(int(environ.parent.name), 9)
+            except (OSError, ValueError):
+                pass
+        time.sleep(1)
+
+
+class Navigateur:
+    def __init__(self, base):
+        self.base = base
+        self.ouvreur = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+    def get(self, chemin):
+        with self.ouvreur.open(self.base + chemin, timeout=30) as r:
+            return r.geturl(), r.read().decode()
+
+    def post(self, chemin, champs):
+        _, page = self.get(chemin)
+        jeton = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', page)[1]
+        corps = urllib.parse.urlencode({"csrfmiddlewaretoken": jeton, **champs}).encode()
+        requete = urllib.request.Request(self.base + chemin, data=corps, headers={"Referer": self.base + chemin})
+        with self.ouvreur.open(requete, timeout=60) as r:
+            return r.geturl(), r.read().decode()
+
+
+class ProgrammeLanceTests(SimpleTestCase):
+    """Le programme (erp_ohada.py, comme l'exe) lancé pour de vrai, piloté comme depuis le navigateur."""
+
+    def test_premier_demarrage_et_administration(self):
+        with tempfile.TemporaryDirectory() as donnees:
+            port = _port_libre()
+            env = {k: v for k, v in os.environ.items() if not k.startswith(("SQLITE_", "DB_", "ERP_", "DJANGO_"))}
+            env.update(ERP_DONNEES=donnees, ERP_PORT=str(port), ERP_SANS_NAVIGATEUR="1", ERP_RESEAU="0", ERP_EDITION="transport")
+            programme = [sys.executable, str(settings.BASE_DIR / "deploy" / "executable" / "erp_ohada.py")]
+            serveur = subprocess.Popen(programme, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            try:
+                nav = Navigateur(f"http://127.0.0.1:{port}")
+                for _ in range(300):
+                    try:
+                        adresse, _ = nav.get("/")
+                        break
+                    except (urllib.error.URLError, OSError):
+                        self.assertIsNone(serveur.poll(), serveur.stdout.read() if serveur.poll() is not None else "")
+                        time.sleep(0.5)
+                self.assertTrue(adresse.endswith("/demarrage/"))
+                # Création de société : identité → rôle → base → compte administrateur (à la fin).
+                nav.post("/installation/", {"raison_sociale": "Transports Essai SA", "pays": "Cameroun"})
+                adresse, page = nav.post("/installation/?etape=role", {"role": "seul"})
+                self.assertTrue(adresse.endswith("/installation/?etape=base"), adresse)
+                self.assertIn("SQL Server", page)
+                adresse, _ = nav.post("/installation/?etape=base", {"action": "sqlite"})
+                self.assertTrue(adresse.endswith("/installation/?etape=compte"), adresse)
+                adresse, page = nav.post("/installation/?etape=compte", {"identifiant": "chef", "mot_de_passe": "Chef-2026-ok",
+                                                                         "confirmation": "Chef-2026-ok"})
+                self.assertTrue(adresse.endswith(f":{port}/"), adresse)
+                self.assertIn("Configuration terminée", page)
+
+                # Version d'essai (aucune licence) : sauvegarde / restauration et gestion de la base sont bloquées
+                # à l'écran (les sauvegardes automatiques au démarrage, elles, continuent côté serveur).
+                _, page = nav.post("/poste/?seul=1", {"action": "sauvegarder"})
+                self.assertIn("réservée à la version sous licence", page)
+                self.assertIn("Créer la simulation", nav.get("/poste/?onglet=simulation")[1])  # toujours disponible
+                _, base = nav.get("/poste/base/")
+                self.assertIn("ne sont pas disponibles en version", base)
+
+                _, page = nav.post("/poste/?seul=1", {"action": "simulation_creer", "debut": "2026-09", "duree": "1"})
+                self.assertIn("en préparation", page)
+                for _ in range(60):                                       # le journal de la simulation se remplit
+                    if list(Path(donnees, "dossiers-simulation").glob("*/simulation.sqlite3")):
+                        break
+                    time.sleep(1)
+                self.assertTrue(list(Path(donnees, "dossiers-simulation").glob("*/simulation.sqlite3")))
+                _, page = nav.post("/poste/?seul=1", {"action": "simulation_supprimer", "confirmation": "SUPPRIMER"})
+                self.assertIn("Simulation supprimée", page)
+                self.assertFalse(list(Path(donnees, "dossiers-simulation").glob("*/simulation.sqlite3")))
+                self.assertIn("Créer la simulation", page)
+                # La vérification, la sauvegarde, le changement de moteur et le redémarrage depuis l'écran Base de
+                # données sont couverts, hors blocage d'essai, par apps/core/tests_base_donnees.py.
+            finally:
+                arreter_programmes(donnees)                               # le programme relancé (même dossier)
+                serveur.terminate()
+                serveur.wait(30)
+
+
+class ChoixDeBaseALInstallationTests(SimpleTestCase):
+    """La base choisie dans l'installateur (installation-base.env) ; SQL Server injoignable → SQLite, erreur montrée."""
+
+    def test_reglages_repris_dans_la_configuration(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("lanceur", settings.BASE_DIR / "deploy" / "executable" / "erp_ohada.py")
+        lanceur = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lanceur)
+        with tempfile.TemporaryDirectory() as donnees, mock.patch.dict(os.environ, {"ERP_DONNEES": donnees}, clear=False):
+            Path(donnees, "installation-base.env").write_text(
+                "MIROIR_DB_ENGINE=mssql\nMIROIR_DB_HOST=SRV\\SQLEXPRESS\nMIROIR_DB_NAME=ERP_COPIE\n", encoding="utf-8")
+            for cle in ("MIROIR_DB_ENGINE", "MIROIR_DB_HOST", "MIROIR_DB_NAME"):
+                os.environ.pop(cle, None)
+            try:
+                lanceur.preparer_environnement()
+                config = Path(donnees, "configuration.env").read_text(encoding="utf-8")
+                self.assertIn("MIROIR_DB_ENGINE=mssql", config)
+                self.assertIn("MIROIR_DB_HOST=SRV\\SQLEXPRESS", config)
+                self.assertNotIn("# MIROIR_DB_ENGINE=mssql", config)
+                self.assertFalse(Path(donnees, "installation-base.env").exists())
+                self.assertTrue(Path(donnees, "installation-base.env.applique").exists())
+            finally:
+                for cle in ("MIROIR_DB_ENGINE", "MIROIR_DB_HOST", "MIROIR_DB_NAME", "SQLITE_FICHIER", "ERP_DOSSIER_DONNEES"):
+                    os.environ.pop(cle, None)
+
+    @unittest.skipUnless(__import__("importlib").util.find_spec("mssql"), "pilote SQL Server absent")
+    def test_sqlserver_injoignable_retour_sur_sqlite(self):
+        with tempfile.TemporaryDirectory() as donnees:
+            Path(donnees, "installation-base.env").write_text(
+                "DB_ENGINE=mssql\nDB_HOST=127.0.0.1,1\nDB_NAME=ERP_INJOIGNABLE\nDB_USER=sa\nDB_PASSWORD=x\n"
+                "DB_PYTHON_DRIVER=mssql_python\n"
+                # Port local volontairement fermé : une tentative courte suffit à vérifier le repli SQLite.
+                "DB_CONNECTION_TIMEOUT=2\nDB_CONNECTION_RETRIES=0\nDB_CONNECTION_RETRY_BACKOFF_TIME=0\n",
+                encoding="utf-8")
+            port = _port_libre()
+            env = {k: v for k, v in os.environ.items() if not k.startswith(("SQLITE_", "DB_", "ERP_", "DJANGO_"))}
+            env.update(ERP_DONNEES=donnees, ERP_PORT=str(port), ERP_SANS_NAVIGATEUR="1", ERP_RESEAU="0", ERP_EDITION="transport",
+                       ERP_ADMIN="chef", ERP_ADMIN_MDP="Chef-2026-ok")
+            programme = [sys.executable, str(settings.BASE_DIR / "deploy" / "executable" / "erp_ohada.py")]
+            sortie = Path(donnees, "sortie.txt")
+            with open(sortie, "w") as f:                          # le programme relancé garde sa propre sortie
+                subprocess.Popen(programme, env=env, stdout=f, stderr=subprocess.STDOUT).wait(180)
+            try:
+                self.assertIn("retour sur SQLite", sortie.read_text())
+                self.assertIn("DB_ENGINE=sqlite", Path(donnees, "configuration.env").read_text(encoding="utf-8"))
+                nav = Navigateur(f"http://127.0.0.1:{port}")
+                for _ in range(240):                                        # relancé tout seul, sur SQLite
+                    try:
+                        nav.get("/connexion/")
+                        break
+                    except (urllib.error.URLError, OSError):
+                        time.sleep(0.5)
+                self.assertTrue(Path(donnees, "erp.sqlite3").exists())
+                self.assertIn("inutilisable", Path(donnees, "erreur-base.txt").read_text(encoding="utf-8"))
+            finally:
+                arreter_programmes(donnees)

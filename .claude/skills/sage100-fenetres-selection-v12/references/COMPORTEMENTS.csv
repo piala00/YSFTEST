@@ -1,0 +1,21 @@
+id;sujet;regle;source;page;version_source;statut
+R001;Recherche multicritères;"Valeur du critère vide : tous les éléments du fichier selon l’aide ; ne pas généraliser aux autres familles";H01;Recherche multicritères;BUILD_NON_PRECISE;DOCUMENTE
+R002;Recherche multi-mots;Dans la recherche de liste décrite, plusieurs mots séparés par espace correspondent à au moins un mot;H06;Recherche de mots;BUILD_NON_PRECISE;DOCUMENTE
+R003;Journal;La barre de recherche documentée est disponible en consultation et absente en modification;H07;Recherche sur journal;BUILD_NON_PRECISE;DOCUMENTE
+R004;Colonnes;Une colonne portant un cadenas ne peut pas être retirée dans Personnaliser la liste;H05;Suppression de colonne;BUILD_NON_PRECISE;DOCUMENTE
+R005;Sorties;Journaux comptables, inventaire et cadencier de livraison sont cités comme éditions standard sans choix de modèle;H04;Modèle standard;BUILD_NON_PRECISE;DOCUMENTE
+R006;Traitement rapide;Les critères ajoutés hors critères pris en charge peuvent être ignorés en Rapide simplifié;M02|M03;"M02 PDF 53-54 ; M03 chapitre Impression des états";V10.00 et sup.;DOCUMENTE
+R007;Format avancé;"Enregistrer une ligne est temporaire ; Sauvegarder conserve le format";M01;PDF 56-59;8.50;DOCUMENTE
+R008;Compatibilité format;Un format de sélection reste propre à la fonction qui l’a créé;M01;PDF 56-57;8.50;DOCUMENTE
+R009;Bornes;"Borne basse vide peut désigner le début ; borne haute vide peut désigner la fin dans les formats historiques";M01|T01;"M01 Formats de sélection ; T01 PDF 29";8.50;DOCUMENTE
+R010;Précédence;"A et B ou C et D est évalué historiquement comme ((A et B) ou C) et D ; utiliser des groupes pour (A et B) ou (C et D)";T01;PDF 30-31;8.50;DOCUMENTE
+R011;Dates relatives;"Le témoin accepte les jetons JJ MM AA ; leur grammaire V12 complète reste à relever";T01;PDF 29-30;8.50;DOCUMENTE
+R012;Appel compte;F4 et racine suivie de Tabulation sont documentés pour les comptes en saisie de journal;M01;PDF 521-523;8.50;DOCUMENTE
+R013;Appel tiers;"Le journal de vente préfiltre les clients ; le journal d’achat les fournisseurs ; les autres les tiers";M01;PDF 523;8.50;DOCUMENTE
+R014;Articles;"Saisie d’un début de référence puis Tabulation ouvre le sélecteur ; OK rapatrie la ligne";T01;PDF 709-710,833,897;8.50;DOCUMENTE
+R015;Articles;La langue du document peut modifier la désignation affichée et rapatriée dans le sélecteur vente;T01;PDF 710;8.50;DOCUMENTE
+R016;Création en saisie;"La création de tiers ou article pendant la saisie dépend du paramétrage ; sélection et création ont des effets distincts";T01;PDF 681,710-711,810;8.50;DOCUMENTE
+R017;Journal général;Le manuel indique explicitement l’absence de format de sélection développé pour le journal général;M01;PDF 755 / imprimée 576;8.50;DOCUMENTE
+R018;Domaine;Changer Client/Fournisseur dans le format développé peut exiger de changer manuellement les fichiers de critères;T01;PDF 1365;8.50;DOCUMENTE
+R019;Recherche sauvegardée;"Les aides H02/H03 citent .sma malgré une portée multi-produits ; ne pas imposer cette extension à tous les produits";H02|H03;Enregistrer / Ouvrir;BUILD_NON_PRECISE;DOCUMENTE
+R020;Fichiers;"Le type de fichier choisi dans le dialogue d’import Sage est significatif ; Tous les fichiers ne suffit pas";K02;Résolution;BUILD_NON_PRECISE;DOCUMENTE

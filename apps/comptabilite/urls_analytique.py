@@ -1,0 +1,28 @@
+"""Logiciel « Comptabilité analytique » : affichage distinct, sur la même comptabilité que la Comptabilité générale.
+
+Les états analytiques restent servis par les vues de la comptabilité (une seule source : les lignes d'écriture
+générales, avec leur véhicule et leur section) ; ce module leur donne leur propre accueil et leurs menus.
+"""
+from django.urls import path
+
+from apps.core import views as core_views
+
+from . import views, views_analytique, views_budget
+
+app_name = "analytique"
+
+urlpatterns = [
+    path("", core_views.accueil_module, {"module": "analytique"}, name="accueil"),
+    path("a-propos/", core_views.a_propos, name="a_propos"),
+    path("autorisations/", core_views.autorisations, {"module": "analytique"}, name="autorisations"),
+    path("journal-evenements/", core_views.journal_evenements, {"module": "analytique"}, name="journal_evenements"),
+    path("sauvegarde/", core_views.sauvegarde, {"module": "analytique"}, name="sauvegarde"),
+    path("sections/", views.structure_liste, {"structure": "sections"}, name="sections"),
+    # Plan analytique : axes → éléments → états détaillés
+    path("plan/", views_analytique.plan, name="plan"),
+    path("plan/<str:axe>/", views_analytique.axe, name="axe"),
+    path("plan/<str:axe>/<str:cle>/", views_analytique.element, name="element"),
+    path("budgets/", views_budget.budgets, name="budgets"),
+    path("budgets/<int:pk>/", views_budget.budget, name="budget"),
+    path("budgets/<int:pk>/reel/", views_budget.budget_reel, name="budget_reel"),
+]

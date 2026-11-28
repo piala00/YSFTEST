@@ -1,0 +1,13 @@
+<div data-contact data-telephone="{{ telephone }}" data-nom="{{ nom }}" data-piece="{{ piece|default:'' }}" data-selection="{{ selection }}">
+  {% include "transport/_champ_rapide.html" with field=telephone_field %}
+  {% include "transport/_champ_rapide.html" with field=nom_field %}
+  {% if piece_field %}{% include "transport/_champ_rapide.html" with field=piece_field %}{% endif %}
+  <div class="d-flex gap-2 mb-1">
+    <button type="button" class="btn btn-link btn-sm p-0" data-recherche-nom>Retrouver par nom</button>
+    <button type="button" class="btn btn-link btn-sm p-0" data-nouvelle-personne>Nouvelle personne</button>
+  </div>
+  <div class="small text-muted" role="status" aria-live="polite" data-contact-message></div>
+  <label class="small" data-contact-choix-label hidden>Choisir la personne
+    <select class="form-select form-select-sm" data-contact-choix aria-label="Personnes trouvées"></select>
+  </label>
+</div>

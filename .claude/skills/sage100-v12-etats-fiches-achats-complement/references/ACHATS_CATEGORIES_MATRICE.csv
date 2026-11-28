@@ -1,0 +1,10 @@
+rang_documentaire;libelle_source;source_id;localisation;version;limite
+1;Demande d'achat;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."
+2;Préparation de commande;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."
+3;Bon de commande;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."
+4;Bon de livraison;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."
+5;Bon de retour;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."
+6;Bon d'avoir financier;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."
+7;Facture;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."
+8;Facture de retour;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."
+9;Facture d'avoir;S04;PDF 11;Sans build;"Catégorie fonctionnelle ; ne pas supposer une correspondance bijective avec DO_Type."

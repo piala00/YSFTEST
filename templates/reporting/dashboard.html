@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% load static erp %}
+{% block title %}Tableau de bord{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Tableau de bord</h1><span class="text-muted">Exercice du {{ d.debut|date:"d/m/Y" }} au {{ d.fin|date:"d/m/Y" }}</span></div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-xl-3"><div class="card kpi p-3"><div class="label">CA HT de l'exercice</div><div class="value text-primary">{{ d.ca_exercice|montant }}</div><div class="small text-muted">Ce mois : {{ d.ca_mois|montant }}</div></div></div>
+  <div class="col-6 col-xl-3"><div class="card kpi p-3"><div class="label">Marge commerciale</div><div class="value">{{ d.marge_commerciale|montant }}</div><div class="small text-muted">Achats HT : {{ d.achats_exercice|montant }}</div></div></div>
+  <div class="col-6 col-xl-3"><div class="card kpi p-3"><div class="label">Résultat net (provisoire)</div><div class="value {% if d.resultat < 0 %}text-danger{% else %}text-success{% endif %}">{{ d.resultat|montant }}</div></div></div>
+  <div class="col-6 col-xl-3"><div class="card kpi p-3"><div class="label">Trésorerie nette</div><div class="value {% if d.tresorerie < 0 %}text-danger{% endif %}">{{ d.tresorerie|montant }}</div></div></div>
+  <div class="col-6 col-xl-3"><div class="card kpi p-3"><div class="label">Créances clients</div><div class="value">{{ d.creances_clients|montant }}</div><div class="small text-muted">{{ d.factures_impayees }} facture(s) impayée(s)</div></div></div>
+  <div class="col-6 col-xl-3"><div class="card kpi p-3"><div class="label">Dettes fournisseurs</div><div class="value">{{ d.dettes_fournisseurs|montant }}</div></div></div>
+  <div class="col-6 col-xl-3"><div class="card kpi p-3"><div class="label">Valeur du stock</div><div class="value">{{ d.valeur_stock|montant }}</div><div class="small text-muted">{{ d.alertes_stock|length }} article(s) en alerte</div></div></div>
+  <div class="col-6 col-xl-3"><div class="card kpi p-3"><div class="label">Devis en attente</div><div class="value">{{ d.devis_en_cours }}</div></div></div>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-xl-8"><div class="card p-3"><h6>Ventes et achats mensuels (HT)</h6><canvas id="g-ca" height="110"></canvas></div></div>
+  <div class="col-xl-4"><div class="card p-3"><h6>Top 5 clients</h6><canvas id="g-clients" height="220"></canvas></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-xl-7"><div class="card"><div class="card-header bg-white fw-semibold">Meilleurs articles</div>
+  <table class="table table-sm mb-0"><thead><tr><th>Article</th><th class="num">Qté</th><th class="num">CA HT</th><th class="num">Marge</th></tr></thead><tbody>
+  {% for a in d.top_articles %}<tr><td>{{ a.article__designation }}</td><td class="num">{{ a.quantite|floatformat:"-3" }}</td><td class="num">{{ a.total|montant }}</td><td class="num">{{ a.taux_marge|floatformat:1 }} %</td></tr>
+  {% empty %}<tr><td colspan="4" class="text-muted">Aucune vente.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="col-xl-5"><div class="card"><div class="card-header bg-white fw-semibold text-danger"><i class="bi bi-exclamation-triangle"></i> Alertes de stock</div>
+  <table class="table table-sm mb-0"><tbody>
+  {% for a in d.alertes_stock %}<tr><td><a href="{% url 'commercial:article_detail' a.pk %}">{{ a.designation }}</a></td><td class="num text-danger">{{ a.stock|floatformat:"-3" }}</td><td class="num text-muted">min {{ a.stock_minimum|floatformat:"-3" }}</td></tr>
+  {% empty %}<tr><td class="text-muted">Aucune alerte.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{{ graph_json|json_script:"graph-data" }}
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+const G = JSON.parse(document.getElementById('graph-data').textContent);
+const fmt = v => v.toLocaleString('fr-FR');
+new Chart(document.getElementById('g-ca'), {
+  type: 'bar',
+  data: { labels: G.labels, datasets: [
+    { label: 'Ventes', data: G.ventes, backgroundColor: '#2563eb' },
+    { label: 'Achats', data: G.achats, backgroundColor: '#94a3b8' } ] },
+  options: { scales: { y: { ticks: { callback: fmt } } }, plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label} : ${fmt(c.raw)}` } } } }
+});
+new Chart(document.getElementById('g-clients'), {
+  type: 'bar',
+  data: { labels: G.clients, datasets: [{ label: 'CA HT', data: G.clients_ca, backgroundColor: '#2563eb' }] },
+  options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: fmt } } } }
+});
+</script>
+{% endblock %}

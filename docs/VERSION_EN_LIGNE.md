@@ -1,0 +1,57 @@
+# Suivre l'ERP en ligne pendant le développement
+
+Deux adresses, mises à jour automatiquement à chaque envoi sur la branche `ccr-5592a371-fusjt2`.
+
+## 1. Aperçu (GitHub Pages) — https://piala00.github.io/YSFTEST/
+
+Construit par `.github/workflows/apercu.yml` : tests, puis simulateurs web et bureau et explorateur des menus,
+avec les données de démonstration. Rien à installer ; les écrans et les chiffres sont ceux du vrai logiciel,
+mais les saisies ne sont pas conservées (simulation).
+
+Mise en place, une seule fois, par le propriétaire du dépôt (GitHub ne permet pas à l'automatisme de le faire) :
+1. GitHub › dépôt `YSFTEST` › **Settings › Pages › Build and deployment › Source : GitHub Actions**.
+2. **Settings › Environments › github-pages › Deployment branches and tags** : ajouter la branche
+   `ccr-5592a371-fusjt2` (par défaut seule `main` a le droit de publier).
+3. Onglet **Actions › Aperçu de l'ERP** › dernière exécution › **Re-run all jobs**.
+
+L'état de chaque construction est visible dans l'onglet **Actions** du dépôt (vert = publié, rouge = un test a échoué :
+l'ancienne version reste en ligne).
+
+## 2. Version en ligne réelle (Render) — saisie de vraies données de test
+
+Le vrai serveur Django, avec connexion, saisie, validation, états. Défini par `render.yaml`.
+
+Mise en place, une seule fois :
+1. Créer un compte gratuit sur https://render.com (connexion avec GitHub).
+2. **New › Blueprint**, choisir le dépôt `piala00/YSFTEST`, nom libre (ex. `erp-ohada`), **Branch : `ccr-5592a371-fusjt2`**
+   (le fichier `render.yaml` n'existe pas encore sur `main`), Blueprint Path vide, puis **Apply**.
+3. Renseigner `DEMO_ADMIN_PASSWORD` : mot de passe du compte `admin` (choisissez-en un solide : le site est public).
+
+L'adresse est du type `https://erp-ohada-test.onrender.com`. Chaque envoi sur la branche redéploie le site.
+
+À savoir :
+- Offre gratuite : le site s'endort après 15 minutes sans visite ; la première ouverture prend alors ~1 minute.
+- Sans `DATABASE_URL`, la base est **remise à la démonstration** à chaque redéploiement ou réveil : idéal pour tester,
+  pas pour garder des saisies. Pour les conserver, créer une base PostgreSQL (Render, Neon, Supabase…) et coller son URL
+  dans une variable `DATABASE_URL` à ajouter (Render › service › Environment).
+- Pour garder vos saisies sans base PostgreSQL : **Fichier › Sauvegarde et restauration** avant une mise à jour,
+  puis restauration du fichier ensuite.
+- C'est un site de test public : **n'y mettez pas les données réelles d'une société**.
+
+> **Render inaccessible ?** Utilisez PythonAnywhere (gratuit, données conservées) : voir `docs/HEBERGEMENT_PYTHONANYWHERE.md`.
+
+## Choisir une base durable (relevé du 21/10/2026, skill `sage100-sql-hebergement`)
+
+Prix en dollars US, hors taxes et frais de change : à revérifier avant de s'engager. Aucune de ces offres n'a été
+testée depuis le Cameroun : mesurer la vitesse sur les connexions des utilisateurs avant d'y mettre une vraie société.
+
+| Offre | Ce qu'il faut savoir |
+|---|---|
+| Render gratuit (site + PostgreSQL) | La base gratuite **expire au bout de 30 jours** (puis 14 jours avant suppression), sans sauvegarde. Pour tester seulement. |
+| Render payant (site 7 $ + base 6 $ par mois environ, hors stockage) | Site toujours éveillé ; restauration à un instant donné sur 3 jours (Hobby) ou 7 jours (Pro). |
+| Neon (PostgreSQL seul) | Gratuit : 1 Go, la base s'endort après 5 min mais n'est pas supprimée ; le site Django reste à héberger ailleurs. |
+| Supabase (PostgreSQL seul) | Gratuit : 500 Mo, mis en pause après une semaine sans activité. Pro à partir de 25 $/mois avec sauvegardes quotidiennes. |
+| Railway, Fly.io | Site et base sur le même compte, facturés à la consommation (Fly.io : environ 44 $/mois dans l'exemple officiel). |
+
+Quelle que soit l'offre : faire aussi une **sauvegarde indépendante** (Fichier › Sauvegarde et restauration), et
+vérifier au moins une fois qu'elle se restaure. Un fichier de sauvegarde jamais restauré n'est pas une garantie.

@@ -1,0 +1,7 @@
+# Prompt à transmettre à Claude avec ce ZIP
+
+Je valide une nouvelle évolution structurante de mes ERP OHADA Commercial et Transport. Lis entièrement le Skill `erp-ohada-analytique-reporting-simulation-exe` joint et applique-le **à mon dépôt de code actuel**, sans repartir de zéro.
+
+Exigences : plan comptable à sept chiffres ; deux modules visibles Comptabilité générale et Comptabilité analytique mais une seule comptabilité ; Transport : dix plans analytiques visibles (Véhicules et Propriétaires sont favoris et non seuls plans) ; Commerce : plans configurables ; Reporting très complet couvrant tous les états généraux et analytiques et analyses croisées ; simulation opérationnelle de plusieurs mois avec rapports mensuels et consolidés ; moteur de prévision par scénarios ; création et test d'une version exécutable Windows de l'ensemble du logiciel.
+
+Procède méthodiquement : 1) audit et tableau des écarts réels, 2) moteur et contrôles comptables, 3) écrans, états, filtres et exports, 4) simulation multi-mois, 5) scénarios, 6) packaging Windows, 7) tests et bilan. Ne prétends pas avoir compilé, testé ou déployé sans preuve. Préserve les données, permissions et fonctionnalités existantes. Pour les choix non prouvés, expose-les comme propositions techniques et documente les inconnues. Assure la synchronisation UX et API entre Web et Windows. Ne lance aucune migration sur la production sans sauvegarde, simulation et mon accord.

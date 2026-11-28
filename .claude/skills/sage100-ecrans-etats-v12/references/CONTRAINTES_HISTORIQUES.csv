@@ -1,0 +1,4 @@
+objet;champ;propriete;valeur_documentee;version;source;preuve;limite
+Article;Référence;Obligatoire / modification;"Oui ; majuscules ; non modifiable après enregistrement";8.50;"T02 | https://wilroad.com/documentation/Manuel%20Sage%20100%20Gestion%20Commerciale.pdf | PDF p.493 ; imprimée 210";DOC-TIERS;Pas une contrainte V12 certifiée
+Article;Désignation;Obligatoire;Oui;8.50;T02 | https://wilroad.com/documentation/Manuel%20Sage%20100%20Gestion%20Commerciale.pdf | PDF p.493;DOC-TIERS;Pas une contrainte V12 certifiée
+Article;Famille;Obligatoire;"Oui ; famille Détail";8.50;T02 | https://wilroad.com/documentation/Manuel%20Sage%20100%20Gestion%20Commerciale.pdf | PDF p.493;DOC-TIERS;Pas une contrainte V12 certifiée

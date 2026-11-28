@@ -1,0 +1,8 @@
+id;feuille;cellule;reference;expression_source;constat;action
+XLS-01;BILAN PAYSAGE;D27;AZ;=+D24+D17+D12;Le total des immobilisations omet AP (D23).;"Bloquer la recopie ; vérifier toutes les colonnes AZ."
+XLS-02;BILAN PAYSAGE;K40;DZ;=+K38+K34+K27;Le total passif omet l’écart de conversion passif DY en ligne39.;Ajouter un cas test où DY est non nul.
+XLS-03;COMPTE DE RESULTAT;E34;XD;=+E32+E33;Les charges de personnel semblent ajoutées en N alors que F34 les soustrait en N-1.;Définir une convention de signe unique et tester.
+XLS-04;COMPTE DE RESULTAT;E43;XF;=+SUM(E38:E42);"La somme suppose des valeurs déjà signées ; incompatible avec une saisie positive de toutes les charges sans transformation.";Ne pas exécuter sans convention de signes.
+XLS-05;TABLEAU DES FLUX DE TRESORERIE;B37;ZF;Texte : D+F;Auto-référence apparente dans le libellé : F est aussi le repère de ZF.;Comparer aux rubriques ZD et ZE avant calcul.
+XLS-06;BILAN PAYSAGE;F29;BB;=+'NOTE 6 '!B23;La cellule nette BB renvoie à la même cellule que la dépréciation E29.;Vérifier brut moins dépréciation et source des notes.
+XLS-07;BILAN PAYSAGE;A30 / H39;BC / DY;Références du modèle DGI;La copie PROJET porte BG / DV aux emplacements homologues.;"Garder les espaces de noms distincts ; ne pas fusionner les codes par ressemblance."

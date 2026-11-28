@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Familles d'articles{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Familles d'articles</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'commercial:famille_create' %}"><i class="bi bi-plus"></i> Nouvelle famille</a></div>
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead><tr><th>Code</th><th>Libellé</th><th>Compte de vente</th><th>Compte d'achat</th><th>Articles</th></tr></thead><tbody>
+{% for f in object_list %}<tr><td><a href="{% url 'commercial:famille_update' f.pk %}">{{ f.code }}</a></td><td>{{ f.libelle }}</td>
+<td>{{ f.compte_vente|default:"(selon nature)" }}</td><td>{{ f.compte_achat|default:"(selon nature)" }}</td><td>{{ f.articles.count }}</td></tr>
+{% empty %}<tr><td colspan="5" class="text-muted text-center">Aucune famille.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

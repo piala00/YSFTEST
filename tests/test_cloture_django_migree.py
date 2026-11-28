@@ -1,0 +1,1104 @@
+"""Véritable parcours N -> N+1 sur les migrations Django de production.
+
+Exécuté indépendamment du backend SQL Server de la CI : chaque dossier annuel
+est un fichier SQLite migré par manage.py, sans schéma de test artificiel.
+"""
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import unittest
+from contextlib import closing, contextmanager
+from decimal import Decimal
+from pathlib import Path
+
+from apps.core.adaptateur_cloture_transport_sqlite import (
+    migrer_schema_django_sqlite, preparer_dossier_transport_sqlite,
+)
+from apps.core.catalogue_societes import lire_catalogue
+
+
+@contextmanager
+def connexion_sqlite(chemin):
+    """Ferme systématiquement les connexions des scénarios, même en erreur.
+
+    sqlite3.Connection.__exit__ valide ou annule une transaction, mais ne
+    ferme pas la connexion ; les tests de clôture créent de nombreuses bases.
+    """
+    with closing(sqlite3.connect(chemin)) as connexion:
+        with connexion:
+            yield connexion
+
+
+RACINE = Path(__file__).resolve().parents[1]
+SEED = """
+from datetime import date
+from datetime import date
+from decimal import Decimal
+from django.contrib.auth.models import User, Group, Permission
+from apps.core.models import Societe, Exercice, Agence
+from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture, Taxe, Banque, Taxe, Banque
+from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, Chauffeur, ChangementGamme
+from apps.commercial.models import Tiers
+from apps.personnel.models import Employe, RubriquePaie
+Societe.objects.create(raison_sociale='Transport Centrale', activite='TRANSPORT')
+Exercice.objects.create(code='2026', date_debut=date(2026,1,1), date_fin=date(2026,12,31))
+User.objects.create_user(username='controle', password='test-local-only')
+groupe = Group.objects.create(name='Guichet')
+User.objects.get(username='controle').groups.add(groupe)
+permission = Permission.objects.get(codename='view_user', content_type__app_label='auth')
+groupe.permissions.add(permission)
+User.objects.get(username='controle').user_permissions.add(permission)
+g1 = Gare.objects.create(code='YDE', nom='Yaoundé', ville='Yaoundé')
+g2 = Gare.objects.create(code='DLA', nom='Douala', ville='Douala')
+pv = Gare.objects.create(code='PVY', nom='Point de vente', ville='Yaoundé', type_gare='POINT_VENTE', rattachement=g1)
+ligne = Ligne.objects.create(code='YDE-DLA', gare_depart=g1, gare_arrivee=g2, prix_billet=5000)
+ArretLigne.objects.create(ligne=ligne, gare=pv, ordre=1)
+proprietaire = Tiers.objects.create(code='PROP-01', nom='Propriétaire contrôle', type_tiers='FOURNISSEUR')
+vehicule = Vehicule.objects.create(
+    immatriculation='CE-123-AA', nombre_places=40, gamme='CLASSIQUE', proprietaire=proprietaire,
+    carte_grise='CG-TEST-2026', mise_en_service=date(2024,5,1),
+    assurance_echeance=date(2027,1,31), visite_technique_echeance=date(2026,12,31))
+ChangementGamme.objects.create(vehicule=vehicule, gamme='CLASSIQUE', debut=date(2026,1,1))
+chauffeur = Chauffeur.objects.create(nom='Chauffeur de contrôle', permis='TEST-2026')
+c1 = Compte.objects.create(numero='411000', intitule='Clients')
+c2 = Compte.objects.create(numero='101000', intitule='Capital')
+taxe_billets = Taxe.objects.create(code='TVA-BIL', intitule='TVA billets',
+    sens=Taxe.COLLECTEE, taux=Decimal('19.25'), compte=c2)
+taxe_colis = Taxe.objects.create(code='TVA-COL', intitule='TVA colis et fret',
+    sens=Taxe.COLLECTEE, taux=Decimal('17.50'), compte=c2)
+caisse = Journal.objects.create(code='CA', intitule='Caisse principale',
+    type_journal=Journal.TYPE_TRESORERIE, compte_tresorerie=c2)
+Banque.objects.create(code='BTA', intitule='Banque principale', domiciliation='Bertoua',
+    rib='CM-TEST-0001', journal=caisse)
+from apps.transport.models import ParametresTransport
+ParametresTransport.objects.create(
+    compte_billets=c1, compte_colis=c1, compte_fret=c1,
+    compte_bagages=c2, compte_contre_remboursement=c2,
+    compte_billets_a_voyager=c1, compte_colis_a_transporter=c2,
+    taxe_billets=taxe_billets, taxe_colis=taxe_colis,
+    compte_remboursements=c1, compte_proprietaires=c2,
+    compte_carburant=c2, compte_pieces=c1, compte_main_oeuvre=c2,
+    sessions_caisse_obligatoires=True, bloquer_papiers_expires=False,
+    avance_depart_toleree=35, plafond_depense_sans_autorisation=Decimal('25000'),
+    retenue_annulation=Decimal('7.50'), report_absent_automatique=True)
+agence = Agence.objects.create(code='CTR', nom='Agence Centre', ville='Yaoundé', locale=True, compte_liaison=c2)
+employe = Employe.objects.create(matricule='EMP-01', nom='Chauffeur de contrôle', service='CONDUITE',
+    agence=agence, vehicule=vehicule, chauffeur=chauffeur, salaire_base=Decimal('150000'))
+RubriquePaie.objects.create(code='PRIME', libelle='Prime de route', nature='GAIN',
+    valeur=Decimal('1000'), compte=c1)
+Journal.objects.create(code='AN', intitule='A nouveaux', type_journal='AN', cloture_au=date(2026,12,31))
+j = Journal.objects.create(code='OD', intitule='Divers', type_journal='OD')
+e = Ecriture.objects.create(journal=j, exercice=Exercice.objects.get(code='2026'),
+    numero='OD-2026-1', date=date(2026,12,31), libelle='Balance de clôture', statut='VALIDEE')
+LigneEcriture.objects.create(ecriture=e, compte=c1, tiers=proprietaire, section=g1.section, vehicule=vehicule,
+    employe=employe, debit=Decimal('125.50'))
+LigneEcriture.objects.create(ecriture=e, compte=c2, credit=Decimal('125.50'))
+"""
+
+
+class ClotureDjangoMigreeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Un schéma vide est créé une fois par les vraies migrations Django.
+        # La source métier et les scénarios rapides sont des copies cohérentes de
+        # ce schéma. Deux parcours conservent la migration réelle de bout en bout :
+        # le test direct ci-dessous et le POST de clôture depuis l'interface.
+        cls._fixture_temp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._fixture_temp.cleanup)
+        cls._fixture_schema = Path(cls._fixture_temp.name) / 'schema-migre.sqlite3'
+        cls._fixture_schema.touch()
+        with closing(sqlite3.connect(cls._fixture_schema)) as db:
+            migrer_schema_django_sqlite(db)
+        cls._fixture_source = Path(cls._fixture_temp.name) / 'source.sqlite3'
+        cls._fixture_source.touch()
+        with closing(sqlite3.connect(cls._fixture_schema)) as schema:
+            with closing(sqlite3.connect(cls._fixture_source)) as source:
+                schema.backup(source)
+        env = os.environ.copy()
+        env.pop('DATABASE_URL', None)
+        env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(cls._fixture_source),
+                   MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                   ERP_LICENCE='0', RELAIS_ACTIF='0')
+        proc = subprocess.run(
+            [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', SEED],
+            cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+        )
+        if proc.returncode:
+            raise RuntimeError(proc.stdout + proc.stderr)
+
+    def _copier_source(self, chemin):
+        # Django peut laisser des pages validées dans le journal WAL : copier
+        # seulement le fichier principal avec shutil.copy2 perd ces écritures.
+        # backup() produit un instantané SQLite cohérent, WAL compris, tout en
+        # conservant une base indépendante pour chaque scénario.
+        with closing(sqlite3.connect(self._fixture_source)) as source:
+            with closing(sqlite3.connect(chemin)) as cible:
+                source.backup(cible)
+
+    def _copier_schema_migre(self, cible):
+        """Copie le schéma issu des migrations réelles, sans données métier."""
+        with closing(sqlite3.connect(self._fixture_schema)) as schema:
+            schema.backup(cible)
+
+    def _preparer_dossier_transport_sqlite(self, *args, **kwargs):
+        """Les scénarios métier réutilisent le schéma migré; les tests de migration gardent le vrai callback."""
+        kwargs.setdefault("migrer_cible", self._copier_schema_migre)
+        return preparer_dossier_transport_sqlite(*args, **kwargs)
+
+    def test_cloture_migrations_reelles_et_balance(self):
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            resultat = preparer_dossier_transport_sqlite(
+                catalogue, 'n', nouveau, 'n1', 2027,
+            )
+            self.assertEqual(resultat['exercice_precedent'], 'n')
+            self.assertTrue(next(b for b in lire_catalogue(catalogue) if b['id'] == 'n')['cloture'])
+            with connexion_sqlite(ancien) as source_db:
+                historique_source = source_db.execute('''SELECT gamme, debut FROM transport_changementgamme ORDER BY id''').fetchall()
+                # Le journal AN est déverrouillé uniquement dans N+1 :
+                # l'exercice historique N doit rester clôturé à sa date.
+                self.assertEqual(source_db.execute(
+                    "SELECT cloture_au FROM comptabilite_journal WHERE code='AN'"
+                ).fetchone()[0], '2026-12-31')
+            with connexion_sqlite(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
+                self.assertEqual(db.execute('SELECT username FROM auth_user').fetchone()[0], 'controle')
+                self.assertEqual(db.execute('SELECT name FROM auth_group').fetchone()[0], 'Guichet')
+                self.assertEqual(db.execute("""SELECT u.username, g.name FROM auth_user_groups AS ug
+                    JOIN auth_user AS u ON ug.user_id=u.id
+                    JOIN auth_group AS g ON ug.group_id=g.id""").fetchall(), [('controle', 'Guichet')])
+                self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], None)
+                self.assertEqual(db.execute("""SELECT COUNT(*) FROM auth_user_user_permissions AS up
+                    JOIN auth_permission AS p ON p.id=up.permission_id
+                    JOIN auth_user AS u ON u.id=up.user_id
+                    WHERE u.username='controle' AND p.codename='view_user'""").fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT COUNT(*) FROM auth_group_permissions AS gp
+                    JOIN auth_permission AS p ON p.id=gp.permission_id
+                    JOIN auth_group AS g ON g.id=gp.group_id
+                    WHERE g.name='Guichet' AND p.codename='view_user'""").fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT c.numero FROM core_agence AS a
+                    JOIN comptabilite_compte AS c ON c.id=a.compte_liaison_id
+                    WHERE a.code='CTR'""").fetchone()[0], '101000')
+                self.assertEqual(db.execute("SELECT code, nom, ville, locale, compte_liaison_id IS NOT NULL FROM core_agence").fetchall(), [('CTR', 'Agence Centre', 'Yaoundé', 1, 1)])
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_gare').fetchone()[0], 3)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_ligne').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_vehicule').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM personnel_employe').fetchone()[0], 1)
+                rubrique = db.execute("SELECT code, libelle, valeur FROM personnel_rubriquepaie").fetchone()
+                self.assertEqual(rubrique[:2], ('PRIME', 'Prime de route'))
+                self.assertEqual(Decimal(str(rubrique[2])), Decimal('1000'))
+                self.assertEqual(db.execute("""SELECT employe.matricule, employe.nom, employe.service,
+                           employe.site_origine, agence.code
+                    FROM personnel_employe AS employe
+                    JOIN core_agence AS agence ON agence.id=employe.agence_id
+                    WHERE employe.matricule='EMP-01'""").fetchone(),
+                    ('EMP-01', 'Chauffeur de contrôle', 'CONDUITE', '', 'CTR'))
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_chauffeur').fetchone()[0], 1)
+                self.assertEqual(db.execute('''SELECT gamme, debut FROM transport_changementgamme ORDER BY id''').fetchall(), historique_source)
+                self.assertEqual(db.execute("""SELECT tiers.code FROM transport_vehicule AS veh
+                    JOIN commercial_tiers AS tiers ON veh.proprietaire_id=tiers.id
+                    WHERE veh.immatriculation='CE-123-AA'""").fetchone()[0], 'PROP-01')
+                self.assertIn(('CLASSIQUE', '2026-01-01'), db.execute("""SELECT historique.gamme, historique.debut
+                    FROM transport_changementgamme AS historique
+                    JOIN transport_vehicule AS veh ON historique.vehicule_id=veh.id
+                    WHERE veh.immatriculation='CE-123-AA'""").fetchall())
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM transport_arretligne').fetchone()[0], 1)
+                self.assertEqual(db.execute("""SELECT ligne.code, gare.code, arret.ordre
+                    FROM transport_arretligne AS arret
+                    JOIN transport_ligne AS ligne ON ligne.id=arret.ligne_id
+                    JOIN transport_gare AS gare ON gare.id=arret.gare_id""").fetchall(),
+                    [('YDE-DLA', 'PVY', 1)])
+                self.assertEqual(db.execute("""SELECT section.code FROM transport_gare AS gare
+                    JOIN comptabilite_sectionanalytique AS section ON section.id=gare.section_id
+                    WHERE gare.code='YDE'""").fetchone()[0], 'G-YDE')
+                self.assertEqual(db.execute("""SELECT parent.code FROM transport_gare AS point
+                    JOIN transport_gare AS parent ON point.rattachement_id=parent.id
+                    WHERE point.code='PVY'""").fetchone()[0], 'YDE')
+                self.assertEqual(db.execute("""SELECT depart.code, arrivee.code FROM transport_ligne AS ligne
+                    JOIN transport_gare AS depart ON ligne.gare_depart_id=depart.id
+                    JOIN transport_gare AS arrivee ON ligne.gare_arrivee_id=arrivee.id
+                    WHERE ligne.code='YDE-DLA'""").fetchone(), ('YDE', 'DLA'))
+                # N+1 conserve les référentiels, jamais les mouvements de N.
+                # Les écritures copiées doivent être uniquement les à-nouveaux.
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture WHERE origine='CLOTURE_ANNUELLE'"
+                ).fetchone()[0], 1)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture WHERE numero='OD-2026-1'"
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture WHERE exercice_id NOT IN "
+                    "(SELECT id FROM core_exercice)"
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute(
+                    "SELECT code FROM comptabilite_journal ORDER BY code"
+                ).fetchall(), [('AN',), ('OD',)])
+                self.assertEqual(db.execute(
+                    "SELECT numero FROM comptabilite_compte ORDER BY numero"
+                ).fetchall(), [('101000',), ('411000',)])
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT date FROM comptabilite_ecriture').fetchone()[0], '2027-01-01')
+                montants = db.execute('SELECT debit,credit FROM comptabilite_ligneecriture ORDER BY compte_id').fetchall()
+                self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                 sum(Decimal(str(c)) for _, c in montants))
+                self.assertEqual(sum(Decimal(str(d)) for d, _ in montants), Decimal('125.50'))
+                # Les axes comptables de bilan doivent survivre à la reprise AN,
+                # pas seulement le total débit/crédit.
+                axes = db.execute("""SELECT t.code, s.code, v.immatriculation
+                    FROM comptabilite_ligneecriture AS l
+                    JOIN comptabilite_compte AS c ON c.id=l.compte_id
+                    LEFT JOIN commercial_tiers AS t ON t.id=l.tiers_id
+                    LEFT JOIN comptabilite_sectionanalytique AS s ON s.id=l.section_id
+                    LEFT JOIN transport_vehicule AS v ON v.id=l.vehicule_id
+                    WHERE c.numero='411000'""").fetchone()
+                self.assertEqual(axes, ('PROP-01', 'G-YDE', 'CE-123-AA'))
+                self.assertEqual(db.execute("""SELECT employe.matricule FROM comptabilite_ligneecriture AS l
+                    JOIN comptabilite_compte AS c ON c.id=l.compte_id
+                    JOIN personnel_employe AS employe ON employe.id=l.employe_id
+                    WHERE c.numero='411000'""").fetchone(), ('EMP-01',))
+                self.assertEqual(db.execute("""SELECT COUNT(*) FROM comptabilite_ligneecriture
+                    WHERE tiers_id IS NOT NULL AND section_id IS NOT NULL
+                      AND vehicule_id IS NOT NULL""").fetchone()[0], 1)
+            # N reste intact et N+1 doit conserver le lien de provenance.
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertEqual(set(entrees), {'n', 'n1'})
+            self.assertTrue(entrees['n']['cloture'])
+            self.assertEqual(str(entrees['n']['exercice']), '2026')
+            self.assertEqual(str(entrees['n1']['exercice']), '2027')
+            self.assertEqual(entrees['n1']['exercice_precedent'], 'n')
+            self.assertEqual(entrees['n1']['societe'], entrees['n']['societe'])
+            self.assertEqual(entrees['n1']['agence'], entrees['n']['agence'])
+            self.assertEqual(Path(entrees['n1']['base']).resolve(), nouveau.resolve())
+            self.assertFalse(entrees['n1']['cloture'])
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT date FROM comptabilite_ecriture').fetchone()[0], '2026-12-31')
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+                self.assertEqual(db.execute('SELECT cloture FROM core_exercice WHERE code="2026"').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT cloture_au FROM comptabilite_journal WHERE code="AN"').fetchone()[0], '2026-12-31')
+
+
+    def test_ouverture_rechargeable_par_orm_django(self):
+        """N+1 doit être utilisable par l'application, pas seulement lisible en SQL."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(nouveau),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                       ERP_LICENCE='0', RELAIS_ACTIF='0')
+            script = """
+from decimal import Decimal
+from django.contrib.auth.models import User
+from apps.core.models import Exercice, Agence
+from apps.personnel.models import Employe, RubriquePaie
+from apps.transport.models import Gare, Ligne, ArretLigne, Vehicule, ChangementGamme
+from apps.comptabilite.models import Compte, Journal, Ecriture, LigneEcriture
+exercice = Exercice.objects.get(code='2027')
+utilisateur = User.objects.get(username='controle')
+assert utilisateur.groups.filter(name='Guichet').exists()
+assert utilisateur.user_permissions.filter(codename='view_user', content_type__app_label='auth').exists()
+assert utilisateur.groups.get(name='Guichet').permissions.filter(codename='view_user', content_type__app_label='auth').exists()
+assert Journal.objects.get(code='AN').cloture_au is None
+assert Journal.objects.get(code='CA').cloture_au is None
+assert Journal.objects.get(code='CA').compte_tresorerie.numero == '101000'
+assert Journal.objects.filter(code='OD').exists()
+banque = Banque.objects.get(code='BTA')
+assert banque.journal.code == 'CA'
+assert banque.rib == 'CM-TEST-0001'
+assert set(Compte.objects.values_list('numero', flat=True)) == {'101000', '411000'}
+assert ArretLigne.objects.get(ligne__code='YDE-DLA').gare.code == 'PVY'
+assert ChangementGamme.objects.filter(vehicule__immatriculation='CE-123-AA', gamme='CLASSIQUE').exists()
+assert Agence.objects.get(code='CTR').compte_liaison.numero == '101000'
+assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
+assert Ligne.objects.get(code='YDE-DLA').gare_arrivee.code == 'DLA'
+vehicule = Vehicule.objects.get(immatriculation='CE-123-AA')
+assert vehicule.proprietaire.code == 'PROP-01'
+assert vehicule.carte_grise == 'CG-TEST-2026'
+assert vehicule.mise_en_service == date(2024,5,1)
+assert vehicule.assurance_echeance == date(2027,1,31)
+assert vehicule.visite_technique_echeance == date(2026,12,31)
+assert Employe.objects.get(matricule='EMP-01', agence__code='CTR').vehicule.immatriculation == 'CE-123-AA'
+assert RubriquePaie.objects.get(code='PRIME').compte.numero == '411000'
+from apps.transport.models import ParametresTransport
+parametres = ParametresTransport.objects.get()
+assert parametres.compte_billets.numero == '411000'
+assert parametres.compte_colis.numero == '411000'
+assert parametres.compte_fret.numero == '411000'
+assert parametres.compte_bagages.numero == '101000'
+assert parametres.compte_billets_a_voyager.numero == '411000'
+assert parametres.compte_colis_a_transporter.numero == '101000'
+assert parametres.taxe_billets.code == 'TVA-BIL'
+assert parametres.taxe_billets.taux == Decimal('19.25')
+assert parametres.taxe_colis.code == 'TVA-COL'
+assert parametres.taxe_colis.taux == Decimal('17.50')
+assert parametres.compte_remboursements.numero == '411000'
+assert parametres.compte_proprietaires.numero == '101000'
+assert parametres.compte_carburant.numero == '101000'
+assert parametres.compte_pieces.numero == '411000'
+assert parametres.compte_main_oeuvre.numero == '101000'
+assert parametres.sessions_caisse_obligatoires
+assert not parametres.bloquer_papiers_expires
+assert parametres.avance_depart_toleree == 35
+assert parametres.plafond_depense_sans_autorisation == Decimal('25000')
+assert parametres.retenue_annulation == Decimal('7.50')
+assert parametres.report_absent_automatique
+piece = Ecriture.objects.get(exercice=exercice, origine='CLOTURE_ANNUELLE')
+lignes = list(LigneEcriture.objects.filter(ecriture=piece))
+assert len(lignes) == 2
+assert sum((ligne.debit for ligne in lignes), Decimal('0')) == Decimal('125.50')
+assert sum((ligne.credit for ligne in lignes), Decimal('0')) == Decimal('125.50')
+assert any(ligne.tiers and ligne.section and ligne.vehicule and ligne.employe
+           and ligne.employe.matricule == 'EMP-01' for ligne in lignes)
+assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
+"""
+            resultat = subprocess.run(
+                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', script],
+                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(resultat.returncode, 0,
+                             resultat.stdout + resultat.stderr)
+
+    def test_commande_cloture_sur_base_django_migree(self):
+        """Le déclencheur public doit produire N+1, ses AN et le lien historique."""
+        # Passer par manage.py dans un processus distinct : call_command(Command())
+        # contourne la découverte publique des commandes et avait masqué
+        # l'erreur "Unknown command: cloturer_exercice" en CI.
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien = dossier / 'n.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                       ERP_LICENCE='0', RELAIS_ACTIF='0')
+            commande = [sys.executable, str(RACINE / 'manage.py'),
+                        'cloturer_exercice', 'n', '--catalogue', str(catalogue)]
+            execution = subprocess.run(commande, cwd=RACINE, env=env,
+                                       capture_output=True, text=True, timeout=180)
+            self.assertEqual(execution.returncode, 0,
+                             execution.stdout + execution.stderr)
+            entrees = {entree['id']: entree for entree in lire_catalogue(catalogue)}
+            self.assertEqual(len(entrees), 2)
+            self.assertTrue(entrees['n']['cloture'])
+            suivant = next(entree for entree in entrees.values()
+                           if entree['id'] != 'n')
+            self.assertEqual(suivant['exercice_precedent'], 'n')
+            self.assertEqual(str(suivant['exercice']), '2027')
+            with connexion_sqlite(suivant['base']) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2027')
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture WHERE origine='CLOTURE_ANNUELLE'"
+                ).fetchone()[0], 1)
+                montants = db.execute(
+                    'SELECT debit, credit FROM comptabilite_ligneecriture'
+                ).fetchall()
+                self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                 sum(Decimal(str(c)) for _, c in montants))
+                self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                 Decimal('125.50'))
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+                self.assertEqual(db.execute('SELECT cloture FROM core_exercice WHERE code="2026"').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+            # Une seconde invocation ne doit ni rouvrir N, ni publier N+2,
+            # ni modifier les écritures à nouveau déjà produites.
+            catalogue_apres = catalogue.read_bytes()
+            seconde = subprocess.run(commande, cwd=RACINE, env=env,
+                                     capture_output=True, text=True, timeout=60)
+            self.assertNotEqual(seconde.returncode, 0)
+            self.assertIn('déjà clôturé', seconde.stdout + seconde.stderr)
+            self.assertEqual(catalogue.read_bytes(), catalogue_apres)
+            with connexion_sqlite(suivant['base']) as db:
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+
+    def test_echec_balance_ne_publie_pas_n_plus_un(self):
+        """Une pièce validée déséquilibrée doit laisser N et le catalogue intacts."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            # Dégrader volontairement une pièce validée, sans désactiver les FK.
+            with connexion_sqlite(ancien) as db:
+                db.execute("""UPDATE comptabilite_ligneecriture
+                              SET credit='124.50' WHERE credit>0""")
+                db.commit()
+            original = {'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}
+            catalogue.write_text(json.dumps(original), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'pièce validée déséquilibrée'):
+                self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertFalse(nouveau.exists(), 'la base N+1 échouée doit être supprimée')
+            self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute(
+                    'SELECT credit FROM comptabilite_ligneecriture WHERE credit>0'
+                ).fetchone()[0], 124.5)
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+
+
+    def test_deux_pieces_desequilibrees_ne_se_compensent_pas(self):
+        """Deux erreurs opposées ne doivent pas autoriser une clôture N+1."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with connexion_sqlite(ancien) as db:
+                # La pièce initiale a un excédent débit de 1,00.
+                db.execute("""UPDATE comptabilite_ligneecriture
+                              SET credit=124.50 WHERE credit>0""")
+                # La seconde pièce compense exactement l'écart au niveau
+                # de la balance globale, mais reste individuellement fausse.
+                db.execute("""INSERT INTO comptabilite_ecriture
+                    (journal_id, exercice_id, numero, date, libelle, reference,
+                     statut, origine, source_cle, source_empreinte, uid,
+                     site_origine, cree_le)
+                    SELECT journal_id, exercice_id, 'OD-2026-2', date,
+                           'Pièce erronée compensatrice', '', 'VALIDEE',
+                           '', '', '', 'regression-contrepartie-2026', '',
+                           CURRENT_TIMESTAMP
+                    FROM comptabilite_ecriture WHERE numero='OD-2026-1'""")
+                piece_id = db.execute(
+                    "SELECT id FROM comptabilite_ecriture WHERE numero='OD-2026-2'"
+                ).fetchone()[0]
+                compte_id = db.execute(
+                    "SELECT id FROM comptabilite_compte WHERE numero='101000'"
+                ).fetchone()[0]
+                db.execute("""INSERT INTO comptabilite_ligneecriture
+                    (ecriture_id, compte_id, libelle, debit, credit,
+                     lettrage, source_cle)
+                    VALUES (?, ?, 'Écart inverse', 0, 1, '', '')""",
+                           (piece_id, compte_id))
+            original = {'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}
+            catalogue.write_text(json.dumps(original), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'pièce validée déséquilibrée'):
+                self._preparer_dossier_transport_sqlite(
+                    catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertFalse(nouveau.exists())
+            self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')),
+                             original)
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 2)
+                self.assertEqual(db.execute(
+                    'SELECT code FROM core_exercice'
+                ).fetchone()[0], '2026')
+
+    def test_commande_refuse_balance_invalide_sans_publier(self):
+        """Le point d'entrée public doit garantir l'atomicité d'une clôture refusée."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien = dossier / 'n.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with connexion_sqlite(ancien) as db:
+                db.execute("UPDATE comptabilite_ligneecriture SET credit=124.50 WHERE credit>0")
+                db.commit()
+            original = {'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}
+            catalogue.write_text(json.dumps(original), encoding='utf-8')
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0',
+                       ERP_LICENCE='0', RELAIS_ACTIF='0')
+            nouveau = dossier / 'n1.sqlite3'
+            commande = [sys.executable, str(RACINE / 'manage.py'),
+                        'cloturer_exercice', 'n', '--catalogue', str(catalogue),
+                        '--destination', str(nouveau), '--nouvel-identifiant', 'n1']
+            execution = subprocess.run(commande, cwd=RACINE, env=env,
+                                       capture_output=True, text=True, timeout=180)
+            self.assertNotEqual(execution.returncode, 0)
+            self.assertIn('pièce validée déséquilibrée',
+                          execution.stdout + execution.stderr)
+            self.assertFalse(nouveau.exists())
+            self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchone()[0], '2026')
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM comptabilite_ecriture').fetchone()[0], 1)
+                self.assertEqual(db.execute('SELECT credit FROM comptabilite_ligneecriture WHERE credit>0').fetchone()[0], 124.5)
+
+
+    def test_plusieurs_pieces_et_ventilations_analytiques_sur_base_migree(self):
+        """Les AN compensent les mouvements par combinaison compte/tiers/axe/véhicule."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with connexion_sqlite(ancien) as db:
+                exercice = db.execute("SELECT id FROM core_exercice WHERE code='2026'").fetchone()[0]
+                journal = db.execute("SELECT id FROM comptabilite_journal WHERE code='OD'").fetchone()[0]
+                compte_client = db.execute("SELECT id FROM comptabilite_compte WHERE numero='411000'").fetchone()[0]
+                compte_capital = db.execute("SELECT id FROM comptabilite_compte WHERE numero='101000'").fetchone()[0]
+                tiers = db.execute("SELECT id FROM commercial_tiers WHERE code='PROP-01'").fetchone()[0]
+                vehicule = db.execute("SELECT id FROM transport_vehicule WHERE immatriculation='CE-123-AA'").fetchone()[0]
+                sections = dict(db.execute("""
+                    SELECT g.code, g.section_id FROM transport_gare g
+                    WHERE g.code IN ('YDE', 'DLA')
+                """))
+                for numero, debit_client, credit_client, section in (
+                    ('OD-2026-2', '50.00', '0.00', sections['DLA']),
+                    ('OD-2026-3', '0.00', '20.00', sections['YDE']),
+                ):
+                    import uuid
+                    db.execute("""
+                        INSERT INTO comptabilite_ecriture
+                        (journal_id, exercice_id, numero, date, libelle, reference,
+                         statut, origine, source_cle, source_empreinte, uid,
+                         site_origine, cree_le)
+                        VALUES (?, ?, ?, '2026-12-31', 'Ventilation de contrôle', '',
+                                'VALIDEE', '', '', '', ?, '', CURRENT_TIMESTAMP)
+                    """, (journal, exercice, numero, str(uuid.uuid4())))
+                    piece = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                    lignes = (
+                        (compte_client, tiers, section, vehicule, debit_client, credit_client),
+                        (compte_capital, None, None, None, credit_client, debit_client),
+                    )
+                    db.executemany("""
+                        INSERT INTO comptabilite_ligneecriture
+                        (ecriture_id, compte_id, tiers_id, section_id, vehicule_id,
+                         libelle, debit, credit, lettrage, source_cle)
+                        VALUES (?, ?, ?, ?, ?, 'Ventilation', ?, ?, '', '')
+                    """, [(piece, *ligne) for ligne in lignes])
+                db.commit()
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            with connexion_sqlite(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture"
+                ).fetchone()[0], 1)
+                lignes = db.execute("""
+                    SELECT c.numero, COALESCE(s.code, ''), COALESCE(t.code, ''),
+                           COALESCE(v.immatriculation, ''), COALESCE(employe.matricule, ''),
+                           l.debit, l.credit
+                    FROM comptabilite_ligneecriture l
+                    JOIN comptabilite_compte c ON c.id=l.compte_id
+                    LEFT JOIN comptabilite_sectionanalytique s ON s.id=l.section_id
+                    LEFT JOIN commercial_tiers t ON t.id=l.tiers_id
+                    LEFT JOIN transport_vehicule v ON v.id=l.vehicule_id
+                    LEFT JOIN personnel_employe employe ON employe.id=l.employe_id
+                """).fetchall()
+                # Le report doit conserver la dimension employé : deux soldes
+                # portant le même compte/tiers/section/véhicule restent distincts
+                # lorsqu'un seul d'entre eux est imputé à un salarié.
+                soldes = {(compte, section, tiers, vehicule, employe):
+                          Decimal(str(debit)) - Decimal(str(credit))
+                          for compte, section, tiers, vehicule, employe, debit, credit in lignes}
+                self.assertEqual(soldes, {
+                    ('411000', 'G-YDE', 'PROP-01', 'CE-123-AA', 'EMP-01'): Decimal('125.50'),
+                    ('411000', 'G-YDE', 'PROP-01', 'CE-123-AA', ''): Decimal('-20.00'),
+                    ('411000', 'G-DLA', 'PROP-01', 'CE-123-AA', ''): Decimal('50.00'),
+                    ('101000', '', '', '', ''): Decimal('-155.50'),
+                })
+                self.assertEqual(sum(soldes.values()), Decimal('0.00'))
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 3)
+            self.assertEqual({b['id'] for b in lire_catalogue(catalogue)}, {'n', 'n1'})
+
+
+    def test_clotures_successives_sur_bases_django_migrees(self):
+        """N -> N+1 -> N+2 conserve les AN sans dupliquer les mouvements."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            n, n1, n2 = (dossier / nom for nom in
+                         ('2026.sqlite3', '2027.sqlite3', '2028.sqlite3'))
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(n)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(n),
+                'cloture': False,
+            }]}), encoding='utf-8')
+
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
+            self._preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
+
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertEqual(set(entrees), {'n', 'n1', 'n2'})
+            self.assertTrue(entrees['n']['cloture'])
+            self.assertTrue(entrees['n1']['cloture'])
+            self.assertFalse(entrees['n2']['cloture'])
+            self.assertEqual(entrees['n1']['exercice_precedent'], 'n')
+            self.assertEqual(entrees['n2']['exercice_precedent'], 'n1')
+
+            for chemin, annee in ((n1, '2027'), (n2, '2028')):
+                with connexion_sqlite(chemin) as db:
+                    self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                    self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                     [(annee,)])
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM comptabilite_ecriture"
+                    ).fetchone()[0], 1)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM comptabilite_ecriture "
+                        "WHERE origine='CLOTURE_ANNUELLE'"
+                    ).fetchone()[0], 1)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM comptabilite_ecriture "
+                        "WHERE numero='OD-2026-1'"
+                    ).fetchone()[0], 0)
+                    montants = db.execute(
+                        'SELECT debit, credit FROM comptabilite_ligneecriture'
+                    ).fetchall()
+                    self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                     Decimal('125.50'))
+                    self.assertEqual(sum(Decimal(str(c)) for _, c in montants),
+                                     Decimal('125.50'))
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM transport_gare"
+                    ).fetchone()[0], 3)
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM auth_user WHERE username='controle'"
+                    ).fetchone()[0], 1)
+            with connexion_sqlite(n) as db:
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2026',)])
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 1)
+
+
+
+    def test_cloture_suivante_integre_les_mouvements_du_nouvel_exercice(self):
+        """Un mouvement de N+1 modifie les AN de N+2, sans reprendre les pièces."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            n, n1, n2 = (dossier / nom for nom in
+                         ('2026.sqlite3', '2027.sqlite3', '2028.sqlite3'))
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(n)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(n),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', n1, 'n1', 2027)
+            with connexion_sqlite(n1) as db:
+                exercice = db.execute(
+                    "SELECT id FROM core_exercice WHERE code='2027'"
+                ).fetchone()[0]
+                journal = db.execute(
+                    "SELECT id FROM comptabilite_journal WHERE code='OD'"
+                ).fetchone()[0]
+                client = db.execute(
+                    "SELECT id FROM comptabilite_compte WHERE numero='411000'"
+                ).fetchone()[0]
+                capital = db.execute(
+                    "SELECT id FROM comptabilite_compte WHERE numero='101000'"
+                ).fetchone()[0]
+                import uuid
+                db.execute("""
+                    INSERT INTO comptabilite_ecriture
+                    (journal_id, exercice_id, numero, date, libelle, reference,
+                     statut, origine, source_cle, source_empreinte, uid,
+                     site_origine, cree_le)
+                    VALUES (?, ?, 'OD-2027-1', '2027-12-31',
+                            'Règlement exercice 2027', '', 'VALIDEE', '',
+                            '', '', ?, '', CURRENT_TIMESTAMP)
+                """, (journal, exercice, str(uuid.uuid4())))
+                piece = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                db.executemany("""
+                    INSERT INTO comptabilite_ligneecriture
+                    (ecriture_id, compte_id, libelle, debit, credit,
+                     lettrage, source_cle)
+                    VALUES (?, ?, 'Règlement', ?, ?, '', '')
+                """, [(piece, client, '0.00', '25.00'),
+                      (piece, capital, '25.00', '0.00')])
+                db.commit()
+            self._preparer_dossier_transport_sqlite(catalogue, 'n1', n2, 'n2', 2028)
+            with connexion_sqlite(n2) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture"
+                ).fetchone()[0], 1)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture "
+                    "WHERE numero='OD-2027-1'"
+                ).fetchone()[0], 0)
+                soldes = dict(db.execute("""
+                    SELECT c.numero, SUM(l.debit-l.credit)
+                    FROM comptabilite_ligneecriture l
+                    JOIN comptabilite_compte c ON c.id=l.compte_id
+                    GROUP BY c.numero
+                """).fetchall())
+                self.assertEqual(Decimal(str(soldes['411000'])), Decimal('100.50'))
+                self.assertEqual(Decimal(str(soldes['101000'])), Decimal('-100.50'))
+                self.assertEqual(sum(Decimal(str(v)) for v in soldes.values()),
+                                 Decimal('0.00'))
+            with connexion_sqlite(n1) as db:
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture"
+                ).fetchone()[0], 2)
+
+
+    def test_echec_apres_migration_et_reprise_ne_publie_rien(self):
+        """Une erreur pendant les AN annule N+1 même après reprise des référentiels."""
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            original = {'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}
+            catalogue.write_text(json.dumps(original), encoding='utf-8')
+            with connexion_sqlite(ancien) as db:
+                avant = db.execute(
+                    'SELECT COUNT(*), SUM(debit), SUM(credit) FROM comptabilite_ligneecriture'
+                ).fetchone()
+
+            def interrompre_apres_reprise(source, cible, ancien_id, nouveau_id, date_an):
+                # Les migrations et la copie des référentiels ont réellement abouti.
+                self.assertEqual(cible.execute(
+                    "SELECT code FROM core_exercice"
+                ).fetchone(), ('2027',))
+                self.assertEqual(cible.execute(
+                    "SELECT COUNT(*) FROM transport_gare"
+                ).fetchone()[0], 3)
+                self.assertEqual(cible.execute(
+                    "SELECT COUNT(*) FROM auth_user WHERE username='controle'"
+                ).fetchone()[0], 1)
+                raise RuntimeError('interruption volontaire des AN')
+
+            with patch('apps.core.adaptateur_cloture_transport_sqlite.reporter_balance_validee',
+                       side_effect=interrompre_apres_reprise):
+                with self.assertRaisesRegex(RuntimeError, 'interruption volontaire des AN'):
+                    self._preparer_dossier_transport_sqlite(
+                        catalogue, 'n', nouveau, 'n1', 2027)
+
+            self.assertFalse(nouveau.exists(), 'aucun dossier N+1 partiel ne doit subsister')
+            for suffixe in ('-wal', '-shm', '-journal'):
+                self.assertFalse(Path(str(nouveau) + suffixe).exists(),
+                                 f'journal SQLite résiduel après échec : {suffixe}')
+            self.assertEqual(json.loads(catalogue.read_text(encoding='utf-8')), original)
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*), SUM(debit), SUM(credit) FROM comptabilite_ligneecriture'
+                ).fetchone(), avant)
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2026',)])
+
+
+    def test_reprise_apres_echec_transactionnel_sur_base_migree(self):
+        """Une reprise après rollback recrée N+1 sans doublons ni état partiel."""
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+
+            with patch('apps.core.adaptateur_cloture_transport_sqlite.reporter_balance_validee',
+                       side_effect=RuntimeError('panne transitoire AN')):
+                with self.assertRaisesRegex(RuntimeError, 'panne transitoire AN'):
+                    self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertFalse(nouveau.exists())
+            self.assertEqual([b['id'] for b in lire_catalogue(catalogue)], ['n'])
+
+            resultat = self._preparer_dossier_transport_sqlite(
+                catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertEqual(resultat['exercice_precedent'], 'n')
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertEqual(set(entrees), {'n', 'n1'})
+            self.assertTrue(entrees['n']['cloture'])
+            with connexion_sqlite(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2027',)])
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM comptabilite_ecriture "
+                    "WHERE origine='CLOTURE_ANNUELLE'"
+                ).fetchone()[0], 1)
+                montants = db.execute(
+                    'SELECT debit, credit FROM comptabilite_ligneecriture'
+                ).fetchall()
+                self.assertEqual(sum(Decimal(str(d)) for d, _ in montants),
+                                 Decimal('125.50'))
+                self.assertEqual(sum(Decimal(str(c)) for _, c in montants),
+                                 Decimal('125.50'))
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 1)
+
+
+    def test_exercice_sans_mouvements_ouvre_n1_sans_piece_an(self):
+        """Une année sans écritures validées crée N+1 sans AN artificielle."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with connexion_sqlite(ancien) as db:
+                db.execute('DELETE FROM comptabilite_ligneecriture')
+                db.execute('DELETE FROM comptabilite_ecriture')
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+
+            resultat = self._preparer_dossier_transport_sqlite(
+                catalogue, 'n', nouveau, 'n1', 2027)
+            self.assertEqual(resultat['exercice_precedent'], 'n')
+            with connexion_sqlite(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2027',)])
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM transport_gare'
+                ).fetchone()[0], 3)
+                self.assertEqual(db.execute(
+                    "SELECT COUNT(*) FROM auth_user WHERE username='controle'"
+                ).fetchone()[0], 1)
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertEqual(set(entrees), {'n', 'n1'})
+            self.assertTrue(entrees['n']['cloture'])
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 0)
+
+
+    def test_soldes_nuls_apres_mouvements_ouvrent_sans_an_fictive(self):
+        """Des mouvements valides soldés en N ne produisent aucune AN fictive."""
+        import uuid
+
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien, nouveau = dossier / 'n.sqlite3', dossier / 'n1.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            with connexion_sqlite(ancien) as db:
+                original = db.execute("""
+                    SELECT e.id, e.journal_id, e.exercice_id
+                    FROM comptabilite_ecriture e WHERE e.numero='OD-2026-1'
+                """).fetchone()
+                self.assertIsNotNone(original)
+                piece_initiale, journal, exercice = original
+                db.execute("""
+                    INSERT INTO comptabilite_ecriture
+                    (journal_id, exercice_id, numero, date, libelle, reference,
+                     statut, origine, source_cle, source_empreinte, uid,
+                     site_origine, cree_le)
+                    VALUES (?, ?, 'OD-2026-2', '2026-12-31',
+                            'Contrepassation totale', '', 'VALIDEE', '',
+                            '', '', ?, '', CURRENT_TIMESTAMP)
+                """, (journal, exercice, str(uuid.uuid4())))
+                contrepassation = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                db.execute("""
+                    INSERT INTO comptabilite_ligneecriture
+                    (ecriture_id, compte_id, tiers_id, section_id, vehicule_id, employe_id,
+                     libelle, debit, credit, lettrage, source_cle)
+                    SELECT ?, compte_id, tiers_id, section_id, vehicule_id, employe_id,
+                           'Contrepassation', credit, debit, '', ''
+                    FROM comptabilite_ligneecriture WHERE ecriture_id=?
+                """, (contrepassation, piece_initiale))
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 2)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+
+            self._preparer_dossier_transport_sqlite(catalogue, 'n', nouveau, 'n1', 2027)
+            with connexion_sqlite(nouveau) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 0)
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(),
+                                 [('2027',)])
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM transport_gare'
+                ).fetchone()[0], 3)
+            with connexion_sqlite(ancien) as db:
+                self.assertEqual(db.execute(
+                    'SELECT COUNT(*) FROM comptabilite_ecriture'
+                ).fetchone()[0], 2)
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertTrue(entrees['n']['cloture'])
+            self.assertEqual(entrees['n1']['exercice_precedent'], 'n')
+
+
+
+    def test_cloture_depuis_interface_sur_base_migree(self):
+        """Le POST administrateur doit créer réellement N+1 et ses à-nouveaux."""
+        with tempfile.TemporaryDirectory() as temporaire:
+            dossier = Path(temporaire)
+            ancien = dossier / 'n.sqlite3'
+            catalogue = dossier / 'catalogue.json'
+            self._copier_source(ancien)
+            catalogue.write_text(json.dumps({'version': 1, 'bases': [{
+                'id': 'n', 'societe': 'Transport Centrale', 'agence': 'Centre',
+                'exercice': '2026', 'moteur': 'sqlite', 'base': str(ancien),
+                'cloture': False,
+            }]}), encoding='utf-8')
+            env = os.environ.copy()
+            env.pop('DATABASE_URL', None)
+            env.update(DB_ENGINE='sqlite', SQLITE_FICHIER=str(ancien),
+                       MIROIR_DB_ENGINE='', ERP_ASSISTANT='0', ERP_LICENCE='0',
+                       RELAIS_ACTIF='0', ERP_CATALOGUE_SOCIETES=str(catalogue))
+            script = """
+from unittest.mock import patch
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory
+from apps.core.views_cloture import cloture_exercice_annuel
+admin = get_user_model().objects.get(username='controle')
+admin.is_superuser = True
+request = RequestFactory().post('/cloture/', {'confirmation': 'CLOTURER'})
+request.user = admin
+from django.contrib.sessions.middleware import SessionMiddleware
+SessionMiddleware(lambda req: None).process_request(request)
+with patch('apps.core.poste.disponible', return_value=True), patch('apps.core.poste.local', return_value=True):
+    response = cloture_exercice_annuel(request)
+assert response.status_code == 200
+assert 'Exercice 2027 créé' in response.content.decode(), response.content.decode()
+# Exercer la sélection réelle du catalogue. Seule la frontière du
+# lanceur natif est remplacée : aucun changement de connexion à chaud.
+import json
+import os
+from pathlib import Path
+from apps.core import poste
+from apps.core.catalogue_societes import lire_catalogue
+from apps.core.views_societes import choix_societe
+from django.conf import settings
+cible = next(b for b in lire_catalogue(os.environ['ERP_CATALOGUE_SOCIETES'])
+             if str(b['exercice']) == '2027')
+actions = []
+def configurer(configuration):
+    actions.append('configurer')
+    Path(os.environ['ERP_CATALOGUE_SOCIETES'] + '.restart.json').write_text(
+        json.dumps(configuration), encoding='utf-8')
+def redemarrer():
+    assert not ouverture.user.is_authenticated
+    actions.append('redemarrer')
+ouverture = RequestFactory().post('/societes/', {
+    'confirmation': 'OUVRIR', 'base_id': cible['id']}, REMOTE_ADDR='127.0.0.1')
+ouverture.user = admin
+SessionMiddleware(lambda req: None).process_request(ouverture)
+with patch.dict(poste.ACTIONS, {'configurer': configurer, 'redemarrer': redemarrer}, clear=True):
+    response = choix_societe(ouverture)
+assert response.status_code == 200
+assert actions == ['configurer', 'redemarrer'], response.content.decode()
+assert Path(settings.DATABASES['default']['NAME']).resolve() != Path(cible['base']).resolve()
+"""
+            resultat = subprocess.run(
+                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', script],
+                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(resultat.returncode, 0, resultat.stdout + resultat.stderr)
+            entrees = {b['id']: b for b in lire_catalogue(catalogue)}
+            self.assertTrue(entrees['n']['cloture'])
+            suivante = next(b for b in entrees.values() if b['exercice'] == '2027')
+            self.assertEqual(suivante['exercice_precedent'], 'n')
+            # Nouveau processus Django, configuré par le résultat de la sélection,
+            # et non par un chemin N+1 injecté directement dans le test.
+            configuration = json.loads(Path(str(catalogue) + '.restart.json').read_text(encoding='utf-8'))
+            self.assertEqual(Path(configuration['SQLITE_FICHIER']).resolve(),
+                             Path(suivante['base']).resolve())
+            for cle, valeur in configuration.items():
+                if valeur is None:
+                    env.pop(cle, None)
+                else:
+                    env[cle] = str(valeur)
+            verification = """
+from decimal import Decimal
+from django.contrib.auth import authenticate
+from apps.core.models import Exercice
+from apps.comptabilite.models import Ecriture, LigneEcriture
+from apps.transport.models import Gare, Vehicule
+from apps.personnel.models import Employe
+assert authenticate(username='controle', password='test-local-only') is not None
+assert list(Exercice.objects.values_list('code', flat=True)) == ['2027']
+assert Gare.objects.get(code='PVY').rattachement.code == 'YDE'
+assert Vehicule.objects.get(immatriculation='CE-123-AA').proprietaire.code == 'PROP-01'
+assert Employe.objects.get(matricule='EMP-01', agence__code='CTR').vehicule.immatriculation == 'CE-123-AA'
+piece = Ecriture.objects.get(origine='CLOTURE_ANNUELLE')
+lignes = list(LigneEcriture.objects.filter(ecriture=piece))
+assert sum((l.debit for l in lignes), Decimal('0')) == Decimal('125.50')
+assert sum((l.credit for l in lignes), Decimal('0')) == Decimal('125.50')
+assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
+"""
+            redemarrage = subprocess.run(
+                [sys.executable, str(RACINE / 'manage.py'), 'shell', '-c', verification],
+                cwd=RACINE, env=env, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(redemarrage.returncode, 0,
+                             redemarrage.stdout + redemarrage.stderr)
+            with connexion_sqlite(suivante['base']) as db:
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+                self.assertEqual(db.execute('SELECT code FROM core_exercice').fetchall(), [('2027',)])
+                self.assertEqual(db.execute('SELECT SUM(debit), SUM(credit) FROM comptabilite_ligneecriture').fetchone(), (125.5, 125.5))
+
+
+if __name__ == '__main__':
+    unittest.main()

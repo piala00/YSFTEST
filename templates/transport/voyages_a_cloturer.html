@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Voyages à clôturer{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Voyages à clôturer et avances de mission</h1></div>
+<div class="card mb-3"><div class="card-header bg-white fw-semibold small">Voyages partis ou arrivés, pas encore clôturés</div>
+<table class="table table-sm mb-0 small"><thead><tr><th>Départ</th><th>Date</th><th>Ligne</th><th>Véhicule</th><th>Chauffeur</th><th>Statut</th></tr></thead>
+<tbody>{% for d in departs %}<tr><td><a href="{% url 'transport:depart_detail' d.pk %}">{{ d.numero }}</a></td><td>{{ d.date|date:"d/m" }} {{ d.heure|time:"H:i" }}</td>
+  <td>{{ d.ligne.code }}</td><td>{{ d.vehicule.immatriculation|default:"" }}</td><td>{{ d.chauffeur|default:"" }}</td><td>{{ d.get_statut_display }}</td></tr>
+{% empty %}<tr><td colspan="6" class="text-muted text-center p-3">Aucun.</td></tr>{% endfor %}</tbody></table></div>
+<div class="card"><div class="card-header bg-white fw-semibold small">Avances de mission à justifier</div>
+<table class="table table-sm mb-0 small"><thead><tr><th>N°</th><th>Remise le</th><th>À</th><th>Départ</th><th class="num">Montant</th><th class="num">Pièces</th></tr></thead>
+<tbody>{% for a in avances %}<tr><td>{{ a.numero }}</td><td>{{ a.date|date:"d/m" }}</td><td>{{ a.beneficiaire }}</td><td><a href="{% url 'transport:depart_detail' a.depart_id %}">{{ a.depart.numero }}</a></td>
+  <td class="num">{{ a.montant|montant }}</td><td class="num">{{ a.depenses|montant }}</td></tr>
+{% empty %}<tr><td colspan="6" class="text-muted text-center p-3">Aucune.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

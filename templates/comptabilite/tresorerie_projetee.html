@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Trésorerie projetée{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Trésorerie projetée <small class="text-muted fs-6">à partir du {{ aujourdhui|date:"d/m/Y" }}</small></h1></div>
+<form class="d-flex flex-wrap gap-2 align-items-end mb-2 d-print-none" method="get">
+  <div><label class="form-label small mb-0" for="mois">Horizon</label><select id="mois" name="mois" class="form-select form-select-sm" onchange="this.form.submit()">
+    <option value="3" {% if nombre_mois == 3 %}selected{% endif %}>3 mois</option><option value="6" {% if nombre_mois == 6 %}selected{% endif %}>6 mois</option>
+    <option value="12" {% if nombre_mois == 12 %}selected{% endif %}>12 mois</option><option value="24" {% if nombre_mois == 24 %}selected{% endif %}>24 mois</option></select></div>
+  <div><label class="form-label small mb-0" for="budget">Ajouter un budget validé</label><select id="budget" name="budget" class="form-select form-select-sm" onchange="this.form.submit()">
+    <option value="">Non (factures et prévisions seulement)</option>{% for b in budgets %}<option value="{{ b.pk }}" {% if budget.pk == b.pk %}selected{% endif %}>{{ b }}</option>{% endfor %}</select></div>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+</form>
+<div class="row g-2 mb-3">
+  <div class="col-6 col-lg-3"><div class="card kpi p-2"><div class="label">Trésorerie aujourd'hui</div><div class="value {% if depart < 0 %}text-danger{% endif %}">{{ depart|montant }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-2"><div class="label">Fin de l'horizon</div><div class="value {% if fin < 0 %}text-danger{% endif %}">{{ fin|montant }}</div></div></div>
+  <div class="col-12 col-lg-6"><div class="card kpi p-2"><div class="label">Point le plus bas</div><div class="value {% if plus_bas.solde_fin < 0 %}text-danger{% endif %}">{{ plus_bas.solde_fin|montant }} <small class="text-muted fs-6">fin {{ plus_bas.debut|date:"F Y" }}</small></div></div></div>
+</div>
+<div class="card mb-3" style="overflow-x:auto"><table data-graphique="courbes" data-colonnes="Encaissements,Décaissements,Trésorerie fin de mois" data-titre-graphique="Encaissements, décaissements et trésorerie de fin de mois" class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Mois</th><th class="num">Trésorerie début</th><th class="num">Clients</th><th class="num">Prévisions (entrées)</th>{% if budget %}<th class="num">Budget (produits)</th>{% endif %}
+    <th class="num">Encaissements</th><th class="num">Fournisseurs</th><th class="num">Prévisions (sorties)</th>{% if budget %}<th class="num">Budget (charges)</th>{% endif %}<th class="num">Décaissements</th><th class="num">Trésorerie fin de mois</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td>{{ l.debut|date:"F Y" }}</td><td class="num">{{ l.solde_debut|montant }}</td>
+    <td class="num">{{ l.clients|montant_ou_vide }}</td><td class="num">{{ l.prevues_entrees|montant_ou_vide }}</td>{% if budget %}<td class="num">{{ l.budget_entrees|montant_ou_vide }}</td>{% endif %}
+    <td class="num fw-semibold">{{ l.entrees|montant }}</td><td class="num">{{ l.fournisseurs|montant_ou_vide }}</td><td class="num">{{ l.prevues_sorties|montant_ou_vide }}</td>{% if budget %}<td class="num">{{ l.budget_sorties|montant_ou_vide }}</td>{% endif %}
+    <td class="num fw-semibold">{{ l.sorties|montant }}</td><td class="num fw-semibold {% if l.solde_fin < 0 %}text-danger{% endif %}">{{ l.solde_fin|montant }}</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="small text-muted">Départ : comptes de trésorerie (52, 53, 55, 57, moins les découverts) des écritures validées. Clients et fournisseurs : factures non soldées
+  à leur échéance ; celles déjà échues comptent dans le mois en cours. {% if budget %}Le budget peut recouper des factures déjà émises : hypothèse de travail.{% endif %}</p>
+<div class="row g-3">
+<div class="col-xl-7"><div class="card" style="max-height:28rem;overflow:auto"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Date</th><th>Origine</th><th>Libellé</th><th class="num">Entrée</th><th class="num">Sortie</th></tr></thead>
+  <tbody>{% for d in detail %}<tr><td class="{% if d.en_retard %}text-danger{% endif %}">{{ d.date|date:"d/m/Y" }}{% if d.en_retard %} (échue){% endif %}</td><td>{{ d.origine }}</td><td>{{ d.libelle }}</td>
+    <td class="num">{{ d.entree|montant_ou_vide }}</td><td class="num">{{ d.sortie|montant_ou_vide }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center p-3">Aucune échéance ni prévision sur l'horizon.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="col-xl-5"><form method="post" class="card p-3 small mb-2">{% csrf_token %}
+  <h6>Ajouter une prévision</h6>
+  <div class="d-flex flex-wrap gap-2 align-items-end">
+    <div><label class="form-label mb-0" for="pv-date">Date</label><input type="date" id="pv-date" name="date" class="form-control form-control-sm" required></div>
+    <div><label class="form-label mb-0" for="pv-sens">Sens</label><select id="pv-sens" name="sens" class="form-select form-select-sm">{% for c, l in sens %}<option value="{{ c }}" {% if c == "DECAISSEMENT" %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div><label class="form-label mb-0" for="pv-montant">Montant</label><input id="pv-montant" name="montant" class="form-control form-control-sm" style="width:9rem" required></div>
+    <div class="flex-grow-1"><label class="form-label mb-0" for="pv-libelle">Libellé</label><input id="pv-libelle" name="libelle" class="form-control form-control-sm" placeholder="ex. Échéance d'emprunt" required></div>
+    <label class="mb-1"><input type="checkbox" name="mensuelle" value="1"> Chaque mois</label>
+    <div><label class="form-label mb-0" for="pv-fin">Jusqu'au</label><input type="date" id="pv-fin" name="jusqu_au" class="form-control form-control-sm"></div>
+    <button class="btn btn-sm btn-primary" name="action" value="ajouter">Ajouter</button></div></form>
+  <div class="card"><table class="table table-sm mb-0 small"><thead><tr><th>Prévisions saisies</th><th class="num">Montant</th><th></th></tr></thead><tbody>
+  {% for p in previsions %}<tr><td>{{ p.date|date:"d/m/Y" }} · {{ p.libelle }} · {{ p.get_sens_display }}{% if p.mensuelle %} · chaque mois{% if p.jusqu_au %} jusqu'au {{ p.jusqu_au|date:"d/m/Y" }}{% endif %}{% endif %}</td>
+    <td class="num">{{ p.montant|montant }}</td><td><form method="post" class="d-print-none">{% csrf_token %}<input type="hidden" name="prevision" value="{{ p.pk }}"><button class="btn btn-sm btn-link text-danger p-0" name="action" value="supprimer" title="Supprimer"><i class="bi bi-trash"></i></button></form></td></tr>
+  {% empty %}<tr><td colspan="3" class="text-muted">Aucune.</td></tr>{% endfor %}</tbody></table></div></div></div>
+{% endblock %}

@@ -1,0 +1,33 @@
+id;produit;famille_ou_contexte;statut;preuves_a_obtenir
+U001;COMMUN;Sélecteur de dossier/société et exercice;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U002;COMMUN;Sélecteur de date/calendrier;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U003;COMMUN;Sélecteur de fichier export/import;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U004;COMMUN;Modèle de mise en page et format d’impression;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U005;COMMUN;Profil/utilisateur et périmètre de droits;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U006;GESCOM;Dépôt source et dépôt destination;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U007;GESCOM;Emplacement, zone et emplacement de contrôle;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U008;GESCOM;Famille et catalogue article;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U009;GESCOM;Catégorie tarifaire et tarif particulier;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U010;GESCOM;Représentant, acheteur et collaborateur;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U011;GESCOM;Adresse de livraison et contact destinataire;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U012;GESCOM;Compte bancaire, échéance et règlement à imputer;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U013;GESCOM;Souche et type de document à générer;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U014;GESCOM;Lot, série, péremption et fabrication;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U015;GESCOM;Gamme 1, gamme 2 et conditionnement;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U016;GESCOM;Code affaire, ressource et centre de charge;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U017;GESCOM;Documents d’origine pour transformation et reliquats;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U018;GESCOM;Réception de commandes, contrôle et articles à contrôler;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U019;GESCOM;Documents de fabrication, nomenclature et composants;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U020;COMPTABILITE;Section et plan analytique;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U021;COMPTABILITE;Taxe, registre de taxe et ventilation;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U022;COMPTABILITE;Journal, période et exercice de saisie;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U023;COMPTABILITE;Ecritures à lettrer et pré-lettrer;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U024;COMPTABILITE;Règlements tiers et échéances à régler;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U025;COMPTABILITE;Banque, extrait et lignes à rapprocher;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U026;COMPTABILITE;Modèle de saisie, grille, règlement et abonnement;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U027;COMPTABILITE;Réimputation, extourne et réévaluation;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U028;COMPTABILITE;Clôture, reports à nouveau et archivage;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U029;COMPTABILITE;Budget, reporting, cycle et registre de révision;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U030;COMPTABILITE;Sélection des états tiers, analytiques, budgétaires, reporting et contrôles;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U031;AUTRES_PRODUITS;Sage BI Reporting : filtres et paramètres dédiés;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée
+U032;AUTRES_PRODUITS;Immobilisations, Moyens de paiement, Trésorerie, Paie, X3 : corpus distincts;A_RELEVER_SUR_BUILD_CIBLE;Titre, déclencheur, colonnes, critères, boutons, retour, droits, édition et capture anonymisée

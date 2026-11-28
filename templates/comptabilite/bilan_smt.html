@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Bilan (SMT){% endblock %}
+{% block content %}
+<div class="page-title"><h1>Bilan — système minimal de trésorerie, au {{ p.date_fin|date:"d/m/Y" }}</h1>
+  {% if bilan.equilibre %}<span class="badge bg-success">Bilan équilibré</span>{% else %}<span class="badge bg-danger">Bilan déséquilibré</span>{% endif %}</div>
+{% include "comptabilite/_periode.html" %}
+<div class="row g-3" style="max-width:60rem">
+<div class="col-md-6"><div class="card"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>Actif</th><th class="num">Montant</th></tr></thead><tbody>
+  <tr><td>Immobilisations</td><td class="num">{{ bilan.actif.immobilisations|montant }}</td></tr>
+  <tr><td>Stocks</td><td class="num">{{ bilan.actif.stocks|montant }}</td></tr>
+  <tr><td>Clients et débiteurs divers</td><td class="num">{{ bilan.actif.clients|montant }}</td></tr>
+  <tr><td>Caisse</td><td class="num">{{ bilan.actif.caisse|montant }}</td></tr>
+  <tr><td>Banque (en + ou en −)</td><td class="num">{{ bilan.actif.banque|montant }}</td></tr></tbody>
+  <tfoot><tr class="total"><td>Total actif</td><td class="num">{{ bilan.total_actif|montant }}</td></tr></tfoot></table></div></div>
+<div class="col-md-6"><div class="card"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>Passif</th><th class="num">Montant</th></tr></thead><tbody>
+  <tr><td>Compte exploitant</td><td class="num">{{ bilan.passif.exploitant|montant }}</td></tr>
+  <tr><td>Résultat de l'exercice</td><td class="num">{{ bilan.passif.resultat|montant }}</td></tr>
+  <tr><td>Emprunt</td><td class="num">{{ bilan.passif.emprunt|montant }}</td></tr>
+  <tr><td>Fournisseurs et créditeurs divers</td><td class="num">{{ bilan.passif.fournisseurs|montant }}</td></tr></tbody>
+  <tfoot><tr class="total"><td>Total passif</td><td class="num">{{ bilan.total_passif|montant }}</td></tr></tfoot></table></div></div></div>
+<p class="small text-muted mt-2">Présentation du système minimal de trésorerie choisi pour la société (fiche Société). Rubriques du modèle DSF SMT de la DGI ;
+  rattachement des comptes proposé, <strong>à valider par l'expert-comptable</strong>.
+  <a href="?ok=1&amp;systeme=NORMAL&amp;date_fin={{ p.date_fin|date:'Y-m-d' }}">Voir au système normal</a>.</p>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Demande de correction {{ d.numero }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Demande de correction {{ d.numero }} <span class="badge {% if d.ouverte %}text-bg-warning{% elif d.statut == 'CORRIGEE' %}text-bg-success{% else %}text-bg-secondary{% endif %} fs-6 align-middle">{{ d.get_statut_display }}</span></h1></div>
+<div class="row g-3">
+<div class="col-lg-6"><div class="card p-3 small h-100">
+  <h6>Demande de la direction</h6>
+  <p class="mb-1">Agence : <strong>{{ d.agence }}</strong> · demandée par {{ d.demandee_par|default:"—" }} le {{ d.demandee_le|date:"d/m/Y H:i" }}</p>
+  <p class="mb-1">Pièce en cause : {% if origine %}<a href="{% url 'comptabilite:ecriture_detail' origine.pk %}">{{ d.ecriture_numero }}</a>{% else %}{{ d.ecriture_numero }}{% endif %} du {{ d.ecriture_date|date:"d/m/Y" }} — {{ d.ecriture_libelle }}</p>
+  <p class="mb-1"><strong>Erreur constatée :</strong> {{ d.motif|linebreaksbr }}</p>
+  {% if d.correction_attendue %}<p class="mb-1"><strong>Correction attendue :</strong> {{ d.correction_attendue|linebreaksbr }}</p>{% endif %}
+  <p class="mb-0 {% if d.en_retard %}text-danger fw-semibold{% endif %}">À corriger avant le {{ d.echeance|date:"d/m/Y"|default:"—" }}{% if d.en_retard %} — en retard{% endif %}</p>
+  {% if d.annulee_motif %}<p class="mb-0 mt-2 text-muted">Annulation : {{ d.annulee_motif }}</p>{% endif %}
+</div></div>
+<div class="col-lg-6"><div class="card p-3 small h-100">
+  <h6>Réponse de l'agence</h6>
+  {% if d.repondu_le %}<p class="mb-1">{{ d.get_statut_display }} par {{ d.repondu_par|default:"—" }} le {{ d.repondu_le|date:"d/m/Y H:i" }}</p>
+    {% if d.reponse %}<p class="mb-1">{{ d.reponse|linebreaksbr }}</p>{% endif %}
+    {% if correctives %}<p class="mb-1">Écritures de correction :</p><ul class="mb-0">{% for e in correctives %}<li><a href="{% url 'comptabilite:ecriture_detail' e.pk %}">{{ e.numero }}</a> du {{ e.date|date:"d/m/Y" }} — {{ e.libelle }}</li>{% endfor %}</ul>
+    {% elif d.ecritures_correction %}<p class="mb-0 text-muted">{{ d.ecritures_correction|length }} écriture(s) de correction.</p>{% endif %}
+  {% elif d.statut == "RECUE" %}<p class="mb-0">L'agence a reçu la demande ; correction en attente.</p>
+  {% else %}<p class="mb-0 text-muted">Pas encore de réponse.</p>{% endif %}
+</div></div></div>
+
+{% if d.site_origine and d.ouverte %}
+<form method="post" class="card p-3 mt-3">{% csrf_token %}
+  <h6>Corriger à l'agence</h6>
+  <ol class="small mb-2"><li>Passez l'<strong>extourne</strong> de la pièce fausse, puis la <strong>bonne écriture</strong>, et validez-les (Saisie par pièce).</li>
+    <li>Cochez-les ci-dessous et confirmez : elles partent à la direction avec le prochain fichier.</li></ol>
+  <div class="table-responsive" style="max-height:20rem"><table class="table table-sm small mb-2"><thead><tr><th></th><th>Pièce</th><th>Date</th><th>Journal</th><th>Libellé</th></tr></thead><tbody>
+  {% for e in candidates %}<tr><td><input type="checkbox" class="form-check-input" name="ecritures" value="{{ e.pk }}" id="e{{ e.pk }}"></td>
+    <td><label for="e{{ e.pk }}">{{ e.numero }}</label></td><td>{{ e.date|date:"d/m/Y" }}</td><td>{{ e.journal.code }}</td><td>{{ e.libelle }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted">Aucune écriture validée depuis la demande : passez d'abord la correction.</td></tr>{% endfor %}</tbody></table></div>
+  <label class="form-label small" for="reponse">Commentaire (obligatoire pour contester)</label>
+  <textarea id="reponse" name="reponse" class="form-control mb-2" rows="2"></textarea>
+  <div class="d-flex gap-2"><button class="btn btn-success btn-sm" name="action" value="corriger"><i class="bi bi-check2-circle"></i> Correction faite</button>
+    <button class="btn btn-outline-warning btn-sm" name="action" value="contester"><i class="bi bi-chat-left-text"></i> Contester (l'écriture est juste)</button></div>
+</form>
+{% elif not d.site_origine and d.statut != "ANNULEE" and d.statut != "CORRIGEE" %}
+<form method="post" class="d-flex gap-2 align-items-end mt-3 d-print-none" onsubmit="return confirm('Annuler cette demande ?')">{% csrf_token %}
+  <div><label class="form-label small mb-0" for="motif">Motif de l'annulation</label><input id="motif" name="motif" class="form-control form-control-sm" style="min-width:20rem"></div>
+  <button class="btn btn-outline-danger btn-sm" name="action" value="annuler">Annuler la demande</button></form>
+{% endif %}
+<p class="mt-3"><a href="{% url 'comptabilite:corrections' %}">← Toutes les demandes</a></p>
+{% endblock %}

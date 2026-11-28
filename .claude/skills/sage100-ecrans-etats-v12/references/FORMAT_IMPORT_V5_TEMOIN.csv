@@ -1,0 +1,5 @@
+objet;champ;longueur_ou_valeurs;source;usage_autorise;usage_exclu
+Dossier entreprise;Raison sociale;35;F01 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=220125200004190 | PDF p.3;Comparer un ancien format identifié;Ne pas imposer cette longueur à l’UI V12
+Dossier entreprise;Code postal;9;F01 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=220125200004190 | PDF p.3;Comparer un ancien format identifié;Ne pas imposer cette longueur à l’UI V12
+Dossier entreprise;E-mail;69;F01 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=220125200004190 | PDF p.9;Comparer un ancien format identifié;Ne pas imposer cette longueur à l’UI V12
+Dossier entreprise;Contrôle encours client;0 Aucun | 1 Création de l’en-tête | 2 Validation de la ligne | 3 Fermeture du document;F01 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=220125200004190 | PDF p.6;Comparer les codes du format V5;Ne pas les confondre avec Type de contrôle de la fiche client ni un type SQL V12

@@ -1,0 +1,3 @@
+id;nature;hypothese;calcul;montant_fcfa;limite;source_taux
+EX1;CALCUL_PEDAGOGIQUE_NON_OFFICIEL;"Base fiscale de 1000000 déjà établie ; AIR réel de droit commun ; hors cas particuliers.";1000000 × 2% + (1000000 × 2% × 10%);22000;Ne fixe ni l’assiette d’une facture particulière ni un cumul automatique avec le précompte.;S12 art.21(1)a
+EX2;CALCUL_PEDAGOGIQUE_NON_OFFICIEL;"Base de précompte de 1000000 déjà établie ; taux de 2% effectivement applicable.";1000000 × 2%;20000;"Aucun CAC ; assiette hypothétique, pas un exemple officiel DGI ni une règle HT/TTC.";S12 art.21(3)

@@ -1,0 +1,42 @@
+id;fenetre_id;libelle;effet;condition;source;page;fidelite_v12
+A001;C01;Ajouter un critère;Ajoute le critère au tableau;NON_ETABLIE;H01|H02|H03;;A-CONFIRMER_V12
+A002;C01;Rechercher;Lance la recherche et ouvre le résultat;NON_ETABLIE;H01|H02|H03;;A-CONFIRMER_V12
+A003;C01;Remplacer;Lance une modification en masse;NON_ETABLIE;H01|H02|H03;;A-CONFIRMER_V12
+A004;C01;Sauvegarder;Enregistre un format;NON_ETABLIE;H01|H02|H03;;A-CONFIRMER_V12
+A005;C01;Sauvegarder sous;Enregistre sous un nouveau nom;NON_ETABLIE;H01|H02|H03;;A-CONFIRMER_V12
+A006;C01;Ouvrir;Recharge un format;NON_ETABLIE;H01|H02|H03;;A-CONFIRMER_V12
+A007;C05;Ajouter;Ajoute une colonne disponible;NON_ETABLIE;H05;;A-CONFIRMER_V12
+A008;C05;Supprimer;Retire une colonne déverrouillée;NON_ETABLIE;H05;;A-CONFIRMER_V12
+A009;C05;Réinitialiser;Rétablit la présentation initiale;NON_ETABLIE;H05;;A-CONFIRMER_V12
+A010;C05;OK;Valide la personnalisation;NON_ETABLIE;H05;;A-CONFIRMER_V12
+A011;C09;Nouveau;Prépare un critère vierge;NON_ETABLIE;M01;PDF 56-59;A-CONFIRMER_V12
+A012;C09;Enregistrer;Valide la ligne du critère pour la session;NON_ETABLIE;M01;PDF 56-59;A-CONFIRMER_V12
+A013;C09;Supprimer;Retire une ligne du format en cours;NON_ETABLIE;M01;PDF 56-59;A-CONFIRMER_V12
+A014;C09;Sauvegarder;Conserve le format pour réemploi;NON_ETABLIE;M01;PDF 56-59;A-CONFIRMER_V12
+A015;C09;Ouvrir;Recharge un format de la fonction concernée;NON_ETABLIE;M01;PDF 56-59;A-CONFIRMER_V12
+A016;C09;Imprimer;Lance la sortie selon les critères;NON_ETABLIE;M01;PDF 56-59;A-CONFIRMER_V12
+A017;C10;OK;Lance l’étape d’impression suivante;NON_ETABLIE;M01;PDF 54-56;A-CONFIRMER_V12
+A018;C10;Annuler;Ferme sans impression;NON_ETABLIE;M01;PDF 54-56;A-CONFIRMER_V12
+A019;C10;Plus;Ouvre le format avancé lorsqu’il est proposé;NON_ETABLIE;M01;PDF 54-56;A-CONFIRMER_V12
+A020;C10;Différer;Mémorise une impression différée lorsque disponible;NON_ETABLIE;M01;PDF 54-56;A-CONFIRMER_V12
+A021;C11;Filtrer;Applique les critères à la liste;NON_ETABLIE;T01;PDF 18;A-CONFIRMER_V12
+A022;C11;Réinitialiser;Retire le filtre et rétablit l’affichage;NON_ETABLIE;T01;PDF 18;A-CONFIRMER_V12
+A023;L01;OK;Rapatrie le tiers choisi dans l’en-tête;NON_ETABLIE;T01;PDF 681 / 810;A-CONFIRMER_V12
+A024;L02;OK;Rapatrie le tiers choisi dans l’en-tête;NON_ETABLIE;T01;PDF 681 / 810;A-CONFIRMER_V12
+A025;L03;OK;Rapatrie la ligne choisie dans le document;NON_ETABLIE;T01;PDF 709-710 / imprimées 426-427;A-CONFIRMER_V12
+A026;L04;OK;Rapatrie la ligne choisie dans le document;NON_ETABLIE;T01;PDF 833-834 / imprimées 550-551;A-CONFIRMER_V12
+A027;L05;OK;Rapatrie la ligne choisie dans le document;NON_ETABLIE;T01;PDF 897 / imprimée 614;A-CONFIRMER_V12
+A028;L06;OK;Rapatrie la ligne choisie dans le document;NON_ETABLIE;T01;PDF 954 / imprimée 671;A-CONFIRMER_V12
+A029;L08;OK;Choisit le compte pour la ligne du journal;NON_ETABLIE;M01;PDF 522-523;A-CONFIRMER_V12
+A030;L08;Nouveau;Ouvre une création selon autorisation;Création de compte en saisie autorisée;M01;PDF 522-523;A-CONFIRMER_V12
+A031;L09;OK;Choisit le compte pour la ligne du journal;NON_ETABLIE;M01;PDF 522-523;A-CONFIRMER_V12
+A032;L09;Nouveau;Ouvre une création selon autorisation;Création de compte en saisie autorisée;M01;PDF 522-523;A-CONFIRMER_V12
+A033;L08;Annuler;Retour au journal sans choisir de compte;NON_ETABLIE;M01;PDF 522;A-CONFIRMER_V12
+A034;P008;OK;Lance l’édition;NON_ETABLIE;M01;PDF 776-779 / imprimées 597-600;A-CONFIRMER_V12
+A035;P008;Plus;Accède au format de sélection;NON_ETABLIE;M01;PDF 776-779 / imprimées 597-600;A-CONFIRMER_V12
+A036;P008;Différer;Prépare une sortie différée;NON_ETABLIE;M01;PDF 776-779 / imprimées 597-600;A-CONFIRMER_V12
+A037;P005;OK;Lance l’édition;NON_ETABLIE;M01;PDF 755-757 / imprimées 576-578;A-CONFIRMER_V12
+A038;P005;Plus;Accède au format de sélection;NON_ETABLIE;M01;PDF 755-757 / imprimées 576-578;A-CONFIRMER_V12
+A039;P005;Différer;Prépare une sortie différée;NON_ETABLIE;M01;PDF 755-757 / imprimées 576-578;A-CONFIRMER_V12
+A040;P902;Afficher;Affiche les lignes recherchées;NON_ETABLIE;H08;;A-CONFIRMER_V12
+A041;P902;Rechercher les écritures de ce libellé;Recherche à partir d’une écriture sélectionnée;NON_ETABLIE;H08;;A-CONFIRMER_V12

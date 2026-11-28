@@ -1,0 +1,622 @@
+# Contrôle de chaque envoi et de chaque pull request (Claude, GPT/Codex) : rien n'est fusionné si un de ces travaux échoue.
+#   tests-linux       toute la suite de tests (SQLite)
+#   tests-sqlserver   toute la suite sur un vrai SQL Server 2022 (conteneur jetable)
+#   windows           compilation du programme Windows (.exe) pour chaque édition, puis démarrage réel :
+#                     base créée, page de connexion servie, sauvegarde faite ; le programme compilé est conservé 7 jours
+name: Contrôle
+
+on:
+  push:
+    branches: [ccr-5592a371-fusjt2, main, "gpt/**", "codex/**"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      identite_publique:
+        description: "Personnalisation : clé PUBLIQUE base64 existante (jamais le coffre privé)"
+        required: false
+        type: string
+      empreinte_sha256:
+        description: "Empreinte SHA-256 publique autorisée, obtenue dans le guide propriétaire"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Un push et sa pull request portent la même branche : un seul contrôle complet
+  # évite deux conteneurs SQL Server simultanés et la contention qui ralentit les tests.
+  group: controle-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  tests-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt tblib
+      - name: Vérifier l'affectation stable des classes SQL Server
+        run: python -m unittest tests.test_sqlserver_runner_partition -v
+      - name: Vérifier la copie contrôlée du code dans l'installateur Windows
+        run: python -m unittest tests.test_installateur_copie_code -v
+      - name: Tests ciblés — diagnostic hors ligne .erpinst
+        run: python manage.py test apps.licences.tests_installation --noinput -v2
+      - name: Tests ciblés — profil SQL de simulation sur activation explicite
+        run: python manage.py test apps.transport.tests_simulation_metier.DiagnosticSqlSimulationTests --noinput -v2
+      - name: Tests ciblés — canaux de vente et ventilation analytique
+        run: python manage.py test apps.transport.tests_analytique_canal --noinput -v2
+      - name: Tests ciblés — exports PDF et Excel analytiques
+        run: python manage.py test apps.comptabilite.tests_analytique_exports --noinput -v2
+      - name: Tests (SQLite)
+        run: python manage.py test --noinput --parallel 4 -v1
+      - name: Métadonnées SQL Server groupées (tests unitaires sans serveur)
+        run: python -m unittest tests.test_structure_batch_sqlserver -v
+      - name: Clôture N vers N+1 sur deux bases réellement migrées (unittest hors découverte Django)
+        run: python -m unittest tests.test_cloture_django_migree -v
+      - name: Cohérence du snapshot WAL lors d'une écriture concurrente sur N
+        run: python -m unittest tests.test_cloture_snapshot_sqlite -v
+      - name: "Build transport : aucune page ne casse, commerce pur démonté"
+        run: ERP_EDITION=transport python manage.py test apps.core.tests_edition.FumeeEditionTransportTests --noinput
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ERP-SIMULATION-Transport-Exemple
+          path: ${{ runner.temp }}/ERP-SIMULATION-ESSAI.erpsim
+          if-no-files-found: error
+          retention-days: 7
+
+  guichet-navigateur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt playwright
+      - run: python -m playwright install --with-deps chromium
+      - name: Vérifier le vrai guichet dans Chromium (dossier fictif jetable)
+        run: python tests_navigateur/guichet.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ERP-Guichet-Controles-Navigateur
+          path: ${{ runner.temp }}/guichet-navigateur
+          retention-days: 7
+
+  simulation-volume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Simuler 250 départs interagences avec les scénarios complets (5 % du remplissage)
+        run: python tests_navigateur/simulation_volume.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ERP-Simulation-250-Departs-Controles
+          path: ${{ runner.temp }}/simulation-volume
+          retention-days: 7
+
+  licences-deux-modules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install cryptography
+      - name: Contrôler les deux modules, le regroupement et les paquets clients
+        run: python -m unittest apps.licences.tests_outil_simple apps.licences.tests_deux_modules apps.licences.tests_complements -v
+      - name: Préparer l'écran virtuel pour la vraie interface
+        run: sudo apt-get update -qq && sudo apt-get install -y xvfb libtk8.6 > /dev/null
+      - name: Exécuter le parcours de la vraie interface (dossier et identité fictifs)
+        run: xvfb-run -a python deploy/licences/licences.py interface-essai
+
+  tests-sqlserver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Un conteneur SQL Server par runner : deux moteurs simultanés sur
+    # le même runner ont provoqué SIGBUS (-7), malgré 721 tests exécutés.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Essai-ERP-2026!"      # conteneur jetable du contrôle, aucune donnée
+        ports: ["11433:1433"]
+    env:
+      DB_ENGINE: mssql
+      DB_HOST: 127.0.0.1
+      DB_PORT: "11433"
+      DB_USER: sa
+      DB_PASSWORD: "Essai-ERP-2026!"
+      DB_NAME: ERP_ESSAI_SHARD_${{ matrix.shard }}
+      SQL_TEST_SHARD: ${{ matrix.shard }}
+      SQL_TEST_SHARDS: "2"
+      DB_PYTHON_DRIVER: mssql_python
+      DB_EXTRA_PARAMS: TrustServerCertificate=yes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: |
+          sudo apt-get install -y libltdl7 > /dev/null || true
+          pip install -r requirements.txt "mssql-django>=2.0" mssql-python
+      - name: Attendre SQL Server
+        run: for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/11433) 2>/dev/null && exit 0; sleep 2; done; exit 1
+      - name: Tests ciblés — profil SQL de simulation (régression)
+        if: matrix.shard == 0
+        run: python -u manage.py test apps.transport.tests_simulation_metier.DiagnosticSqlSimulationExecutionTests --noinput -v2
+      - name: Tests (SQL Server 2022)
+        timeout-minutes: 18
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Borne la suite meme si un subprocess ou une requete SQL reste bloque.
+          # Le code 124/137 distingue le timeout d'un echec de test ordinaire.
+          # Le journal local permet aussi de vérifier que la télémétrie est bien émise.
+          log_file="${RUNNER_TEMP}/sqlserver-shard-${{ matrix.shard }}.log"
+          timeout --verbose --signal=TERM --kill-after=30s 16m python -u tests_navigateur/sqlserver_test_runner.py 2>&1 | tee "$log_file"
+          grep -q '^\[SQL-DB-SUMMARY\]' "$log_file"
+          grep -q '^\[SQL-DB-TEST-TOP\]' "$log_file"
+      - name: Diagnostic SQL Server apres echec ou timeout
+        if: failure()
+        shell: bash
+        run: |
+          echo '=== Processus Python / SQL actifs ==='
+          ps -eo pid,ppid,stat,etime,args | grep -E 'python|sqlservr|manage.py|timeout' | head -80 || true
+          echo '=== Memoire et disque ==='
+          free -h || true
+          df -h || true
+          echo '=== Connectivite SQL Server ==='
+          timeout 5 bash -c 'echo > /dev/tcp/127.0.0.1/11433' && echo 'Port SQL accessible' || echo 'Port SQL inaccessible'
+      - name: Archiver les diagnostics SQL Server
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ERP-SQLServer-Diagnostics-${{ matrix.shard }}
+          path: ${{ runner.temp }}/sqlserver-shard-${{ matrix.shard }}.log
+          if-no-files-found: warn
+          retention-days: 7
+
+
+  activation-compilee:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      ERP_VERSION_ESSAI: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r deploy/windows/outils/composants.txt -r deploy/windows/outils/compilation.txt
+      - run: python manage.py collectstatic --noinput -v0
+      - name: Préparer une identité fictive, privée uniquement dans le dossier temporaire du runner
+        run: python tests_navigateur/activation_compilee.py preparer
+      - name: Compiler l'identité et l'ERP, sans repli en essai
+        run: python deploy/executable/compiler_natif.py . --supprimer-sources
+      - name: Activer les deux vrais EXE et vérifier après redémarrage (données fictives)
+        shell: pwsh
+        run: |
+          foreach ($edition in @("transport", "commerce")) {
+            $nom = if ($edition -eq "transport") { "Transport" } else { "Commerce" }
+            $env:ERP_EDITION = $edition
+            python -m PyInstaller deploy/executable/erp_ohada.spec --noconfirm --workpath "build-$edition" --distpath "dist-activation"
+            if ($LASTEXITCODE -ne 0) { throw "Compilation $edition en échec" }
+            python tests_navigateur/activation_compilee.py verifier "dist-activation\ERP-OHADA-$nom\ERP-OHADA-$nom.exe" $edition
+            if ($LASTEXITCODE -ne 0) { throw "Activation compilée $edition en échec" }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ERP-Activation-Compilee-Preuves-Fictives
+          path: |
+            ${{ runner.temp }}/activation-fictive/RESULTATS-*.json
+            ${{ runner.temp }}/activation-fictive/EXPORT-*.xlsx
+            ${{ runner.temp }}/activation-fictive/*/serveur-*.log
+          retention-days: 7
+      # Aucun exécutable ancré sur cette identité fictive ni aucune clé privée n'est publié.
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - edition: transport
+            nom: Transport
+            port: 8100
+          - edition: commerce
+            nom: Commerce
+            port: 8000
+    env:
+      ERP_EDITION: ${{ matrix.edition }}
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"                     # même version que le paquet Windows
+          cache: pip
+      - run: pip install -r deploy/windows/outils/composants.txt -r deploy/windows/outils/compilation.txt
+      - run: python manage.py collectstatic --noinput -v0
+      - name: Vérifier le stockage protégé (DPAPI Windows réelle)
+        run: python -m unittest apps.licences.tests_stockage -v
+      - name: Vérifier les dossiers portables et leurs protections sous Windows
+        run: python -m unittest apps.core.tests_dossiers_simulation -v
+      - name: Compiler le code de l'ERP en natif (protection contre le décorticage)
+        shell: pwsh
+        env:
+          PUBLIQUE_AUTORISEE: ${{ inputs.identite_publique }}
+          EMPREINTE_AUTORISEE: ${{ inputs.empreinte_sha256 }}
+        run: |
+          if ($env:PUBLIQUE_AUTORISEE -or $env:EMPREINTE_AUTORISEE) {
+            python deploy/executable/personnaliser_identite.py --publique-base64 "$env:PUBLIQUE_AUTORISEE" --empreinte "$env:EMPREINTE_AUTORISEE"
+            if ($LASTEXITCODE -ne 0) { throw "Identité publique non autorisée : compilation annulée" }
+            "ERP_VERSION_ESSAI=0" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "ERP_TYPE_PAQUET=Personnalise" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "ERP_DISTRIBUTION_FICTIVE=0" | Out-File -FilePath $env:GITHUB_ENV -Append
+            python deploy/executable/compiler_natif.py . --supprimer-sources
+          } else {
+            python tests_navigateur/activation_compilee.py preparer
+            if ($LASTEXITCODE -ne 0) { throw "Préparation de l'identité fictive en échec" }
+            "ERP_VERSION_ESSAI=0" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "ERP_TYPE_PAQUET=ESSAI-IDENTITE-FICTIVE" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "ERP_DISTRIBUTION_FICTIVE=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+            python deploy/executable/compiler_natif.py . --supprimer-sources
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Compilation native refusée" }
+      - name: Vérifier qu'il ne reste aucun code source de l'ERP
+        shell: pwsh
+        run: |
+          $sources = Get-ChildItem -Recurse apps, erp -Filter *.py |
+            Where-Object { $_.Name -ne '__init__.py' -and $_.FullName -notmatch 'migrations' -and $_.FullName -notmatch 'tests' }
+          if ($sources) { $sources | ForEach-Object { Write-Output $_.FullName }; throw "Du code source de l'ERP subsiste" }
+          Write-Output "Code de l'ERP entièrement compilé en natif (.pyd)."
+      - name: Tester le garage et les exports avec les vrais modules natifs
+        if: matrix.edition == 'transport'
+        env:
+          DB_ENGINE: sqlite
+          DATABASE_URL: ""
+          MIROIR_DB_ENGINE: ""
+          ERP_ASSISTANT: "0"
+          ERP_LICENCE: "0"
+          RELAIS_ACTIF: "0"
+        run: python tests_navigateur/garage_natif.py
+      - name: Compiler le programme
+        run: python -m PyInstaller deploy/executable/erp_ohada.spec --noconfirm --workpath build --distpath dist
+      - name: Démarrer le programme compilé et l'interroger
+        shell: pwsh
+        run: |
+          $exe = "dist\ERP-OHADA-${{ matrix.nom }}\ERP-OHADA-${{ matrix.nom }}.exe"
+          $env:ERP_DONNEES = "$env:RUNNER_TEMP\donnees"
+          $env:ERP_ADMIN = "essai"; $env:ERP_ADMIN_MDP = "Essai-Windows-2026"
+          $env:ERP_SANS_NAVIGATEUR = "1"; $env:ERP_RESEAU = "0"
+          $p = Start-Process -FilePath $exe -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\sortie.txt" -RedirectStandardError "$env:RUNNER_TEMP\erreurs.txt"
+          $ok = $false
+          for ($i = 0; $i -lt 90; $i++) {
+            Start-Sleep -Seconds 2
+            try { if ((Invoke-WebRequest "http://127.0.0.1:${{ matrix.port }}/connexion/" -UseBasicParsing -TimeoutSec 5).StatusCode -eq 200) { $ok = $true; break } } catch {}
+            if ($p.HasExited) { break }
+          }
+          Get-Content "$env:RUNNER_TEMP\sortie.txt" -ErrorAction SilentlyContinue
+          Get-Content "$env:RUNNER_TEMP\erreurs.txt" -ErrorAction SilentlyContinue | Select-Object -Last 40
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          if (-not $ok) { throw "Le programme n'a pas servi la page de connexion" }
+          if (-not (Test-Path "$env:ERP_DONNEES\erp.sqlite3")) { throw "Base non créée" }
+          if (-not (Get-ChildItem "$env:ERP_DONNEES\sauvegardes\erp-*.sqlite3")) { throw "Pas de sauvegarde au démarrage" }
+          & $exe sauvegarder
+          if ($LASTEXITCODE -ne 0) { throw "Sauvegarde à la demande en échec" }
+          Write-Output "Programme Windows ${{ matrix.nom }} : compilé, démarré, page de connexion servie, sauvegardes faites."
+      - name: Clôture annuelle depuis l'EXE natif puis redémarrage sur N+1 (données fictives)
+        if: matrix.edition == 'transport'
+        shell: pwsh
+        run: |
+          python tests_navigateur/cloture_natif_windows.py "dist\ERP-OHADA-Transport\ERP-OHADA-Transport.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Clôture annuelle native N→N+1 ou redémarrage en échec" }
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.edition == 'transport'
+        with:
+          name: ERP-Cloture-Native-Transport
+          path: ${{ runner.temp }}/cloture-natif
+          retention-days: 7
+      - name: Refuser les commandes de développement dans le programme client compilé
+        shell: pwsh
+        run: |
+          $exe = "dist\ERP-OHADA-${{ matrix.nom }}\ERP-OHADA-${{ matrix.nom }}.exe"
+          foreach ($arguments in @("manage check", "simulation 1")) {
+            $p = Start-Process $exe -ArgumentList $arguments -PassThru -NoNewWindow
+            if (-not $p.WaitForExit(20000)) { Stop-Process -Id $p.Id -Force; throw "Commande cliente non refusée : $arguments" }
+            $p.WaitForExit()
+            if ($p.ExitCode -ne 2) { throw "Refus attendu (2), obtenu $($p.ExitCode) : $arguments" }
+          }
+          $global:LASTEXITCODE = 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ERP-OHADA-${{ matrix.nom }}-${{ env.ERP_TYPE_PAQUET }}-Windows-exe
+          path: dist/ERP-OHADA-${{ matrix.nom }}
+          retention-days: 7
+      - name: Simulateur autonome portable (Transport)
+        if: matrix.nom == 'Transport'
+        shell: pwsh
+        run: |
+          Copy-Item "deploy\windows\SIMULATEUR.bat" "dist\ERP-OHADA-Transport\"
+          Copy-Item "deploy\windows\LISEZ-MOI-SIMULATEUR.txt" "dist\ERP-OHADA-Transport\"
+      - uses: actions/upload-artifact@v4
+        if: matrix.nom == 'Transport'
+        with:
+          name: ERP-OHADA-Simulateur
+          path: dist/ERP-OHADA-Transport
+          retention-days: 7
+      - name: Service Windows (WinSW, version et empreinte vérifiées)
+        shell: pwsh
+        run: |
+          $dist = "dist\ERP-OHADA-${{ matrix.nom }}"
+          $source = "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe"
+          $destination = "$env:RUNNER_TEMP\winsw.exe"
+          $attendue = "05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA"
+          $telecharge = $false
+          for ($tentative = 1; $tentative -le 3; $tentative++) {
+            try {
+              Invoke-WebRequest $source -OutFile $destination -TimeoutSec 60 -ErrorAction Stop
+              $empreinte = (Get-FileHash $destination -Algorithm SHA256).Hash
+              if ($empreinte -ne $attendue) { throw "WinSW : empreinte inattendue ($empreinte)" }
+              $telecharge = $true
+              break
+            } catch {
+              Remove-Item $destination -ErrorAction SilentlyContinue
+              if ($tentative -eq 3) { throw }
+              Write-Warning "WinSW : tentative $tentative/3 échouée : $_"
+              Start-Sleep -Seconds (5 * $tentative)
+            }
+          }
+          if (-not $telecharge) { throw "WinSW : téléchargement non vérifié" }
+          Copy-Item "$env:RUNNER_TEMP\winsw.exe" "$dist\ERP-OHADA-${{ matrix.nom }}-service.exe"
+          (Get-Content deploy\installateur\service.xml -Raw).Replace("@EDITION@", "${{ matrix.nom }}").Replace("@PORT@", "${{ matrix.port }}") |
+            Set-Content "$dist\ERP-OHADA-${{ matrix.nom }}-service.xml" -Encoding utf8
+      - name: Compiler les outils embarqués de contrôle et nettoyage
+        run: python -m PyInstaller deploy/installateur/outils.spec --noconfirm --workpath build-outils --distpath dist-outils
+      - name: Vérifier la vraie fenêtre de nettoyage compilée sur ses propres fichiers fictifs
+        shell: pwsh
+        run: |
+          # La recette N→N+1 redémarre volontairement l'EXE en processus détaché.
+          # Elle doit arrêter tous ses processus avant de tester l'écran de nettoyage.
+          $nomProcessus = "ERP-OHADA-${{ matrix.nom }}"
+          $processusRestants = @(Get-Process -Name $nomProcessus -ErrorAction SilentlyContinue)
+          if ($processusRestants.Count -gt 0) {
+            $processusRestants | Select-Object Id, ProcessName, Path | Format-Table | Out-String | Write-Output
+            throw "Le test natif a laissé $($processusRestants.Count) processus $nomProcessus actifs."
+          }
+          Write-Output "Aucun processus ERP actif avant la recette de nettoyage."
+          $p = Start-Process "dist-outils\ERP-Nettoyage.exe" -ArgumentList "--recette-fictive" -PassThru
+          if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw "Interface nettoyage bloquée" }
+          $p.WaitForExit()
+          if ($p.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\NETTOYAGE-INTERFACE-ERREUR.txt" -ErrorAction SilentlyContinue; throw "Interface nettoyage en échec" }
+          Get-Content "$env:RUNNER_TEMP\NETTOYAGE-INTERFACE-FICTIVE.json"
+      - name: Fabriquer l'installateur (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
+          & $iscc /Q "/DEdition=${{ matrix.nom }}" "/DPort=${{ matrix.port }}" "/DVersion=1.0.${{ github.run_number }}" deploy\installateur\erp_ohada.iss
+          if ($LASTEXITCODE -ne 0) { throw "Compilation de l'installateur en échec" }
+      - name: Vérifier le vrai clic « Copier le code » dans le wizard Inno Setup
+        shell: pwsh
+        run: |
+          & .\tests_navigateur\installateur_copie_code_windows.ps1 `
+            -Installateur "dist\ERP-OHADA-${{ matrix.nom }}-Installation.exe" `
+            -Edition "${{ matrix.edition }}" `
+            -Rapport "$env:RUNNER_TEMP\copie-code-interactive-${{ matrix.edition }}.json"
+      - name: Compiler l'outil propriétaire pour la recette de signature
+        if: env.ERP_DISTRIBUTION_FICTIVE == '1'
+        shell: pwsh
+        run: |
+          python -m PyInstaller deploy/licences/licences.py --paths . --onefile --name ERP-OHADA-Licences --noconfirm --workpath build-licences --distpath dist-licences
+          if ($LASTEXITCODE -ne 0) { throw "Compilation de l'outil propriétaire en échec" }
+      - name: Installer en service sans question, mettre à jour, désinstaller
+        if: env.ERP_DISTRIBUTION_FICTIVE == '1'
+        shell: pwsh
+        run: |
+          $setup = "dist\ERP-OHADA-${{ matrix.nom }}-Installation.exe"
+          $dossier = "$env:RUNNER_TEMP\programme"
+          $service = "ERP-OHADA-${{ matrix.nom }}"
+          $donnees = "$env:ProgramData\ERP-OHADA\${{ matrix.nom }}"
+          python tests_navigateur/installateur_p0.py autorisation "dist-outils\ERP-Controle-Installation.exe" "dist-licences\ERP-OHADA-Licences.exe" "${{ matrix.edition }}"
+          if ($LASTEXITCODE -ne 0) { throw "Préparation autorisation fictive en échec" }
+          $autorisation = "$env:RUNNER_TEMP\activation-fictive\autorisation-${{ matrix.edition }}.erpinst"
+          function Attendre-Serveur {
+            for ($n = 0; $n -lt 120; $n++) {
+              Start-Sleep -Seconds 2
+              try { if ((Invoke-WebRequest "http://127.0.0.1:${{ matrix.port }}/connexion/" -UseBasicParsing -TimeoutSec 5).StatusCode -eq 200) { return $true } } catch {}
+            }
+            return $false
+          }
+          function Diagnostic {
+            Get-Service $service -ErrorAction SilentlyContinue | Format-List Name, Status, StartType | Out-String | Write-Output
+            sc.exe qc $service | Write-Output
+            Get-ChildItem "$dossier\journaux-service" -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "== $($_.Name)"; Get-Content $_.FullName -Tail 40 }
+            Get-Content "$donnees\journal.txt" -Tail 30 -ErrorAction SilentlyContinue
+            Get-WinEvent -LogName System -MaxEvents 15 -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -eq "Service Control Manager" } | Format-List TimeCreated, Message | Out-String | Write-Output
+          }
+          function Attendre-Service {
+            for ($n = 0; $n -lt 30; $n++) {
+              if ((Get-Service $service -ErrorAction SilentlyContinue).Status -eq "Running") { return $true }
+              Start-Sleep -Seconds 2
+            }
+            return $false
+          }
+          function Executer-Installation($programmeInstalleur, $parametresInstalleur, $journalInstalleur) {
+            Write-Host "Exécution contrôlée : $journalInstalleur"
+            $p = Start-Process $programmeInstalleur -ArgumentList $parametresInstalleur -PassThru
+            if (-not $p.WaitForExit(240000)) {
+              taskkill.exe /F /T /PID $p.Id | Out-Null
+              Get-Content $journalInstalleur -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+              throw "Délai de quatre minutes dépassé : $journalInstalleur"
+            }
+            $p.WaitForExit()
+            return $p.ExitCode
+          }
+          function Installer($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/BASE=sqlite", "/TASKS=parefeu,service", "/AUTORISATION=`"$autorisation`"", "/DIR=`"$dossier`"", "/LOG=`"$journal`"")
+            $code = Executer-Installation $setup $parametres $journal
+            if ($code -ne 0) { Get-Content $journal -Tail 40; throw "Installation en échec ($code)" }
+          }
+          function Refuser-Sans-Autorisation($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/DIR=`"$dossier`"", "/LOG=`"$journal`"")
+            $code = Executer-Installation $setup $parametres $journal
+            if ($code -eq 0) { throw "Installation sans autorisation acceptée : $journal" }
+          }
+          function Installer-Essai($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ROLE=siege", "/BASE=sqlite", "/TASKS=parefeu,service", "/ESSAI=1", "/DIR=`"$dossier`"", "/LOG=`"$journal`"")
+            $code = Executer-Installation $setup $parametres $journal
+            if ($code -ne 0) { Get-Content $journal -Tail 40; throw "Installation d'essai (sans clé) refusée ($code) : $journal" }
+          }
+          function Desinstaller($journal) {
+            $parametres = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=`"$journal`"")
+            $code = Executer-Installation "$dossier\unins000.exe" $parametres $journal
+            if ($code -ne 0) { throw "Désinstallation en échec ($code)" }
+            # Inno peut terminer depuis sa copie temporaire après le retour du lanceur initial.
+            # Attendre aussi son propre retrait ; le nettoyeur n'est pas autorisé à effacer un exécutable inconnu.
+            for ($n = 0; $n -lt 60; $n++) {
+              if (-not (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") -and -not (Test-Path "$dossier\unins000.exe")) { break }
+              Start-Sleep -Seconds 2
+            }
+            Get-Content $journal -Tail 50 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+            if (Get-Service $service -ErrorAction SilentlyContinue) { throw "Service toujours présent après désinstallation" }
+            if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme toujours présent après désinstallation" }
+            if (Test-Path "$dossier\unins000.exe") { throw "Désinstallateur Inno toujours présent ; consulter son journal" }
+          }
+          # Une installation initiale sans autorisation est refusée, avant de toucher au service ou aux données.
+          Refuser-Sans-Autorisation "$env:RUNNER_TEMP\installateur-refus-initial.log"
+          if (Test-Path "$dossier\ERP-OHADA-${{ matrix.nom }}.exe") { throw "Programme copié sans autorisation" }
+          Installer "$env:RUNNER_TEMP\installation.log"
+          if (-not (Attendre-Service)) { Diagnostic; Get-Content "$env:RUNNER_TEMP\installation.log" -Tail 30; throw "Service non démarré" }
+          if ((Get-Service $service).StartType -notin @("Automatic", "AutomaticDelayedStart")) { throw "Service pas en démarrage automatique" }
+          if (-not (Attendre-Serveur)) { Diagnostic; throw "Le service ne sert pas la page de connexion" }
+          if ((Get-Content "$donnees\role-installation.txt") -ne "siege") { throw "Rôle choisi non transmis à l'assistant" }
+          if (-not (Test-Path "$donnees\erp.sqlite3")) { throw "Base SQLite non créée par le service" }
+          netsh advfirewall firewall show rule name="ERP OHADA (port ${{ matrix.port }})" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Règle du pare-feu absente" }
+
+          # Le service se relance tout seul si le programme s'arrête
+          Stop-Process -Name "ERP-OHADA-${{ matrix.nom }}" -Force
+          if (-not (Attendre-Serveur)) { Diagnostic; throw "Le service ne s'est pas relancé après l'arrêt du programme" }
+
+          # Mise à jour par-dessus : service remplacé, données et configuration gardées
+          $config = Get-Content "$donnees\configuration.env" -Raw
+          Installer "$env:RUNNER_TEMP\mise-a-jour.log"
+          if (-not (Attendre-Service)) { Diagnostic; throw "Service non redémarré après la mise à jour" }
+          if (-not (Attendre-Serveur)) { throw "Serveur muet après la mise à jour" }
+          if ((Get-Content "$donnees\configuration.env" -Raw) -ne $config) { throw "La mise à jour a modifié la configuration" }
+
+          # Désinstallation : service retiré, données conservées
+          Desinstaller "$env:RUNNER_TEMP\installateur-desinstallation.log"
+          if (-not (Test-Path "$donnees\erp.sqlite3")) { throw "La désinstallation a effacé les données" }
+          # La conservation des anciennes données ne doit pas autoriser une nouvelle installation.
+          Refuser-Sans-Autorisation "$env:RUNNER_TEMP\installateur-refus-reinstallation.log"
+          Installer "$env:RUNNER_TEMP\installateur-reinstallation.log"
+          if (-not (Attendre-Service) -or -not (Attendre-Serveur)) { Diagnostic; throw "Réinstallation autorisée non fonctionnelle" }
+          Desinstaller "$env:RUNNER_TEMP\installateur-seconde-desinstallation.log"
+          # Essai : une installation SANS clé ni autorisation est permise ; le logiciel démarre en version d'essai.
+          Installer-Essai "$env:RUNNER_TEMP\installateur-essai.log"
+          if (-not (Attendre-Service) -or -not (Attendre-Serveur)) { Diagnostic; throw "Installation d'essai (sans clé) non fonctionnelle" }
+          Desinstaller "$env:RUNNER_TEMP\installateur-essai-desinstallation.log"
+          python tests_navigateur/installateur_p0.py nettoyer "$dossier" "$donnees" "${{ matrix.edition }}"
+          if ($LASTEXITCODE -ne 0) { throw "Nettoyage fictif en échec" }
+          netsh advfirewall firewall show rule name="ERP OHADA (port ${{ matrix.port }})" | Out-Null
+          if ($LASTEXITCODE -eq 0) { throw "Règle du pare-feu restée après désinstallation" }
+          $global:LASTEXITCODE = 0
+          Write-Output "Installateur ${{ matrix.nom }} : service Windows installé, relancé seul, mis à jour, désinstallé ; données conservées."
+      - name: Supprimer le coffre fictif après recette
+        if: always() && env.ERP_DISTRIBUTION_FICTIVE == '1'
+        shell: pwsh
+        run: |
+          $dossier = "$env:RUNNER_TEMP\\activation-fictive"
+          foreach ($nom in @("coffre-fictif.dat", "parametres-fictif.dat", "machine-controle.txt")) {
+            $f = Join-Path $dossier $nom
+            if (Test-Path $f) { Remove-Item -Force $f }
+          }
+          Get-ChildItem $dossier -Filter "*.erpinst" -ErrorAction SilentlyContinue | Remove-Item -Force
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ERP-Installateur-${{ matrix.nom }}-Diagnostics
+          path: |
+            ${{ runner.temp }}/installateur-*.log
+            ${{ runner.temp }}/wizard-copie-code-*.log
+            ${{ runner.temp }}/installation.log
+            ${{ runner.temp }}/mise-a-jour.log
+            ${{ runner.temp }}/NETTOYAGE-INTERFACE-*.json
+            ${{ runner.temp }}/NETTOYAGE-INTERFACE-ERREUR.txt
+            ${{ runner.temp }}/NETTOYAGE-DIAGNOSTIC-*.json
+            ${{ runner.temp }}/copie-code-interactive-*.json
+            ${{ runner.temp }}/activation-fictive/autorisation-*-preuve.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Outil d'émission des licences (propriétaire, jamais livré aux clients)
+        if: matrix.edition == 'transport'
+        shell: pwsh
+        run: |
+          $outil = "dist-licences\ERP-OHADA-Licences.exe"
+          if (-not (Test-Path $outil)) {
+            python -m PyInstaller deploy/licences/licences.py --paths . --onefile --name ERP-OHADA-Licences --noconfirm --workpath build-licences --distpath dist-licences
+            if ($LASTEXITCODE -ne 0) { throw "Compilation de l'outil propriétaire en échec" }
+          }
+          $env:ERP_LICENCES_MDP = "Essai-CI-uniquement-2026"
+          $cles = "$env:RUNNER_TEMP\cles-essai"
+          & $outil cles --dossier $cles
+          if ($LASTEXITCODE -ne 0) { throw "Création des clés en échec" }
+          & $outil installation --cle "$cles\coffre.dat" --client "Société Essai" --edition transport --sortie $cles
+          if (($LASTEXITCODE -ne 0) -or -not (Get-ChildItem "$cles\CLE-INSTALLATION-INS-*.txt")) { throw "Clé d'installation en échec" }
+          & $outil emettre --cle "$cles\coffre.dat" --client "Société Essai" --edition transport --role siege --postes 5 --code T-AAAA-BBBB-CCCC-DDDD --sortie $cles
+          if ($LASTEXITCODE -ne 0) { throw "Émission en échec" }
+          $lic = Get-ChildItem "$cles\LIC-*.erplic" | Select-Object -First 1
+          & $outil verifier $lic.FullName --publique "$cles\parametres.dat"
+          if ($LASTEXITCODE -ne 0) { throw "Vérification en échec" }
+          $fin = (Get-Date).AddDays(2).ToString("yyyy-MM-dd")
+          & $outil autoriser-installation --cle "$cles\coffre.dat" --code T-AAAA-BBBB-CCCC-DDDD --jusqu-au $fin --sortie $cles
+          if ($LASTEXITCODE -ne 0) { throw "Émission d'autorisation d'installation en échec" }
+          $autorisationOutil = Get-ChildItem "$cles\*.erpinst" | Select-Object -First 1
+          if (-not $autorisationOutil) { throw "Autorisation .erpinst absente" }
+          python tests_navigateur/installateur_p0.py verifier-emission "$cles\parametres.dat" $autorisationOutil.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Signature de l'autorisation émise par l'outil compilé invalide" }
+          $f = Start-Process $outil -ArgumentList "interface-essai" -Wait -PassThru
+          if ($f.ExitCode -ne 0) { throw "La fenêtre de l'outil ne se construit pas" }
+          if (Get-ChildItem -Recurse "dist\ERP-OHADA-${{ matrix.nom }}" -Filter "licences.py*") { throw "L'outil du propriétaire ne doit pas être dans le programme client" }
+          Remove-Item -Recurse -Force $cles
+          $global:LASTEXITCODE = 0
+      - uses: actions/upload-artifact@v4
+        if: matrix.edition == 'transport'
+        with:
+          name: ERP-OHADA-Licences-PROPRIETAIRE
+          path: dist-licences/ERP-OHADA-Licences.exe
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ERP-OHADA-${{ matrix.nom }}-${{ env.ERP_TYPE_PAQUET }}-Installation
+          path: dist/ERP-OHADA-${{ matrix.nom }}-Installation.exe
+          retention-days: 7
+
+
+

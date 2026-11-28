@@ -1,0 +1,4 @@
+source_id;document;editeur;version;url;localisation;limite;consulte_le
+S03;Découpage fonctionnel Comptabilité;Sage;Sans build explicite;https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=240126080556277;9 pages PDF;"Huit offres ; arborescence de fonctions et paramètres, pas uniquement menus de la barre.";2026-10-22
+S04;Découpage fonctionnel Gestion commerciale;Sage;Sans build explicite;https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=240126080738580;14 pages PDF;Ne suffit pas à dater chaque commande en V12.;2026-10-22
+S10;Correspondance Maintenance et versions Sage 100;Sage;V12, V12.10 et V12.20 explicités;https://fr-kb.sage.com/portal/app/portlets/results/viewsolution.jsp?solutionid=211010150096261;Table des versions;Ne pas confondre les versions historiques 12.xx avec la génération 100 V12 actuelle.;2026-10-22

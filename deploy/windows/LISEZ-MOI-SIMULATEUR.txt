@@ -1,0 +1,25 @@
+Simulateur ERP OHADA Transport — logiciel autonome et portable (donnees fictives)
+=================================================================================
+
+A quoi ca sert
+--------------
+Essayer et demontrer l ERP Transport avec des donnees realistes, SANS saisie et SANS
+licence, dans un dossier a part. Rien ici ne touche votre vraie societe : tout est fictif.
+
+Comment l utiliser
+-------------------
+1. Decompressez entierement ce dossier (par exemple sur le Bureau ou une cle USB).
+2. Double-cliquez SIMULATEUR.bat.
+3. Le navigateur s ouvre sur l atelier de simulation. Connectez-vous avec :
+       utilisateur : simulateur
+       mot de passe : simulateur
+4. Creez une simulation : choisissez le nombre d agences, les voyages par jour, la duree
+   et le volume, puis lancez. Vous pouvez l arreter a tout moment (les donnees deja
+   produites restent consultables) et ouvrir le dossier genere comme une societe.
+
+Bon a savoir
+------------
+- Les donnees sont ecrites dans le sous-dossier « donnees-simulateur » cree a cote de ce
+  fichier. Pour repartir de zero, fermez le logiciel et supprimez ce sous-dossier.
+- Tous les noms, prix, salaires et taux sont fictifs (demonstration).
+- Ce logiciel est portable : aucune installation, aucun service Windows, aucune licence.

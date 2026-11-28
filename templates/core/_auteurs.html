@@ -1,0 +1,7 @@
+{% load erp %}{# Bandeau des auteurs d'une pièce : créée, modifiée, validée, annulée — par qui et quand #}
+<div class="bandeau-auteurs small">
+  <span><i class="bi bi-person"></i> Créé{% if objet.cree_le %} le {{ objet.cree_le|date:"d/m/Y H:i" }}{% endif %} par <strong>{{ objet.cree_par|default:"auteur inconnu (reprise ou traitement automatique)" }}</strong></span>
+  {% if objet.valide_le %}<span><i class="bi bi-check2-circle"></i> Validé le {{ objet.valide_le|date:"d/m/Y H:i" }} par <strong>{{ objet.valide_par|default:"traitement automatique" }}</strong></span>{% endif %}
+  {% if objet.annule_le %}<span class="text-danger"><i class="bi bi-x-circle"></i> Annulé le {{ objet.annule_le|date:"d/m/Y H:i" }} par <strong>{{ objet.annule_par|default:"—" }}</strong></span>{% endif %}
+  {% derniere_modification objet as modif %}{% if modif %}<span><i class="bi bi-pencil"></i> Modifié le {{ modif.date|date:"d/m/Y H:i" }} par <strong>{{ modif.utilisateur|default:"—" }}</strong></span>{% endif %}
+</div>

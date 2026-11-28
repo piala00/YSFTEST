@@ -1,0 +1,1062 @@
+"""ERP OHADA en un seul programme (ERP-OHADA-Transport.exe ou ERP-OHADA-Commerce.exe).
+
+Le programme contient le logiciel, Python, le serveur et la documentation. Un double-clic démarre tout ce que les
+anciens fichiers .bat lançaient un par un :
+  - le serveur, ouvert aux postes du réseau local (les autres ordinateurs n'installent rien) ;
+  - les sauvegardes automatiques de la base (au démarrage puis toutes les ERP_SAUVEGARDE_HEURES heures) ;
+  - la copie miroir vers SQL Server, si elle est configurée (toutes les MIROIR_INTERVALLE_MINUTES minutes) ;
+  - la synchronisation du dossier d'origine pendant la transition (toutes les heures, si elle est commencée) ;
+  - les échanges direction ↔ agences par la boîte aux lettres, si elle est configurée (toutes les 5 minutes) ;
+  - les dossiers fictifs importables (Administration du poste > Simulation), sans serveur secondaire automatique.
+
+Les données ne sont PAS dans le dossier du programme (on peut le remplacer ou l'effacer sans rien perdre) :
+  Windows : C:\\ProgramData\\ERP-OHADA\\<Édition>     (autre emplacement : ERP_DONNEES=…)
+  configuration.env, erp.sqlite3 (créée au premier démarrage), sauvegardes\\, journal.txt
+
+    ERP-OHADA-Transport.exe                     démarre tout et ouvre le navigateur
+    ERP-OHADA-Transport.exe local               ce poste seulement (pas d'accès réseau)
+    ERP-OHADA-Transport.exe simulation 3        dossier de simulation séparé (3 mois fictifs dès 09/2026), puis démarrage
+    ERP-OHADA-Transport.exe simulation 2026-01  simulation de janvier 2026 jusqu'à aujourd'hui (2026-01 6 : six mois)
+    ERP-OHADA-Transport.exe sauvegarder         sauvegarde immédiate
+    ERP-OHADA-Transport.exe restaurer [fichier] remet la dernière sauvegarde (ou le fichier indiqué)
+    ERP-OHADA-Transport.exe demarrage-auto      démarrage à l'ouverture de session Windows (relancer pour retirer)
+    ERP-OHADA-Transport.exe dossier             affiche l'emplacement des données
+    ERP-OHADA-Transport.exe manage <commande>   commande d'administration (miroir, longueur_comptes, echanges…)
+"""
+import datetime
+import json
+import os
+import re
+import secrets
+import shutil
+import socket
+import sqlite3
+import stat
+import subprocess
+import sys
+import threading
+import time
+import traceback
+import webbrowser
+from pathlib import Path
+
+PORTS = {"commerce": 8000, "transport": 8100}
+ENVIRONNEMENT_INITIAL = dict(os.environ)          # avant configuration.env : un redémarrage relit la configuration
+MODELE_SAUVEGARDE = "erp-????????-??????*.sqlite3"
+
+
+def dossier_programme():
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[2]                    # exécution depuis le dépôt (essais)
+
+
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, str(dossier_programme()))
+
+# Sortie redirigée vers un fichier sous Windows (démarrage automatique, service…) : encodage cp1252 qui ne connaît pas
+# tous les caractères (→, …) ; le programme ne doit jamais s'arrêter pour un caractère affiché
+for _flux in (sys.stdout, sys.stderr):
+    if _flux is not None and hasattr(_flux, "reconfigure"):
+        try:
+            _flux.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)   # progression lisible
+        except (ValueError, OSError):
+            pass
+
+
+def edition():
+    """Commerce ou Transport : fixée à la compilation (edition.txt dans le programme), sinon ERP_EDITION."""
+    fichier = Path(getattr(sys, "_MEIPASS", dossier_programme())) / "edition.txt"
+    if fichier.exists():
+        return fichier.read_text(encoding="utf-8").strip().lower()
+    return os.environ.get("ERP_EDITION", "transport").lower()
+
+
+def dossier_donnees():
+    """Hors du dossier du programme : effacer ou remplacer le programme ne touche pas aux données."""
+    if os.environ.get("ERP_DONNEES"):
+        return Path(os.environ["ERP_DONNEES"])
+    ancien = dossier_programme() / "donnees"                       # programmes compilés avant ce changement
+    if (ancien / "configuration.env").exists():
+        return ancien
+    if os.name == "nt":
+        base = Path(os.environ.get("PROGRAMDATA") or "C:\\ProgramData")
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    return base / "ERP-OHADA" / edition().capitalize()
+
+
+def journal(message):
+    ligne = f"{datetime.datetime.now():%d/%m/%Y %H:%M} {message}"
+    print(ligne, flush=True)
+    try:
+        with open(Path(os.environ.get("ERP_DOSSIER_DONNEES") or dossier_donnees()) / "journal.txt", "a", encoding="utf-8") as f:
+            f.write(ligne + "\n")
+    except OSError:
+        pass
+
+
+def preparer_environnement(base="erp.sqlite3"):
+    """Configuration du dossier des données ; les réglages déjà présents (ex. SQL Server, miroir) sont respectés."""
+    donnees = dossier_donnees()
+    donnees.mkdir(parents=True, exist_ok=True)
+    config = donnees / "configuration.env"
+    if not config.exists():
+        config.write_text("\n".join([
+            f"SECRET_KEY={secrets.token_urlsafe(50)}", "DEBUG=False",
+            "ALLOWED_HOSTS=*",                       # les postes du réseau local ouvrent l'adresse du serveur
+            "TIME_ZONE=Africa/Douala", "DB_ENGINE=sqlite",
+            "# Accès depuis les autres postes du réseau local (0 : ce poste seulement)",
+            "ERP_RESEAU=1",
+            "# Sauvegardes automatiques : toutes les N heures, nombre gardé, copie dans un second dossier (clé USB, NAS…)",
+            "ERP_SAUVEGARDE_HEURES=4", "ERP_SAUVEGARDE_GARDER=60", "# ERP_SAUVEGARDE_COPIE=D:\\Sauvegardes-ERP",
+            "# Copie miroir automatique dans SQL Server (la société continue de travailler sur SQLite)",
+            "# MIROIR_DB_ENGINE=mssql", "# MIROIR_DB_HOST=SERVEUR\\INSTANCE", "# MIROIR_DB_NAME=ERP_MIROIR",
+            "# MIROIR_DB_USER=            (vide : compte Windows)", "# MIROIR_DB_PASSWORD=",
+            "# MIROIR_DB_PYTHON_DRIVER=mssql_python", "# MIROIR_INTERVALLE_MINUTES=60",
+            "# Direction et agences : échanges automatiques par une boîte aux lettres (lots chiffrés)",
+            "#   relais Internet (adresse et jeton donnés par la direction) :",
+            "# ECHANGES_RELAIS_URL=https://relais.exemple.com", "# ECHANGES_RELAIS_JETON=",
+            "#   ou dossier partagé (réseau, disque synchronisé) :",
+            "# ECHANGES_DOSSIER_PARTAGE=\\\\SERVEUR\\Echanges-ERP", "# ECHANGES_INTERVALLE_MINUTES=5", ""]), encoding="utf-8")
+    choix = donnees / "installation-base.env"                    # base choisie dans l'installateur
+    if choix.exists():
+        valeurs = dict(l.split("=", 1) for l in choix.read_text(encoding="utf-8").splitlines() if "=" in l)
+        modifier_configuration(donnees, {k.strip(): v.strip() for k, v in valeurs.items()})
+        choix.replace(donnees / "installation-base.env.applique")
+    for ligne in config.read_text(encoding="utf-8").splitlines():
+        if "=" in ligne and not ligne.lstrip().startswith("#"):
+            cle, valeur = ligne.split("=", 1)
+            if cle.strip() in ("ERP_LICENCE", "ERP_ASSISTANT", "ERP_DOSSIER_SIMULATION", "ERP_DOSSIER_RACINE", "ERP_SESSION_COOKIE"):   # jamais pilotés par le fichier (contournement)
+                continue
+            os.environ.setdefault(cle.strip(), valeur.strip())
+    os.environ.setdefault("SQLITE_FICHIER", str(donnees / base))   # chemin absolu, dans le dossier des données
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "erp.settings")
+    os.environ.setdefault("ERP_EDITION", edition())              # le logiciel livré ne présente que son métier
+    os.environ.setdefault("ERP_DOSSIER_DONNEES", str(donnees))    # mémoire de l'essai hors de la base
+    os.environ["ERP_DOSSIER_RACINE"] = str(donnees)
+    if base == "erp.sqlite3":
+        from apps.core.dossiers_simulation import environnement_actif
+        os.environ.pop("ERP_DOSSIER_SIMULATION", None)
+        try:
+            resultat = environnement_actif(donnees, os.environ)
+            return resultat
+        except (ValueError, OSError, sqlite3.Error) as exc:
+            # Le dossier fictif défectueux reste conservé. Le serveur revient à sa société.
+            (donnees / "dossier-erreur.txt").write_text(str(exc)[:300], encoding="utf-8")
+            marqueur = donnees / "dossier-actif.json"
+            if marqueur.exists():
+                marqueur.replace(donnees / ("dossier-refuse-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + ".json"))
+            return donnees
+    return donnees
+
+
+def modifier_configuration(donnees, valeurs):
+    """Écran Base de données : met à jour configuration.env (clé=valeur ; None met la ligne en commentaire).
+    L'ancien fichier est gardé (configuration-AAAAMMJJ-HHMMSS.env) ; le changement prend effet au redémarrage."""
+    config = donnees / "configuration.env"
+    lignes = config.read_text(encoding="utf-8").splitlines() if config.exists() else []
+    if config.exists():
+        shutil.copy2(config, donnees / f"configuration-{datetime.datetime.now():%Y%m%d-%H%M%S}.env")
+    restantes = dict(valeurs)
+    for i, ligne in enumerate(lignes):
+        cle = ligne.lstrip("# ").split("=", 1)[0].strip()
+        if "=" in ligne and cle in restantes:
+            valeur = restantes.pop(cle)
+            lignes[i] = f"# {cle}=" if valeur is None else f"{cle}={valeur}"
+    lignes += [f"{cle}={valeur}" for cle, valeur in restantes.items() if valeur is not None]
+    config.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+    # Le processus de redémarrage reçoit cette photographie d'environnement.
+    # La synchroniser avec la configuration persistée évite de relancer N
+    # lorsqu'une ancienne variable SQLITE_FICHIER/DB_* masque le choix N+1.
+    for cle, valeur in valeurs.items():
+        if valeur is None:
+            ENVIRONNEMENT_INITIAL.pop(cle, None)
+        else:
+            ENVIRONNEMENT_INITIAL[cle] = str(valeur)
+    for cle, valeur in valeurs.items():                           # sauvegardes et vérifications : sans redémarrage
+        if cle.startswith(("ERP_SAUVEGARDE_", "ERP_VERIFICATION_")):
+            if valeur is None:
+                os.environ.pop(cle, None)
+            else:
+                os.environ[cle] = str(valeur)
+
+
+def base_sqlite():
+    return Path(os.environ["SQLITE_FICHIER"]) if os.environ.get("DB_ENGINE", "sqlite") == "sqlite" else None
+
+
+# ---------------------------------------------------------------- Sauvegardes de la base SQLite
+def _retirer(fichier):
+    os.chmod(fichier, stat.S_IREAD | stat.S_IWRITE)              # les sauvegardes sont en lecture seule
+    fichier.unlink()
+
+
+def sauvegarder(base, donnees):
+    """Copie à chaud (API de sauvegarde SQLite, cohérente même pendant l'utilisation), contrôlée, en lecture seule,
+    puis rotation ; éventuellement recopiée dans ERP_SAUVEGARDE_COPIE. Renvoie le fichier créé."""
+    dossier = donnees / "sauvegardes"
+    dossier.mkdir(parents=True, exist_ok=True)
+    for interrompue in dossier.glob("erp-*.partiel"):            # sauvegarde coupée par un arrêt du programme
+        interrompue.unlink()
+    horodatage = f"{datetime.datetime.now():%Y%m%d-%H%M%S}"
+    fichier, n = dossier / f"erp-{horodatage}.sqlite3", 1
+    while fichier.exists():                          # deux sauvegardes dans la même seconde : ne jamais écraser
+        n += 1
+        fichier = dossier / f"erp-{horodatage}-{n}.sqlite3"
+    partiel = fichier.with_suffix(".partiel")
+    source, copie = sqlite3.connect(base), sqlite3.connect(partiel)
+    try:
+        source.backup(copie)
+        controle = copie.execute("PRAGMA quick_check").fetchone()[0]
+    finally:
+        source.close()
+        copie.close()
+    if controle != "ok":
+        partiel.unlink()
+        raise RuntimeError(f"sauvegarde incorrecte ({controle})")
+    partiel.replace(fichier)
+    os.chmod(fichier, stat.S_IREAD)
+    garder = max(1, int(os.environ.get("ERP_SAUVEGARDE_GARDER") or 60))
+    destinations = [dossier]
+    if os.environ.get("ERP_SAUVEGARDE_COPIE"):
+        second = Path(os.environ["ERP_SAUVEGARDE_COPIE"])
+        second.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(fichier, second / fichier.name)
+        os.chmod(second / fichier.name, stat.S_IREAD)
+        destinations.append(second)
+    for d in destinations:
+        for ancien in par_date(d.glob(MODELE_SAUVEGARDE))[:-garder]:
+            _retirer(ancien)
+    return fichier
+
+
+def par_date(fichiers):
+    """Du plus ancien au plus récent (date du fichier : le nom suit l'heure locale, qui peut changer)."""
+    return sorted(fichiers, key=lambda f: f.stat().st_mtime)
+
+
+def sauvegardes(donnees):
+    return par_date((donnees / "sauvegardes").glob(MODELE_SAUVEGARDE))
+
+
+def restaurer(donnees, fichier=None):
+    base = Path(os.environ["SQLITE_FICHIER"])
+    candidates = sauvegardes(donnees)
+    source = Path(fichier) if fichier else (candidates[-1] if candidates else None)
+    if source is None or not source.exists():
+        print("Aucune sauvegarde trouvée dans", donnees / "sauvegardes")
+        return 1
+    if base.exists():
+        mise_de_cote = base.with_name(f"erp-avant-restauration-{datetime.datetime.now():%Y%m%d-%H%M%S}.sqlite3")
+        base.replace(mise_de_cote)
+        print(f"Base actuelle mise de côté : {mise_de_cote}")
+    for suffixe in ("-wal", "-shm"):
+        reste = Path(str(base) + suffixe)
+        if reste.exists():
+            reste.unlink()
+    shutil.copy2(source, base)
+    os.chmod(base, stat.S_IREAD | stat.S_IWRITE)
+    journal(f"Base restaurée depuis {source}")
+    return 0
+
+
+def restauration_prevue(donnees):
+    marqueur = donnees / "restaurer-au-demarrage.txt"
+    return marqueur.read_text(encoding="utf-8").strip() if marqueur.exists() else ""
+
+
+def prevoir_restauration(donnees, nom):
+    """Écran Administration du poste : la base ne se remplace pas pendant qu'elle sert ; on le fait au redémarrage."""
+    marqueur = donnees / "restaurer-au-demarrage.txt"
+    if nom is None:
+        marqueur.unlink(missing_ok=True)
+        return
+    if nom not in {f.name for f in sauvegardes(donnees)}:
+        raise ValueError("sauvegarde inconnue")
+    marqueur.write_text(nom, encoding="utf-8")
+
+
+def controler_base(donnees):
+    """La base a été créée mais elle a disparu : ne jamais repartir d'une base vide sans le dire."""
+    base, temoin = base_sqlite(), donnees / "base-creee.txt"
+    if base is None or base.exists() or not temoin.exists():
+        return True
+    print(f"\n  ATTENTION : la base {base} a disparu (effacée ou déplacée).")
+    dernieres = sauvegardes(donnees)
+    if not dernieres:
+        print("  Aucune sauvegarde dans", donnees / "sauvegardes", ": remettez le fichier à sa place puis relancez.")
+        return False
+    print(f"  Dernière sauvegarde : {dernieres[-1].name}")
+    if input("  Remettre cette sauvegarde ? (O/N) ").strip().lower() in ("o", "oui"):
+        return restaurer(donnees) == 0
+    print("  Rien n'a été fait. Relancez le programme quand le fichier est revenu, ou choisissez « restaurer ».")
+    return False
+
+
+# ---------------------------------------------------------------- Tâches automatiques
+def tache_periodique(nom, intervalle_s, action, attendre_d_abord=False):
+    def boucle():
+        from django.db import connections
+
+        if attendre_d_abord:
+            time.sleep(intervalle_s)
+        while True:
+            try:
+                action()
+            except Exception as exc:                              # une tâche en échec n'arrête pas le serveur
+                journal(f"{nom} : ÉCHEC — {exc}")
+                with open(Path(os.environ.get("ERP_DOSSIER_DONNEES") or dossier_donnees()) / "journal.txt", "a", encoding="utf-8") as f:
+                    traceback.print_exc(file=f)
+            finally:
+                connections.close_all()
+            time.sleep(intervalle_s)
+
+    threading.Thread(target=boucle, name=nom, daemon=True).start()
+
+
+def commande(*args):
+    import io
+
+    from django.core.management import call_command
+
+    sortie = io.StringIO()
+    call_command(*args, stdout=sortie, stderr=sortie)
+    return sortie.getvalue().strip().splitlines()[-1:] or [""]
+
+
+PLANIFICATEUR = {"objet": None}
+
+
+def sauvegarde_immediate(donnees):
+    """Sauvegarde de la base de travail : fichier SQLite contrôlé, ou .bak SQL Server vérifié."""
+    def faire():
+        base = base_sqlite()
+        if base is None:
+            from apps.core.base_donnees import sauvegarder_sqlserver
+
+            return sauvegarder_sqlserver()
+        return sauvegarder(base, donnees).name
+    return faire
+
+
+def demarrer_taches(donnees):
+    from django.conf import settings
+
+    from apps.core import base_donnees, planification
+
+    taches = []
+    planificateur = planification.Planificateur(donnees, sauvegarde_immediate(donnees), base_donnees.verifier, journal)
+    PLANIFICATEUR["objet"] = planificateur
+    tache_periodique("Planificateur", 60, planificateur.passage)
+    r = planification.reglages()
+    taches.append({"heures": f"sauvegardes toutes les {r['heures']:g} h", "quotidien": f"sauvegarde chaque jour à {r['heure']}",
+                   "desactive": "sauvegardes automatiques DÉSACTIVÉES"}[r["mode"]]
+                  + (" (SQL Server : .bak sur le serveur SQL)" if base_sqlite() is None else f" → {donnees / 'sauvegardes'}")
+                  + (f" et {r['copie']}" if r["copie"] else "")
+                  + ("" if r["verification"] == "desactive" else " ; vérification de la base chaque semaine"))
+    if "miroir" in settings.DATABASES:
+        minutes = settings.MIROIR_INTERVALLE_MINUTES
+        cible = settings.DATABASES["miroir"]
+        tache_periodique("Miroir", minutes * 60, lambda: journal(commande("miroir")[0]))
+        taches.append(f"copie miroir toutes les {minutes} min → {cible.get('HOST') or ''} {cible['NAME']}")
+
+    def synchroniser():
+        from apps.core.models import Societe
+
+        if Societe.get().source_mode == Societe.SYNCHRO_MIROIR:
+            journal("Synchronisation du dossier d'origine : " + commande("synchroniser_dossier")[0])
+
+    tache_periodique("Synchronisation", 3600, synchroniser, attendre_d_abord=True)
+    taches.append("synchronisation du dossier d'origine toutes les heures (si elle a été commencée à l'écran)")
+
+    from apps.echanges import synchro
+
+    boite = synchro.boite_configuree()
+    if boite is not None:
+        minutes = float(os.environ.get("ECHANGES_INTERVALLE_MINUTES") or 5)
+
+        def echanger():
+            bilan = synchro.synchroniser(boite)
+            if bilan.envoyes or bilan.recus or bilan.erreurs:      # le journal ne se remplit pas de passages vides
+                journal(f"Échanges ({boite}) : {bilan.texte()}")
+
+        tache_periodique("Échanges", minutes * 60, echanger)
+        taches.append(f"échanges direction / agences toutes les {minutes:g} min → {boite}")
+    return taches
+
+
+SIMULATION = {"processus": None}
+FICHIERS_SIMULATION = ("simulation.sqlite3", "simulation.sqlite3-wal", "simulation.sqlite3-shm", "BILAN-SIMULATION.md",
+                       "simulation-journal.txt")
+
+
+def demarrer_simulation(donnees, port, arguments=None):
+    """Serveur de simulation (dossier séparé), dans un second processus qui s'arrête avec le programme.
+    arguments (mois de départ, durée) : la simulation est d'abord fabriquée (comptez une heure par mois)."""
+    if arguments is None and not (donnees / "simulation.sqlite3").exists():
+        return None
+    from django.contrib.auth import get_user_model
+
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("SQLITE_FICHIER", "ERP_ASSISTANT", "ERP_LICENCE", "ERP_DOSSIER_DONNEES", "ERP_SERVICE")
+           and not k.startswith("DB_") and not k.startswith(("MIROIR_", "ECHANGES_"))}
+    env.update(ERP_SANS_NAVIGATEUR="1", ERP_SOUS_PROCESSUS="1", PYTHONUNBUFFERED="1",
+               ERP_ADMIN_COMPTES=json.dumps(list(get_user_model().objects.filter(is_superuser=True, is_active=True)
+                                                 .values_list("username", "password"))))
+    programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
+    sortie = open(donnees / "simulation-journal.txt", "a", encoding="utf-8")
+    processus = subprocess.Popen(programme + ["simulation", *(arguments or [])], env=env, stdout=sortie,
+                                 stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+    sortie.close()
+    SIMULATION["processus"] = processus
+    import atexit
+
+    atexit.register(processus.terminate)
+    return f"simulation : http://127.0.0.1:{port + 1}"
+
+
+def etat_simulation(donnees, port):
+    p = SIMULATION["processus"]
+    vivant = p is not None and p.poll() is None
+    if deja_demarre(port + 1):
+        etat = "prete"
+    elif vivant:
+        etat = "preparation"
+    elif (donnees / "simulation.sqlite3").exists():
+        etat = "arretee"
+    else:
+        etat = "absente"
+    journal_ = donnees / "simulation-journal.txt"
+    lignes = journal_.read_text(encoding="utf-8", errors="replace").splitlines()[-15:] if journal_.exists() else []
+    return {"etat": etat, "port": port + 1, "journal": "\n".join(lignes) if etat != "prete" else ""}
+
+
+def racine_dossiers(donnees):
+    return Path(os.environ.get("ERP_DOSSIER_RACINE") or donnees)
+
+
+def creer_simulation(donnees, port, debut, duree, criteres=None):
+    from apps.core import dossiers_simulation as ds
+
+    p = SIMULATION["processus"]
+    if p is not None and p.poll() is None:
+        raise ValueError("une génération est déjà en cours")
+    criteres = ds.normaliser_criteres(criteres)
+    identifiant, dossier = ds.creer(racine_dossiers(donnees), debut, duree, criteres)
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("SQLITE_", "ERP_", "DB_", "MIROIR_", "ECHANGES_", "DJANGO_")) and k != "SECRET_KEY"}
+    env.update(ERP_DONNEES=str(dossier), ERP_EDITION="transport", ERP_SANS_NAVIGATEUR="1",
+               ERP_SOUS_PROCESSUS="1", ERP_PARENT_DONNEES=str(racine_dossiers(donnees)),
+               PYTHONUNBUFFERED="1", CONTROLE_HEURE_DEPART="0")
+    programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
+    try:
+        with (dossier / "simulation-journal.txt").open("w", encoding="utf-8") as sortie:
+            processus = subprocess.Popen(programme + ["simulation-dossier", debut, duree, json.dumps(criteres)], env=env, stdout=sortie,
+                                         stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+        SIMULATION.update(processus=processus, dossier=identifiant)
+    except OSError as exc:
+        ds.terminer(dossier, str(exc))
+        raise
+    return identifiant
+
+
+def supprimer_simulation(donnees, identifiant=""):
+    from apps.core import dossiers_simulation as ds
+
+    racine = racine_dossiers(donnees)
+    if not identifiant:
+        dossiers = ds.lister(racine)
+        if len(dossiers) != 1:
+            raise ValueError("choisissez le dossier fictif à supprimer")
+        identifiant = dossiers[0]["id"]
+    if ds.identifiant_actif(racine) == identifiant:
+        raise ValueError("revenez d'abord au dossier de la société")
+    p = SIMULATION["processus"]
+    if SIMULATION.get("dossier") == identifiant and p is not None and p.poll() is None:
+        p.terminate()
+        try:
+            p.wait(15)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait(10)
+        SIMULATION.update(processus=None, dossier="")
+    elif ds.generation_active(ds.emplacement(racine, identifiant)):
+        raise ValueError("cette génération appartient à un autre démarrage ; vérifiez son arrêt avant suppression")
+    ds.supprimer(racine, identifiant)
+
+
+def arreter_simulation(donnees):
+    """Demande l'arrêt PROPRE de la génération en cours : elle termine le mois en cours puis s'arrête
+    (données déjà produites conservées et consultables), au lieu d'être tuée en plein mois."""
+    from apps.core import dossiers_simulation as ds
+
+    identifiant = SIMULATION.get("dossier")
+    p = SIMULATION["processus"]
+    if not identifiant or p is None or p.poll() is not None:
+        raise ValueError("aucune génération n'est en cours")
+    ds.demander_arret(ds.emplacement(racine_dossiers(donnees), identifiant))
+    return identifiant
+
+
+def ouvrir_dossier(donnees, identifiant, utilisateur):
+    from apps.core import dossiers_simulation as ds
+
+    racine = racine_dossiers(donnees)
+    p = SIMULATION["processus"]
+    if p is not None and p.poll() is None:
+        raise ValueError("attendez la fin de la génération ou supprimez le dossier en préparation avant de changer de société")
+    if identifiant:
+        dossier = ds.emplacement(racine, identifiant)
+        ds.verifier_manifeste(ds.lire_json(dossier / ds.MANIFESTE))
+        # La première ouverture d'un dossier généré crée l'administrateur local.
+        with ds.ouvrir_base(dossier / ds.BASE) as c:
+            administrateurs = c.execute("SELECT count(*) FROM auth_user WHERE is_active=1 AND is_superuser=1").fetchone()[0]
+        if not administrateurs:
+            ds.nettoyer_copie(dossier / ds.BASE, utilisateur)
+    ds.prevoir_ouverture(racine, identifiant, sauvegarde_immediate(donnees))
+
+
+def importer_dossier(donnees, fichier, utilisateur):
+    from django.db.migrations.loader import MigrationLoader
+    from apps.core import dossiers_simulation as ds
+
+    return ds.importer(racine_dossiers(donnees), fichier, utilisateur, MigrationLoader(None).disk_migrations)
+
+
+def importer_ancienne_simulation(donnees, utilisateur):
+    from apps.core import dossiers_simulation as ds
+
+    racine = racine_dossiers(donnees)
+    ancienne = racine / "simulation.sqlite3"
+    ds.verifier_base(ancienne)
+    identifiant, dossier = ds.creer(racine, "ancienne", "")
+    try:
+        ds.copier_base(ancienne, dossier / ds.BASE)
+        ds.nettoyer_copie(dossier / ds.BASE, utilisateur)
+        ds.terminer(dossier)
+    except BaseException:
+        shutil.rmtree(dossier)
+        raise
+    return identifiant
+
+
+def preparer_sqlserver(donnees):
+    """Base SQL Server choisie : créée si elle n'existe pas, refusée si elle contient d'autres tables.
+    En cas d'échec, la configuration revient à SQLite (le logiciel reste utilisable) et l'erreur est montrée à
+    l'écran Base de données / dans l'assistant. Renvoie False s'il faut relancer le programme."""
+    from django.conf import settings
+
+    reglage = settings.DATABASES["default"]
+    if reglage["ENGINE"] != "mssql":
+        return True
+    try:
+        from apps.core.management.commands.miroir import controler_tables, creer_base_sqlserver
+
+        creer_base_sqlserver(reglage, journal)
+        controler_tables("default")
+        (donnees / "erreur-base.txt").unlink(missing_ok=True)
+        return True
+    except Exception as exc:
+        message = f"SQL Server {reglage.get('HOST')} / {reglage['NAME']} inutilisable : {exc}"[:600]
+        journal(message + " — retour sur SQLite")
+        (donnees / "erreur-base.txt").write_text(message, encoding="utf-8")
+        modifier_configuration(donnees, {"DB_ENGINE": "sqlite"})
+        return False
+
+
+def relancer():
+    """Nouveau départ avec la configuration relue (en service Windows : le service se relance tout seul)."""
+    if os.environ.get("ERP_SERVICE"):
+        return 1
+    programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
+    options = {"creationflags": subprocess.CREATE_NEW_CONSOLE} if os.name == "nt" else {"start_new_session": True}
+    subprocess.Popen(programme + ["redemarrage"], env=dict(ENVIRONNEMENT_INITIAL), stdin=subprocess.DEVNULL, **options)
+    return 0
+
+
+def redemarrer(port):
+    """Relance le programme (nouvelle fenêtre) puis arrête celui-ci : le nouveau attend que le port se libère."""
+    p = SIMULATION["processus"]
+    if p is not None and p.poll() is None:
+        p.terminate()
+    journal("Redémarrage demandé à l'écran")
+    if os.environ.get("ERP_SERVICE"):                             # service Windows : il se relance tout seul
+        threading.Timer(1.5, os._exit, [3]).start()
+        return f"Redémarrage du service (port {port})"
+    programme = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(Path(__file__).resolve())]
+    env = {**ENVIRONNEMENT_INITIAL, "ERP_SANS_NAVIGATEUR": "1"}
+    options = {"creationflags": subprocess.CREATE_NEW_CONSOLE} if os.name == "nt" else {"start_new_session": True}
+    subprocess.Popen(programme + ["redemarrage"], env=env, stdin=subprocess.DEVNULL, **options)
+    threading.Timer(1.5, os._exit, [0]).start()
+    return f"Redémarrage en cours (port {port})"
+
+
+def deja_demarre(port):
+    with socket.socket() as s:
+        s.settimeout(1)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def ouvrir_pare_feu(port):
+    if os.name != "nt":
+        return
+    regle = f"ERP OHADA (port {port})"
+    if subprocess.run(["netsh", "advfirewall", "firewall", "show", "rule", f"name={regle}"], capture_output=True).returncode == 0:
+        return
+    ajout = subprocess.run(["netsh", "advfirewall", "firewall", "add", "rule", f"name={regle}", "dir=in", "action=allow",
+                            "protocol=TCP", f"localport={port}", "profile=private,domain"], capture_output=True)
+    if ajout.returncode != 0:
+        print("  Pare-feu : acceptez la question de Windows (cochez « Réseaux privés ») pour les autres postes.")
+
+
+def adresses_reseau():
+    try:
+        return sorted({i[4][0] for i in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+                       if not i[4][0].startswith("127.")})
+    except OSError:
+        return []
+
+
+# ---------------------------------------------------------------- Démarrage
+def initialiser(edition_, donnees, demander_compte=True):
+    """Base, référentiels et comptes au premier démarrage (rien n'est effacé ensuite). Le compte administrateur se crée
+    dans le navigateur (assistant de premier démarrage) ; ERP_ADMIN / ERP_ADMIN_MDP le créent sans question."""
+    from django.contrib.auth import get_user_model
+    from django.core.management import call_command
+
+    from apps.comptabilite.models import Compte
+    from apps.core.models import Societe
+
+    call_command("migrate", interactive=False, verbosity=0)
+    if not Compte.objects.exists():
+        print("Premier démarrage : création de la base, plan comptable, journaux et exercice…")
+        call_command("init_erp", "--activite", edition_, verbosity=0)
+        if demander_compte:
+            Societe.objects.filter(pk=Societe.get().pk).update(assistant_termine=False)
+    if base_sqlite() is not None and not os.environ.get("ERP_SOUS_PROCESSUS"):
+        (donnees / "base-creee.txt").write_text(f"{base_sqlite()}\n", encoding="utf-8")
+    U = get_user_model()
+    if U.objects.filter(is_superuser=True).exists():
+        return
+    if os.environ.get("ERP_ADMIN_COMPTES"):                       # simulation : mêmes identifiants que la vraie base
+        for identifiant, empreinte in json.loads(os.environ["ERP_ADMIN_COMPTES"]):
+            U.objects.create(username=identifiant, password=empreinte, is_superuser=True, is_staff=True, is_active=True)
+        return
+    if os.environ.get("ERP_ADMIN") and os.environ.get("ERP_ADMIN_MDP"):
+        u = U(username=os.environ["ERP_ADMIN"], is_superuser=True, is_staff=True, is_active=True)
+        u.set_password(os.environ["ERP_ADMIN_MDP"])
+        u.save()
+        print(f"Compte administrateur prêt : {u.username}")
+    elif demander_compte:
+        print("  Premier démarrage : le navigateur va s'ouvrir pour créer le compte administrateur,")
+        print("  puis renseigner la société et le rôle de ce serveur (direction, agence ou site unique).")
+
+
+def inscrire_base_au_catalogue(donnees):
+    """Inscrit la base de la société au catalogue multi-sociétés, sans jamais bloquer le démarrage.
+
+    Rend « Ouvrir une société » et la clôture annuelle utilisables : la base courante apparaît dans
+    le catalogue dès que la société a été nommée (assistant de premier démarrage terminé). C'est une
+    fonction de confort : toute erreur est ignorée et le logiciel démarre quoi qu'il arrive.
+    """
+    try:
+        catalogue = os.environ.get("ERP_CATALOGUE_SOCIETES", "").strip()
+        base = base_sqlite()
+        if not catalogue or base is None:
+            return
+        from django.core.management import call_command
+        from apps.core.catalogue_societes import lire_catalogue
+        from apps.core.models import Exercice, Societe
+
+        societe = Societe.objects.first()
+        if societe is None or not societe.assistant_termine:
+            return                                    # attendre le vrai nom (assistant de premier démarrage)
+        exercice = (Exercice.objects.filter(cloture=False).order_by("-date_fin").first()
+                    or Exercice.objects.order_by("-date_fin").first())
+        if exercice is None or not (len(exercice.code) == 4 and exercice.code.isdigit()):
+            return                                    # le catalogue attend une année AAAA
+        cible = str(base.resolve())
+        try:
+            existantes = lire_catalogue(catalogue) if Path(catalogue).is_file() else []
+        except (OSError, ValueError):
+            return
+        for entree in existantes:
+            if entree.get("moteur") == "sqlite":
+                try:
+                    if Path(entree["base"]).resolve() == Path(cible):
+                        return                        # déjà inscrite : rien à faire
+                except OSError:
+                    continue
+        call_command("inscrire_base_catalogue", societe=societe.raison_sociale, agence="Siège",
+                     exercice=exercice.code, base=cible, catalogue=catalogue)
+        journal(f"Base inscrite au catalogue multi-sociétés : {societe.raison_sociale} ({exercice.code})")
+    except Exception as exc:                          # confort : ne jamais empêcher le démarrage
+        try:
+            journal(f"Catalogue multi-sociétés : inscription ignorée ({str(exc)[:160]})")
+        except Exception:
+            pass
+
+
+def _navigateur_chromium():
+    """Chemin d'un navigateur Chromium récent (Edge puis Chrome) sur Windows, sinon None.
+
+    Sur un Windows 10 fraîchement installé et pas entièrement à jour, le navigateur par
+    défaut peut être l'ancien Edge (EdgeHTML) ou Internet Explorer, qui n'exécutent pas le
+    JavaScript moderne : l'interface s'affiche mais « rien ne réagit aux clics ». Windows
+    Server et Windows 11 ont d'office un Edge Chromium, d'où la différence de comportement.
+    On repère donc un moteur récent plutôt que de dépendre du navigateur par défaut du poste."""
+    if os.name != "nt":
+        return None
+    for var in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        base = os.environ.get(var)
+        if not base:
+            continue
+        for chemin in (Path(base) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+                       Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe"):
+            try:
+                if chemin.is_file():
+                    return chemin
+            except OSError:
+                continue
+    return None
+
+
+def ouvrir_interface(adresse):
+    """Ouvre l'interface de l'ERP de façon identique sur Windows 10, 11 et Windows Server.
+
+    Quand un Chromium récent (Edge ou Chrome) est présent, on l'ouvre en mode application,
+    avec un profil dédié à l'ERP : l'interface fonctionne alors quel que soit le navigateur
+    par défaut du poste. À défaut, on retombe sur le navigateur par défaut du système."""
+    chromium = _navigateur_chromium()
+    if chromium is not None:
+        try:
+            profil = Path(os.environ.get("LOCALAPPDATA") or dossier_donnees()) / "ERP-OHADA-Navigateur"
+            subprocess.Popen([str(chromium), f"--app={adresse}", f"--user-data-dir={profil}",
+                              "--no-first-run", "--no-default-browser-check"],
+                             stdin=subprocess.DEVNULL)
+            return
+        except OSError:
+            pass
+    try:
+        webbrowser.open(adresse)
+    except Exception:
+        print(f"  Ouvrez un navigateur récent (Microsoft Edge ou Google Chrome à jour) sur : {adresse}")
+
+
+def servir(port, reseau=False, ouvrir=True, resume=()):
+    from waitress import serve
+
+    from erp.wsgi import application
+
+    hote = "0.0.0.0" if reseau else "127.0.0.1"
+    adresse = f"http://127.0.0.1:{port}"
+    # Logiciel de simulation autonome : ouvrir directement l'atelier de simulation.
+    cible = adresse + ("/poste/?onglet=simulation" if os.environ.get("ERP_SIMULATEUR") else "")
+    print(f"\n  ERP OHADA {edition().capitalize()} : {adresse}")
+    if reseau:
+        for ip in adresses_reseau():
+            print(f"  Autres postes du réseau : http://{ip}:{port}")
+        ouvrir_pare_feu(port)
+    for ligne in resume:
+        print(f"  {ligne}")
+    print("  Gardez cette fenêtre ouverte ; fermez-la pour tout arrêter.\n")
+    if ouvrir and not os.environ.get("ERP_SANS_NAVIGATEUR"):
+        threading.Thread(target=lambda: (time.sleep(2), ouvrir_interface(cible)), daemon=True).start()
+    serve(application, host=hote, port=port, threads=16 if reseau else 8)
+
+
+def lien_demarrage():
+    dossier = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    return dossier / f"ERP OHADA {edition().capitalize()}.bat"
+
+
+def lien_installateur():
+    """Raccourci « Démarrage » pour tous les utilisateurs, posé par l'installateur (option cochée)."""
+    dossier = Path(os.environ.get("ProgramData", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "StartUp"
+    return dossier / f"ERP OHADA {edition().capitalize()}.lnk"
+
+
+def installation_prevue(donnees):
+    """Rôle choisi dans l'installateur (et fichier de l'agence), proposé par l'assistant du premier démarrage."""
+    role, fichier = donnees / "role-installation.txt", donnees / "installation-agence.erpx"
+    cle = donnees / "installation.dat"
+    from apps.licences.licence import ouvrir_stockage
+    return {"role": role.read_text(encoding="utf-8").strip() if role.exists() else "",
+            "fichier_agence": fichier if fichier.exists() else None,
+            "cle_installation": ouvrir_stockage(cle.read_text(encoding="ascii")) if cle.exists() else ""}
+
+
+def demarrage_automatique():
+    """Lien dans le dossier Démarrage de Windows : le programme démarre à l'ouverture de session (sans navigateur)."""
+    if os.name != "nt":
+        return "Le démarrage automatique se règle sous Windows."
+    lien = lien_demarrage()
+    if lien.exists():
+        lien.unlink()
+        return "Démarrage automatique retiré."
+    lien.parent.mkdir(parents=True, exist_ok=True)
+    lien.write_text(f'@echo off\r\nset ERP_SANS_NAVIGATEUR=1\r\nstart "ERP OHADA" /min "{sys.executable}"\r\n', encoding="utf-8")
+    return "Le logiciel démarrera à chaque ouverture de session Windows sur ce poste."
+
+
+def enregistrer_actions(donnees, port):
+    """Écran Fichier › Administration du poste (apps.core.poste) : ce que le programme sait faire sur ce serveur."""
+    from apps.core import poste
+
+    def etat():
+        from apps.core import dossiers_simulation as ds
+        base = base_sqlite()
+        return {
+            "edition": edition(), "port": port, "donnees": str(donnees), "base": str(base or "SQL Server"),
+            "taille_base": base.stat().st_size if base and base.exists() else 0,
+            "windows": os.name == "nt", "demarrage_auto": os.name == "nt" and lien_demarrage().exists(),
+            "demarrage_installateur": os.name == "nt" and lien_installateur().exists(),
+            "service": bool(os.environ.get("ERP_SERVICE")),
+            "sauvegarde_heures": os.environ.get("ERP_SAUVEGARDE_HEURES") or "4",
+            "sauvegarde_garder": os.environ.get("ERP_SAUVEGARDE_GARDER") or "60",
+            "sauvegarde_copie": os.environ.get("ERP_SAUVEGARDE_COPIE", ""),
+            "sauvegardes": [{"nom": f.name, "taille": f.stat().st_size,
+                             "date": datetime.datetime.fromtimestamp(f.stat().st_mtime)} for f in reversed(sauvegardes(donnees))][:30],
+            "restauration_prevue": restauration_prevue(donnees),
+            "simulation": {"etat": "absente"},
+            "simulations": ds.lister(racine_dossiers(donnees)),
+            "simulation_active": ds.identifiant_actif(racine_dossiers(donnees)),
+            "ancienne_simulation": (racine_dossiers(donnees) / "simulation.sqlite3").is_file(),
+            "erreur_dossier": ((racine_dossiers(donnees) / "dossier-erreur.txt").read_text(encoding="utf-8")
+                                if (racine_dossiers(donnees) / "dossier-erreur.txt").exists() else ""),
+            "mois_courant": f"{datetime.date.today():%Y}-01"}
+
+    def sauvegarder_maintenant():
+        resultat = sauvegarde_immediate(donnees)()
+        journal(f"Sauvegarde (à l'écran) : {resultat}")
+        return resultat
+
+    poste.ACTIONS.update(
+        etat=etat, sauvegarder=sauvegarder_maintenant,
+        restaurer_au_demarrage=lambda nom: prevoir_restauration(donnees, nom),
+        simulation_creer=lambda debut, duree, criteres=None: creer_simulation(donnees, port, debut, duree, criteres),
+        simulation_supprimer=lambda identifiant="": supprimer_simulation(donnees, identifiant),
+        simulation_arreter=lambda: arreter_simulation(donnees),
+        dossier_exporter=lambda identifiant: __import__("apps.core.dossiers_simulation", fromlist=["exporter"]).exporter(racine_dossiers(donnees), identifiant),
+        dossier_importer=lambda fichier, utilisateur: importer_dossier(donnees, fichier, utilisateur),
+        dossier_ouvrir=lambda identifiant, utilisateur: ouvrir_dossier(donnees, identifiant, utilisateur),
+        dossier_ancienne=lambda utilisateur: importer_ancienne_simulation(donnees, utilisateur),
+        demarrage_auto_basculer=demarrage_automatique,
+        configurer=lambda valeurs: modifier_configuration(donnees, valeurs),
+        planification=lambda: PLANIFICATEUR["objet"].resume() if PLANIFICATEUR["objet"] else {},
+        erreur_base=lambda: ((donnees / "erreur-base.txt").read_text(encoding="utf-8")
+                             if (donnees / "erreur-base.txt").exists() else ""),
+        redemarrer=lambda: redemarrer(port),
+        nouveau_fichier_sqlite=lambda: donnees / ("erp.sqlite3" if not (donnees / "erp.sqlite3").exists()
+                                                  else f"erp-{datetime.datetime.now():%Y%m%d-%H%M%S}.sqlite3"),
+        restaurer_sqlserver_au_demarrage=lambda fichier: (
+            (donnees / "restaurer-sqlserver.txt").write_text(fichier, encoding="utf-8") if fichier
+            else (donnees / "restaurer-sqlserver.txt").unlink(missing_ok=True)),
+        restauration_sqlserver_prevue=lambda: ((donnees / "restaurer-sqlserver.txt").read_text(encoding="utf-8").strip()
+                                               if (donnees / "restaurer-sqlserver.txt").exists() else ""),
+        installation_prevue=lambda: installation_prevue(donnees))
+
+
+def main(argv):
+    edition_ = edition()
+    port = int(os.environ.get("ERP_PORT") or PORTS.get(edition_, 8000))
+    action = argv[0] if argv else ""
+    if action == "__erp_internal_migrate_sqlite__":
+        # Sous-processus réservé au moteur de clôture N→N+1 du programme natif.
+        # Il ne reçoit aucune commande Python arbitraire : uniquement migrate sur
+        # le fichier SQLite explicitement configuré par le processus parent.
+        jeton_attendu = os.environ.pop("ERP_INTERNAL_MIGRATION_TOKEN", "")
+        jeton_fourni = argv[1] if len(argv) == 2 else ""
+        if (not getattr(sys, "frozen", False) or not jeton_attendu or
+                not secrets.compare_digest(jeton_attendu, jeton_fourni)):
+            print("Commande interne de migration refusée.")
+            return 2
+        base = Path(os.environ.get("SQLITE_FICHIER", ""))
+        if (os.environ.get("DB_ENGINE", "sqlite").lower() != "sqlite" or
+                not base.is_absolute() or not base.is_file()):
+            print("Migration interne : fichier SQLite absolu requis.")
+            return 2
+        os.environ["DJANGO_SETTINGS_MODULE"] = "erp.settings"
+        os.environ["ERP_ASSISTANT"] = "0"
+        os.environ["ERP_LICENCE"] = "0"
+        os.environ["MIROIR_DB_ENGINE"] = ""
+        os.environ.pop("ERP_DOSSIER_SIMULATION", None)
+        import django
+        django.setup()
+        from django.core.management import call_command
+        call_command("migrate", interactive=False, verbosity=1)
+        return 0
+    if getattr(sys, "frozen", False) and action in ("manage", "simulation"):
+        # L'entrée de maintenance Python permettrait sinon de lancer un serveur
+        # de développement avant le contrôle de licence, ou d'exécuter du code.
+        print("Commande réservée à l'atelier de développement. Dans ce programme client, utilisez Administration du poste.")
+        return 2
+    if action in ("sans-navigateur", "service"):                  # démarrage Windows, ou service Windows
+        os.environ["ERP_SANS_NAVIGATEUR"] = "1"
+        if action == "service":
+            os.environ["ERP_SERVICE"] = "1"
+        action, argv = "", argv[1:]
+    if action == "ouvrir":                                        # le serveur tourne en service : ouvrir le navigateur
+        for _ in range(240):
+            if deja_demarre(port):
+                ouvrir_interface(f"http://127.0.0.1:{port}")
+                return 0
+            time.sleep(0.5)
+        print(f"Le serveur ne répond pas sur le port {port} : vérifiez le service « ERP OHADA {edition_.capitalize()} ».")
+        return 1
+    if action == "dossier":
+        print(dossier_donnees())
+        return 0
+    if action == "demarrage-auto":
+        print(demarrage_automatique())
+        return 0
+    if action == "manage":
+        preparer_environnement()
+        from django.core.management import execute_from_command_line
+
+        execute_from_command_line(["manage.py", *argv[1:]])
+        return 0
+    if action == "simulation-dossier":
+        # Travail de génération uniquement : aucun serveur ni navigateur secondaire.
+        os.environ.update(DB_ENGINE="sqlite", ERP_LICENCE="0", ERP_ASSISTANT="0", CONTROLE_HEURE_DEPART="0",
+                          SQLITE_FICHIER=str(dossier_donnees() / "simulation.sqlite3"))
+        donnees = preparer_environnement(base="simulation.sqlite3")
+        from apps.core import dossiers_simulation as ds
+        if donnees.parent.name != "dossiers-simulation" or not re.fullmatch(r"[a-f0-9]{32}", donnees.name):
+            raise ValueError("La génération exige un dossier fictif créé par l'administration.")
+        import django
+        django.setup()
+        from django.core.management import call_command
+        from apps.core.models import Societe
+        with ds.verrou_generation(donnees):
+            try:
+                call_command("migrate", interactive=False, verbosity=0)
+                debut, duree = argv[1:3]
+                periode = ["--jusqu-au", "aujourdhui"] if duree == "aujourdhui" else ["--nombre-mois", duree]
+                rapide = (["--jours", "1", "--vehicules", "2", "--salaries", "2", "--echelle", "0.005"]
+                          if "--essai-rapide" in argv and not getattr(sys, "frozen", False) else [])
+                criteres = ds.normaliser_criteres(json.loads(argv[3]) if len(argv) > 3 and argv[3].startswith("{") else None)
+                metier = (["--scenarios-complets"] if criteres["scenarios_complets"] else [])
+                metier += ["--departs-jour", str(criteres["departs_jour"]), "--echelle", str(criteres["echelle"])]
+                if criteres.get("agences"):
+                    metier += ["--agences", str(criteres["agences"])]
+                if rapide and criteres["scenarios_complets"]:
+                    metier += ["--departs-jour", "4"]
+                from apps.transport.management.commands.simulation import Command as _CommandeSimulation
+                cmd = _CommandeSimulation()
+                call_command(cmd, "--mois", debut, *periode, *metier, *rapide,
+                             "--journal-scenarios", str(donnees / "SCENARIOS-SIMULATION.json"),
+                             "--rapport", str(donnees / "BILAN-SIMULATION.md"))
+                initialiser(edition_, donnees, demander_compte=False)
+                Societe.objects.update(assistant_termine=True)
+                dernier = str(cmd.par_mois[-1][1])[:7] if getattr(cmd, "par_mois", None) else ""
+                ds.terminer(donnees, interrompu=getattr(cmd, "interrompu", False), dernier_mois=dernier)
+                return 0
+            except Exception as exc:
+                ds.terminer(donnees, str(exc))
+                raise
+    if action == "simulation":
+        os.environ["CONTROLE_HEURE_DEPART"] = "0"
+        os.environ["MIROIR_DB_ENGINE"] = ""                     # jamais de copie miroir d'un dossier fictif
+        os.environ["DB_ENGINE"] = "sqlite"                      # toujours son propre fichier, jamais la vraie base SQL
+        for cle in ("ECHANGES_RELAIS_URL", "ECHANGES_DOSSIER_PARTAGE"):
+            os.environ[cle] = ""                                # ni d'échange avec les vraies agences
+        donnees = preparer_environnement(base="simulation.sqlite3")
+        import django
+
+        django.setup()
+        from django.core.management import call_command
+
+        from apps.transport.models import Depart
+
+        call_command("migrate", interactive=False, verbosity=0)
+        if not Depart.objects.exists():
+            # simulation 3 (3 mois dès 09/2026) · simulation 2026-01 (jusqu'à aujourd'hui) · simulation 2026-01 6
+            debut = next((a for a in argv[1:] if "-" in a), None)
+            duree = next((a for a in argv[1:] if "-" not in a), None)
+            periode = ["--nombre-mois", duree or "1"] if duree or not debut else ["--jusqu-au", "aujourdhui"]
+            print(f"Simulation à partir de {debut or '2026-09'} ({duree + ' mois' if duree else 'jusqu à aujourd hui' if debut else '1 mois'}, "
+                  "données fictives) : comptez environ une heure par mois.")
+            call_command("simulation", "--mois", debut or "2026-09", *periode,
+                         "--rapport", str(donnees / "BILAN-SIMULATION.md"))
+        initialiser(edition_, donnees, demander_compte=False)
+        if not os.environ.get("ERP_SOUS_PROCESSUS"):
+            os.environ["ERP_ASSISTANT"] = "1"                     # lancée seule : compte créé dans le navigateur
+        servir(port + 1, reseau=os.environ.get("ERP_RESEAU", "1") != "0")
+        return 0
+    donnees = preparer_environnement()
+    if action == "sauvegarder":
+        base = base_sqlite()
+        if base is None or not base.exists():
+            print("Pas de base SQLite à sauvegarder.")
+            return 1
+        print(f"Sauvegarde : {sauvegarder(base, donnees)}")
+        return 0
+    if action == "restaurer":
+        if deja_demarre(port):
+            print("Arrêtez d'abord le logiciel (fermez sa fenêtre), puis relancez la restauration.")
+            return 1
+        return restaurer(donnees, argv[1] if len(argv) > 1 else None)
+    if action == "redemarrage":                                   # demandé à l'écran : attendre l'arrêt de l'ancien
+        for _ in range(120):
+            if not deja_demarre(port):
+                break
+            time.sleep(0.5)
+        action = ""
+    if deja_demarre(port):
+        print(f"Le logiciel est déjà démarré sur ce poste : http://127.0.0.1:{port}")
+        if not os.environ.get("ERP_SANS_NAVIGATEUR"):
+            ouvrir_interface(f"http://127.0.0.1:{port}")
+        return 0
+    prevue = restauration_prevue(donnees)
+    if prevue:                                                    # demandée à l'écran Administration du poste
+        (donnees / "restaurer-au-demarrage.txt").unlink()
+        restaurer(donnees, str(donnees / "sauvegardes" / prevue))
+    if not controler_base(donnees):
+        return 1
+    if os.environ.get("ERP_SIMULATEUR"):                          # logiciel de simulation autonome (portable)
+        os.environ["ERP_ASSISTANT"] = "0"                         # base prête, pas d'assistant de société
+        os.environ.setdefault("ERP_ADMIN", "simulateur")          # compte par défaut (données fictives, hors production)
+        os.environ.setdefault("ERP_ADMIN_MDP", "simulateur")
+    else:
+        os.environ.setdefault("ERP_ASSISTANT", "1")               # premier démarrage : assistant dans le navigateur
+    os.environ["ERP_LICENCE"] = "0" if (os.environ.get("ERP_DOSSIER_SIMULATION")
+                                        or os.environ.get("ERP_SIMULATEUR")) else "1"
+    # Comme l'ancien serveur de simulation, un dossier fictif identifié est en démonstration.
+    # Le choix résulte du catalogue local vérifié, pas d'une variable de désactivation de licence.
+    # Dossier de la société : contrôle toujours actif :
+    #   ni configuration.env ni une variable d'environnement ne peuvent désactiver le contrôle de licence.
+    import django
+
+    django.setup()
+    if not preparer_sqlserver(donnees):
+        return relancer()
+    marqueur = donnees / "restaurer-sqlserver.txt"
+    if marqueur.exists():                                         # demandée à l'écran Base de données
+        from django.conf import settings
+
+        from apps.core.base_donnees import restaurer_sqlserver
+
+        fichier = marqueur.read_text(encoding="utf-8").strip()
+        marqueur.unlink()
+        journal(f"Restauration SQL Server depuis {fichier} (base actuelle sauvegardée dans "
+                f"{restaurer_sqlserver(settings.DATABASES['default'], fichier)})")
+    if not os.environ.get("ERP_DOSSIER_SIMULATION"):
+        # Catalogue multi-sociétés du poste (pour « Ouvrir une société » et la clôture annuelle).
+        os.environ.setdefault("ERP_CATALOGUE_SOCIETES", str(donnees / "societes.json"))
+    initialiser(edition_, donnees)
+    inscrire_base_au_catalogue(donnees)              # confort, jamais bloquant
+    from apps.licences.licence import proteger_ancienne_installation
+
+    proteger_ancienne_installation(donnees)
+    enregistrer_actions(donnees, port)
+    reseau = action != "local" and os.environ.get("ERP_RESEAU", "1") != "0"
+    resume = [f"Données : {donnees}"] + demarrer_taches(donnees)
+    servir(port, reseau=reseau, resume=resume)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
+

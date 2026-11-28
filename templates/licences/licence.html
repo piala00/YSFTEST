@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Licence{% endblock %}
+{% block content %}
+<div class="page-title"><h1><i class="bi bi-key" style="color:var(--module)"></i> Licence</h1></div>
+{% include "core/_onglets_poste.html" %}
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6">État</h2>
+    {% if etat.mode == "licence" %}
+    <table class="table table-sm small mb-2"><tbody>
+      <tr><th>Licence</th><td>{{ etat.licence.numero }}</td></tr>
+      <tr><th>Client</th><td>{{ etat.licence.client }}{% if etat.licence.niu %} · NIU {{ etat.licence.niu }}{% endif %}</td></tr>
+      <tr><th>Édition</th><td>{{ etat.licence.edition|capfirst }}</td></tr>
+      <tr><th>Rôle du serveur</th><td>{% for k, v in roles.items %}{% if k == etat.licence.role %}{{ v }}{% endif %}{% endfor %}{% if etat.licence.site %} ({{ etat.licence.site }}){% endif %}</td></tr>
+      <tr><th>Postes</th><td>{{ etat.postes }} · {{ actifs }} compte(s) actif(s)</td></tr>
+      <tr><th>Valable jusqu'au</th><td>{% if etat.echeance %}{{ etat.echeance|date:"d/m/Y" }}{% else %}licence définitive{% endif %}</td></tr>
+      {% if etat.licence.maj_jusqu_au %}<tr><th>Mises à jour jusqu'au</th><td>{{ etat.licence.maj_jusqu_au }}</td></tr>{% endif %}
+    </tbody></table>
+    {% else %}
+    <p class="small mb-2">Version d'essai : {{ etat.postes }} postes, {% if etat.lecture_seule %}<strong class="text-danger">terminée</strong>{% else %}encore <strong>{{ etat.ouvertures_restantes }} ouverture(s)</strong> sur {{ essai_ouvertures }}
+      (chaque connexion compte pour une), au plus tard jusqu'au {{ etat.echeance|date:"d/m/Y" }}{% endif %}
+      ({{ actifs }} compte(s) actif(s)).</p>
+    {% endif %}
+    {% if etat.message %}<div class="alert alert-{% if etat.lecture_seule %}danger{% elif etat.statut == 'grace' %}warning{% else %}info{% endif %} small py-2 mb-2">{{ etat.message }}</div>{% endif %}
+    {% if etat.probleme %}<div class="alert alert-warning small py-2 mb-2">Licence déposée non appliquée : {{ etat.probleme }}</div>{% endif %}
+    {% if etat.horloge_reculee %}<div class="alert alert-warning small py-2 mb-2">La date de cet ordinateur a reculé : vérifiez l'horloge de Windows.</div>{% endif %}
+    <div class="form-text">Une licence expirée ne bloque jamais la consultation, les états, les exports ni les sauvegardes.</div>
+    <a href="{% url 'tarifs' %}" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-tags"></i> Voir les tarifs / acquérir une licence</a>
+  </div></div>
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6">1. Clé d'installation</h2>
+    {% if installation %}
+    <p class="small mb-0"><i class="bi bi-check-circle text-success"></i> Installation <strong>{{ installation.reference }}</strong> enregistrée pour
+      <strong>{{ installation.societe }}</strong> (édition {{ installation.edition }}).</p>
+    {% else %}
+    <p class="small mb-1">Saisissez la clé d'installation remise par l'éditeur{% if not installation_requise %} (facultative dans cette version){% endif %} :</p>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="installation">
+      <textarea name="cle" rows="3" class="form-control form-control-sm font-monospace mb-2" required aria-label="Clé d'installation" placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX"></textarea>
+      <button class="btn btn-sm btn-primary">Enregistrer la clé d'installation</button></form>
+    {% endif %}
+  </div></div>
+  <div class="col-lg-6"><div class="card card-body h-100">
+    <h2 class="h6">2. Demande de licence (à envoyer à l'éditeur)</h2>
+    <table class="table table-sm small mb-2"><tbody>
+      <tr><th>Société</th><td>{{ demande.societe }}</td></tr>
+      <tr><th>Nom de la machine</th><td>{{ demande.machine_nom }}</td></tr>
+      <tr><th>Identifiant matériel du serveur</th><td><input id="identifiant-materiel" class="form-control form-control-sm font-monospace" value="{{ demande.materiel }}" readonly aria-label="Identifiant matériel du serveur"><button type="button" class="btn btn-sm btn-outline-secondary mt-1" id="copier-identifiant">Copier l’identifiant</button></td></tr>
+      <tr><th>Installation</th><td>{{ installation.reference|default:"—" }}</td></tr>
+      <tr><th>Rôle du serveur</th><td>{% for k, v in roles.items %}{% if k == demande.role %}{{ v }}{% endif %}{% endfor %}{% if demande.site %} ({{ demande.site }}){% endif %}</td></tr>
+    </tbody></table>
+    <a class="btn btn-sm btn-primary align-self-start" href="?demande=1"><i class="bi bi-download"></i> Télécharger la demande de licence</a>
+    <div class="form-text">Envoyez ce fichier (.erpdem) à l'éditeur par e-mail ou WhatsApp. Pour une société avec agences :
+      la demande du serveur de la direction, puis celle de chaque agence.</div>
+  </div></div>
+  <div class="col-12"><div class="card card-body">
+    <h2 class="h6">3. Activer la licence reçue</h2>
+    {% if not cles %}<div class="alert alert-warning small py-2">Activation indisponible dans cette version d'essai : l'identité de votre éditeur doit être intégrée au programme. Conservez votre licence et demandez la distribution personnalisée ; recréer des clés ou copier parametres.dat ne résout pas ce problème.</div>{% endif %}
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="action" value="fichier">
+      <label class="form-label small mb-1" for="fichier-licence">Choisissez le fichier de licence reçu (.erplic)</label>
+      <input id="fichier-licence" type="file" name="fichier" accept=".erplic" class="form-control form-control-sm mb-2" required>
+      <div class="form-text mb-2">Importez uniquement votre fichier .erplic. L’identité publique est intégrée au programme ; aucun fichier public à choisir, aucune copie dans les dossiers Windows. Le coffre privé reste chez l’éditeur.</div>
+      <button class="btn btn-primary">Installer la licence</button>
+    </form>
+    <div class="form-text mb-2">Lorsque l'identité de l'éditeur est intégrée, le fichier .erplic suffit : aucune deuxième clé ni fichier public n'est nécessaire. Il ne vaut que pour le serveur et l'édition prévus.</div>
+    {% if empreintes_publiques %}
+    <details class="mb-2"><summary class="small">Vérifier l'identité publique de l'éditeur</summary>
+      <p class="small mb-1">Comparez cette empreinte SHA-256 avec le guide reçu du propriétaire. Un fichier importé ne remplace pas l'autorité intégrée au programme.</p>
+      {% for empreinte in empreintes_publiques %}<div class="small font-monospace text-break">{{ empreinte }}</div>{% endfor %}
+    </details>
+    {% endif %}
+    <details class="mt-2"><summary class="small">Saisir une clé d’activation signée</summary>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="activation">
+        <label class="form-label small" for="cle-activation">Code d'activation alternatif</label>
+        <textarea id="cle-activation" name="cle" rows="3" class="form-control form-control-sm font-monospace mb-2" required></textarea>
+        <button class="btn btn-sm btn-outline-primary">Activer avec le code</button>
+      </form>
+    </details>
+    {% if not cles %}<div class="alert alert-secondary small py-2 mt-2 mb-0">Cette version ne contient pas encore la clé de vérification de l'éditeur : elle fonctionne en version d'essai.</div>{% endif %}
+  </div></div>
+  {% if historique %}<div class="col-12"><div class="card">
+    <div class="card-header bg-white fw-semibold small">Licences déposées</div>
+    <table class="table table-sm small mb-0"><thead><tr><th>Date</th><th>Par</th><th>Numéro</th><th>Client</th><th>Résultat</th></tr></thead><tbody>
+    {% for h in historique %}<tr><td>{{ h.deposee_le|date:"d/m/Y H:i" }}</td><td>{{ h.deposee_par|default:"" }}</td><td>{{ h.numero }}</td><td>{{ h.client }}</td>
+      <td>{% if h.valide %}<span class="text-success">acceptée</span>{% else %}<span class="text-danger">refusée</span> : {{ h.motif }}{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div></div>{% endif %}
+</div>
+<script>
+document.getElementById('copier-identifiant').addEventListener('click', async function () {
+  const champ = document.getElementById('identifiant-materiel');
+  champ.focus(); champ.select();
+  try {
+    if (navigator.clipboard) await navigator.clipboard.writeText(champ.value);
+    else if (!document.execCommand('copy')) throw new Error('copie');
+    this.textContent = 'Identifiant copié';
+  } catch (_) { this.textContent = 'Identifiant sélectionné — Ctrl+C'; }
+});
+</script>
+{% endblock %}
+

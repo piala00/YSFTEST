@@ -1,0 +1,4 @@
+interface:
+  display_name: "Compléments Cameroun et OHADA"
+  short_description: "Preuves tracées et limites pour ERP OHADA"
+  default_prompt: "Utilise $ohada-cameroun-complements-2026 pour répondre avec les sources et les limites de version."

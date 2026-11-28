@@ -1,0 +1,9 @@
+fichier;sha256;portee
+transmission-gpt-2026-10-24.zip;5bd4ff6008f0c4559a7a39f08449b59113fa394de66126e76be774c9f4d75c6e;"Archive transmise ; branche GitHub annoncée non vérifiée"
+apps/commercial/models.py;d4e519065870944f1aa5d839509dda9576c2beb2ac04930cab3962df7563f8df;Fichier source examiné, non modifié par cette revue
+apps/commercial/views.py;fc90b7f18c68f9f248d65f3d50a1ef0559d8db89eb1a55e9bba66101a381eb59;Fichier source examiné, non modifié par cette revue
+apps/commercial/fiche_stock.py;eb1d62de1a33199466ee8344c663a958814bbcddca1c5fb92bacdb5636c6bfac;Fichier source examiné, non modifié par cette revue
+apps/reporting/services.py;382f1b03f088ea29738f89c442804d2f5050c235a64cf8564d2268c2f8e04384;Fichier source examiné, non modifié par cette revue
+apps/core/droits.py;e17490aea4891f747eb440517175893aa7d44243442f9d43c3ee9f3693085f14;Fichier source examiné, non modifié par cette revue
+apps/api/views.py;65daf5260b7c96f5e5ff32a0854dd6c3b981e2bf0a2edee389dbc97ec9d6e736;Fichier source examiné, non modifié par cette revue
+apps/api/serializers.py;206b9d30ba2daaf81381d192badf6ea7c43aebba2f86d42472f4f803311c798d;Fichier source examiné, non modifié par cette revue

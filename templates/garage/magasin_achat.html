@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Achat du magasin{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Achat de pièces, fournitures ou matériel</h1></div>
+<form method="post" class="card card-body">{% csrf_token %}
+  <div class="row g-2 mb-3">
+    <div class="col-md-2"><label class="form-label small mb-0" for="h-d">Date</label><input id="h-d" type="date" name="date" value="{{ aujourdhui|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+    <div class="col-md-3"><label class="form-label small mb-0" for="h-f">Fournisseur</label><select id="h-f" name="fournisseur" class="form-select form-select-sm"><option value="">—</option>{% for t in fournisseurs %}<option value="{{ t.pk }}">{{ t.nom }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label small mb-0" for="h-n">N° de facture</label><input id="h-n" name="facture" class="form-control form-control-sm"></div>
+    <div class="col-md-3"><label class="form-label small mb-0" for="h-p">Paiement</label><select id="h-p" name="paiement" class="form-select form-select-sm">{% for c, l in paiements %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label small mb-0" for="h-c">Caisse (si payé)</label><select id="h-c" name="caisse" class="form-select form-select-sm"><option value="">—</option>{% for c in caisses %}<option value="{{ c.pk }}">{{ c.code }}</option>{% endfor %}</select></div>
+  </div>
+  <table class="table table-sm small mb-2"><thead><tr><th>Destination</th><th>Article du magasin</th><th>ou désignation</th><th>Qté</th><th>Prix unitaire</th><th>Véhicule</th><th>Compte (immobilisation)</th></tr></thead>
+  <tbody>{% for i in lignes %}<tr>
+    <td><select name="destination_{{ i }}" class="form-select form-select-sm" aria-label="Destination">{% for c, l in destinations %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select></td>
+    <td><select name="article_{{ i }}" class="form-select form-select-sm" aria-label="Article"><option value="">—</option>{% for a in articles %}<option value="{{ a.pk }}">{{ a.code }} {{ a.designation }}</option>{% endfor %}</select></td>
+    <td><input name="designation_{{ i }}" class="form-control form-control-sm" aria-label="Désignation"></td>
+    <td><input name="quantite_{{ i }}" type="number" step="0.01" min="0" value="1" class="form-control form-control-sm" style="width:5rem" aria-label="Quantité"></td>
+    <td><input name="prix_{{ i }}" type="number" min="0" class="form-control form-control-sm" style="width:8rem" aria-label="Prix unitaire"></td>
+    <td><select name="vehicule_{{ i }}" class="form-select form-select-sm" aria-label="Véhicule"><option value="">—</option>{% for v in vehicules %}<option value="{{ v.pk }}">{{ v.immatriculation }}</option>{% endfor %}</select></td>
+    <td><input name="compte_{{ i }}" class="form-control form-control-sm" style="width:6rem" placeholder="244" aria-label="Compte"></td></tr>{% endfor %}</tbody></table>
+  <div><button class="btn btn-sm btn-primary">Enregistrer l'achat</button></div>
+  <p class="form-text mb-0">Pour le stock : l'article entre au magasin (actif). Pour un véhicule précis : la charge va directement sur ce véhicule.
+    Matériel durable : immobilisation (compte de classe 2, 244 par défaut). Comptes à valider par l'expert-comptable.</p>
+</form>
+{% endblock %}

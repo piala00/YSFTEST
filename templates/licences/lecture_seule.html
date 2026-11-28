@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Lecture seule{% endblock %}
+{% block content %}
+<div class="container" style="max-width:640px">
+  <div class="alert alert-danger mt-4"><h1 class="h5"><i class="bi bi-lock"></i> Lecture seule</h1>
+    <p class="mb-2">{{ etat.message }}</p>
+    <p class="mb-0 small">Rien n'a été enregistré. Vos données sont intactes : consultation, états, impressions, exports et sauvegardes
+      restent possibles. {% if user.is_superuser %}<a href="{% url 'licence' %}" target="_top">Déposer une licence</a>.{% else %}Prévenez l'administrateur.{% endif %}</p></div>
+</div>
+{% endblock %}
+{% block public %}<div class="container" style="max-width:640px"><div class="alert alert-danger mt-5">{{ etat.message }}</div></div>{% endblock %}

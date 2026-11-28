@@ -1,0 +1,7 @@
+﻿ref;gravite;constat;attendu
+AN-RJ-001;BLOQUANT;Solde caisse espèces théorique -162000 FCFA après transfert -500000;Vérifier soldes, transferts, pièces et ne pas clôturer sans justification
+AN-RJ-002;MAJEUR;Voyages futurs marqués effectués dans RJ généré 00:05;Séparer voyages programmés/réalisés et date localisée
+AN-RJ-003;MAJEUR;730000 recettes exploitées égalent 730000 encaissés sans rapprochement;Relier chaque paiement au billet et à la date/lieu de vente
+AN-RJ-004;MAJEUR;45000 courriers non affectés aux véhicules;Lier chaque bordereau au trajet et transporteur réel
+AN-RJ-005;MAJEUR;Bagages: saisie non disponible mais 0 affiché;Afficher non disponible, ne pas déduire 0 recette réelle
+AN-RJ-006;A_VERIFIER;155000 banque/MM agrégés, 551 libellé MM;Distinguer comptes 521 et 552 sous validation SYSCOHADA

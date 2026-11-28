@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Connexion{% endblock %}
+{% block public %}
+<div class="container" style="max-width:380px; margin-top:12vh">
+  <div class="card p-4">
+    <h1 class="h4 mb-3 text-center"><i class="bi bi-grid-3x3-gap-fill"></i> ERP OHADA</h1>
+    {% if form.errors %}<div class="alert alert-danger">Identifiants incorrects.</div>{% endif %}
+    <form method="post">{% csrf_token %}
+      <div class="mb-3"><label class="form-label">Utilisateur</label><input name="username" class="form-control" autofocus required></div>
+      <div class="mb-3"><label class="form-label">Mot de passe</label><input type="password" name="password" class="form-control" required></div>
+      <input type="hidden" name="next" value="{{ next }}">
+      <button class="btn btn-primary w-100">Se connecter</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+﻿contrat_id;vehicule_id;partenaire_id;debut;fin;mode;assiette;taux_simule;conditions
+CTR-BUS-002;BUS-002;PAR-001;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-006;BUS-006;PAR-002;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-017;BUS-017;PAR-003;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-020;BUS-020;PAR-004;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-022;BUS-022;PAR-005;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-030;BUS-030;PAR-006;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-031;BUS-031;PAR-007;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-032;BUS-032;PAR-008;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-033;BUS-033;PAR-009;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-035;BUS-035;PAR-010;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-038;BUS-038;PAR-001;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-039;BUS-039;PAR-002;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-043;BUS-043;PAR-003;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-047;BUS-047;PAR-004;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider
+CTR-BUS-051;BUS-051;PAR-005;2026-09-01;;REDEVANCE_VARIABLE;70% du résultat contributif de véhicule avant redevance, avec exclusions documentées;0.70;FICTIF - à formaliser et faire valider

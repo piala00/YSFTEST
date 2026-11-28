@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Budget / réel — {{ b.nom }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Budget / réel — {{ b.nom }} <small class="text-muted fs-6">{{ titre_axe }} · du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" with export_url="?"|add:params_periode|add:"&export=csv" %}
+<p class="small text-muted">Budget : mois entiers de la période ({% for m in mois %}{{ m|date:"M y" }}{% if not forloop.last %}, {% endif %}{% empty %}aucun mois de l'exercice{% endfor %}).
+  Réel : écritures validées. Écart = réel − budget ; <span class="text-success">favorable</span> si les produits dépassent ou si les charges restent en dessous.</p>
+{% if b.axe %}<div class="btn-group btn-group-sm mb-2 d-print-none"><a class="btn {% if vue == 'elements' %}btn-secondary{% else %}btn-outline-secondary{% endif %}" href="?{{ params_periode }}&vue=elements">Par élément</a>
+  <a class="btn {% if vue == 'comptes' %}btn-secondary{% else %}btn-outline-secondary{% endif %}" href="?{{ params_periode }}&vue=comptes">Détail par compte</a></div>{% endif %}
+{% if vue == "elements" %}
+<div class="card mb-3" style="overflow-x:auto"><table data-graphique="barres" data-colonnes="Résultat budget,Résultat réel" data-titre-graphique="Résultat : budget et réel par élément" class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Élément</th><th class="num">Produits budget</th><th class="num">Produits réels</th><th class="num">Charges budget</th><th class="num">Charges réelles</th>
+    <th class="num">Résultat budget</th><th class="num">Résultat réel</th><th class="num">Écart</th></tr></thead>
+  <tbody>{% for g in elements %}<tr><td>{{ g.element_nom }}</td><td class="num">{{ g.budget_produits|montant }}</td><td class="num">{{ g.reel_produits|montant }}</td>
+    <td class="num">{{ g.budget_charges|montant }}</td><td class="num">{{ g.reel_charges|montant }}</td><td class="num">{{ g.budget_resultat|montant }}</td>
+    <td class="num fw-semibold">{{ g.reel_resultat|montant }}</td><td class="num {% if g.ecart_resultat < 0 %}text-danger{% else %}text-success{% endif %}">{{ g.ecart_resultat|montant }}</td></tr>
+  {% empty %}<tr><td colspan="8" class="text-muted text-center p-3">Ni budget ni réel sur la période.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td>Total</td><td class="num">{{ total.budget_produits|montant }}</td><td class="num">{{ total.reel_produits|montant }}</td><td class="num">{{ total.budget_charges|montant }}</td>
+    <td class="num">{{ total.reel_charges|montant }}</td><td class="num">{{ total.budget_resultat|montant }}</td><td class="num">{{ total.reel_resultat|montant }}</td><td class="num">{{ total.ecart_resultat|montant }}</td></tr></tfoot>
+</table></div>
+{% else %}
+<div class="card mb-3" style="overflow-x:auto"><table data-graphique="barres-h" data-colonnes="Budget,Réel" data-titre-graphique="Budget et réel par ligne" class="table table-sm table-hover mb-0 small">
+  <thead><tr>{% if b.axe %}<th>Élément</th>{% endif %}<th>Compte</th><th>Libellé</th><th class="num">Budget</th><th class="num">Réel</th><th class="num">Écart</th><th class="num">Réalisation</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr>{% if b.axe %}<td>{{ l.element_nom }}</td>{% endif %}<td>{{ l.compte }}{% if l.produit %} <span class="text-muted">(produit)</span>{% endif %}</td><td>{{ l.libelle }}</td>
+    <td class="num">{{ l.budget|montant }}</td><td class="num">{{ l.reel|montant }}</td>
+    <td class="num {% if l.favorable %}text-success{% else %}text-danger{% endif %}">{{ l.ecart|montant }}</td><td class="num">{% if l.taux is not None %}{{ l.taux }} %{% endif %}</td></tr>
+  {% endfor %}
+  {% for l in hors_budget %}<tr class="table-warning">{% if b.axe %}<td>{{ l.element_nom }}</td>{% endif %}<td>{{ l.compte }}…</td><td>Hors budget</td><td class="num">—</td><td class="num">{{ l.reel|montant }}</td><td class="num">{{ l.ecart|montant }}</td><td></td></tr>{% endfor %}
+  {% if not lignes and not hors_budget %}<tr><td colspan="7" class="text-muted text-center p-3">Ni budget ni réel sur la période.</td></tr>{% endif %}</tbody>
+  <tfoot><tr class="total"><td colspan="{% if b.axe %}3{% else %}2{% endif %}">Résultat (produits − charges)</td><td class="num">{{ total.budget_resultat|montant }}</td><td class="num">{{ total.reel_resultat|montant }}</td><td class="num">{{ total.ecart_resultat|montant }}</td><td></td></tr></tfoot>
+</table></div>
+{% endif %}
+<p class="small"><a href="{% url 'analytique:budget' b.pk %}">← Saisie du budget</a></p>
+{% endblock %}

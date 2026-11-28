@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Colis arrivés non livrés{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Colis arrivés non livrés <small class="text-muted fs-6">au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<form class="d-flex align-items-end gap-2 mb-2 d-print-none" method="get">
+  <input type="hidden" name="du" value="{{ du|date:'Y-m-d' }}"><input type="hidden" name="au" value="{{ au|date:'Y-m-d' }}">
+  <div><label class="form-label small mb-0" for="seuil">En retard au-delà de (jours)</label>
+    <input id="seuil" name="seuil" type="number" min="1" value="{{ seuil }}" class="form-control form-control-sm" style="max-width:8rem"></div>
+  <button class="btn btn-sm btn-outline-secondary">Appliquer</button></form>
+
+<div class="row g-2 mb-2">
+  <div class="col-auto"><div class="card card-body py-2"><div class="small text-muted">Colis en attente</div><div class="fs-5 fw-semibold">{{ total }}</div></div></div>
+  <div class="col-auto"><div class="card card-body py-2"><div class="small text-muted">Dont en retard (&ge; {{ seuil }} j)</div><div class="fs-5 fw-semibold text-danger">{{ nb_en_retard }}</div></div></div>
+</div>
+
+{% if par_gare %}<div class="card mb-2"><div class="table-responsive"><table data-graphique="barres-h" data-colonnes="2" class="table table-sm mb-0 small">
+  <thead><tr><th>Gare d'arrivée</th><th class="num">Colis en attente</th><th class="num">Dont en retard</th></tr></thead>
+  <tbody>{% for g in par_gare %}<tr><td>{{ g.gare }}</td><td class="num">{{ g.colis }}</td><td class="num {% if g.en_retard %}text-danger{% endif %}">{{ g.en_retard }}</td></tr>{% endfor %}</tbody>
+</table></div></div>{% endif %}
+
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>N° colis</th><th>Enregistré le</th><th class="num">Jours</th><th>Départ</th><th>Arrivée</th>
+    <th>Destinataire</th><th>Téléphone</th><th>Statut</th><th class="num">Pièces</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr class="{% if l.en_retard %}table-warning{% endif %}">
+    <td><a href="{{ l.lien }}">{{ l.numero }}</a></td><td>{{ l.date|date:"d/m/Y" }}</td>
+    <td class="num {% if l.en_retard %}fw-semibold text-danger{% endif %}">{{ l.jours }}</td>
+    <td>{{ l.depart }}</td><td>{{ l.arrivee }}</td><td>{{ l.destinataire }}</td><td>{{ l.tel }}</td>
+    <td>{{ l.statut }}</td><td class="num">{{ l.pieces }}</td></tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucun colis en attente : tout est livré.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+<div class="form-text">Les colis livrés et annulés ne figurent pas ici. Un colis « en retard » attend depuis {{ seuil }} jours ou plus.</div>
+{% endblock %}

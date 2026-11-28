@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Partenaires propriétaires{% endblock %}
+{% block content %}
+<div class="page-title d-flex align-items-center"><h1>Partenaires propriétaires</h1>
+  <a class="btn btn-sm btn-outline-primary ms-auto" href="{% url 'partenaires:contrats' %}">Contrats</a></div>
+<div class="card"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Code</th><th>Propriétaire</th><th>Compte</th><th>Véhicules</th><th class="num">Contrats en vigueur</th><th class="num">Solde (dû au propriétaire)</th><th></th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td>{{ l.tiers.code }}</td><td>{{ l.tiers.nom }}</td><td>{{ l.tiers.get_compte_collectif.numero|default:"" }}</td>
+    <td>{{ l.vehicules|join:", " }}</td><td class="num">{{ l.contrats }}</td><td class="num {% if l.solde < 0 %}text-danger{% endif %}">{{ l.solde|montant }}</td>
+    <td><a href="{% url 'partenaires:releve' l.tiers.pk %}">Relevé</a></td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted text-center p-4">Aucun partenaire : déclarez un propriétaire sur la fiche d'un véhicule ou par un contrat.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="small text-muted mt-2">Un partenaire est le propriétaire d'un ou plusieurs véhicules exploités par la société, payé selon son contrat
+  (commission, location, part variable). Son compte reçoit ce qui lui est dû.</p>
+{% endblock %}

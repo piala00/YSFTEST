@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}{% if element_actif %}{{ element_actif.titre }}{% elif titre_etat %}{{ titre_etat }}{% else %}Sélection{% endif %}{% endblock %}
+{% block content %}
+<div class="selection-dialogue card" id="fenetre-selection">
+  <div class="card-header bg-white fw-semibold"><i class="bi bi-funnel" style="color:var(--module)"></i> {% if element_actif %}{{ element_actif.titre }}{% elif titre_etat %}{{ titre_etat }}{% else %}Sélection{% endif %}</div>
+  {# Barre de la fenêtre de sélection Sage : commandes affichées, pas encore disponibles dans l'ERP #}
+  <div class="selection-barre" aria-hidden="true"><span><i class="bi bi-gear"></i> Fonctions</span>
+    <span><i class="bi bi-ui-checks"></i> Plus de critères</span><span><i class="bi bi-clock"></i> Différer</span></div>
+  <form method="get" class="card-body py-3">
+    {% for k, v in caches %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input type="hidden" name="ok" value="1">
+    {% for c in champs %}
+      {% if c.critere == "periode" %}
+      <div class="selection-ligne"><label for="sel-du">Date de</label>
+        <div class="selection-plage"><input type="date" id="sel-du" name="date_debut" value="{{ valeurs.date_debut }}" class="form-control form-control-sm" required>
+          <span class="small">à</span><input type="date" id="sel-au" name="date_fin" value="{{ valeurs.date_fin }}" class="form-control form-control-sm" aria-label="à" required></div></div>
+      {% elif c.critere == "date" %}
+      <div class="selection-ligne"><label for="sel-date">Date de situation</label><input type="date" id="sel-date" name="date" value="{{ valeurs.date }}" class="form-control form-control-sm" required></div>
+      {% elif c.critere == "comptes" %}
+      <div class="selection-ligne"><label for="sel-cpt-de">N° compte de</label>
+        <div class="selection-plage"><input id="sel-cpt-de" name="compte_debut" value="{{ valeurs.compte_debut|default:'' }}" class="form-control form-control-sm" placeholder="Premier">
+          <span class="small">à</span><input name="compte_fin" value="{{ valeurs.compte_fin|default:'' }}" class="form-control form-control-sm" placeholder="Dernier" aria-label="à"></div></div>
+      {% elif c.critere == "type_tiers" %}
+      <div class="selection-ligne"><label for="sel-type">Nature de compte</label>
+        <select id="sel-type" name="type" class="form-select form-select-sm">
+          <option value="CLIENT" {% if valeurs.type != "FOURNISSEUR" %}selected{% endif %}>Client</option>
+          <option value="FOURNISSEUR" {% if valeurs.type == "FOURNISSEUR" %}selected{% endif %}>Fournisseur</option></select></div>
+      {% elif c.critere == "anciennete" %}
+      <div class="selection-ligne"><label for="sel-d-apres">D'après la date d'</label>
+        <select name="d_apres" id="sel-d-apres" class="form-select form-select-sm">
+          <option value="ECRITURE" {% if valeurs.d_apres != "ECHEANCE" %}selected{% endif %}>Écriture</option>
+          <option value="ECHEANCE" {% if valeurs.d_apres == "ECHEANCE" %}selected{% endif %}>Échéance</option></select></div>
+      {% for nom, libelle in delais %}<div class="selection-ligne"><label for="sel-{{ nom }}">{{ libelle }}</label>
+        <input type="number" min="1" id="sel-{{ nom }}" name="{{ nom }}" value="{{ valeurs|valeur:nom }}" class="form-control form-control-sm" style="max-width:7rem" required></div>{% endfor %}
+      {% else %}
+      <div class="selection-ligne"><label for="sel-{{ c.critere }}">{% if c.critere == "journal" %}Code journal{% elif c.critere == "tiers" %}Tiers{% elif c.critere == "depot" %}Dépôt{% elif c.critere == "famille" %}Famille{% elif c.critere == "caisse" %}Caisse{% else %}Article{% endif %}</label>
+        <select name="{{ c.critere }}" id="sel-{{ c.critere }}" class="form-select form-select-sm">
+          <option value="">{% if c.critere == "famille" %}Toutes{% elif c.critere == "caisse" %}Caisse principale (CA){% else %}Tous{% endif %}</option>
+          {% for valeur, libelle, type_tiers in c.choix %}<option value="{{ valeur }}" {% if type_tiers %}data-type="{{ type_tiers }}"{% endif %} {% if valeurs|valeur:c.critere == valeur %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
+        </select></div>
+      {% endif %}
+    {% empty %}<p class="small text-muted">Aucun critère pour cet état.</p>{% endfor %}
+    <div class="d-flex gap-2 justify-content-end mt-3">
+      <button class="btn btn-ok btn-sm" autofocus>OK</button>
+      <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm px-3">Annuler</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+(function () {
+  // Liste des tiers limitée au type choisi (clients / fournisseurs)
+  const form = document.querySelector('#fenetre-selection form'), liste = form.querySelector('select[name=tiers]');
+  if (!liste) return;
+  const filtrer = () => {
+    const type = (form.querySelector('[name=type]') || {}).value;
+    liste.querySelectorAll('option[data-type]').forEach(o => { o.hidden = type && o.dataset.type !== type; });
+    if (liste.selectedOptions[0] && liste.selectedOptions[0].hidden) liste.value = '';
+  };
+  form.querySelectorAll('[name=type]').forEach(r => r.addEventListener('change', filtrer));
+  filtrer();
+})();
+</script>{% endblock %}

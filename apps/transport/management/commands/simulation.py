@@ -1,0 +1,823 @@
+"""Simulation d'un mois complet dans un dossier SÉPARÉ (données fictives), par les fonctions du logiciel lui-même.
+
+    set DB_ENGINE=sqlite & set SQLITE_FICHIER=simulation.sqlite3        (Windows : 7-SIMULATION.bat le fait)
+    python manage.py migrate
+    python manage.py simulation --mois 2026-09 --rapport docs/retour/BILAN_SIMULATION_RESULTATS.md
+
+8 gares (agences), 60 cars voyageurs (24 VIP, 36 Classique) dont 15 de propriétaires partenaires, 5 camions courrier,
+300 salariés, ventes de billets avec bagages, colis, carburant, magasin (achats, sorties, réparations), loyers
+autorisés, transferts en banque, paie, décomptes des propriétaires. Chaque jour est joué « à sa date » : l'horloge du
+logiciel est avancée au jour simulé, pour que chaque écriture porte la bonne date.
+Tous les noms, prix, salaires et taux sont FICTIFS (taux de paie de démonstration : 5 % salarié, 10 % employeur).
+Après l'essai : supprimer le fichier du dossier de simulation, ou créer la vraie société dans un autre dossier.
+"""
+import calendar
+import contextlib
+import datetime
+import os
+import random
+import time
+from pathlib import Path
+
+from apps.core.dossiers_simulation import arret_demande, effacer_arret
+from apps.transport.simulation_metier import SimulationMetierMixin
+from decimal import Decimal
+from unittest import mock
+
+from django.core.management import call_command
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection, transaction
+from django.utils import timezone
+
+GARES = [("DLA", "Douala"), ("YDE", "Yaoundé"), ("BFS", "Bafoussam"), ("BTA", "Bertoua"), ("NGD", "Ngaoundéré"),
+         ("GAR", "Garoua"), ("KRI", "Kribi"), ("EBW", "Ebolowa")]
+# (départ, arrivée, km, prix Classique, prix VIP)
+ROUTES = [("DLA", "YDE", 240, 6000, 10000), ("DLA", "BFS", 280, 5000, 9000), ("YDE", "BTA", 340, 6000, 10000),
+          ("YDE", "NGD", 620, 10000, 15000), ("NGD", "GAR", 290, 6000, 9000), ("DLA", "KRI", 170, 4000, 7000),
+          ("YDE", "EBW", 160, 3500, 6000), ("YDE", "BFS", 300, 5000, 8000)]
+PRIX_LITRE = Decimal("840")
+
+
+def diagnostic_sql_actif(environ=None):
+    """Active le profil SQL exhaustif uniquement sur demande explicite.
+
+    SQL_TEST_TIMINGS appartient au runner CI : il mesure les tests et les
+    accès DB sans activer un execute_wrapper coûteux dans chaque journée.
+    """
+    variables = os.environ if environ is None else environ
+    valeur = str(variables.get("SIMULATION_SQL_DIAGNOSTIC", "")).strip().lower()
+    return valeur in {"1", "true", "yes", "on"}
+
+
+def traces_phases_actives(environ=None):
+    """Temps de phase légers du runner, distincts du profileur SQL exhaustif."""
+    variables = os.environ if environ is None else environ
+    valeur = str(variables.get("SQL_TEST_TIMINGS", "")).strip().lower()
+    return valeur in {"1", "true", "yes", "on"} or diagnostic_sql_actif(variables)
+
+
+def tracer_phase_sql(phase, debut, active=None):
+    """Trace une phase sans activer l'instrumentation SQL coûteuse et retourne sa durée."""
+    if active is None:
+        active = traces_phases_actives()
+    if not active:
+        return None
+    secondes = time.perf_counter() - debut
+    print(f"[SIM-PHASE] {phase} {secondes:.3f}s", flush=True)
+    return secondes
+
+
+def _cumuler_phase_sql(agregats, phase, secondes):
+    """Regroupe les phases datées par famille sans instrumentation des requêtes SQL."""
+    famille = str(phase).split(" ", 1)[0]
+    mesure = agregats.setdefault(famille, {"appels": 0, "secondes": 0.0, "max": 0.0})
+    duree = max(0.0, float(secondes))
+    mesure["appels"] += 1
+    mesure["secondes"] += duree
+    mesure["max"] = max(mesure["max"], duree)
+    return mesure
+
+
+SAISON = {1: 0.85, 2: 0.9, 7: 1.05, 8: 1.12, 12: 1.15}                    # remplissage relatif (fictif)
+ARTICLES = [("FILT", "Filtre à huile", "PIECE", 100, 5000), ("PLAQ", "Plaquettes de frein", "PIECE", 60, 8000),
+            ("PNEU", "Pneu 315/80", "PNEU", 40, 110000), ("HUIL", "Huile moteur (litre)", "LUBRIFIANT", 200, 3500),
+            ("CART", "Carton d'emballage", "EMBALLAGE", 2000, 150), ("RUBA", "Ruban adhésif", "EMBALLAGE", 500, 800),
+            ("PAPI", "Papier (rame)", "BUREAU", 100, 3000)]
+
+
+@contextlib.contextmanager
+def horloge(moment):
+    """Le logiciel croit être à ce moment (dates des pièces, contrôles d'heure de départ)."""
+    with mock.patch("django.utils.timezone.now", return_value=moment):
+        yield
+
+
+class Command(SimulationMetierMixin, BaseCommand):
+    help = "Simule un mois d'activité (données fictives) dans le dossier courant, qui doit être un dossier de simulation"
+
+    def add_arguments(self, p):
+        p.add_argument("--mois", default="2026-09", help="Premier mois simulé (AAAA-MM)")
+        p.add_argument("--nombre-mois", type=int, default=1, help="Nombre de mois simulés à la suite (1 à 24)")
+        p.add_argument("--jusqu-au", default="", help="Dernier jour simulé (AAAA-MM-JJ, ou « aujourdhui ») : "
+                                                       "remplace --nombre-mois, le dernier mois s'arrête à ce jour")
+        p.add_argument("--jours", type=int, default=0, help="Jours simulés par mois (0 : le mois entier ; essais rapides)")
+        p.add_argument("--vehicules", type=int, default=60, help="Cars voyageurs (40 % VIP, un quart de partenaires)")
+        p.add_argument("--salaries", type=int, default=300)
+        p.add_argument("--echelle", type=float, default=1.0, help="Fraction des voyageurs et colis (essai rapide : 0.1)")
+        p.add_argument("--graine", type=int, default=2026)
+        p.add_argument("--rapport", default="", help="Fichier Markdown du bilan")
+        p.add_argument("--scenarios-complets", action="store_true", help="Transit, transvasement, incidents colis, garage et retraits propriétaires (fictifs)")
+        p.add_argument("--departs-jour", type=int, default=0, help="Nombre exact de départs quotidiens pour toutes les agences réunies (0 : aléatoire)")
+        p.add_argument("--agences", type=int, default=0, help=f"Nombre d'agences simulées (0 : les {len(GARES)} gares ; sinon 2 à {len(GARES)})")
+        p.add_argument("--journal-scenarios", default="", help="Rapport JSON traçable des scénarios et temps réellement mesurés")
+        p.add_argument("--forcer", action="store_true", help="Lever les contrôles de dossier (tests automatiques seulement)")
+
+    def handle(self, *a, **o):
+        from apps.echanges.publication import cache_site_local
+        from apps.transport.models import Depart
+
+        base = connection.settings_dict
+        if not o["forcer"] and (connection.vendor != "sqlite" or "simulation" not in str(base["NAME"]).lower()):
+            raise CommandError(f"Base {base['NAME']} : la simulation ne s'exécute que dans un fichier SQLite dont le nom contient "
+                               "« simulation » (SQLITE_FICHIER=simulation.sqlite3, ou SIMULATION.bat).")
+        if Depart.objects.exists() and not o["forcer"]:
+            raise CommandError("Ce dossier contient déjà des départs : la simulation se fait dans un dossier SÉPARÉ "
+                               "(SQLITE_FICHIER=simulation.sqlite3), jamais dans la vraie société.")
+        try:
+            annee, mois = (int(x) for x in o["mois"].split("-"))
+            premier = datetime.date(annee, mois, 1)
+        except ValueError:
+            raise CommandError("--mois doit être au format AAAA-MM (ex. 2026-01).")
+        fin = None
+        if o["jusqu_au"]:
+            try:
+                fin = (timezone.localdate() if o["jusqu_au"].replace("'", "").lower() == "aujourdhui"
+                       else datetime.date.fromisoformat(o["jusqu_au"]))
+            except ValueError:
+                raise CommandError("--jusqu-au doit être une date AAAA-MM-JJ ou « aujourdhui ».")
+            if fin < premier:
+                raise CommandError(f"Le dernier jour ({fin:%d/%m/%Y}) est avant le premier mois ({premier:%m/%Y}).")
+            o["nombre_mois"] = (fin.year - annee) * 12 + fin.month - mois + 1
+        if not 1 <= o["nombre_mois"] <= 24:
+            raise CommandError("De 1 à 24 mois.")
+        self.configurer_metier(o)
+        self.nb_agences = o.get("agences") or len(GARES)
+        if not 2 <= self.nb_agences <= len(GARES):
+            raise CommandError(f"Nombre d'agences : de 2 à {len(GARES)} (0 : toutes).")
+        self.r = random.Random(o["graine"])
+        self.echelle = o["echelle"]
+        # Arrêt coopératif : le dossier de simulation est le répertoire du fichier SQLite.
+        nom_base = base.get("NAME")
+        self.dossier_sim = Path(nom_base).resolve().parent if nom_base else None
+        self.interrompu = False
+        if self.dossier_sim is not None:
+            try:
+                effacer_arret(self.dossier_sim)                  # repartir d'un marqueur propre
+            except OSError:
+                self.dossier_sim = None
+        self.mois = []                                           # [(premier jour, jours simulés)]
+        for k in range(o["nombre_mois"]):
+            a, m = annee + (mois - 1 + k) // 12, (mois - 1 + k) % 12 + 1
+            nb_jours = min(o["jours"] or 31, calendar.monthrange(a, m)[1])
+            self.mois.append([d for d in (datetime.date(a, m, j) for j in range(1, nb_jours + 1)) if fin is None or d <= fin])
+        self.jours = [j for jours in self.mois for j in jours]
+        # SQL_TEST_TIMINGS active les traces légères ; le profileur SQL exhaustif
+        # reste réservé à SIMULATION_SQL_DIAGNOSTIC.
+        diagnostic_sql = diagnostic_sql_actif()
+        phases_actives = traces_phases_actives()
+        # Les totaux légers sont disponibles avec SQL_TEST_TIMINGS ; ils ne
+        # déclenchent jamais execute_wrapper ni le profilage SQL exhaustif.
+        self._sim_phases_cumulees = {} if phases_actives else None
+        # Les sous-phases transport détaillées ont une structure [appels, secondes] ;
+        # ne pas les mélanger aux agrégats de phases murales (dict de mesures).
+        self._sim_transport_cumulees = {} if diagnostic_sql else None
+
+        def trace_phase(phase, debut):
+            secondes = tracer_phase_sql(phase, debut, active=phases_actives)
+            if secondes is not None and self._sim_phases_cumulees is not None:
+                _cumuler_phase_sql(self._sim_phases_cumulees, phase, secondes)
+        debut_phase = time.perf_counter()
+        self.exercices()
+        self.moment(self.jours[0], 6)
+        with horloge(self.maintenant):
+            self.preparer(o["vehicules"], o["salaries"])
+            self.initialiser_metier()
+        trace_phase('initialisation', debut_phase)
+        self.par_mois = []
+        for idx, jours in enumerate(self.mois):
+            self.mois_jours, avant = jours, dict(self.compteurs)
+            for jour in jours:
+                avant_jour = dict(self.compteurs)
+                chrono = time.perf_counter()
+
+                def executer_journee():
+                    # Une journée ne change pas l'agence locale ; les événements
+                    # publiés partagent donc la même lecture de référentiel.
+                    with cache_site_local():
+                        self.journee(jour)
+
+                # Profil SQL facultatif : identifier les requêtes réellement lentes
+                # sans modifier les transactions ni allonger le timeout CI.
+                if diagnostic_sql:
+                    from django.db import connection as sql_connection
+                    requetes = {"nombre": 0, "duree": 0.0, "lentes": [], "par_sql": {}, "par_etape": {}}
+                    self._sim_sql_etape = "preparation_et_achats"
+
+                    def mesurer_requete(execute, sql, params, many, context):
+                        debut_sql = time.perf_counter()
+                        try:
+                            return execute(sql, params, many, context)
+                        finally:
+                            ecoule = time.perf_counter() - debut_sql
+                            requetes["nombre"] += 1
+                            requetes["duree"] += ecoule
+                            # Regrouper par texte SQL (sans paramètres) pour repérer
+                            # les N+1 : des milliers de requêtes rapides peuvent
+                            # coûter davantage qu'une requête lente isolée.
+                            etape = getattr(self, "_sim_sql_etape", "inconnue")
+                            par_etape = requetes["par_etape"].setdefault(etape, {})
+                            etape_stats = par_etape.setdefault(sql, [0, 0.0])
+                            etape_stats[0] += 1
+                            etape_stats[1] += ecoule
+                            stats = requetes["par_sql"].setdefault(sql, [0, 0.0, 0.0])
+                            stats[0] += 1
+                            stats[1] += ecoule
+                            stats[2] = max(stats[2], ecoule)
+                            if ecoule >= 0.5:
+                                # Empreinte et durée seulement : jamais de paramètres
+                                # SQL (données métier potentiellement sensibles).
+                                import hashlib
+                                empreinte = hashlib.sha256(sql.encode("utf-8")).hexdigest()[:12]
+                                requetes["lentes"].append((ecoule, empreinte))
+
+                    with sql_connection.execute_wrapper(mesurer_requete):
+                        executer_journee()
+                    import hashlib
+                    top_cumules = sorted(requetes["par_sql"].items(),
+                                        key=lambda item: item[1][1], reverse=True)[:5]
+                    top_cumules = [
+                        {"sha": hashlib.sha256(sql.encode("utf-8")).hexdigest()[:12],
+                         "count": stats[0], "total_s": round(stats[1], 3),
+                         "max_s": round(stats[2], 3)}
+                        for sql, stats in top_cumules
+                    ]
+                    # Identifier les formes SQL coûteuses sans journaliser les paramètres.
+                    for sql, stats in sorted(requetes["par_sql"].items(),
+                                             key=lambda item: item[1][1], reverse=True)[:5]:
+                        signature = hashlib.sha256(sql.encode("utf-8")).hexdigest()[:12]
+                        forme = " ".join(sql.split())[:240]
+                        print(f'[SIM-SQL-SIGNATURE] {jour} sha={signature} '
+                              f'count={stats[0]} total_s={stats[1]:.3f} '
+                              f'sql_shape={forme!r}', flush=True)
+                    for etape, signatures in requetes["par_etape"].items():
+                        dominantes = sorted(signatures.items(), key=lambda item: item[1][1], reverse=True)[:3]
+                        total = sum(s[0] for s in signatures.values())
+                        secondes = sum(s[1] for s in signatures.values())
+                        top = [{"sha": hashlib.sha256(sql.encode("utf-8")).hexdigest()[:12],
+                                "count": stats[0], "total_s": round(stats[1], 3)}
+                               for sql, stats in dominantes]
+                        print(f'[SIM-SQL-ETAPE] {jour} phase={etape} count={total} '
+                              f'db_seconds={secondes:.3f} top={top}', flush=True)
+                    self._sim_sql_etape = None
+                    print(f'[SIM-SQL] {jour} count={requetes["nombre"]} '
+                          f'db_seconds={requetes["duree"]:.3f} '
+                          f'slowest={sorted(requetes["lentes"], reverse=True)[:5]} '
+                          f'top_cumulative={top_cumules}', flush=True)
+                else:
+                    executer_journee()
+                if diagnostic_sql:
+                    stats_caisse = getattr(self, "_diagnostic_caisse", None)
+                    if stats_caisse:
+                        print(f'[SIM-CAISSE] {jour} appels={stats_caisse["appels"]} '
+                              f'total_s={stats_caisse["secondes"]:.3f} '
+                              f'max_s={stats_caisse["max_s"]:.3f}', flush=True)
+                        self._diagnostic_caisse = None
+                trace_phase(f'journee {jour}', chrono)
+                self.mesures.append({"jour": str(jour), "secondes": round(time.perf_counter()-chrono, 3),
+                    "departs": self.compteurs['voyages']-avant_jour['voyages'],
+                    "billets": self.compteurs['billets']-avant_jour['billets'], "echelle": self.echelle})
+                self.stdout.write(f"Durée réelle {jour} : {self.mesures[-1]['secondes']:.3f} s · {self.mesures[-1]['departs']} départs · {self.mesures[-1]['billets']} billets")
+                self.stdout.write(f"{jour:%d/%m/%Y} : {self.compteurs['voyages']} voyages, {self.compteurs['billets']} billets")
+            self.moment(jours[-1], 22)
+            debut_phase = time.perf_counter()
+            with cache_site_local():
+                with horloge(self.maintenant):
+                    self.fin_de_mois(jours[0], jours[-1])
+            trace_phase(f'fin_de_mois {jours[0]:%Y-%m}', debut_phase)
+            self.par_mois.append((jours[0], jours[-1], {k: self.compteurs[k] - avant[k] for k in self.compteurs}))
+            # Arrêt propre demandé à l'écran : la tranche (ce mois) est terminée et consultable ;
+            # on s'arrête avant le mois suivant plutôt que de tout annuler.
+            if (self.dossier_sim is not None and idx + 1 < len(self.mois)
+                    and arret_demande(self.dossier_sim)):
+                self.interrompu = True
+                self.stdout.write(f"Arrêt demandé : génération interrompue après {jours[-1]:%m/%Y} "
+                                  f"({idx + 1}/{len(self.mois)} mois ; données déjà consultables).")
+                break
+        if o["journal_scenarios"]:
+            self.ecrire_rapports_metier(o["journal_scenarios"])
+        debut_phase = time.perf_counter()
+        bilan = self.bilan()
+        texte = self.texte_bilan(bilan, o)
+        trace_phase('bilan_et_controles', debut_phase)
+        self.stdout.write(texte)
+        if phases_actives:
+            for phase, mesure in sorted(
+                    self._sim_phases_cumulees.items(),
+                    key=lambda item: item[1]["secondes"], reverse=True):
+                appels = mesure["appels"]
+                secondes = mesure["secondes"]
+                print(f"[SIM-PHASE-TOTAL] phase={phase} appels={appels} "
+                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f} "
+                      f"max_s={mesure['max']:.3f}", flush=True)
+        if diagnostic_sql and self._sim_transport_cumulees:
+            for phase, (appels, secondes) in sorted(
+                    self._sim_transport_cumulees.items(),
+                    key=lambda item: item[1][1], reverse=True):
+                print(f"[SIM-TRANSPORT-TOTAL] phase={phase} appels={appels} "
+                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f}", flush=True)
+        if o["rapport"]:
+            with open(o["rapport"], "w", encoding="utf-8") as f:
+                f.write(texte)
+        return None
+
+    def exercices(self):
+        """Un exercice comptable par année civile couverte (la simulation peut passer sur l'année suivante)."""
+        from apps.core.models import Exercice
+
+        for a in sorted({j.year for j in self.jours}):
+            Exercice.objects.get_or_create(code=str(a), defaults={"date_debut": datetime.date(a, 1, 1),
+                                                                   "date_fin": datetime.date(a, 12, 31)})
+
+    def caisse_pour(self, montant, jour):
+        """Le guichet paie en espèces s'il en a assez, sinon la dépense est réglée par la banque."""
+        from apps.transport.models_caisse import solde_tresorerie
+
+        if self.profil_complet:
+            return self.assurer_especes(montant, jour)
+        # Mesurer séparément les recalculs du solde, suspects de croître avec
+        # l'historique des écritures. Ne pas mettre en cache un solde mutable.
+        diagnostic = diagnostic_sql_actif()
+        debut = time.perf_counter() if diagnostic else None
+        try:
+            solde = solde_tresorerie(self.ca.compte_tresorerie, jour)
+        finally:
+            if diagnostic:
+                stats = getattr(self, "_diagnostic_caisse", None)
+                if stats is None:
+                    stats = self._diagnostic_caisse = {"appels": 0, "secondes": 0.0, "max_s": 0.0}
+                duree = time.perf_counter() - debut
+                stats["appels"] += 1
+                stats["secondes"] += duree
+                stats["max_s"] = max(stats["max_s"], duree)
+        return self.ca if solde >= montant else self.bq
+
+    def moment(self, jour, heure, minute=0):
+        self.maintenant = timezone.make_aware(datetime.datetime.combine(jour, datetime.time(heure, minute)))
+        return self.maintenant
+
+    # ------------------------------------------------------------------ mise en place
+    @transaction.atomic
+    def preparer(self, nb_vehicules, nb_salaries):
+        from django.contrib.auth import get_user_model
+
+        from apps.commercial.models import Tiers
+        from apps.comptabilite.models import Compte, Journal
+        from apps.comptabilite.services import creer_ecriture
+        from apps.core.models import Societe
+        from apps.garage.models_magasin import ArticleMagasin
+        from apps.partenaires.models import ContratPartenaire
+        from apps.personnel.models import Employe, RubriquePaie
+        from apps.transport.models import Chauffeur, Gare, Ligne, Vehicule
+
+        call_command("init_erp", "--activite", "transport", verbosity=0)
+        s = Societe.get()
+        s.raison_sociale, s.ville = "SIMULATION — données fictives", "Douala"
+        s.save()
+        U = get_user_model()
+        self.agent = U.objects.get_or_create(username="sim_agent")[0]
+        self.chef = U.objects.get_or_create(username="sim_chef")[0]
+        self.ca, self.bq = Journal.objects.get(code="CA"), Journal.objects.get(code="BQ")
+        capital = Compte.objects.get_or_create(numero="101", defaults={"intitule": "Capital social"})[0]
+        creer_ecriture(self.bq, self.jours[0], "Apport initial (simulation)", [{"compte": self.bq.compte_tresorerie, "debit": 48_000_000},
+                                                                              {"compte": self.ca.compte_tresorerie, "debit": 2_000_000},
+                                                                              {"compte": capital, "credit": 50_000_000}])
+        selection = GARES[:self.nb_agences]
+        codes_retenus = {c for c, _ in selection}
+        self.gares = {c: Gare.objects.create(code=c, nom=f"Gare de {v}", ville=v) for c, v in selection}
+        self.lignes = []
+        for a, b, km, prix, vip in ROUTES:
+            if a not in codes_retenus or b not in codes_retenus:
+                continue                                     # route hors des agences simulées
+            for x, y in ((a, b), (b, a)):
+                for gamme, p in (("CLASSIQUE", prix), ("VIP", vip)):
+                    self.lignes.append(Ligne.objects.create(
+                        code=f"{x}-{y}{'-VIP' if gamme == 'VIP' else ''}", gare_depart=self.gares[x], gare_arrivee=self.gares[y],
+                        distance_km=km, prix_billet=p, gamme=gamme, colis_forfait=2500, colis_prix_kg=50))
+        par_trajet = {(l.gare_depart.code, l.gare_arrivee.code, l.gamme): l for l in self.lignes}
+        routes_retenues = [r for r in ROUTES if r[0] in codes_retenus and r[1] in codes_retenus]
+        nb_vip = round(nb_vehicules * 0.4)
+        self.cars = []
+        for i in range(nb_vehicules):
+            gamme = "VIP" if i < nb_vip else "CLASSIQUE"
+            a, b, km, *_ = routes_retenues[i % len(routes_retenues)]
+            v = Vehicule.objects.create(immatriculation=f"SIM {i + 1:03d} {'VP' if gamme == 'VIP' else 'CL'}",
+                                        designation=f"Car {i + 1:02d} (fictif)", gamme=gamme,
+                                        nombre_places=self.r.choice([30, 35]) if gamme == "VIP" else self.r.choice([50, 60, 70]))
+            self.cars.append({"vehicule": v, "aller": par_trajet[(a, b, gamme)], "retour": par_trajet[(b, a, gamme)], "km": km})
+        self.camions = [Vehicule.objects.create(immatriculation=f"SIM C{i + 1:02d}", designation=f"Camion courrier {i + 1} (fictif)",
+                                                type_vehicule=Vehicule.CAMION, nombre_places=0) for i in range(5)]
+        for i, c in enumerate(self.camions):
+            a, b, km, *_ = routes_retenues[i % len(routes_retenues)]
+            self.cars.append({"vehicule": c, "aller": par_trajet[(a, b, "CLASSIQUE")], "retour": par_trajet[(b, a, "CLASSIQUE")],
+                              "km": km, "courrier": True})
+        # Personnel : un chauffeur et un convoyeur par car, le reste dans les gares
+        rubrique_compte = lambda n, i: Compte.objects.get_or_create(numero=n, defaults={"intitule": i})[0]  # noqa: E731
+        RubriquePaie.objects.get_or_create(code="RETSIM", defaults={
+            "libelle": "Retenue salariale de démonstration (FICTIVE)", "nature": RubriquePaie.RETENUE, "calcul": RubriquePaie.TAUX,
+            "valeur": 5, "compte": rubrique_compte("431", "Sécurité sociale"), "automatique": True})
+        RubriquePaie.objects.get_or_create(code="PATSIM", defaults={
+            "libelle": "Charge patronale de démonstration (FICTIVE)", "nature": RubriquePaie.PATRONALE, "calcul": RubriquePaie.TAUX,
+            "valeur": 10, "compte": rubrique_compte("664", "Charges sociales"),
+            "compte_contrepartie": rubrique_compte("431", "Sécurité sociale"), "automatique": True})
+        n = 0
+        for c in self.cars:
+            ch = Chauffeur.objects.create(nom=f"Chauffeur {n + 1} (fictif)")
+            c["chauffeur"] = ch
+            Employe.objects.create(matricule=f"S{n + 1:04d}", nom=ch.nom, poste="Chauffeur", service=Employe.CONDUITE,
+                                   vehicule=c["vehicule"], chauffeur=ch,
+                                   salaire_base=150000, ventilation=Employe.HABITUEL)
+            n += 1
+            if n < nb_salaries and not c.get("courrier"):
+                Employe.objects.create(matricule=f"S{n + 1:04d}", nom=f"Convoyeur {n + 1} (fictif)", poste="Convoyeur",
+                                       service=Employe.CONDUITE, vehicule=c["vehicule"], salaire_base=90000, ventilation=Employe.HABITUEL)
+                n += 1
+        postes = [("Guichetier", Employe.BILLETTERIE, 100000), ("Agent colis", Employe.COLIS, 95000),
+                  ("Mécanicien", Employe.GARAGE, 120000), ("Comptable", Employe.ADMINISTRATION, 180000), ("Gardien", Employe.AUTRE, 70000)]
+        while n < nb_salaries:
+            poste, service, salaire = postes[n % len(postes)]
+            Employe.objects.create(matricule=f"S{n + 1:04d}", nom=f"{poste} {n + 1} (fictif)", poste=poste, service=service,
+                                   salaire_base=salaire)
+            n += 1
+        # Propriétaires partenaires : un car sur quatre, quatre types de contrat
+        modeles = [dict(modele=ContratPartenaire.COMMISSION, taux_commission=10, montant_location=50000),  # contrat type
+                   dict(modele=ContratPartenaire.LOCATION, montant_location=400000, charge_carburant=False,
+                        charge_reparations=False, charge_route=False),
+                   dict(modele=ContratPartenaire.FIXE_PLUS_VARIABLE, montant_location=150000, taux_proprietaire=40),
+                   dict(modele=ContratPartenaire.AVANCE_SUR_VARIABLE, montant_location=150000, taux_proprietaire=40)]
+        nb_partenaires = max(1, round(nb_vehicules / 4))
+        proprietaires = [Tiers.objects.create(code=f"PROP{i + 1:02d}", nom=f"Propriétaire {i + 1} (fictif)",
+                                              type_tiers=Tiers.FOURNISSEUR) for i in range(max(1, round(nb_partenaires * 2 / 3)))]
+        self.contrats = []
+        for i, c in enumerate(self.cars[-nb_partenaires - 5:-5] if nb_partenaires < len(self.cars) - 5 else self.cars[:1]):
+            self.contrats.append(ContratPartenaire.objects.create(
+                vehicule=c["vehicule"], partenaire=proprietaires[i % len(proprietaires)], debut=self.jours[0],
+                **{k: Decimal(str(v)) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
+                   for k, v in modeles[i % len(modeles)].items()}).activer())
+        self.fournisseur = Tiers.objects.create(code="FOURPIE", nom="Pièces et fournitures (fictif)", type_tiers=Tiers.FOURNISSEUR)
+        self.articles = {code: ArticleMagasin.objects.create(code=code, designation=nom, categorie=cat)
+                         for code, nom, cat, _, _ in ARTICLES}
+        self.compteurs = {"voyages": 0, "billets": 0, "colis": 0, "bagages": 0, "pleins": 0, "reparations": 0}
+
+    # ------------------------------------------------------------------ une journée
+    def journee(self, jour):
+        from apps.garage.models import LigneReparation, OrdreReparation, PleinCarburant
+        from apps.garage.models_magasin import AchatMagasin, LigneAchatMagasin, sortir
+        from apps.partenaires.models import ContratPartenaire, ReglementPartenaire
+        from apps.transport.models import Billet, Colis, Depart, DepenseVehicule
+        from apps.transport.models_caisse import TransfertFonds, solde_tresorerie
+        from apps.transport.models_depenses import DemandeDepense
+
+        r = self.r
+        colis_avant_jour = self.compteurs['colis']
+        diagnostic_sql = diagnostic_sql_actif()
+        debut_etape = time.perf_counter()
+
+        def mesurer_etape(nom):
+            nonlocal debut_etape
+            maintenant = time.perf_counter()
+            if diagnostic_sql:
+                print(f'[SIM-JOUR] {jour} {nom} {maintenant - debut_etape:.3f}s', flush=True)
+            # Le chronomètre clôt la phase « nom » ; les requêtes suivantes
+            # appartiennent à la phase suivante, et non à celle qui vient de finir.
+            phase_suivante = {
+                "preparation_et_achats": "billets_et_colis",
+                "billets_et_colis": "scenarios_avant_depart",
+                "scenarios_avant_depart": "departs_carburant_arrivees",
+                "departs_carburant_arrivees": "operations_fin_journee",
+                "operations_fin_journee": "terminee",
+            }
+            self._sim_sql_etape = phase_suivante[nom]
+            debut_etape = maintenant
+
+        with horloge(self.moment(jour, 5)), transaction.atomic():
+            if jour == self.mois_jours[0]:                      # achats du magasin pour le mois
+                achat = AchatMagasin.objects.create(date=jour, fournisseur=self.fournisseur, facture="FICTIVE-01")
+                for code, _, _, qte, prix in ARTICLES:
+                    LigneAchatMagasin.objects.create(achat=achat, article=self.articles[code], quantite=qte, prix_unitaire=prix)
+                LigneAchatMagasin.objects.create(achat=achat, destination=LigneAchatMagasin.IMMOBILISATION,
+                                                 designation="Imprimante de guichet", prix_unitaire=250000)
+                achat.valider(self.agent)
+                for c in self.cars:                              # assurance et papiers du mois, imputés au véhicule
+                    DepenseVehicule(vehicule=c["vehicule"], nature=DepenseVehicule.ASSURANCE, montant=Decimal(35000),
+                                    libelle="Assurance et papiers du mois (fictif)", caisse=self.bq, date=jour).enregistrer()
+            if jour.day == 15 and self.cars:                     # achat direct pour un car précis
+                achat = AchatMagasin.objects.create(date=jour, fournisseur=self.fournisseur, facture="FICTIVE-02")
+                LigneAchatMagasin.objects.create(achat=achat, destination=LigneAchatMagasin.VEHICULE, designation="Pare-brise",
+                                                 prix_unitaire=85000, vehicule=self.cars[0]["vehicule"])
+                achat.valider(self.agent)
+        mesurer_etape('preparation_et_achats')
+        # Mesurer les opérations métier, séparément des requêtes SQL et des
+        # commits de transaction : la somme des temps SQL seule ne révèle pas
+        # les coûts Python, validations et signaux de vente/chargement.
+        vente_stats = {nom: [0, 0.0] for nom in ("billet_vendre", "colis_enregistrer", "colis_charger", "transaction_depart")}
+
+        def chronometrer_vente(nom, debut):
+            if diagnostic_sql:
+                vente_stats[nom][0] += 1
+                vente_stats[nom][1] += time.perf_counter() - debut
+
+        departs = []
+        for c, ligne, heure in self.plan_journee(jour):
+            debut_transaction = time.perf_counter() if diagnostic_sql else None
+            with horloge(self.moment(jour, max(heure - 3, 0))), transaction.atomic():
+                d = Depart.objects.create(ligne=ligne, date=jour, heure=datetime.time(heure), vehicule=c["vehicule"],
+                                          chauffeur=c["chauffeur"])
+                if not c.get("courrier"):
+                    saison = SAISON.get(jour.month, 1)                 # fêtes de fin d'année, grandes vacances
+                    voyageurs = max(1, int(d.places * min(r.uniform(0.55, 0.95) * saison, 1) * self.echelle))
+                    reserve = self.reserve_scenarios(c, heure, jour)
+                    for k in range(min(voyageurs, d.places - reserve)):
+                        bagages = r.random() < 0.15
+                        debut_vente = time.perf_counter() if diagnostic_sql else None
+                        Billet(depart=d, voyageur=f"Voyageur {k + 1} (fictif)",
+                               paiement=Billet.MOBILE_MONEY if r.random() < (0.05 if self.profil_complet else 0.2) else Billet.ESPECES,
+                               bagages="1 colis encombrant" if bagages else "", bagages_nombre=1 if bagages else 0,
+                               prix_bagages=Decimal(r.choice([1000, 2000, 3000])) if bagages else Decimal(0)).vendre(self.agent)
+                        chronometrer_vente("billet_vendre", debut_vente)
+                        self.compteurs["billets"] += 1
+                        self.compteurs["bagages"] += bagages
+                nb_colis = max(0, int(r.randint(0, 3 if not c.get("courrier") else 12) * max(self.echelle, 0.25)))
+                for k in range(nb_colis):
+                    debut_colis = time.perf_counter() if diagnostic_sql else None
+                    colis = Colis(gare_depart=ligne.gare_depart, gare_arrivee=ligne.gare_arrivee, expediteur="Expéditeur (fictif)",
+                                  destinataire="Destinataire (fictif)", poids=Decimal(r.randint(2, 40)), description="Carton").enregistrer()
+                    chronometrer_vente("colis_enregistrer", debut_colis)
+                    debut_chargement = time.perf_counter() if diagnostic_sql else None
+                    colis.charger(d)
+                    chronometrer_vente("colis_charger", debut_chargement)
+                    self.compteurs["colis"] += 1
+            chronometrer_vente("transaction_depart", debut_transaction)
+            departs.append((d, c, heure))
+        if diagnostic_sql:
+            for nom, (appels, secondes) in vente_stats.items():
+                print(f"[SIM-VENTES] {jour} {nom} appels={appels} duree={secondes:.3f}s", flush=True)
+        mesurer_etape('billets_et_colis')
+        with horloge(self.moment(jour, 0)), transaction.atomic():
+            self.scenarios_avant_depart(jour, departs)
+        mesurer_etape('scenarios_avant_depart')
+        # Sous-chronométrage du traitement le plus coûteux, sans toucher aux
+        # écritures ni à l'ordonnancement des transactions métier.
+        sous_phases = {nom: [0, 0.0] for nom in (
+            "depart", "incidents_en_route", "carburant_et_caisse", "arrivee", "incidents_apres_arrivee")}
+
+        def chronometrer_sous_phase(nom, debut):
+            if diagnostic_sql:
+                stats = sous_phases[nom]
+                stats[0] += 1
+                elapsed = time.perf_counter() - debut
+                stats[1] += elapsed
+                cumul = self._sim_transport_cumulees.setdefault(nom, [0, 0.0])
+                cumul[0] += 1
+                cumul[1] += elapsed
+
+        for d, c, heure in departs:
+            with horloge(self.moment(jour, heure, 5)), transaction.atomic():
+                debut_operation = time.perf_counter() if diagnostic_sql else None
+                if self.profil_complet and d.pk in (getattr(self, '_depart_scenario', None), getattr(self, '_depart_suite_scenario', None)):
+                    self.tracer_scenario('Transport', 'Départ : reconnaissance des produits de cette portion, sans nouvel encaissement', d.partir)
+                else:
+                    d.partir()
+                chronometrer_sous_phase("depart", debut_operation)
+                debut_operation = time.perf_counter() if diagnostic_sql else None
+                self.scenarios_en_route(jour, d)
+                chronometrer_sous_phase("incidents_en_route", debut_operation)
+                debut_operation = time.perf_counter() if diagnostic_sql else None
+                litres = Decimal(c["km"] * 35 // 100)
+                PleinCarburant(vehicule=c["vehicule"], depart=d, litres=litres, prix_litre=PRIX_LITRE,
+                               caisse=self.caisse_pour(litres * PRIX_LITRE, jour), date=jour).enregistrer()
+                self.compteurs["voyages"] += 1
+                self.compteurs["pleins"] += 1
+                chronometrer_sous_phase("carburant_et_caisse", debut_operation)
+            arrivee_jour = jour + datetime.timedelta(days=(heure+6)//24) if self.departs_jour else jour
+            arrivee_heure = (heure+6)%24 if self.departs_jour else min(heure+6,23)
+            with horloge(self.moment(arrivee_jour, arrivee_heure)), transaction.atomic():
+                debut_operation = time.perf_counter() if diagnostic_sql else None
+                d.arriver()
+                chronometrer_sous_phase("arrivee", debut_operation)
+                debut_operation = time.perf_counter() if diagnostic_sql else None
+                self.scenarios_apres_arrivee(jour, d)
+                chronometrer_sous_phase("incidents_apres_arrivee", debut_operation)
+        if diagnostic_sql:
+            for nom, (appels, secondes) in sous_phases.items():
+                print(f'[SIM-TRANSPORT] {jour} {nom} appels={appels} duree={secondes:.3f}s', flush=True)
+        mesurer_etape('departs_carburant_arrivees')
+        with horloge(self.moment(jour, 20)), transaction.atomic():
+            if self.compteurs["colis"] > colis_avant_jour:       # emballages uniquement si colis créés ce jour
+                carton = self.articles["CART"]
+                carton.refresh_from_db()
+                besoin = Decimal(min(len(departs), int(carton.quantite)))
+                if besoin:
+                    sortir(carton, besoin, motif="Emballage des colis du jour", date=jour)
+            if jour.weekday() == 2 and self.cars:                # réparations du mercredi avec pièces du magasin
+                for c in r.sample(self.cars, min(3, len(self.cars))):
+                    o = OrdreReparation.objects.create(vehicule=c["vehicule"], date_entree=jour, panne="Entretien périodique")
+                    for code, qte in (("FILT", 1), ("HUIL", 8)):
+                        a = self.articles[code]
+                        a.refresh_from_db()
+                        if a.quantite >= qte:
+                            LigneReparation.objects.create(ordre=o, nature=LigneReparation.MAGASIN, article=a, designation=a.designation,
+                                                           quantite=qte, prix_unitaire=a.cout_moyen)
+                    LigneReparation.objects.create(ordre=o, nature=LigneReparation.MAIN_OEUVRE_EXTERNE, designation="Main d'œuvre",
+                                                   prix_unitaire=10000)
+                    o.cloturer(caisse=self.caisse_pour(o.cout, jour), date=jour)
+                    self.compteurs["reparations"] += 1
+            if jour == self.mois_jours[0]:                       # loyers des gares, autorisés puis payés
+                for g in self.gares.values():
+                    dd = DemandeDepense(nature=DemandeDepense.LOYER, libelle=f"Loyer {g.nom} (fictif)", montant=Decimal(150000),
+                                        date=jour).demander(self.agent)
+                    dd.decider(True, self.chef)
+                    dd.payer(self.bq, self.agent, date=jour)
+            if jour.day == 15:                                   # avances des contrats « avance sur variable »
+                for ct in self.contrats:
+                    if ct.modele == ContratPartenaire.AVANCE_SUR_VARIABLE:
+                        ReglementPartenaire(partenaire=ct.partenaire, montant=ct.montant_location, caisse=self.bq,
+                                            nature=ReglementPartenaire.AVANCE, date=jour).enregistrer()
+            especes = solde_tresorerie(self.ca.compte_tresorerie, jour)
+            versement = Decimal(0) if self.profil_complet else (especes * Decimal("0.8")).quantize(Decimal("1"))
+            if versement > 0:                                    # versement en banque du soir
+                t = TransfertFonds(origine=self.ca, destination=self.bq, montant=versement, date_envoi=jour, porteur="Convoyeur de fonds")
+                t.envoyer(self.chef)
+                t.recevoir(self.chef, date=jour)
+        mesurer_etape('operations_fin_journee')
+
+    # ------------------------------------------------------------------ fin de mois
+    @transaction.atomic
+    def fin_de_mois(self, debut, fin):
+        from apps.comptabilite.models import Ecriture, LigneEcriture
+        from apps.comptabilite.services import creer_ecriture
+        from apps.partenaires.models import Decompte, ReglementPartenaire
+        from apps.personnel.models import PeriodePaie
+
+        periode = PeriodePaie.objects.create(annee=fin.year, mois=fin.month)
+        periode.generer()
+        periode.valider(date=fin)
+        periode.payer(self.caisse_pour(sum((b.net for b in periode.bulletins.all()), Decimal(0)), fin) if self.profil_complet else self.bq, date=fin)
+        if self.profil_complet:
+            self.decomptes_metier(debut, fin)
+        else:
+            for ct in self.contrats:
+                d = Decompte.calculer(ct, debut, fin).approuver(date=fin)
+                if d.montant_du > 0:                             # profil historique conservé
+                    ReglementPartenaire(partenaire=ct.partenaire, decompte=d, montant=(d.montant_du * Decimal("0.6")).quantize(Decimal("1")),
+                                        caisse=self.bq, date=fin).enregistrer()
+        # Agréger dans SQL plutôt que matérialiser toutes les lignes fournisseur.
+        from django.db.models import Sum
+
+        solde_fournisseur = LigneEcriture.objects.filter(
+            tiers=self.fournisseur,
+            compte=self.fournisseur.get_compte_collectif(),
+            ecriture__statut=Ecriture.STATUT_VALIDEE,
+        ).aggregate(debit=Sum("debit"), credit=Sum("credit"))
+        dette = (solde_fournisseur["credit"] or Decimal(0)) - (solde_fournisseur["debit"] or Decimal(0))
+        if dette > 0:                                            # règlement du fournisseur par la banque
+            journal = self.caisse_pour(dette,fin) if self.profil_complet else self.bq
+            creer_ecriture(journal, fin, "Règlement fournisseur pièces (fictif)",
+                           [{"compte": self.fournisseur.get_compte_collectif(), "tiers": self.fournisseur, "debit": dette},
+                            {"compte": journal.compte_tresorerie, "credit": dette}])
+
+    # ------------------------------------------------------------------ bilan et contrôles
+    def bilan(self):
+        from django.db.models import Sum
+
+        from apps.comptabilite.models import Ecriture, LigneEcriture
+        from apps.garage.models_magasin import ArticleMagasin
+        from apps.partenaires.models import solde_partenaire
+        from apps.personnel.models import Bulletin
+        from apps.transport import analytique
+
+        debut, fin = self.jours[0], self.jours[-1]
+        tot = LigneEcriture.objects.filter(ecriture__statut=Ecriture.STATUT_VALIDEE).aggregate(d=Sum("debit"), c=Sum("credit"))
+
+        # Un seul regroupement SQL par compte pour les contrôles du bilan.
+        # Les préfixes OHADA se recouvrent (7 / 70611, 6 / 6053, etc.) :
+        # chaque solde conserve exactement la sémantique de startswith.
+        soldes_comptes = list(
+            LigneEcriture.objects.filter(ecriture__statut=Ecriture.STATUT_VALIDEE)
+            .values("compte__numero")
+            .annotate(d=Sum("debit"), c=Sum("credit"))
+        )
+
+        def solde(prefixe):
+            return sum(
+                ((ligne["d"] or Decimal(0)) - (ligne["c"] or Decimal(0))
+                 for ligne in soldes_comptes if ligne["compte__numero"].startswith(prefixe)),
+                Decimal(0),
+            )
+
+        ana = analytique.vehicules(debut, fin)
+
+        # Regrouper les classes 6/7 par mois en une requête au lieu de
+        # deux agrégations SQL pour chacun des mois simulés.
+        from django.db.models.functions import ExtractMonth, ExtractYear
+
+        lignes_mensuelles = (
+            LigneEcriture.objects.filter(
+                ecriture__date__range=(debut, fin),
+                ecriture__statut=Ecriture.STATUT_VALIDEE,
+                compte__numero__startswith="6",
+            )
+            .annotate(annee=ExtractYear("ecriture__date"), mois=ExtractMonth("ecriture__date"))
+            .values("annee", "mois")
+            .annotate(d=Sum("debit"), c=Sum("credit"))
+        )
+        charges_mensuelles = {
+            (ligne["annee"], ligne["mois"]): (ligne["d"] or Decimal(0)) - (ligne["c"] or Decimal(0))
+            for ligne in lignes_mensuelles
+        }
+        produits_mensuels = {
+            (ligne["annee"], ligne["mois"]): (ligne["c"] or Decimal(0)) - (ligne["d"] or Decimal(0))
+            for ligne in (
+                LigneEcriture.objects.filter(
+                    ecriture__date__range=(debut, fin),
+                    ecriture__statut=Ecriture.STATUT_VALIDEE,
+                    compte__numero__startswith="7",
+                )
+                .annotate(annee=ExtractYear("ecriture__date"), mois=ExtractMonth("ecriture__date"))
+                .values("annee", "mois")
+                .annotate(d=Sum("debit"), c=Sum("credit"))
+            )
+        }
+        mensuel = [
+            {"debut": d, "fin": f, **n,
+             "produits": produits_mensuels.get((d.year, d.month), Decimal(0)),
+             "charges": charges_mensuelles.get((d.year, d.month), Decimal(0))}
+            for d, f, n in self.par_mois
+        ]
+        return {"mensuel": mensuel,
+            **self.compteurs, "ecritures": Ecriture.objects.count(), "debit": tot["d"] or 0, "credit": tot["c"] or 0,
+            "produits": -solde("7"), "charges": solde("6"), "billets_70611": -solde("70611"), "bagages_70614": -solde("70614"),
+            "colis_70612": -solde("70612"), "carburant": solde("6053"), "pieces_624": solde("624"), "paie_661": solde("661"),
+            "paie_664": solde("664"), "net_a_payer_422": -solde("422"), "organismes_431": -solde("431"),
+            "fournisseurs_401": -solde("401"), "proprietaires_467": -solde("467"), "caisse_57": solde("57"), "banque_52": solde("52"),
+            "mobile_money_55": solde("55"), "transit_585": solde("585"), "stock_33": solde("33"), "immobilisations_2": solde("2"),
+            "valeur_magasin": sum((a.valeur for a in ArticleMagasin.objects.all()), Decimal(0)),
+            "bulletins": Bulletin.objects.count(), "net_bulletins": Bulletin.objects.aggregate(s=Sum("net"))["s"] or 0,
+            "analytique": ana["controle"], "resultat_vehicules": ana["total"]["resultat_societe"],
+            "proprietaires": [(c.partenaire.nom, c.vehicule.immatriculation, c.get_modele_display(), solde_partenaire(c.partenaire))
+                              for c in self.contrats],
+        }
+
+    def texte_bilan(self, b, o):
+        def m(v):
+            return f"{Decimal(v):,.0f}".replace(",", " ")
+
+        controles = [
+            ("Débit = crédit de toutes les écritures", b["debit"] == b["credit"]),
+            ("Caisse espèces positive en fin de période", b["caisse_57"] >= 0),
+            ("Fonds en transit soldés (versements reçus)", b["transit_585"] == 0),
+            ("Salaires nets payés (422 soldé)", b["net_a_payer_422"] == 0),
+            ("Stock comptable (33) = valeur du magasin", abs(b["stock_33"] - b["valeur_magasin"]) <= len(ARTICLES)),
+            ("Produits analytiques affectés + non affectés = comptabilité", b["analytique"]["produits_gl"]
+             == b["analytique"]["produits_affectes"] + b["analytique"]["produits_non_affectes"]),
+        ]
+        complet = all(len(jm) == calendar.monthrange(jm[0].year, jm[0].month)[1] for jm in self.mois)
+        note_partielle = ([
+            "> ⚠ Période partielle : les charges mensuelles fixes (paie, cotisations) sont comptabilisées en entier,",
+            "> alors que les recettes ne couvrent que les jours simulés — le résultat n'est pas représentatif d'un mois complet.", ""]
+            if not complet else [])
+        lignes = [
+            "# Bilan de la simulation (données FICTIVES)", "",
+            f"Période simulée : {self.jours[0]:%d/%m/%Y} au {self.jours[-1]:%d/%m/%Y} "
+            f"({len(self.mois)} mois, {len(self.jours)} jours simulés) · échelle {o['echelle']} · graine {o['graine']}", "",
+            *note_partielle,
+            "| Mois | Voyages | Billets | Colis | Produits | Charges | Résultat |", "|---|---:|---:|---:|---:|---:|---:|",
+            *[f"| {x['debut']:%m/%Y} | {x['voyages']} | {x['billets']} | {x['colis']} | {m(x['produits'])} | {m(x['charges'])} | "
+              f"{m(x['produits'] - x['charges'])} |" for x in b["mensuel"]], "",
+            "| Activité | Nombre |", "|---|---:|",
+            *[f"| {k} | {b[k]} |" for k in ("voyages", "billets", "bagages", "colis", "pleins", "reparations", "bulletins", "ecritures")],
+            "", "| Comptabilité générale | FCFA |", "|---|---:|",
+            *[f"| {k} | {m(b[k])} |" for k in ("produits", "charges", "billets_70611", "bagages_70614", "colis_70612", "carburant",
+                                               "pieces_624", "paie_661", "paie_664", "net_bulletins", "net_a_payer_422",
+                                               "organismes_431", "fournisseurs_401", "proprietaires_467", "caisse_57", "banque_52",
+                                               "mobile_money_55", "transit_585", "stock_33", "valeur_magasin", "immobilisations_2")],
+            f"| Résultat (produits − charges) | {m(b['produits'] - b['charges'])} |",
+            f"| Total débit = total crédit | {m(b['debit'])} = {m(b['credit'])} |", "",
+            "| Analytique véhicules | FCFA |", "|---|---:|",
+            *[f"| {k} | {m(v)} |" for k, v in b["analytique"].items()],
+            f"| Résultat des véhicules pour la société | {m(b['resultat_vehicules'])} |", "",
+            "| Propriétaire | Véhicule | Contrat | Solde du propriétaire, tous ses véhicules (467) |", "|---|---|---|---:|",
+            *[f"| {p} | {v} | {c} | {m(s)} |" for p, v, c, s in b["proprietaires"]], "",
+            "| Contrôle | Résultat |", "|---|---|",
+            *[f"| {t} | {'OK' if ok else 'ÉCART'} |" for t, ok in controles], "",
+            "Taux de paie de démonstration (5 % / 10 %), prix, salaires et contrats : fictifs, sans valeur réglementaire.\nNon simulés systématiquement : amortissements, péages, impôts et taxes. Les imprévus et incidents ne sont joués que dans le profil complet ; leurs montants sont fictifs, sans fréquence statistique garantie. Saisonnalité de démonstration : janvier-février plus calmes, août et décembre plus chargés.",
+        ]
+        if self.profil_complet:
+            lignes += ["", "## Scénarios et conséquences comptables (fictifs)", "",
+                "15 % : base du contrat réel À CONFIRMER. Les deux hypothèses sont comparées sans double comptabilisation.",
+                "Le retrait dit salaire propriétaire débite son compte tiers ; il n’est ni une paie ni une charge supplémentaire.",
+                "| Date | Module | Cas | Débit | Crédit | Pièces comptables |", "|---|---|---|---:|---:|---|",
+                *[f"| {e['date']} | {e['module']} | {e['cas']} | {e['debit']} | {e['credit']} | {', '.join(sorted({l['ecriture'] for l in e['ecritures']})) or 'Aucune écriture'} |" for e in self.scenarios],
+                "", "## Temps réellement mesurés", "", "| Journée | Départs (toutes agences) | Billets | Secondes |", "|---|---:|---:|---:|",
+                *[f"| {e['jour']} | {e['departs']} | {e['billets']} | {e['secondes']} |" for e in self.mesures],
+                "", "Initialisation, paie et arrêtés mensuels s’ajoutent aux temps des journées."]
+            lignes += ["", "## Comparaison des deux hypothèses de commission (non confirmées)",
+                "| Véhicule | Base | Recettes | Dépenses | Part société | Dû propriétaire | Traitement |", "|---|---|---:|---:|---:|---:|---|",
+                *[f"| {h['vehicule']} | {base} | {v['recettes']} | {v['depenses']} | {v['commission']} | {v['montant_du']} | {'Comptabilisé dans la démonstration' if base==h['base_fictive_comptabilisee'] else 'Comparaison sans écriture'} |"
+                  for h in self.hypotheses for base,v in h['comparaison_sans_ecriture'].items()]]
+            controles += [("Scénarios équilibrés individuellement", all(Decimal(e['debit']) == Decimal(e['credit']) for e in self.scenarios))]
+            if self.departs_jour:
+                controles += [("Nombre exact de départs quotidiens toutes agences réunies", all(e['departs']==self.departs_jour for e in self.mesures))]
+            lignes += [f"{t} : {'OK' if ok else 'ÉCART'}" for t,ok in controles[-2:]]
+        self.controles = controles
+        return "\n".join(lignes) + "\n"
+

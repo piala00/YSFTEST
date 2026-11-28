@@ -1,0 +1,4 @@
+interface:
+  display_name: "Matrices de menus Sage"
+  short_description: "Preuves tracées et limites pour ERP OHADA"
+  default_prompt: "Utilise $sage100-matrices-menus-complement pour répondre avec les sources et les limites de version."

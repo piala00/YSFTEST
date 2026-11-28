@@ -1,0 +1,2 @@
+contrat_id;vehicule;owner;periode;formule;produits;frais_hors_owner;marge_avant_owner;fixe_garanti;assiette_variable_apres_fixe;taux_complement;complement_variable;droit_total;resultat_vehicule_apres_owner;montant_fixe_verse;retrait_variable_verse;reste_du;nature
+CTR-EX-01;BUS-EX-01;OWNER-EX-01;2026-09;FIXE_GARANTI_PLUS_VARIABLE;1000000;400000;600000;150000;450000;0.40;180000;330000;270000;150000;100000;80000;FICTIF_AUTONOME

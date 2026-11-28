@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Bulletin {{ b.employe.nom }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Bulletin de paie — {{ b.employe.nom }}</h1>
+  <button type="button" class="btn btn-sm btn-outline-secondary d-print-none" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button></div>
+<div class="card mb-3 card-body small">{{ societe.raison_sociale }} · {{ b.periode }} · matricule {{ b.employe.matricule }} · {{ b.employe.poste }} ({{ b.employe.get_service_display }})
+  {% if b.employe.numero_cnps %} · CNPS {{ b.employe.numero_cnps }}{% endif %}{% if b.employe.vehicule %} · véhicule {{ b.employe.vehicule.immatriculation }}{% endif %}</div>
+<div class="card mb-3"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Rubrique</th><th class="num">Gain</th><th class="num">Retenue</th><th class="num">Charge patronale</th><th></th></tr></thead>
+  <tbody><tr><td>Salaire de base</td><td class="num">{{ b.salaire_base|montant }}</td><td></td><td></td><td>{% if modifiable %}<form method="post" class="d-flex gap-1 d-print-none">{% csrf_token %}
+    <input name="salaire_base" type="number" min="0" value="{{ b.salaire_base|floatformat:0 }}" class="form-control form-control-sm" style="width:8rem" aria-label="Salaire de base">
+    <button class="btn btn-sm btn-outline-secondary py-0" name="action" value="base">Modifier</button></form>{% endif %}</td></tr>
+  {% for l in lignes %}<tr><td>{{ l.rubrique.libelle }}</td>
+    <td class="num">{% if l.rubrique.nature == "GAIN" %}{{ l.montant|montant }}{% endif %}</td><td class="num">{% if l.rubrique.nature == "RETENUE" %}{{ l.montant|montant }}{% endif %}</td>
+    <td class="num">{% if l.rubrique.nature == "PATRONALE" %}{{ l.montant|montant }}{% endif %}</td>
+    <td>{% if modifiable %}<form method="post" class="d-print-none">{% csrf_token %}<input type="hidden" name="ligne" value="{{ l.pk }}"><button class="btn btn-sm btn-link text-danger p-0" name="action" value="retirer"><i class="bi bi-x-lg"></i></button></form>{% endif %}</td></tr>{% endfor %}
+  {% if b.avances %}<tr><td>Avances reprises</td><td></td><td class="num">{{ b.avances|montant }}</td><td></td><td></td></tr>{% endif %}</tbody>
+  <tfoot><tr class="total"><td>Brut {{ b.brut|montant }} · retenues {{ b.retenues|montant }}</td><td colspan="2" class="num">Net à payer : {{ b.net|montant }}</td><td class="num">{{ b.patronales|montant_ou_vide }}</td><td></td></tr></tfoot></table>
+{% if modifiable %}<form method="post" class="card-body border-top d-flex flex-wrap gap-2 align-items-end d-print-none">{% csrf_token %}
+  <div><label class="form-label small mb-0" for="b-rub">Ajouter une rubrique</label><select id="b-rub" name="rubrique" class="form-select form-select-sm">{% for r in rubriques %}<option value="{{ r.pk }}">{{ r }}</option>{% endfor %}</select></div>
+  <div><label class="form-label small mb-0" for="b-mt">Montant (vide : calculé)</label><input id="b-mt" name="montant" type="number" min="0" class="form-control form-control-sm"></div>
+  <button class="btn btn-sm btn-outline-primary" name="action" value="ajouter" {% if not rubriques %}disabled{% endif %}>Ajouter</button></form>{% endif %}</div>
+<a class="d-print-none small" href="{% url 'personnel:paie' b.periode.pk %}">← Paie du mois</a>
+{% endblock %}

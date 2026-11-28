@@ -1,0 +1,149 @@
+﻿id,produit,table,fonction,version,page_pdf_index_zero,page_imprimee,acces_driver_sage_documente,presence_locale,url_source
+TX001,COMPTA,F_ENUMSTAT,Enumérés statistiques,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX002,COMPTA,F_COMPTEGA,Répartitions analytiques comptes généraux,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX003,COMPTA,F_COMPTEGNOTE,Blocs-notes des comptes généraux,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX004,COMPTA,F_COMPTEGBUDGET,Budgets des comptes généraux,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX005,COMPTA,F_COMPTEGBUDGETA,Budgets analytiques des comptes généraux,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX006,COMPTA,F_COMPTEAMEDIA,Documents associés aux comptes analytiques,12.20,4,3,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX007,COMPTA,F_COMPTEABUDGET,Budgets analytiques,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX008,COMPTA,F_COMPTEABUDGETG,Budgets généraux des comptes analytiques,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX009,COMPTA,F_COMPTER,Comptes reporting,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX010,COMPTA,F_COMPTETMEDIA,Documents multimédia des tiers,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX011,COMPTA,F_COMPTETG,Liens comptes tiers / comptes généraux,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX012,COMPTA,F_BANQUET,Banques des tiers,12.20,4,3,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=5
+TX013,COMPTA,F_REGLEMENTT,Règlements tiers,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX014,COMPTA,F_CONTACTT,Contacts tiers,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX015,COMPTA,F_LIVRAISON,Lieux de livraison clients,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX016,COMPTA,F_ETAXE,Éléments des taux de taxe,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX017,COMPTA,F_JOURNAUXA,Codes journaux analytiques,12.20,5,4,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX018,COMPTA,F_BANQUE,Banques,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX019,COMPTA,F_EBANQUE,Éléments de banque,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX020,COMPTA,F_CONTACTB,Contacts banques,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX021,COMPTA,F_PIECE,Pièces / modèles,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX022,COMPTA,F_PIECEG,Pièces générales,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX023,COMPTA,F_PIECEA,Pièces analytiques,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX024,COMPTA,F_MODELEG,Modèles de grille,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX025,COMPTA,F_EMODELEG,Éléments modèles de grille,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX026,COMPTA,F_MODELER,Modèles de règlement,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX027,COMPTA,F_EMODELER,Éléments modèles de règlement,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX028,COMPTA,F_MODELEA,Modèles d'abonnement,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX029,COMPTA,F_EMODELEA,Éléments modèles d'abonnement,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX030,COMPTA,F_LIBELLE,Libellés,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX031,COMPTA,F_BUDGET,Postes budgétaires,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX032,COMPTA,F_EBUDGET,Éléments des postes budgétaires,12.20,5,4,"A,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX033,COMPTA,F_ECRITURECMEDIA,Pièces jointes aux écritures,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX034,COMPTA,F_ECRITURECREGUL,Lien des écritures de régularisation,12.20,5,4,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX035,COMPTA,F_ENUMLIBRECPTA,Énumérés libres comptables,12.20,5,4,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX036,COMPTA,F_REGREVISION,Registres de révision,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX037,COMPTA,F_EXTRAIT,Extraits bancaires,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX038,COMPTA,F_EEXTRAIT,Éléments d'extraits bancaires,12.20,5,4,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=6
+TX039,COMPTA,F_EEXTRAITEC,Liens extraits et écritures,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX040,COMPTA,F_ENUMANAL,Énumérés analytiques,12.20,6,5,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX041,COMPTA,F_PAYS,Pays,12.20,6,5,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX042,COMPTA,F_ECRITURER,Écritures de reports analytiques,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX043,COMPTA,F_CYCLEOBS,Cycles observations,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX044,COMPTA,F_REGROUPOBS,Regroupements d'observations,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX045,COMPTA,F_CYCLECONS,Consignes de cycles,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX046,COMPTA,F_ETABLEAU,Éléments tableaux,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX047,COMPTA,F_INTERBANCAIRE,Codes interbancaires,12.20,6,5,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX048,COMPTA,F_CONTACTD,Contacts dossier,12.20,6,5,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX049,COMPTA,F_ECRITUREF,Écritures de fin d'exercice,12.20,6,5,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX050,COMPTA,F_EEXTRAITECNC,Éléments d'extraits non comptabilisés,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX051,COMPTA,F_EEXTRAITLIB,Libellés complémentaires extraits,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX052,COMPTA,F_COMPTETRAPPEL,Historique de rappels,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX053,COMPTA,F_COLLABORATEUR,Collaborateurs,12.20,6,5,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX054,COMPTA,F_SCENARIO,Scénarios de recouvrement,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX055,COMPTA,F_ESCENARIO,Éléments de scénarios de recouvrement,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX056,COMPTA,F_DRECOUVREMENT,Dossiers de recouvrement,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX057,COMPTA,F_DRECOUVREMENTEC,Liens dossiers de recouvrement et écritures,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX058,COMPTA,F_DRECOUVREMENTIV,Interventions dossiers de recouvrement,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX059,COMPTA,F_CONTACTR,Contacts dossiers de recouvrement,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX060,COMPTA,F_CALENDRIER,Modèles de calendrier,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX061,COMPTA,F_ECALENDRIER,Jours d'exception,12.20,6,5,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=7
+TX062,COMPTA,F_BONAPAYERHISTO,Historique des bons à payer,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX063,COMPTA,F_MANDAT,Mandats de prélèvement,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX064,COMPTA,F_COMPTETNOTE,Blocs-notes tiers,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX065,COMPTA,F_CTRLFIELDTIERS,Contrôle en saisie des tiers,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX066,COMPTA,F_CTRLFIELDECRITUREC,Contrôle en saisie écritures,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX067,COMPTA,F_AUDITCPTA,Table d'audit système comptable,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX068,COMPTA,F_ECRITURECHASHHISTO,Historique empreintes écritures,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX069,COMPTA,F_REGTAXEHASHHISTO,Historique empreintes taxes,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX070,COMPTA,F_MENTIONEXONERATION,Mentions d'exonération,12.20,7,6,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX071,COMPTA,F_CODEACTION,Codes d'action e-facture,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX072,COMPTA,F_FACTRECEPTION,Règles réception factures,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX073,COMPTA,F_MOTIFREFUS,Motifs de refus factures,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX074,COMPTA,F_COMPTETFACTRECEPTION,Informations tiers réception électronique,12.20,7,6,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=8
+TX075,GESCOM,F_ENUMSTATART,Énumérés statistiques articles,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX076,GESCOM,F_AGENDADET,Événements agenda détaillés,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX077,GESCOM,F_ENUMGAMME,Énumérés des gammes,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX078,GESCOM,F_ENUMCOND,Énumérés des conditionnements,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX079,GESCOM,F_ENUMLIBRECIAL,Énumérés des informations libres,12.20,8,7,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX080,GESCOM,F_FAMFOURNISS,Familles / fournisseurs,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX081,GESCOM,F_FAMTARIF,Familles / catégories,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX082,GESCOM,F_FAMCLIENT,Familles / clients,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX083,GESCOM,F_FAMTARIFQTE,Tarification de quantité par famille,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX084,GESCOM,F_FAMCOMPTA,Passerelle comptable des familles,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX085,GESCOM,F_FAMMODELE,Modèles de familles,12.20,8,7,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX086,GESCOM,F_ARTENUMREF,Énumérés des gammes références,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX087,GESCOM,F_ARTPRIX,Prix par énumérés de gamme,12.20,8,7,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX088,GESCOM,F_ARTICLEMEDIA,Articles / multimédias,12.20,8,7,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=9
+TX089,GESCOM,F_GAMSTOCKEMPL,Stocks de gammes par emplacement,12.20,9,8,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX090,GESCOM,F_ARTGLOSS,Liens articles / glossaires,12.20,9,8,"A,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX091,GESCOM,F_ARTMODELE,Modèles associés aux articles,12.20,9,8,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX092,GESCOM,F_GLOSSAIRE,Glossaire,12.20,9,8,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX093,GESCOM,F_AGENDA,Agenda,12.20,9,8,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX094,GESCOM,F_DEPOTCONTACT,Contacts dépôts,12.20,9,8,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX095,GESCOM,F_DEPOTUSER,Utilisateurs associés aux dépôts,12.20,9,8,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX096,GESCOM,F_TARIF,Barèmes,12.20,9,8,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX097,GESCOM,F_TARIFSELECT,Tarifs de sélection,12.20,9,8,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX098,GESCOM,F_TARIFREMISE,Remises tarifaires,12.20,9,8,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX099,GESCOM,F_REPCOM,Commissions représentants,12.20,9,8,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=10
+TX100,GESCOM,F_DOCENTETEMEDIA,Médias des documents commerciaux,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX101,GESCOM,F_DOCLIGNEEMPL,Lignes de documents par emplacement,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX102,GESCOM,F_PROTECTIONCIAL,Protection système commercial,12.20,10,9,AUCUN,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX103,GESCOM,F_EPROTECTIONCIAL,Protection système commercial,12.20,10,9,AUCUN,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX104,GESCOM,F_ABOPERIODE,Périodicité des abonnements,12.20,10,9,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX105,GESCOM,F_ABOENTETE,En-têtes abonnements,12.20,10,9,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX106,GESCOM,F_ABOLIGNE,Lignes abonnements,12.20,10,9,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX107,GESCOM,F_ABOREGLEMENT,Règlements abonnements,12.20,10,9,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX108,GESCOM,F_MODELE,Modèles d'enregistrement,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX109,GESCOM,F_AFFICHEUR,Lignes de l'afficheur,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX110,GESCOM,F_CAISSE,Caisses,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX111,GESCOM,F_AFFICHEURCAISSE,Afficheur lié aux caisses,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX112,GESCOM,F_TICKETARCHIVE,Tickets archivés,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX113,GESCOM,F_LIGNEARCHIVE,Lignes tickets archivés,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX114,GESCOM,F_REGLEARCHIVE,Règlements archivés,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX115,GESCOM,F_CLAVIER,Raccourcis clavier,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX116,GESCOM,F_CAISSECAISSIER,Liaisons caisse / caissiers,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX117,GESCOM,F_COMMPLANIFIE,Communications planifiées,12.20,10,9,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=11
+TX118,GESCOM,F_RESSOURCEPROD,Ressources de production,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX119,GESCOM,F_ARTCOMPO,Gammes opératoires,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX120,GESCOM,F_DOCCURRENTPIECE,Dernières numérotations de documents,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX121,GESCOM,F_RESSCENTRE,Liaisons ressources / centres charges,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX122,GESCOM,F_BILLETPIECE,Billets/pièces par devise,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX123,GESCOM,F_PREVISION,Prévisions de fabrication,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX124,GESCOM,F_CATALOGUE,Catalogue article,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX125,GESCOM,F_ARTICLERESSOURCE,Articles / ressources,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX126,GESCOM,F_PROJETFABRICATION,Projets de fabrication,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX127,GESCOM,F_PROJETLIGNE,Lignes projets fabrication,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX128,GESCOM,F_PROJETPLANNING,Plannings des projets,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX129,GESCOM,F_PROJETHISTO,Historiques des projets,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX130,GESCOM,F_DOCLIGNETEXT,Glossaire lié aux lignes,12.20,11,10,"A,M",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX131,GESCOM,F_DOCENTETETEXT,Textes complémentaires des documents,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX132,GESCOM,F_BONAPAYERHISTOCIAL,Historique bon à payer commercial,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX133,GESCOM,F_COMPTETINFOS,Informations e-facture tiers,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX134,GESCOM,F_DOCENTETEINFOS,Informations e-facture document,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX135,GESCOM,F_DOCLIGNEINFOS,Informations e-facture lignes,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX136,GESCOM,F_ABOENTETEINFOS,Informations e-facture abonnement,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX137,GESCOM,F_ABOLIGNEINFOS,Informations e-facture lignes abonnement,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX138,GESCOM,F_CAISSETOTAL,Grand total par caisse,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX139,GESCOM,F_AUDITCIAL,Audit système commercial,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX140,GESCOM,F_DOCENTETEHASHHISTO,Historique hash entêtes,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX141,GESCOM,F_DOCLIGNEHASHHISTO,Historique hash lignes,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX142,GESCOM,F_DOCREGLHASHHISTO,Historique hash échéances,12.20,11,10,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=12
+TX143,GESCOM,F_CREGLEMENTHASHHISTO,Historique hash règlements,12.20,12,11,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=13
+TX144,GESCOM,F_EXPEDITIONGRILLE,Grille des frais d'expédition,12.20,12,11,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=13
+TX145,GESCOM,F_DOCENTETEGRILLE,Frais expédition appliqués documents,12.20,12,11,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=13
+TX146,GESCOM,F_CTRLSAISIEDOCENTETE,Contrôles de saisie entêtes,12.20,12,11,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=13
+TX147,GESCOM,F_CTRLSAISIEDOCLIGNE,Contrôles de saisie lignes,12.20,12,11,LECTURE,NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=13
+TX148,GESCOM,F_FACTCADRE,Cadre de facturation,12.20,12,11,"A,M,S",NON_OBSERVE,https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230113095648937#page=13

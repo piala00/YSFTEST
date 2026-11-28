@@ -1,0 +1,32 @@
+ERP OHADA — PROGRAMME WINDOWS
+
+Démarrez le logiciel depuis son raccourci Windows. Les autres postes utilisent
+l'adresse du serveur dans leur navigateur. Le service Windows démarre et se
+relance automatiquement lorsqu'il a été choisi à l'installation.
+
+Fichier > Administration du poste regroupe les onglets :
+  Ce poste ; Licence ; Base de données ; Sauvegarde et restauration ;
+  Import et export agences ; Simulation.
+
+Le programme se trouve dans Program Files\ERP-OHADA\<Édition>.
+Les données sont conservées dans ProgramData\ERP-OHADA\<Édition>.
+Une mise à jour du programme conserve les données.
+
+Pour activer, sélectionnez le fichier de licence reçu dans l'onglet Licence.
+Le coffre privé reste chez l'éditeur. Aucune copie de clés dans les dossiers
+d'installation n'est nécessaire.
+
+Les agences utilisent les fichiers .erpx dans l'onglet Import et export agences.
+Les dossiers fictifs utilisent les fichiers .erpsim dans l'onglet Simulation.
+Un dossier de simulation s'ouvre dans le même logiciel, à la même adresse,
+après sauvegarde et redémarrage confirmé sur le serveur. Il reste séparé de
+votre société. Tous les postes connectés doivent terminer leurs saisies avant
+ce changement. Le bandeau SIMULATION rappelle en permanence le dossier ouvert.
+
+La copie exportée d'une simulation ne contient pas les mots de passe, sessions
+ou licences du poste d'origine. Le poste qui l'importe y crée son administrateur.
+Ne transmettez que des données fictives ; vérifiez les ajouts manuels éventuels.
+
+Conservez des sauvegardes sur un support séparé et testez leur restauration.
+Une réparation qui nécessite de perdre des données n'est pas effectuée par le logiciel.
+Guide complémentaire : documentation\GUIDE-CLIENT.txt.

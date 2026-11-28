@@ -1,0 +1,732 @@
+ligne_extraction;page_pdf;menu_racine;texte_source;source_id;version
+2;1;;Nombre d'utilisateurs maximum 10 10 Illimité Illimité Illimité Illimité Illimité Illimité;S03;Sans build
+3;1;Fichier;Menu Fichier;S03;Sans build
+4;1;Fichier;Nouveau Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+5;1;Fichier;Ouvrir Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+6;1;Fichier;Favoris Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+7;1;Fichier;Fermer Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+8;1;Fichier;Paramètres société;S03;Sans build
+9;1;Fichier;Identification;S03;Sans build
+10;1;Fichier;Identification;S03;Sans build
+11;1;Fichier;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+12;1;Fichier;Coordonnées Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+13;1;Fichier;Télécommunication Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+14;1;Fichier;Immatriculation Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+15;1;Fichier;Monnaie & Formats;S03;Sans build
+16;1;Fichier;Monnaie de tenue de compte Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+17;1;Fichier;Formats Quantité Prix Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+18;1;Fichier;IFRS Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+19;1;Fichier;Fichiers liés Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+20;1;Fichier;Préférences;S03;Sans build
+21;1;Fichier;Sélection de compte Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+22;1;Fichier;Message en suppression Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+23;1;Fichier;Mise en sommeil Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+24;1;Fichier;Recherche d'écritures Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+25;1;Fichier;Logo Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+26;1;Fichier;Exercices;S03;Sans build
+27;1;Fichier;Exercices Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+28;1;Fichier;Reports à-nouveaux;S03;Sans build
+29;1;Fichier;Reports à-nouveaux généraux Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+30;1;Fichier;Résultat de l'exercice Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+31;1;Fichier;Reports à-nouveaux analytique Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+32;1;Fichier;Reports à-nouveaux IFRS si IFRS si IFRS si IFRS si IFRS si IFRS si IFRS si IFRS si IFRS;S03;Sans build
+33;1;Fichier;Reports à-nouveaux généraux Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+34;1;Fichier;Reports à-nouveaux analytique Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+35;1;Fichier;Vos contacts Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+36;1;Fichier;Sécurité;S03;Sans build
+37;1;Fichier;Traçabilité des données Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+38;1;Fichier;AutoUpdate Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+39;1;Fichier;Comptes généraux;S03;Sans build
+40;1;Fichier;Général;S03;Sans build
+41;1;Fichier;Longueur des comptes généraux et reoprting Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+42;1;Fichier;Création de compte général Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+43;1;Fichier;Budget : Gérer les budgets sur les comptes généraux Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+44;1;Fichier;Nature de compte;S03;Sans build
+45;1;Fichier;Options de saisie Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+46;1;Fichier;Options de traitement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+47;1;Fichier;Option d'impression Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+48;1;Fichier;Gestion des écarts;S03;Sans build
+49;1;Fichier;Ecart de règlement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+50;1;Fichier;Ecart d'arrondi de conversion Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+51;1;Fichier;Ecart de change Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+52;1;Fichier;Information libre 64 64 64 64 64 64 64 64;S03;Sans build
+53;1;Fichier;Tiers;S03;Sans build
+54;1;Fichier;Général;S03;Sans build
+55;1;Fichier;Délai maximum d'une échéance client Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+56;1;Fichier;Numéro de pièce règlement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+57;1;Fichier;Codification des comptes tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+58;1;Fichier;Mode de règlement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+59;1;Fichier;Gestion des écarts;S03;Sans build
+60;1;Fichier;Ecart de règlement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+61;1;Fichier;Ecart d'escompte Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+62;1;Fichier;"Ecart d""arrondi de conversion Standard Standard Standard Standard Standard Standard Standard Standard";S03;Sans build
+63;1;Fichier;Ecart de change Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+64;1;Fichier;Code risque Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+65;1;Fichier;Champs statistiques 10 10 10 10 10 10 10 10;S03;Sans build
+66;1;Fichier;Information libre 64 64 64 64 64 64 64 64;S03;Sans build
+67;1;Fichier;Compte collectif Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+76;2;Fichier;Analytique;S03;Sans build
+77;2;Fichier;Général;S03;Sans build
+78;2;Fichier;Longueur des sections analytiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+79;2;Fichier;Affectation de la pré-ventilation analytique Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+80;2;Fichier;Ventilation de la quantité ou montant devise Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+81;2;Fichier;Budget : Gérer les budgets sur les sections analytiques Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+82;2;Fichier;Plan analytique;S03;Sans build
+83;2;Fichier;Nombre de plan 2 2 si Option analytique 11 2 si Option analytique 11 2 11 2 2 si Option analytique 11 11;S03;Sans build
+84;2;Fichier;Structurer le plan analytique Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+85;2;Fichier;IFRS Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+86;2;Fichier;Niveau d'analyse Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+87;2;Fichier;Information libre 64 64 64 64 64 64 64 64;S03;Sans build
+88;2;Fichier;Tva et taxes;S03;Sans build
+89;2;Fichier;Général;S03;Sans build
+90;2;Fichier;Calcul automatique des montants Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+91;2;Fichier;Gestion des registres taxes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+92;2;Fichier;Calcul de la TVA sur encaissement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+93;2;Fichier;Exigibilité TVA sur acomptes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+94;2;Fichier;Comptabilité;S03;Sans build
+95;2;Fichier;Mise à jour des écritures de taxe Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+96;2;Fichier;Mise à jour des constantes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+97;2;Fichier;Informations fiscales;S03;Sans build
+98;2;Fichier;Informations : Régime Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+99;2;Fichier;Option de paiement de la TVA sur les débits Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+100;2;Fichier;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+101;2;Fichier;Situation Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+102;2;Fichier;Identification du redevable Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+103;2;Fichier;Centre des impôts;S03;Sans build
+104;2;Fichier;Coordonnées Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+105;2;Fichier;Télécommunication Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+106;2;Fichier;Horaires Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+107;2;Fichier;OGA;S03;Sans build
+108;2;Fichier;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+109;2;Fichier;Immatriculation Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+110;2;Fichier;Coordonnées Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+111;2;Fichier;Télécommunication Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+112;2;Fichier;EDI-TVA;S03;Sans build
+113;2;Fichier;Emetteur Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+114;2;Fichier;Télécommunication Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+115;2;Fichier;Paramétrage CA3 Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+116;2;Fichier;Paramétrage Annexe 3310A Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+117;2;Fichier;Mention d'exonération de TVA Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+118;2;Fichier;Paramètres fiscaux;S03;Sans build
+119;2;Fichier;Général;S03;Sans build
+120;2;Fichier;Gestion des modèles Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+121;2;Fichier;Exporter Standard Standard Standard Non disponible Non disponible Standard Standard Standard;S03;Sans build
+122;2;Fichier;Bilan Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+123;2;Fichier;Compte de résultat Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+124;2;Fichier;Soldes intermédiaires Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+125;2;Fichier;Rapport d'activité Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+126;2;Fichier;Bilan reporting Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+127;2;Fichier;Compte de résultat reporting Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+128;2;Fichier;Soldes intermédiaires reporting Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+129;2;Fichier;Contacts;S03;Sans build
+130;2;Fichier;Service Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+131;2;Fichier;Type Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+132;2;Fichier;International;S03;Sans build
+133;2;Fichier;Devise 32 32 32 32 32 32 32 32;S03;Sans build
+134;2;Fichier;Pays Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+135;2;Fichier;Banque;S03;Sans build
+136;2;Fichier;Général;S03;Sans build
+137;2;Fichier;Supprimer les fichiers d'extrait après incorporation ou importation Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+138;2;Fichier;Opération bancaire;S03;Sans build
+139;2;Fichier;Intégration extrait de compte dans la saisie des opérations bancaires Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+140;2;Fichier;Génération des écritures comptables dans la saisie des opérations bancaires Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+141;2;Fichier;Rapprochement bancaire : Devise de rapprochement bancaire Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+142;2;Fichier;Structure compte;S03;Sans build
+143;2;Fichier;Locale Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+144;2;Fichier;Autre Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+145;2;Fichier;Code interbancaire Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+146;2;Fichier;Motif de rejet Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+151;3;Fichier;Motif de rejet SEPA Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+152;3;Fichier;Compabilisation;S03;Sans build
+153;3;Fichier;Général;S03;Sans build
+154;3;Fichier;Gérer les charges et produits à regulariser Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+155;3;Fichier;Règles de saisie;S03;Sans build
+156;3;Fichier;Gestion du numéro de pièce Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+157;3;Fichier;Autorisations Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+158;3;Fichier;Equilibre des devises Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+159;3;Fichier;Saisie des écritures IFRS Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+160;3;Fichier;Options de saisie;S03;Sans build
+161;3;Fichier;Mode de déplacement dans les zones de saisie Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+162;3;Fichier;Saisie rapide des comptes généraux Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+163;3;Fichier;Matérialisation de la pièce comptable Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+164;3;Fichier;Regularisations;S03;Sans build
+165;3;Fichier;Journal de comptabilisation Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+166;3;Fichier;Modèles de saisie charges et dettes Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+167;3;Fichier;Modèles de saisie produits et créances Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+168;3;Fichier;Gestion des régularisations Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+169;3;Fichier;Extourne et annulation : Sens de l'écriture Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+170;3;Fichier;Information libre 64 64 64 64 64 64 64 64;S03;Sans build
+171;3;Fichier;Libellé Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+172;3;Fichier;Gestion du Bon à payer;S03;Sans build
+173;3;Fichier;Circuit d'affectation du bon à payer Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+174;3;Fichier;Paramètre de validation - Niveau responsable financier Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+175;3;Fichier;Options d'impression;S03;Sans build
+176;3;Fichier;Général;S03;Sans build
+177;3;Fichier;Résultat à 0 Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+178;3;Fichier;Impression de la référence pièce Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+179;3;Fichier;Grand-livre / Balance Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+180;3;Fichier;Echange de données;S03;Sans build
+181;3;Fichier;Connexion aux service Sage;S03;Sans build
+182;3;Fichier;Code client Sage Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+183;3;Fichier;Activation des services Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+184;3;Fichier;Import;S03;Sans build
+185;3;Fichier;Eléments de structure Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+186;3;Fichier;Ecritures comptables Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+187;3;Fichier;Synchro Compta;S03;Sans build
+188;3;Fichier;Modalités de transfert des données Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+189;3;Fichier;Expert-comptable Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+190;3;Fichier;Adresse E-Mail Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+191;3;Fichier;Sage eFacture;S03;Sans build
+192;3;Fichier;Identification Option Sage eFacture Option Sage eFacture Option Sage eFacture;S03;Sans build
+193;3;Fichier;Service connecté Sage;S03;Sans build
+194;3;Fichier;eFacture;S03;Sans build
+195;3;Fichier;Service connecté Sage;S03;Sans build
+196;3;Fichier;eFacture;S03;Sans build
+197;3;Fichier;Service connecté Sage;S03;Sans build
+198;3;Fichier;eFacture;S03;Sans build
+199;3;Fichier;Service connecté Sage;S03;Sans build
+200;3;Fichier;eFacture;S03;Sans build
+201;3;Fichier;Service connecté Sage;S03;Sans build
+202;3;Fichier;eFacture;S03;Sans build
+203;3;Fichier;Comptabilisation des factures électroniques Option Sage eFacture Option Sage eFacture Option Sage eFacture;S03;Sans build
+204;3;Fichier;Service connecté Sage;S03;Sans build
+205;3;Fichier;eFacture;S03;Sans build
+206;3;Fichier;Service connecté Sage;S03;Sans build
+207;3;Fichier;eFacture;S03;Sans build
+208;3;Fichier;Service connecté Sage;S03;Sans build
+209;3;Fichier;eFacture;S03;Sans build
+210;3;Fichier;Service connecté Sage;S03;Sans build
+211;3;Fichier;eFacture;S03;Sans build
+212;3;Fichier;Service connecté Sage;S03;Sans build
+213;3;Fichier;eFacture;S03;Sans build
+214;3;Fichier;Authentification au service Option Sage eFacture Option Sage eFacture Option Sage eFacture;S03;Sans build
+215;3;Fichier;Service connecté Sage;S03;Sans build
+216;3;Fichier;eFacture;S03;Sans build
+217;3;Fichier;Service connecté Sage;S03;Sans build
+218;3;Fichier;eFacture;S03;Sans build
+219;3;Fichier;Service connecté Sage;S03;Sans build
+220;3;Fichier;eFacture;S03;Sans build
+221;3;Fichier;Service connecté Sage;S03;Sans build
+222;3;Fichier;eFacture;S03;Sans build
+223;3;Fichier;Service connecté Sage;S03;Sans build
+224;3;Fichier;eFacture;S03;Sans build
+225;3;Fichier;Cours des devises Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+226;3;Fichier;Paiement en ligne;S03;Sans build
+227;3;Fichier;Paiement en ligne Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+228;3;Fichier;Comptabilisation des paiements enregistrés en ligne Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+229;3;Fichier;Microsoft 365;S03;Sans build
+230;3;Fichier;Envoi des mails et impression Excel Standard Standard Standard Service connecté Microsoft;S03;Sans build
+231;3;Fichier;Office 365;S03;Sans build
+232;3;Fichier;Service connecté Microsoft;S03;Sans build
+233;3;Fichier;Office365;S03;Sans build
+234;3;Fichier;Service connecté Microsoft;S03;Sans build
+235;3;Fichier;Office 365;S03;Sans build
+236;3;Fichier;Service connecté Microsoft;S03;Sans build
+237;3;Fichier;Office 365;S03;Sans build
+238;3;Fichier;Service connecté Microsoft;S03;Sans build
+239;3;Fichier;Office365;S03;Sans build
+240;3;Fichier;Authentification au service Standard Standard Standard Service connecté Microsoft;S03;Sans build
+241;3;Fichier;Office 365;S03;Sans build
+242;3;Fichier;Service connecté Microsoft;S03;Sans build
+243;3;Fichier;Office365;S03;Sans build
+244;3;Fichier;Service connecté Microsoft;S03;Sans build
+245;3;Fichier;Office 365;S03;Sans build
+246;3;Fichier;Service connecté Microsoft;S03;Sans build
+247;3;Fichier;Office 365;S03;Sans build
+248;3;Fichier;Service connecté Microsoft;S03;Sans build
+249;3;Fichier;Office365;S03;Sans build
+250;3;Fichier;Stockage et partage Microsoft 365;S03;Sans build
+251;3;Fichier;Sage 100 Stockage et partage Microsoft 365 Option Stockage et;S03;Sans build
+252;3;Fichier;partage Microsoft 365;S03;Sans build
+253;3;Fichier;Option Stockage et;S03;Sans build
+254;3;Fichier;partage Microsoft 365;S03;Sans build
+255;3;Fichier;Option Stockage et;S03;Sans build
+256;3;Fichier;partage Microsoft 365;S03;Sans build
+257;3;Fichier;Service connecté Stockage;S03;Sans build
+258;3;Fichier;et partage Microsoft 365;S03;Sans build
+259;3;Fichier;Service connecté Stockage;S03;Sans build
+260;3;Fichier;et partage Microsoft 365;S03;Sans build
+261;3;Fichier;Service connecté Stockage;S03;Sans build
+262;3;Fichier;et partage Microsoft 365;S03;Sans build
+263;3;Fichier;Service connecté Stockage;S03;Sans build
+264;3;Fichier;et partage Microsoft 365;S03;Sans build
+265;3;Fichier;Service connecté Stockage;S03;Sans build
+266;3;Fichier;et partage Microsoft 365;S03;Sans build
+267;3;Fichier;Authentification au service Option Stockage et;S03;Sans build
+268;3;Fichier;partage Microsoft 365;S03;Sans build
+269;3;Fichier;Option Stockage et;S03;Sans build
+270;3;Fichier;partage Microsoft 365;S03;Sans build
+271;3;Fichier;Option Stockage et;S03;Sans build
+272;3;Fichier;partage Microsoft 365;S03;Sans build
+273;3;Fichier;Service connecté Stockage;S03;Sans build
+274;3;Fichier;et partage Microsoft 365;S03;Sans build
+275;3;Fichier;Service connecté Stockage;S03;Sans build
+276;3;Fichier;et partage Microsoft 365;S03;Sans build
+277;3;Fichier;Service connecté Stockage;S03;Sans build
+278;3;Fichier;et partage Microsoft 365;S03;Sans build
+279;3;Fichier;Service connecté Stockage;S03;Sans build
+280;3;Fichier;et partage Microsoft 365;S03;Sans build
+281;3;Fichier;Service connecté Stockage;S03;Sans build
+282;3;Fichier;et partage Microsoft 365;S03;Sans build
+283;3;Fichier;Recherche d'adresse;S03;Sans build
+284;3;Fichier;Recherche d'adresse Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+285;3;Fichier;Nomenclature des activités principales Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+286;3;Fichier;Appels des services Sirene et VIES Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+287;3;Fichier;Sage Network (*);S03;Sans build
+288;3;Fichier;Inscription sur Sage Network Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+289;3;Fichier;Synchronisation des données Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+290;3;Fichier;Rappel/ Recouvrement;S03;Sans build
+291;3;Fichier;Rappel;S03;Sans build
+292;3;Fichier;Solde minimum pour un rappel Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+297;4;Fichier;Périodes de rappel Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+298;4;Fichier;Frais et pénalités de retard;S03;Sans build
+299;4;Fichier;Pénalités de retard Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+300;4;Fichier;Frais d'impayés et de recouvrement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+301;4;Fichier;Comptabilisation;S03;Sans build
+302;4;Fichier;Comptabilisation Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+303;4;Fichier;Créances douteuses Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+304;4;Fichier;Provisions Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+305;4;Fichier;Créances irrécouvrables Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+306;4;Fichier;Motif de litige Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+307;4;Fichier;Résolution Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+308;4;Fichier;Factures électroniques;S03;Sans build
+309;4;Fichier;Général;S03;Sans build
+310;4;Fichier;Mise en conformité pour la facturation électronique Option SDCC Option SDCC Option SDCC Option SDCC Option SDCC Option SDCC Option SDCC Option SDCC;S03;Sans build
+311;4;Fichier;Paramètres émission/réception Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+312;4;Fichier;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+313;4;Fichier;Réception des factures - Règles d'intégration (*) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+314;4;Fichier;Comptabilisation des factures électroniques (*) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+315;4;Fichier;Colonnage;S03;Sans build
+316;4;Fichier;Saisie par pièce Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+317;4;Fichier;Journal achat Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+318;4;Fichier;Journal vente Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+319;4;Fichier;Journal trésorerie Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+320;4;Fichier;Journal général Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+321;4;Fichier;Journal de situation Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+322;4;Fichier;Sasie des opérations bancaires Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+323;4;Fichier;Interrogation générale Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+324;4;Fichier;Interrogation tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+325;4;Fichier;Interrogation analytique Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+326;4;Fichier;Rapprochement bancaire Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+327;4;Fichier;Règlement tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+328;4;Fichier;Rappel/ relevé Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+329;4;Fichier;Recherche générale Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+330;4;Fichier;Recherche analytique Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+331;4;Fichier;Libellé Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+332;4;Fichier;Modèles;S03;Sans build
+333;4;Fichier;Rappel Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+334;4;Fichier;Relance préventative Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+335;4;Fichier;Relevé Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+336;4;Fichier;Règlement tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+337;4;Fichier;Recouvrement Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+338;4;Fichier;Extrait tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+339;4;Fichier;Etat tiers / Justificatif de solde Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+340;4;Fichier;Saisie - Personnalisation en saisie;S03;Sans build
+341;4;Fichier;Ecritures comptables Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+342;4;Fichier;Tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+343;4;Fichier;Lire les informations;S03;Sans build
+344;4;Fichier;Ecritures Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+345;4;Fichier;Structure Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+346;4;Fichier;Configuration système et partage;S03;Sans build
+347;4;Fichier;Système Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+348;4;Fichier;Utilisateurs Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+349;4;Fichier;Autorisations d'accès;S03;Sans build
+350;4;Fichier;Gestion du mot de passe Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+351;4;Fichier;Utilisateurs Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+352;4;Fichier;Paramètres de sécurité Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+353;4;Fichier;Importer;S03;Sans build
+354;4;Fichier;Format Sage;S03;Sans build
+355;4;Fichier;Comptes Sage (*.pnc) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+356;4;Fichier;Ecritures Sage (*.pnm) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+357;4;Fichier;Ecritures Ciel Windows (*.txt) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+358;4;Fichier;Format XML (*.xml) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+359;4;Fichier;Format paramétrable Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+360;4;Fichier;Exporter;S03;Sans build
+361;4;Fichier;Format Sage, HTML Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+362;4;Fichier;Format Trésorerie Sage, Ciel et FEC Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+363;4;Fichier;Format paramétrable Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+364;4;Fichier;Balance Sage Etats comptables et fiscaux Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+365;4;Fichier;Format import/export paramétrable Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+366;4;Fichier;Synchro compta Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+371;5;Fichier;Gérer les services bancaires Non disponible Option SFB et Option;S03;Sans build
+372;5;Fichier;rapprochement;S03;Sans build
+373;5;Fichier;Option SFB et Option;S03;Sans build
+374;5;Fichier;rapprochement Non disponible Service connecté Sage Flux Bancaire Non disponible;S03;Sans build
+375;5;Fichier;Service connecté;S03;Sans build
+376;5;Fichier;Sage Flux Bancaire et;S03;Sans build
+377;5;Fichier;Option rapprochement;S03;Sans build
+378;5;Fichier;Service connecté;S03;Sans build
+379;5;Fichier;Sage Flux Bancaire;S03;Sans build
+380;5;Fichier;Paiement en ligne Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+381;5;Fichier;Imprimer les paramètres société;S03;Sans build
+382;5;Fichier;Cumul dossier Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+383;5;Fichier;Paramètres BCR Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+384;5;Fichier;Tableau de bord personnalisé Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+385;5;Fichier;Mise en page Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+386;5;Fichier;Format d'impression Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+387;5;Fichier;Impression différée Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+388;5;Fichier;Outils;S03;Sans build
+389;5;Fichier;Purge des extraits Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+390;5;Fichier;Recalcul des informations libres Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+391;5;Fichier;Renumération des pièces / registres Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+392;5;Fichier;Regénération des registres Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+393;5;Fichier;Historique des modifications et des suppressions Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+394;5;Fichier;Purge des historiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+395;5;Fichier;Maintenance Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+396;5;Fichier;Réorganisation de la base de données Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+397;5;Fichier;Sauvegarder ma société Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+398;5;Fichier;Restaurer ma société Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+399;5;Fichier;Afficher le journal de maintenance Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+400;5;Fichier;Journal des événements légaux Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+401;5;Fichier;Journal d'audit des données sécurisées Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+402;5;Fichier;Importer les préférences (A partir de la version 2024.1 sur SPC) Standard Standard Standard Non disponible Non disponible Standard Standard Standard;S03;Sans build
+403;5;Fichier;Exporter les préférences (A partir de la version 2024.1 sur SPC) Standard Standard Standard Non disponible Non disponible Standard Standard Standard;S03;Sans build
+404;5;Fichier;Réinitialisation des paramètres Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+405;5;Fichier;Allouer un nouvel identifiant Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+406;5;Fichier;Réinitialiser la clé d'autentification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+407;5;Fichier;Actualiser l'authentification à Sage Network (*) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+408;5;Structure;Menu Structure;S03;Sans build
+409;5;Structure;Plan comptable;S03;Sans build
+410;5;Structure;Identification;S03;Sans build
+411;5;Structure;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+412;5;Structure;Caractéristiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+413;5;Structure;Compte reporting Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+414;5;Structure;Analytique;S03;Sans build
+415;5;Structure;Appeler une grille Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+416;5;Structure;Budgets Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+417;5;Structure;Champs libres;S03;Sans build
+418;5;Structure;Informations libres 64 64 64 64 64 64 64 64;S03;Sans build
+419;5;Structure;Bloc-notes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+420;5;Structure;Paramètres;S03;Sans build
+421;5;Structure;Options de traitement;S03;Sans build
+422;5;Structure;Paramètres de saisie : Saisir dans la devise, Saisir le compte tiers,Saisir une quantité… Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+423;5;Structure;Comptes tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+424;5;Structure;IFRS si IFRS si IFRS si IFRS si IFRS si IFRS si IFRS si IFRS si IFRS;S03;Sans build
+425;5;Structure;Options d'impression Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+426;5;Structure;Plan analytique 2 2 si Option analytique 11 2 si Option analytique 11 2 11 2 2 si Option analytique 11 11;S03;Sans build
+427;5;Structure;Fonction Générer Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+428;5;Structure;Identification;S03;Sans build
+429;5;Structure;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+430;5;Structure;Caractéristiques;S03;Sans build
+431;5;Structure;Niveau d'analyse Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+432;5;Structure;Options d'impression Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+433;5;Structure;Budgets Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+434;5;Structure;Champs libres : Informations libres 64 64 64 64 64 64 64 64;S03;Sans build
+435;5;Structure;Plan reporting;S03;Sans build
+436;5;Structure;Identification Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+437;5;Structure;Options d'impression Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+438;5;Structure;Plan tiers;S03;Sans build
+439;5;Structure;Identification;S03;Sans build
+440;5;Structure;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+441;5;Structure;Coordonnées Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+442;5;Structure;Télécommunication Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+443;5;Structure;Immatriculation Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+444;5;Structure;Contacts Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+445;5;Structure;Banques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+446;5;Structure;Champs libres;S03;Sans build
+447;5;Structure;Informations libres 64 64 64 64 64 64 64 64;S03;Sans build
+452;6;Structure;Bloc-notes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+453;6;Structure;Champs statistiques 10 10 10 10 10 10 10 10;S03;Sans build
+454;6;Structure;Documents attachés Standard Standard Standard Service connecté Stockage;S03;Sans build
+455;6;Structure;et partage Microsoft 365;S03;Sans build
+456;6;Structure;Service connecté Stockage;S03;Sans build
+457;6;Structure;et partage Microsoft 365;S03;Sans build
+458;6;Structure;Service connecté Stockage;S03;Sans build
+459;6;Structure;et partage Microsoft 365;S03;Sans build
+460;6;Structure;Service connecté Stockage;S03;Sans build
+461;6;Structure;et partage Microsoft 365;S03;Sans build
+462;6;Structure;Service connecté Stockage;S03;Sans build
+463;6;Structure;et partage Microsoft 365;S03;Sans build
+464;6;Structure;Solvabilité;S03;Sans build
+465;6;Structure;Contrôle automatique de l'encours Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+466;6;Structure;Informations sur le code risque Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+467;6;Structure;Paramètres;S03;Sans build
+468;6;Structure;Conditions de paiement;S03;Sans build
+469;6;Structure;Représentant Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+470;6;Structure;Tiers payeur Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+471;6;Structure;Condition de paiement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+472;6;Structure;Options de traitement;S03;Sans build
+473;6;Structure;Comptabilisation des factures Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+474;6;Structure;Paramètres de saisie : Devise, Ventilation IFRS, Raccourci, Automatiser les écritures multi-échéances… Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+475;6;Structure;Rappels Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+476;6;Structure;Comptes généraux collectifs Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+477;6;Structure;Sage eFacture;S03;Sans build
+478;6;Structure;Identification Option Sage eFacture Option Sage eFacture Option Sage eFacture;S03;Sans build
+479;6;Structure;Service connecté Sage;S03;Sans build
+480;6;Structure;eFacture;S03;Sans build
+481;6;Structure;Service connecté Sage;S03;Sans build
+482;6;Structure;eFacture;S03;Sans build
+483;6;Structure;Service connecté Sage;S03;Sans build
+484;6;Structure;eFacture;S03;Sans build
+485;6;Structure;Service connecté Sage;S03;Sans build
+486;6;Structure;eFacture;S03;Sans build
+487;6;Structure;Service connecté Sage;S03;Sans build
+488;6;Structure;eFacture;S03;Sans build
+489;6;Structure;Référencement sur le portail Option Sage eFacture Option Sage eFacture Option Sage eFacture;S03;Sans build
+490;6;Structure;Service connecté Sage;S03;Sans build
+491;6;Structure;eFacture;S03;Sans build
+492;6;Structure;Service connecté Sage;S03;Sans build
+493;6;Structure;eFacture;S03;Sans build
+494;6;Structure;Service connecté Sage;S03;Sans build
+495;6;Structure;eFacture;S03;Sans build
+496;6;Structure;Service connecté Sage;S03;Sans build
+497;6;Structure;eFacture;S03;Sans build
+498;6;Structure;Service connecté Sage;S03;Sans build
+499;6;Structure;eFacture;S03;Sans build
+500;6;Structure;Factures électroniques;S03;Sans build
+501;6;Structure;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+502;6;Structure;Entreprise soumise à obligation de factures électroniques - Données annuaire Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+503;6;Structure;Fournisseurs - Réception des factures (*) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+504;6;Structure;Options d'impression;S03;Sans build
+505;6;Structure;Paramètres d'impression : saut de page/ligne, langue Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+506;6;Structure;Options d'impression par type de document : modèle d'impression Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+507;6;Structure;Envoi par messagerie : service contact adressé, E-mail(s) personnalisé(s) Standard Standard Standard Service connecté Microsoft;S03;Sans build
+508;6;Structure;Office 365;S03;Sans build
+509;6;Structure;Service connecté Microsoft;S03;Sans build
+510;6;Structure;Office365;S03;Sans build
+511;6;Structure;Service connecté Microsoft;S03;Sans build
+512;6;Structure;Office 365;S03;Sans build
+513;6;Structure;Service connecté Microsoft;S03;Sans build
+514;6;Structure;Office 365;S03;Sans build
+515;6;Structure;Service connecté Microsoft;S03;Sans build
+516;6;Structure;Office365;S03;Sans build
+517;6;Structure;Collaborateurs Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+518;6;Structure;Identification;S03;Sans build
+519;6;Structure;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+520;6;Structure;Coordonnées Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+521;6;Structure;Télécommunications Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+522;6;Structure;Profil;S03;Sans build
+523;6;Structure;Profil Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+524;6;Structure;Autorisation d'accès Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+525;6;Structure;Taux de taxes;S03;Sans build
+526;6;Structure;TVA/ débit - Vente de biens;S03;Sans build
+527;6;Structure;TVA/ encaissement- Prestation de services Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+528;6;Structure;TP/ HT Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+529;6;Structure;TP/ TTC Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+530;6;Structure;TP/ poids Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+531;6;Structure;TVA/ CEE Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+532;6;Structure;Surtaxe Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+533;6;Structure;Codes journaux;S03;Sans build
+534;6;Structure;Identification;S03;Sans build
+535;6;Structure;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+536;6;Structure;Caractéristiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+537;6;Structure;Personnalisation en saisie Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+538;6;Structure;Libellés personnalisés Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+539;6;Structure;Codes journaux analytiques Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+540;6;Structure;Banques;S03;Sans build
+541;6;Structure;Identification;S03;Sans build
+542;6;Structure;Identification Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+543;6;Structure;Coordonnées Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+544;6;Structure;Télécommunication Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+545;6;Structure;Contacts Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+546;6;Structure;Comptes bancaires Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+547;6;Structure;Paramètres / Extrait bancaire Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+548;6;Structure;Paramètres;S03;Sans build
+549;6;Structure;Communication;S03;Sans build
+550;6;Structure;Communication bancaire Standard Standard Standard Option Standard Option Standard;S03;Sans build
+551;6;Structure;Format de fichier Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+552;6;Structure;Modèle import paramétrable des extraits Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+553;6;Structure;Format de fichiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+554;6;Structure;Modèles;S03;Sans build
+555;6;Structure;Modèles de saisie Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+556;6;Structure;Modèles de grille Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+561;7;Structure;Modèles de règlement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+562;7;Structure;Modèles d'abonnement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+563;7;Structure;Postes budgétaires;S03;Sans build
+564;7;Structure;Identification;S03;Sans build
+565;7;Structure;Identification Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+566;7;Structure;Caractéristiques Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+567;7;Structure;Prévisions Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+568;7;Structure;Comptes généraux Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+569;7;Structure;Scénarios de recouvrement Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+570;7;Structure;Fusion Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+571;7;Traitement;Menu Traitement;S03;Sans build
+572;7;Traitement;Saisie par pièce;S03;Sans build
+573;7;Traitement;Ajout d'une pièce Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+574;7;Traitement;Visualisation/ modification d'une pièce Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+575;7;Traitement;Saisie analytique : multi section Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+576;7;Traitement;Saisie des opérations bancaires;S03;Sans build
+577;7;Traitement;Appeler extraits Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+578;7;Traitement;Saisie analytique : multi section Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+579;7;Traitement;Saisie des écritures Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+580;7;Traitement;Saisie par lot Non disponible Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+581;7;Traitement;Saisie des OD analytiques;S03;Sans build
+582;7;Traitement;Ajout d'une OD analytique Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+583;7;Traitement;Visualisation/ modification d'une OD Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+584;7;Traitement;Journaux de saisie;S03;Sans build
+585;7;Traitement;Saisie analytique : multi section Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+586;7;Traitement;Gestion des registres taxes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+587;7;Traitement;Gestion de la régularisation des charges et produits Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+588;7;Traitement;Gérer l'historique Bon à payer Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+589;7;Traitement;Voir la régularisation des charges et produits Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+590;7;Traitement;Supprimer la régularisation des charges et produits associée Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+591;7;Traitement;Voir le cycle de vie de la facture (*) Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+592;7;Traitement;Clôture des journaux Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+593;7;Traitement;Gestion des comptes généraux;S03;Sans build
+594;7;Traitement;Interrogation / lettrage;S03;Sans build
+595;7;Traitement;Lettrage / prélettrage montant Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+596;7;Traitement;Lettrage / prélettrage en devise Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+597;7;Traitement;Calcul de la différence de change Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+598;7;Traitement;Pointage montant Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+599;7;Traitement;Saisir les registres de taxes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+600;7;Traitement;Visualiser la pièce Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+601;7;Traitement;Saisir la régularisation des charges et produits Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+602;7;Traitement;Cumuls généraux Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+603;7;Traitement;Cumuls analytiques;S03;Sans build
+604;7;Traitement;Type OD analytiques Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+605;7;Traitement;Gestion des comptes tiers;S03;Sans build
+606;7;Traitement;Interrogation / lettrage;S03;Sans build
+607;7;Traitement;Lettrage / prélettrage montant Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+608;7;Traitement;Lettrage / prélettrage en devise Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+609;7;Traitement;Calcul de la différence de change Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+610;7;Traitement;Pointage montant Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+611;7;Traitement;Saisir les registres de taxes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+612;7;Traitement;Visualiser la pièce Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+613;7;Traitement;Saisir une régularisation des charges et produits Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+614;7;Traitement;Rappels Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+615;7;Traitement;Recouvrement Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+616;7;Traitement;Cumuls Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+617;7;Traitement;Interrogation analytique;S03;Sans build
+618;7;Traitement;Interrogation;S03;Sans build
+619;7;Traitement;Interrogation Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+620;7;Traitement;Type OD analytiques Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+621;7;Traitement;Cumuls;S03;Sans build
+622;7;Traitement;Cumuls Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+623;7;Traitement;Type OD analytiques Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+624;7;Traitement;Sage connect (*);S03;Sans build
+625;7;Traitement;Accéder à la société Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+626;7;Traitement;Réception des factures fournisseurs Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+627;7;Traitement;Génération d'écriture à partir d'un modèle de saisie Option SDCC Option SDCC Option SDCC Option SDCC Option SDCC Option SDCC Option SDCC Option SDCC;S03;Sans build
+628;7;Traitement;Déclaration des enciassements… Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+629;7;Traitement;Visualisation des notifications Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+634;8;Traitement;Sage eFacture Option Sage eFacture Option Sage eFacture option Sage eFacture;S03;Sans build
+635;8;Traitement;Service connecté Sage;S03;Sans build
+636;8;Traitement;eFacture;S03;Sans build
+637;8;Traitement;Service connecté Sage;S03;Sans build
+638;8;Traitement;eFacture;S03;Sans build
+639;8;Traitement;Service connecté Sage;S03;Sans build
+640;8;Traitement;eFacture;S03;Sans build
+641;8;Traitement;Service connecté Sage;S03;Sans build
+642;8;Traitement;eFacture;S03;Sans build
+643;8;Traitement;Service connecté Sage;S03;Sans build
+644;8;Traitement;eFacture;S03;Sans build
+645;8;Traitement;Gestion des extraits Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+646;8;Traitement;Synthèse de trésorerie Non disponible Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+647;8;Traitement;Rapprochement bancaire automatique Non disponible Option Rapprochement Option Rapprochement Non disponible Standard Non disponible Option Rapprochement Standard;S03;Sans build
+648;8;Traitement;Rapprochement bancaire manuel Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+649;8;Traitement;Gestion du bon à payer Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+650;8;Traitement;Règlement tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+651;8;Traitement;Génération des règlements Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+652;8;Traitement;Intégration des paiements en ligne Non disponible Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+653;8;Traitement;Rappel/Relevé;S03;Sans build
+654;8;Traitement;Rappel Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+655;8;Traitement;Ajouter à un dossier de recouvrement Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+656;8;Traitement;Recouvrement;S03;Sans build
+657;8;Traitement;Dossiers de recouvrement Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+658;8;Traitement;Gestion des actions Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+659;8;Traitement;Gestion des provisions Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+660;8;Traitement;Ecritures de régularisations des charges et produits Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+661;8;Traitement;Réévaluation des dettes et créances en devises Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+662;8;Traitement;Recherche d'écritures;S03;Sans build
+663;8;Traitement;Rechercher les écritures générales Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+664;8;Traitement;Reventilation analytique Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+665;8;Traitement;Rechercher les écritures générales sans répartition analytique Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+666;8;Traitement;Reventilation analytique Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+667;8;Traitement;Recherche des écritures analytiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+668;8;Traitement;Réimputation;S03;Sans build
+669;8;Traitement;Ecritures générales Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+670;8;Traitement;Ecritures analytiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+671;8;Traitement;Nouvelle affectation analytique : multi section Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+672;8;Traitement;Type OD analytiques Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+673;8;Traitement;Réimputation sous forme d'OD analytiques Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+674;8;Traitement;Ecritures d'abonnement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+675;8;Traitement;Fin d'exercice;S03;Sans build
+676;8;Traitement;Gestion des exercices;S03;Sans build
+677;8;Traitement;Création exercice (antérieur ou nouveau), suppression 1er exercice Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+678;8;Traitement;Report-à-nouveau Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+679;8;Traitement;Report des sections analytiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+680;8;Traitement;Inclure les OD analytiques pour le report Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+681;8;Traitement;Sélection d'un code journal OD analytique Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+682;8;Traitement;Report des écritures IFRS Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+683;8;Traitement;Report des budgets Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+684;8;Traitement;Générateur fichier écritures DGFiP Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+685;8;Traitement;Etats de cloture Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+686;8;Traitement;Sauvegarde fiscale des données Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+687;8;Etat;Menu Etat;S03;Sans build
+688;8;Etat;Etats personnalisés Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+689;8;Etat;Brouillard Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+690;8;Etat;Journal;S03;Sans build
+691;8;Etat;Journal Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+692;8;Etat;Journal centralisé Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+693;8;Etat;Journal général Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+694;8;Etat;Grand-livre des comptes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+695;8;Etat;Balance des comptes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+696;8;Etat;Echéancier Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+697;8;Etat;Balance âgée Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+698;8;Etat;Etats tiers;S03;Sans build
+699;8;Etat;Grand-livre des tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+700;8;Etat;Balance des tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+701;8;Etat;Justificatif de solde à date Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+702;8;Etat;Rapport des délais de paiement Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+703;8;Etat;Statistiques tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+704;8;Etat;Historique des rappels Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+705;8;Etat;Dossiers de recouvrement Option Recouvrement Option Recouvrement Option Recouvrement Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+706;8;Etat;Registre taxes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+707;8;Etat;Declaration de taxes;S03;Sans build
+708;8;Etat;Etat déclaration de taxes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+709;8;Etat;Génération EDI-TVA Standard Standard Standard Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+710;8;Etat;Mise à jour fiscale Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+711;8;Etat;Option : Télécharger le fichier de paramétrage sur Internet Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+712;8;Etat;Option : Rechercher le fichier de paramétrage sur support physique Standard Standard Standard Non disponible Non disponible Standard Standard Standard;S03;Sans build
+717;9;Etat;Rapport d'activité Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+718;9;Etat;Bilan/ compte de résultat;S03;Sans build
+719;9;Etat;Etat bilan/ compte de résultat Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+720;9;Etat;Mise à jour du paramétrage Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+721;9;Etat;Option : Télécharger le fichier de paramétrage sur Internet Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+722;9;Etat;Option : Rechercher le fichier de paramétrage sur support physique Standard Standard Standard Non disponible Non disponible Standard Standard Standard;S03;Sans build
+723;9;Etat;Etats analytiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+724;9;Etat;Journal Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+725;9;Etat;Balance Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+726;9;Etat;Ecritures analytiques : OD analytiques Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+727;9;Etat;Grand-livre Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+728;9;Etat;Ecritures analytiques : OD analytiques Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+729;9;Etat;Contrôle des cumuls Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+730;9;Etat;Bilan/ compte de résultat Non disponible Option Analytique Option Analytique Non disponible Standard Non disponible Option Analytique Standard;S03;Sans build
+731;9;Etat;Etats budgétaires Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+732;9;Etat;Etats reporting;S03;Sans build
+733;9;Etat;Grand-livre Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+734;9;Etat;Balance Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+735;9;Etat;Etats analytiques Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+736;9;Etat;Bilan/compte de résultat Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+737;9;Etat;Etats budgétaires Non disponible Option Budget Option Budget Non disponible Standard Non disponible Option Budget Standard;S03;Sans build
+738;9;Etat;Analyses et contrôles;S03;Sans build
+739;9;Etat;Comparatif multi-exercices Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+740;9;Etat;Analyse des journaux Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+741;9;Etat;Palmarès des comptes Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+742;9;Etat;Tableau de bord personnalisé Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+743;9;Etat;Contrôles comptables Non disponible avec ouverture Cycle;S03;Sans build
+744;9;Etat;expert;S03;Sans build
+745;9;Etat;avec ouverture Cycle;S03;Sans build
+746;9;Etat;expert;S03;Sans build
+747;9;Etat;Non disponible Non disponible Non disponible Non disponible Non disponible;S03;Sans build
+748;9;Etat;Contrôles des registres taxe Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+749;9;Etat;Contrôles TVA dans les registres Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+750;9;Etat;Contrôles du paramétrage Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+751;9;Etat;Pré-contrôles FEC Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+752;9;Etat;Régularisations des charges et produits Non disponible Standard Standard Non disponible Standard Non disponible Standard Standard;S03;Sans build
+753;9;Etat;Contrôle de caisse Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+754;9;Etat;Etats libres;S03;Sans build
+755;9;Etat;Liste des comptes généraux Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+756;9;Etat;Liste des comptes tiers Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+757;9;Etat;Liste des sections analytiques Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+758;9;Fenêtre;Menu Fenêtre;S03;Sans build
+759;9;Fenêtre;Réorganiser Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+760;9;Fenêtre;Actualiser Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+761;9;Fenêtre;Personnaliser Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+762;9;Fenêtre;Personnaliser les écrans Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+763;9;Fenêtre;Personnaliser la liste Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+764;9;Fenêtre;Ajustement automatique des colonnes Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+765;9;Fenêtre;Préférences Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+766;9;Fenêtre;Barre verticale Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+767;9;Fenêtre;Mode assistant Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build
+768;9;Fenêtre;Mode personnalisé Standard Standard Standard Standard Standard Standard Standard Standard;S03;Sans build

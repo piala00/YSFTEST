@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP OHADA — Simulateur web</title>
+<style>/*__BOOTSTRAP_CSS__*/</style>
+<style>/*__ICONES_CSS__*/</style>
+<style>/*__ERP_CSS__*/</style>
+<style>
+/* Bandeau de simulation et fenêtre d'information (propres au simulateur) */
+.sim-bandeau { position: fixed; left: 12px; bottom: 12px; z-index: 3000; display: flex; gap: 8px; align-items: center;
+  background: #1e2a3a; color: #fff; border-radius: 6px; padding: 6px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.sim-bandeau a { color: #9fc5ff; }
+.sim-bandeau button { background: none; border: 0; color: #c8d1dc; padding: 0 2px; }
+.sim-voile { position: fixed; inset: 0; z-index: 3100; background: rgba(15, 23, 35, .45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.sim-boite { background: #fff; border-radius: 8px; max-width: 480px; width: 100%; box-shadow: 0 12px 30px rgba(0,0,0,.3); overflow: hidden; }
+.sim-boite header { background: var(--module); color: #fff; padding: 10px 14px; font-weight: 600; }
+.sim-boite .corps { padding: 14px; font-size: .92rem; }
+.sim-boite footer { padding: 10px 14px; display: flex; justify-content: flex-end; gap: 8px; background: #f6f8fb; }
+.sim-absente { max-width: 620px; }
+@media print { .sim-bandeau { display: none; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="sim-bandeau" id="sim-bandeau">
+  <i class="bi bi-display"></i> <span>Simulation hors ligne · données de démonstration · rien n'est enregistré</span>
+  <a href="erp-simulateur-bureau.html" target="_blank" title="Ouvrir la version bureau (fichier placé à côté)">Version bureau</a>
+  <button type="button" onclick="this.parentNode.hidden = true" aria-label="Masquer">×</button>
+</div>
+<script>/*__BOOTSTRAP_JS__*/</script>
+<script>/*__CHART_JS__*/</script>
+<script id="sim-pages" type="application/json">/*__PAGES__*/</script>
+<script id="sim-navigation" type="application/json">/*__NAVIGATION__*/</script>
+<script id="sim-contexte" type="application/json">/*__CONTEXTE__*/</script>
+<script>
+(function () {
+  "use strict";
+  const PAGES_BRUTES = JSON.parse(document.getElementById("sim-pages").textContent);
+  const NAV = JSON.parse(document.getElementById("sim-navigation").textContent);
+  const CTX = JSON.parse(document.getElementById("sim-contexte").textContent);
+  const PREFIXES = { commercial: "/commercial/", comptabilite: "/comptabilite/", reporting: "/reporting/" };
+  const ACCUEILS = { commercial: "/commercial/", comptabilite: "/comptabilite/", reporting: "/reporting/" };
+  const ICONES = { commercial: "bi-shop", comptabilite: "bi-calculator", reporting: "bi-bar-chart-line" };
+
+  // ------------------------------------------------------------ URL normalisées (paramètres triés, vides retirés)
+  function normaliser(url) {
+    const [chemin, requete = ""] = url.split("#")[0].split("?");
+    const params = [...new URLSearchParams(requete)].filter(([, v]) => v !== "").sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : (a[1] < b[1] ? -1 : 1));
+    const q = new URLSearchParams(params).toString();
+    return chemin + (q ? "?" + q : "");
+  }
+  const PAGES = {};
+  for (const [url, page] of Object.entries(PAGES_BRUTES)) PAGES[normaliser(url)] = page;
+
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const moduleDe = chemin => NAV.modules.find(m => chemin.startsWith(PREFIXES[m.code])) || null;
+
+  // ------------------------------------------------------------ Élément actif (même règle que navigation.py)
+  function marquer(module, chemin, params) {
+    let meilleur = null, score = -1, ongletActif = null;
+    const parents = new Map();
+    for (const o of module.onglets) {
+      (function parcourir(noeuds, parent) {
+        for (const n of noeuds) {
+          if (n.separateur) continue;
+          parents.set(n, parent);
+          if (n.url && !n.module) {
+            const [p, q = ""] = n.url.split("?");
+            const attendus = [...new URLSearchParams(q)];
+            if (p === chemin && attendus.every(([k, v]) => params.get(k) === v) && attendus.length > score) {
+              meilleur = n; score = attendus.length; ongletActif = o;
+            }
+          }
+          parcourir(n.enfants, n);
+        }
+      })(o.elements, null);
+    }
+    const ouverts = new Set();
+    for (let n = meilleur; n; n = parents.get(n)) ouverts.add(n);
+    return { actif: meilleur, onglet: ongletActif, ouverts, parents };
+  }
+  const dernierOnglet = {};
+
+  // ------------------------------------------------------------ Construction du cadre (identique à base.html)
+  function menuHtml(noeuds) {
+    return `<ul class="menu-deroulant">${noeuds.map(n => {
+      const icone = `<i class="bi ${n.icone || "bi-blank"}"></i>`;
+      if (n.separateur) return `<li class="sep" role="separator"></li>`;
+      if (n.enfants.length) return `<li class="sous"><span class="item">${icone}<span>${esc(n.titre)}</span><i class="bi bi-caret-right-fill fleche"></i></span>${menuHtml(n.enfants)}</li>`;
+      if (n.action === "quitter") return `<li><button type="button" class="item" data-action="quitter">${icone}<span>${esc(n.titre)}</span></button></li>`;
+      if (n.action) return `<li><a href="#" class="item" data-action="${n.action}">${icone}<span>${esc(n.titre)}</span></a></li>`;
+      if (n.url) return `<li><a class="item${n === etat.actif ? " actif" : ""}" href="${esc(n.url)}">${icone}<span>${esc(n.titre)}</span>${n.module ? '<i class="bi bi-box-arrow-up-right externe"></i>' : ""}</a></li>`;
+      return `<li><span class="item desactive" title="Non disponible dans cette version">${icone}<span>${esc(n.titre)}</span></span></li>`;
+    }).join("")}</ul>`;
+  }
+  function arbreHtml(noeuds, niveau, prefixe) {
+    return `<ul class="arbre-liste niveau-${niveau}">${noeuds.filter(n => !n.separateur).map(n => {
+      const ouvert = etat.ouverts.has(n), actif = n === etat.actif;
+      const icone = n.icone ? `<i class="bi ${n.icone}"></i>` : "";
+      if (n.enfants.length) {
+        const id = `arbre-${prefixe}-${slug(n.code)}`;
+        return `<li><a class="noeud${actif ? " actif" : ""}${ouvert ? "" : " collapsed"}" data-bs-toggle="collapse" href="#${id}" role="button" aria-expanded="${ouvert}">
+          <i class="bi bi-chevron-right chevron"></i>${icone} ${esc(n.titre)}</a>
+          <div class="collapse${ouvert ? " show" : ""}" id="${id}">${arbreHtml(n.enfants, niveau + 1, prefixe)}</div></li>`;
+      }
+      const i = `<i class="bi ${n.icone || "bi-dot"}"></i>`;
+      if (n.action === "quitter") return `<li><button type="button" class="noeud feuille w-100 text-start border-0 bg-transparent" data-action="quitter">${i} ${esc(n.titre)}</button></li>`;
+      if (n.action) return `<li><a class="noeud feuille" href="#" data-action="${n.action}">${i} ${esc(n.titre)}</a></li>`;
+      if (n.url) return `<li><a class="noeud feuille${actif ? " actif" : ""}" href="${esc(n.url)}">${i} ${esc(n.titre)}${n.module ? ' <i class="bi bi-box-arrow-up-right small text-muted ms-auto"></i>' : ""}</a></li>`;
+      return `<li><span class="noeud feuille desactive" title="Non disponible dans cette version">${i} ${esc(n.titre)}</span></li>`;
+    }).join("")}</ul>`;
+  }
+  function filAriane() {
+    if (!etat.actif) return "";
+    const chemin = [];
+    for (let n = etat.actif; n; n = etat.parents.get(n)) chemin.unshift(n.titre);
+    return `<nav class="fil-ariane d-print-none"><span>${esc(etat.onglet.titre)}</span>${chemin.map(t => ` <i class="bi bi-chevron-right"></i> <span>${esc(t)}</span>`).join("")}</nav>`;
+  }
+  function entete(module) {
+    const logiciels = NAV.modules.map(m => `<li><a class="dropdown-item" href="${ACCUEILS[m.code]}"><i class="bi ${ICONES[m.code]}" style="color:${m.couleur}"></i> ${esc(m.titre)}</a></li>`).join("");
+    return `<header class="topbar d-print-none ${module ? "" : "topbar-portail"}">
+      <a class="app-nom" href="${module ? ACCUEILS[module.code] : "/"}"><i class="bi ${module ? ICONES[module.code] : "bi-grid-3x3-gap-fill"}"></i> ${module ? esc(module.titre) : "ERP OHADA"}</a>
+      <span class="contexte">${esc(CTX.societe)}${CTX.exercice ? " · Exercice " + esc(CTX.exercice) : ""}</span>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        ${module ? "" : `<div class="dropdown"><button class="btn btn-sm btn-topbar dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-grid-3x3-gap"></i> Logiciels</button><ul class="dropdown-menu dropdown-menu-end">${logiciels}</ul></div>`}
+        <button type="button" class="btn btn-sm btn-topbar" data-action="quitter" title="Quitter"><i class="bi bi-person-circle"></i> ${esc(CTX.utilisateur)} <i class="bi bi-box-arrow-right"></i></button>
+      </div></header>`;
+  }
+  function barreOutils(module) {
+    const b = (action, icone, titre) => `<button type="button" data-action="${action}" title="${titre}"><i class="bi ${icone}"></i></button>`;
+    return `<div class="barre-outils d-print-none" role="toolbar">${b("ajouter", "bi-plus-square", "Ajouter")}${b("modifier", "bi-pencil-square", "Voir/Modifier")}<span class="sep"></span>
+      ${b("couper", "bi-scissors", "Couper")}${b("copier", "bi-files", "Copier")}${b("coller", "bi-clipboard", "Coller")}<span class="sep"></span>
+      ${b("rechercher", "bi-search", "Rechercher")}${b("imprimer", "bi-printer", "Imprimer")}${b("actualiser", "bi-arrow-clockwise", "Actualiser")}<span class="sep"></span>
+      ${b("barre_verticale", "bi-layout-sidebar", "Barre verticale")}<a href="${ACCUEILS[module.code]}" title="Page d'accueil"><i class="bi bi-house-door"></i></a></div>`;
+  }
+
+  // ------------------------------------------------------------ Rendu d'une page
+  const etat = { url: "", actif: null, onglet: null, ouverts: new Set(), parents: new Map() };
+  function afficher(url) {
+    const cle = normaliser(url);
+    const [chemin, requete = ""] = cle.split("?");
+    let page = PAGES[cle], remarque = "";
+    if (!page && requete && PAGES[chemin]) { page = PAGES[chemin]; remarque = "Ce filtre n'est pas inclus dans la simulation : la page est affichée sans filtre."; }
+    etat.url = cle;
+    if (chemin === "/connexion/") return afficherConnexion();
+    const module = moduleDe(chemin);
+    document.documentElement.style.setProperty("--module", module ? module.couleur : "#1e2a3a");
+    const app = document.getElementById("app");
+    let cadre = "";
+    if (module) {
+      Object.assign(etat, marquer(module, chemin, new URLSearchParams(requete)));
+      if (etat.onglet) dernierOnglet[module.code] = etat.onglet.code;
+      etat.onglet = etat.onglet || module.onglets.find(o => o.code === dernierOnglet[module.code])
+        || module.onglets.find(o => o.code === "traitement" || o.code === "etat") || module.onglets[0];
+      const menus = module.onglets.map(o => `<div class="menu"><button type="button" class="menu-titre${o === etat.onglet && chemin !== PREFIXES[module.code] ? " courant" : ""}">${esc(o.titre)}</button>${menuHtml(o.elements)}</div>`).join("");
+      const choix = module.onglets.filter(o => o.code !== "aide").map(o => `<option value="${o.code}"${o === etat.onglet ? " selected" : ""}>${esc(o.titre)}</option>`).join("");
+      const arbres = module.onglets.filter(o => o.code !== "aide").map(o => `<div class="arbre-menu" data-menu="${o.code}"${o === etat.onglet ? "" : " hidden"}>${arbreHtml(o.elements, 0, o.code)}</div>`).join("");
+      cadre = `${entete(module)}<nav class="barre-menus d-print-none" id="barre-menus">${menus}</nav>${barreOutils(module)}
+        <div class="d-flex espace"><aside class="arbre d-print-none"><select class="form-select form-select-sm arbre-choix" id="arbre-choix" aria-label="Barre de navigation">${choix}</select>${arbres}</aside>
+        <main class="flex-grow-1 p-4 main" id="zone">${filAriane()}<div id="contenu"></div></main></div>`;
+    } else {
+      etat.actif = null;
+      cadre = `${entete(null)}<main class="p-4 main" id="zone"><div id="contenu"></div></main>`;
+    }
+    app.innerHTML = cadre;
+    const contenu = document.getElementById("contenu");
+    if (page) {
+      contenu.innerHTML = (remarque ? `<div class="alert alert-warning small">${esc(remarque)}</div>` : "") + page.html;
+      document.title = (page.titre || "ERP") + " — Simulateur";
+      for (const code of page.scripts) { try { new Function(code)(); } catch (err) { console.warn("Script de page :", err); } }
+    } else {
+      contenu.innerHTML = `<div class="card sim-absente"><div class="card-body">
+        <h1 class="h5">Écran non inclus dans la simulation</h1>
+        <p class="text-muted mb-2">L'adresse <code>${esc(cle)}</code> existe dans le logiciel réel mais n'a pas été capturée (page de saisie après enregistrement, filtre particulier…).</p>
+        <a class="btn btn-primary btn-sm" href="${module ? ACCUEILS[module.code] : "/"}">Retour à l'accueil</a></div></div>`;
+    }
+    if (document.body.classList.contains("sans-barre-verticale")) { /* état conservé */ }
+    brancherMenus();
+    window.scrollTo(0, 0);
+  }
+  function afficherConnexion() {
+    document.documentElement.style.setProperty("--module", "#1e2a3a");
+    document.getElementById("app").innerHTML = PAGES["/connexion/"].html;
+    document.title = "Connexion — Simulateur ERP OHADA";
+    const nom = document.querySelector("input[name=username]"), mdp = document.querySelector("input[name=password]");
+    if (nom) nom.value = CTX.utilisateur;
+    if (mdp) mdp.placeholder = "Mot de passe (simulation : saisie libre)";
+  }
+  function naviguer(url) {
+    const cible = "#" + normaliser(url);
+    if (location.hash === cible) afficher(url); else location.hash = cible;
+  }
+  addEventListener("hashchange", () => afficher(decodeURIComponent(location.hash.slice(1)) || "/connexion/"));
+
+  // ------------------------------------------------------------ Barre de menus (clic puis survol, Échap)
+  function brancherMenus() {
+    const barre = document.getElementById("barre-menus");
+    const choix = document.getElementById("arbre-choix");
+    if (choix) choix.addEventListener("change", () => document.querySelectorAll(".arbre-menu").forEach(d => { d.hidden = d.dataset.menu !== choix.value; }));
+    if (!barre) return;
+    const menus = barre.querySelectorAll(".menu");
+    const fermer = () => { barre.classList.remove("active"); menus.forEach(m => m.classList.remove("ouvert")); };
+    const ouvrir = m => { menus.forEach(x => x.classList.toggle("ouvert", x === m)); barre.classList.add("active"); };
+    menus.forEach(m => {
+      const t = m.querySelector(".menu-titre");
+      t.addEventListener("click", e => { e.stopPropagation(); m.classList.contains("ouvert") ? fermer() : ouvrir(m); });
+      t.addEventListener("mouseenter", () => { if (barre.classList.contains("active")) ouvrir(m); });
+    });
+    fermerMenus = fermer;
+  }
+  let fermerMenus = () => {};
+  document.addEventListener("click", e => { if (!e.target.closest("#barre-menus")) fermerMenus(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { fermerMenus(); fermerBoite(); } });
+
+  // ------------------------------------------------------------ Boîte d'information
+  function boite(titre, message) {
+    fermerBoite();
+    const voile = document.createElement("div");
+    voile.className = "sim-voile"; voile.id = "sim-voile";
+    voile.innerHTML = `<div class="sim-boite" role="dialog" aria-modal="true"><header>${esc(titre)}</header><div class="corps">${message}</div>
+      <footer><button type="button" class="btn btn-primary btn-sm" id="sim-ok">OK</button></footer></div>`;
+    document.body.appendChild(voile);
+    voile.addEventListener("click", e => { if (e.target === voile || e.target.id === "sim-ok") fermerBoite(); });
+    document.getElementById("sim-ok").focus();
+  }
+  function fermerBoite() { document.getElementById("sim-voile")?.remove(); }
+  function signaler(texte) {
+    const t = document.createElement("div"); t.className = "toast-erp"; t.textContent = texte;
+    document.body.appendChild(t); setTimeout(() => t.remove(), 2500);
+  }
+
+  // ------------------------------------------------------------ Liens, commandes et formulaires
+  let dernierChamp = null;
+  document.addEventListener("focusin", e => { if (e.target.matches("input:not([type=checkbox]):not([type=hidden]), textarea")) dernierChamp = e.target; });
+  const lien = icone => document.querySelector(`#contenu a > i.${icone}`)?.closest("a");
+  const ACTIONS = {
+    imprimer: () => window.print(),
+    actualiser: () => afficher(etat.url),
+    fermer: () => naviguer("/"),
+    quitter: () => naviguer("/connexion/"),
+    annuler: () => { if (dernierChamp) { dernierChamp.focus(); document.execCommand("undo"); } },
+    couper: () => { if (dernierChamp) { dernierChamp.focus(); document.execCommand("cut"); } },
+    copier: () => { const t = String(window.getSelection()) || (dernierChamp ? dernierChamp.value.slice(dernierChamp.selectionStart, dernierChamp.selectionEnd) : "");
+      if (t && navigator.clipboard) navigator.clipboard.writeText(t).then(() => signaler("Copié dans le presse-papiers.")); else signaler("Sélectionnez du texte à copier."); },
+    coller: () => signaler("Utilisez Ctrl+V pour coller dans le champ."),
+    effacer: () => { if (dernierChamp) { dernierChamp.value = ""; dernierChamp.dispatchEvent(new Event("input", { bubbles: true })); } },
+    selectionner_tout: () => { if (dernierChamp) { dernierChamp.focus(); dernierChamp.select(); } },
+    ajouter: () => {
+      const a = lien("bi-plus") || lien("bi-plus-square"), ligne = document.getElementById("ajout-ligne");
+      if (a) naviguer(a.getAttribute("href")); else if (ligne) ligne.click(); else signaler("Aucune création possible depuis cette fenêtre.");
+    },
+    modifier: () => { const a = lien("bi-pencil"); a ? naviguer(a.getAttribute("href")) : signaler("Aucune fiche à modifier dans cette fenêtre."); },
+    rechercher: () => { const c = document.querySelector("#contenu input[name=q], #contenu input[type=search], #contenu input[type=text]"); c ? c.focus() : signaler("Pas de zone de recherche dans cette fenêtre."); },
+    barre_verticale: () => document.body.classList.toggle("sans-barre-verticale"),
+  };
+  document.addEventListener("click", e => {
+    const commande = e.target.closest("[data-action]");
+    if (commande) {
+      e.preventDefault(); fermerMenus();
+      (ACTIONS[commande.dataset.action] || (() => {}))();
+      return;
+    }
+    const a = e.target.closest("a[href]");
+    if (!a || a.dataset.bsToggle) return;
+    const href = a.getAttribute("href");
+    if (href.startsWith("/")) {
+      e.preventDefault(); fermerMenus();
+      if (href.includes("/imprimer/")) return boite("Impression", "Dans le logiciel réel, ce bouton ouvre la pièce au format A4 prête à imprimer. Elle n'est pas incluse dans la simulation.");
+      if (href.includes("export=")) return boite("Export CSV", "Dans le logiciel réel, ce bouton télécharge le tableau au format CSV (Excel).");
+      if (href.startsWith("/admin")) return boite("Administration", "La gestion des utilisateurs et des droits se fait dans l'administration du logiciel réel. Elle n'est pas incluse dans la simulation.");
+      naviguer(href);
+    } else if (href === "#" || href.startsWith("javascript:")) {
+      e.preventDefault();
+      if (href.includes("history.back")) history.back();
+    }
+  });
+  document.addEventListener("submit", e => {
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    const form = e.target;
+    const methode = (form.getAttribute("method") || "get").toLowerCase();
+    if (form.querySelector("input[name=username]")) return naviguer("/");
+    if (methode === "get") {
+      const action = form.getAttribute("action") || etat.url.split("?")[0];
+      const donnees = new FormData(form);
+      if (e.submitter && e.submitter.name) donnees.append(e.submitter.name, e.submitter.value);
+      const params = new URLSearchParams([...donnees].filter(([, v]) => typeof v === "string"));
+      if (params.get("export")) return boite("Export CSV", "Dans le logiciel réel, ce bouton télécharge le tableau au format CSV (Excel).");
+      return naviguer(action + (params.toString() ? "?" + params : ""));
+    }
+    const bouton = e.submitter ? e.submitter.textContent.trim().replace(/\s+/g, " ") : "Enregistrer";
+    boite("Simulation", `<p>Dans le logiciel réel, l'action <strong>« ${esc(bouton)} »</strong> enregistre ou valide les données
+      (numérotation, mouvements de stock, écritures comptables).</p><p class="mb-0 text-muted">Ici, rien n'est enregistré : poursuivez la visite par les menus.</p>`);
+  });
+
+  // Les pages appellent parfois form.submit() (filtres « onchange ») : on le fait passer par l'interception
+  HTMLFormElement.prototype.submit = function () {
+    const evenement = new SubmitEvent("submit", { bubbles: true, cancelable: true });
+    this.dispatchEvent(evenement);
+  };
+
+  afficher(decodeURIComponent(location.hash.slice(1)) || "/connexion/");
+})();
+</script>
+</body>
+</html>

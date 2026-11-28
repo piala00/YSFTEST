@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Réparations{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Ordres de réparation</h1><a class="btn btn-primary btn-sm" href="{% url 'garage:reparation_create' %}"><i class="bi bi-wrench"></i> Entrée au garage</a></div>
+<form class="d-flex gap-2 align-items-end mb-3"><div><label class="form-label small mb-0" for="r-statut">Statut</label>
+  <select id="r-statut" name="statut" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Tous</option>
+  {% for code, lib in statuts %}<option value="{{ code }}" {% if code == statut %}selected{% endif %}>{{ lib }}</option>{% endfor %}</select></div></form>
+<div class="card"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>N°</th><th>Véhicule</th><th>Entrée</th><th>Sortie</th><th>Panne / travaux</th><th>Intervenant</th><th class="num">Jours</th><th class="num">Coût</th><th>Statut</th></tr></thead>
+  <tbody>{% for o in ordres %}<tr><td><a href="{% url 'garage:reparation' o.pk %}">{{ o.numero }}</a></td><td>{{ o.vehicule.immatriculation }}</td>
+    <td>{{ o.date_entree|date:"d/m/Y" }}</td><td>{{ o.date_sortie|date:"d/m/Y" }}</td><td>{{ o.panne }}</td><td>{{ o.intervenant }}</td>
+    <td class="num">{{ o.immobilisation_jours }}</td><td class="num">{{ o.cout|montant }}</td><td>{{ o.get_statut_display }}</td></tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucun ordre.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

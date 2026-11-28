@@ -1,0 +1,12 @@
+table;champs;regle;portee;source;preuve
+F_COMPTET;CT_Num;"Unicité ; non modifiable";"Règle Sage ; ne prouve pas une PK SQL";M01 PDF 62-63 / imprimées 60-61;DOC-OFFICIEL
+F_COMPTET;CT_Type;Non modifiable;Règle Sage;M01 PDF 62 / imprimée 60;DOC-OFFICIEL
+F_COMPTET;CG_NumPrinc;Compte général existant;"Règle Sage ; contrôler les orphelins";M01 PDF 63 / imprimée 61;DOC-OFFICIEL
+F_COMPTEG;CG_Num;"Unicité ; non modifiable";Index ICG_NUM documentaire;M01 PDF 43 / imprimée 41;DOC-OFFICIEL
+F_COMPTEG;CG_Type;Non modifiable;Règle Sage;M01 PDF 43 / imprimée 41;DOC-OFFICIEL
+F_COMPTEG;CG_Type=0;Comptes utilisés en saisie des journaux;Règle Sage;M01 PDF 44 / imprimée 42;DOC-OFFICIEL
+F_ARTICLE;AR_Ref|AR_Design|FA_CodeFamille|AR_UniteVen;Requis à l’ajout;"Structure logique ; ne certifie pas l’astérisque d’un écran";M01 PDF 211 / imprimée 209;DOC-OFFICIEL
+F_ARTICLE;AR_Ref;Non modifiable;Règle Sage;M01 PDF 211 / imprimée 209;DOC-OFFICIEL
+F_ARTICLE;AR_SuiviStock;Non modifiable si mouvement;"Règle Sage ; pas une interdiction SQL observée";M01 PDF 211 / imprimée 209;DOC-OFFICIEL
+F_JOURNAUX;JO_Num;"Unicité ; non modifiable";Index IJO_NUM documentaire;M01 PDF 76-77 / imprimées 74-75;DOC-OFFICIEL
+F_ECRITUREC;EC_No;"Unicité ; compteur";Index IEC_ECNO documentaire;M01 PDF 107 / imprimée 105;DOC-OFFICIEL

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Échéances des véhicules{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Papiers des véhicules</h1></div>
+<div class="card"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Véhicule</th><th>Assurance jusqu'au</th><th>Visite technique jusqu'au</th><th>Alerte</th></tr></thead>
+  <tbody>{% for v, alertes in vehicules %}<tr class="{% if alertes %}table-warning{% endif %}"><td><a href="{% url 'transport:vehicule_fiche' v.pk %}">{{ v.immatriculation }}</a></td>
+    <td>{{ v.assurance_echeance|date:"d/m/Y"|default:"à renseigner" }}</td><td>{{ v.visite_technique_echeance|date:"d/m/Y"|default:"à renseigner" }}</td>
+    <td>{{ alertes|join:" · " }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

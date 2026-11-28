@@ -1,0 +1,9 @@
+﻿agency_id;ville;employes_attendus;vehicules_voyageurs_attendus;mode_caisses;siege
+AG01;Douala;65;12;MULTI;OUI
+AG02;Yaoundé;64;12;MULTI;NON
+AG03;Bafoussam;34;8;MULTI;NON
+AG04;Bertoua;32;8;UNIQUE;NON
+AG05;Garoua-Boulaï;26;5;UNIQUE;NON
+AG06;Ngaoundéré;30;6;UNIQUE;NON
+AG07;Bamenda;27;5;UNIQUE;NON
+AG08;Buea;22;4;UNIQUE;NON

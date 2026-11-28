@@ -1,0 +1,311 @@
+diff --git a/apps/comptabilite/management/commands/longueur_comptes.py b/apps/comptabilite/management/commands/longueur_comptes.py
+--- a/apps/comptabilite/management/commands/longueur_comptes.py
++++ b/apps/comptabilite/management/commands/longueur_comptes.py
+@@ -33,11 +33,13 @@
+         if len(changements) > 30:
+             self.stdout.write(f"  … et {len(changements) - 30} autres")
+         for numero in trop_longs:
+-            self.stdout.write(f"  {numero} : plus long que {longueur} chiffres, laissé tel quel")
++            self.stdout.write(f"  INCOMPATIBLE : {numero} ne peut pas devenir un numéro à {longueur} chiffres")
+         for cible, numeros in sorted(collisions.items()):
+             self.stdout.write(f"  COLLISION : {', '.join(numeros)} deviendraient tous {cible}")
+         if collisions:
+             raise CommandError(f"{len(collisions)} collision(s) : rien n'est modifié.")
++        if trop_longs:
++            raise CommandError(f"{len(trop_longs)} compte(s) incompatible(s) : rien n'est modifié.")
+         if not o["appliquer"]:
+             self.stdout.write(f"{len(changements)} compte(s) à renuméroter. Relancez avec --appliquer pour le faire.")
+             return
+diff --git a/apps/comptabilite/services.py b/apps/comptabilite/services.py
+--- a/apps/comptabilite/services.py
++++ b/apps/comptabilite/services.py
+@@ -661,7 +661,8 @@
+         cibles[normaliser_numero(numero, longueur)].append(numero)
+     changements = sorted((n, c) for c, ns in cibles.items() for n in ns if n != c and len(ns) == 1)
+     collisions = {c: sorted(ns) for c, ns in cibles.items() if len(ns) > 1}
+-    trop_longs = sorted(n for n in existants if len(n) > longueur) if longueur else []
++    trop_longs = sorted(n for n in existants if longueur and
++                        (not n.isascii() or not n.isdecimal() or len(n) > longueur))
+     return changements, collisions, trop_longs
+ 
+ 
+@@ -670,7 +671,11 @@
+     """Passe le dossier à `longueur` chiffres ; refuse s'il y a une collision. Renvoie le nombre de comptes renumérotés."""
+     from apps.core.models import Societe
+ 
+-    changements, collisions, _ = projet_longueur_comptes(longueur)
++    if not 4 <= longueur <= 12:
++        raise ValidationError("La longueur doit être comprise entre 4 et 12 chiffres.")
++    changements, collisions, trop_longs = projet_longueur_comptes(longueur)
++    if trop_longs:
++        raise ValidationError("Comptes incompatibles avec la longueur demandée : " + ", ".join(trop_longs))
+     if collisions:
+         raise ValidationError("Comptes qui se confondraient : " + " ; ".join(
+             f"{', '.join(ns)} → {c}" for c, ns in sorted(collisions.items())))
+diff --git a/apps/comptabilite/tests.py b/apps/comptabilite/tests.py
+--- a/apps/comptabilite/tests.py
++++ b/apps/comptabilite/tests.py
+@@ -129,3 +129,19 @@
+         with self.assertRaisesMessage(CommandError, "collision"):
+             call_command("longueur_comptes", "--appliquer", stdout=io.StringIO())
+         self.assertTrue(Compte.objects.filter(numero="4111").exists())       # rien n'a bougé
++
++
++class ConversionSeptChiffresSecuriteTests(TestCase):
++    """Ne jamais activer le format sept chiffres si un numéro est incompatible."""
++
++    def test_refus_compte_huit_chiffres_sans_modification(self):
++        from django.core.management.base import CommandError
++        from apps.core.models import Societe
++
++        call_command("init_erp", "--longueur-comptes", "0", verbosity=0)
++        Compte.objects.create(numero="41112345", intitule="Compte spécifique à huit chiffres")
++        with self.assertRaisesMessage(CommandError, "incompatible"):
++            call_command("longueur_comptes", "--appliquer", stdout=io.StringIO())
++        self.assertEqual(Societe.get().longueur_comptes, 0)
++        self.assertTrue(Compte.objects.filter(numero="4111").exists())
++        self.assertTrue(Compte.objects.filter(numero="41112345").exists())
+diff --git a/apps/core/accueil.py b/apps/core/accueil.py
+--- a/apps/core/accueil.py
++++ b/apps/core/accueil.py
+@@ -131,12 +131,48 @@
+ 
+ 
+ def analytique():
+-    """Comptabilité analytique : lue sur les écritures générales validées (véhicule, section), jamais ressaisie."""
++    """Comptabilité analytique : uniquement à partir des écritures générales validées.
++
++    Activité commerciale : analyse par section. Activité transport : véhicule/propriétaire.
++    Les données analytiques ne constituent jamais un deuxième journal comptable.
++    """
++    from apps.core.models import Societe
+     from apps.reporting import services
++    from apps.comptabilite import services as compta
++    from apps.comptabilite.models import SectionAnalytique
+     from apps.transport import analytique as ana
+ 
+     debut, fin = services._periode()
+     fin_effective = min(fin, datetime.date.today()) if debut <= datetime.date.today() else fin
++    if Societe.get().activite == Societe.ACTIVITE_COMMERCE:
++        lignes = compta.balance_analytique(debut, fin_effective)
++        affectees = [l for l in lignes if l["section"] is not None]
++        sans_section = next((l for l in lignes if l["section"] is None), None)
++        charges = sum((l["charges"] for l in affectees), ZERO)
++        produits = sum((l["produits"] for l in affectees), ZERO)
++        return {
++            "raccourcis": [{"groupe": "Comptabilité analytique par section", "liens": [
++                _raccourci("Balance analytique", "bi-table", "comptabilite:balance_analytique"),
++                _raccourci("Plan analytique", "bi-diagram-2", "analytique:sections"),
++                _raccourci("Affecter une section aux écritures", "bi-pencil-square", "comptabilite:ventilation"),
++            ]}],
++            "indicateurs": [
++                _indicateur("Sections analytiques actives", SectionAnalytique.objects.filter(actif=True).count(),
++                            reverse("analytique:sections"), genre="nombre"),
++                _indicateur("Produits affectés", produits, reverse("comptabilite:balance_analytique")),
++                _indicateur("Charges affectées", charges, reverse("comptabilite:balance_analytique")),
++                _indicateur("Charges non affectées", sans_section["charges"] if sans_section else ZERO,
++                            reverse("comptabilite:balance_analytique"), alerte=bool(sans_section and sans_section["charges"])),
++                _indicateur("Résultat affecté", produits - charges, reverse("comptabilite:balance_analytique")),
++            ],
++            "dernieres": [
++                {"date": fin_effective, "piece": l["section"].code,
++                 "libelle": l["section"].intitule, "montant": l["resultat"],
++                 "statut": "Résultat par section", "url": reverse("comptabilite:balance_analytique")}
++                for l in affectees[:8]
++            ],
++            "titre_dernieres": "Résultats par section",
++        }
+     r = ana.vehicules(debut, fin_effective)
+     c = r["controle"]
+     vehicules = sorted((l for l in r["lignes"] if l["produits"] or l["charges"]), key=lambda l: l["resultat_societe"])
+diff --git a/apps/core/navigation.py b/apps/core/navigation.py
+--- a/apps/core/navigation.py
++++ b/apps/core/navigation.py
+@@ -697,7 +697,7 @@
+ ANALYTIQUE = Module(
+     code="analytique",
+     titre="Comptabilité analytique",
+-    description="Véhicules, propriétaires et sections, issus des écritures de la comptabilité générale",
++    description="Analyses et affectations issues des écritures de la comptabilité générale (source unique)",
+     icone="bi-diagram-3",
+     couleur="#00695c",
+     prefixe="/comptabilite/analytique/",
+@@ -1100,6 +1100,28 @@
+     return None
+ 
+ 
++def elements_selon_activite(module, onglet):
++    """Deux menus comptables distincts, spécialisation de l'analytique selon l'activité.
++
++    Commerce : sections uniquement (pas de véhicules ni de partenaires transport).
++    Transport : seuls Véhicules et Propriétaires sont des rubriques principales d'états;
++    les sections restent en Structure et Traitement comme dimensions d'affectation.
++    """
++    if module.code != "analytique":
++        return onglet.elements
++    from .models import Societe
++
++    activite = Societe.get().activite
++    if activite == Societe.ACTIVITE_COMMERCE:
++        if onglet.code == "structure":
++            return [e for e in onglet.elements if e.code == "structure.sections"]
++        if onglet.code == "etat":
++            return [e for e in onglet.elements if e.code == "analytique.sections"]
++    if activite in (Societe.ACTIVITE_TRANSPORT, Societe.ACTIVITE_MIXTE) and onglet.code == "etat":
++        return [e for e in onglet.elements if e.code in ("analytique.vehicules", "analytique.proprietaires")]
++    return onglet.elements
++
++
+ def structure_module(module, chemin="", parametres=None):
+     """Menus du module, avec le menu et l'élément actifs."""
+     parametres = parametres or {}
+@@ -1107,7 +1129,7 @@
+     onglets = []
+     for onglet in module.onglets:
+         avant = meilleur["noeud"]
+-        arbre = _arbre(module, onglet.elements, chemin, parametres, meilleur)
++        arbre = _arbre(module, elements_selon_activite(module, onglet), chemin, parametres, meilleur)
+         onglets.append({"code": onglet.code, "titre": onglet.titre, "icone": onglet.icone, "elements": arbre,
+                         "url": premier_lien(arbre), "contient_actif": False})
+         if meilleur["noeud"] is not avant:
+diff --git a/apps/transport/tests.py b/apps/transport/tests.py
+--- a/apps/transport/tests.py
++++ b/apps/transport/tests.py
+@@ -1323,3 +1323,26 @@
+         # Les états analytiques s'ouvrent dans le module analytique ; la saisie reste en comptabilité générale
+         self.assertEqual(module_pour_chemin(reverse("comptabilite:analytique_vehicules")).code, "analytique")
+         self.assertEqual(module_pour_chemin(reverse("comptabilite:ecriture_create")).code, "comptabilite")
++
++
++class AccueilAnalytiqueCommerceTests(TestCase):
++    """L'ERP commerce dispose de deux comptabilités à l'écran, sans rubriques transport parasites."""
++
++    def setUp(self):
++        call_command("init_erp", "--activite", "commerce", verbosity=0)
++        from django.contrib.auth import get_user_model
++        self.client.force_login(get_user_model().objects.create_superuser("admincommerce", "", "x"))
++
++    def test_portail_et_dashboard(self):
++        from django.urls import reverse
++        portail = self.client.get(reverse("core:portail"))
++        self.assertContains(portail, "Comptabilité générale")
++        self.assertContains(portail, "Comptabilité analytique")
++        dashboard = self.client.get(reverse("analytique:accueil"))
++        self.assertEqual(dashboard.status_code, 200)
++        self.assertContains(dashboard, "Sections analytiques actives")
++        self.assertNotContains(dashboard, "Résultat des véhicules")
++        from apps.core.navigation import ANALYTIQUE, structure_module
++        onglets, _ = structure_module(ANALYTIQUE)
++        etat = next(o for o in onglets if o["code"] == "etat")
++        self.assertEqual([e["code"] for e in etat["elements"]], ["analytique.sections"])
+diff --git a/desktop/COMPILER.bat b/desktop/COMPILER.bat
+--- a/desktop/COMPILER.bat
++++ b/desktop/COMPILER.bat
+@@ -1,12 +1,13 @@
+-@echo off
+-REM Compile les logiciels ERP OHADA en executables Windows (dossier dist\)
+-cd /d "%~dp0"
+-call .venv\Scripts\activate.bat
+-pip install pyinstaller
+-pyinstaller --noconfirm --onefile --windowed --name ERP_Commercial --collect-all customtkinter commercial.py
+-pyinstaller --noconfirm --onefile --windowed --name ERP_Comptabilite --collect-all customtkinter comptabilite.py
+-pyinstaller --noconfirm --onefile --windowed --name ERP_Reporting --collect-all customtkinter reporting.py
+-pyinstaller --noconfirm --onefile --windowed --name ERP_OHADA --collect-all customtkinter lanceur.py
+-echo.
+-echo Executables disponibles dans le dossier dist\
+-pause
++@echo off
++REM Compile les logiciels ERP OHADA en executables Windows (dossier dist\)
++cd /d "%~dp0"
++call .venv\Scripts\activate.bat
++pip install pyinstaller
++pyinstaller --noconfirm --onefile --windowed --name ERP_Commercial --collect-all customtkinter commercial.py
++pyinstaller --noconfirm --onefile --windowed --name ERP_Comptabilite --collect-all customtkinter comptabilite.py
++pyinstaller --noconfirm --onefile --windowed --name ERP_Analytique --collect-all customtkinter analytique.py
++pyinstaller --noconfirm --onefile --windowed --name ERP_Reporting --collect-all customtkinter reporting.py
++pyinstaller --noconfirm --onefile --windowed --name ERP_OHADA --collect-all customtkinter lanceur.py
++echo.
++echo Executables disponibles dans le dossier dist\
++pause
+diff --git a/desktop/comptabilite.py b/desktop/comptabilite.py
+--- a/desktop/comptabilite.py
++++ b/desktop/comptabilite.py
+@@ -1,4 +1,4 @@
+-"""ERP OHADA — logiciel « Comptabilité OHADA ».  Lancer : python comptabilite.py"""
++"""ERP OHADA — logiciel « Comptabilité générale ».  Lancer : python comptabilite.py"""
+ from pages import ECRANS_COMPTABILITE
+ from shell import lancer
+ 
+diff --git a/desktop/lanceur.py b/desktop/lanceur.py
+--- a/desktop/lanceur.py
++++ b/desktop/lanceur.py
+@@ -9,7 +9,7 @@
+         super().__init__()
+         ctk.set_appearance_mode("light")
+         self.title("ERP OHADA")
+-        self.geometry("860x360")
++        self.geometry("1060x380")
+         self.resizable(False, False)
+         ctk.CTkLabel(self, text="ERP OHADA", font=ctk.CTkFont(size=26, weight="bold")).pack(pady=(24, 2))
+         ctk.CTkLabel(self, text="Choisissez une application", text_color="gray").pack(pady=(0, 18))
+@@ -21,7 +21,7 @@
+             carte.grid(row=0, column=i, padx=10, sticky="nsew")
+             ctk.CTkLabel(carte, text=info["titre"], font=ctk.CTkFont(size=17, weight="bold"),
+                          text_color=info["couleur"]).pack(pady=(20, 6), padx=12)
+-            ctk.CTkLabel(carte, text=info["description"], wraplength=220, text_color="gray").pack(padx=12)
++            ctk.CTkLabel(carte, text=info["description"], wraplength=205, text_color="gray").pack(padx=12)
+             ctk.CTkButton(carte, text="Ouvrir", fg_color=info["couleur"], hover_color=assombrir(info["couleur"]),
+                           command=lambda c=code: lancer_module(c)).pack(side="bottom", pady=18)
+ 
+diff --git a/desktop/pages.py b/desktop/pages.py
+--- a/desktop/pages.py
++++ b/desktop/pages.py
+@@ -447,3 +447,8 @@
+     "finances.bilan": lambda app, el: PageBilan(app, el["titre"]),
+     "finances.resultat": lambda app, el: PageCompteResultat(app, el["titre"]),
+ }
++
++
++# Le module analytique utilise les écrans analytiques du même serveur et de la même comptabilité.
++# Les états spécifiques véhicules/propriétaires s'ouvrent dans le navigateur (PageWeb).
++ECRANS_ANALYTIQUE = {}
+diff --git a/desktop/shell.py b/desktop/shell.py
+--- a/desktop/shell.py
++++ b/desktop/shell.py
+@@ -36,8 +36,10 @@
+ MODULES = {
+     "commercial": {"titre": "Gestion commerciale", "couleur": "#1565c0",
+                    "description": "Tiers, articles, ventes, achats, stock, règlements"},
+-    "comptabilite": {"titre": "Comptabilité OHADA", "couleur": "#2e7d32",
+-                     "description": "Plan SYSCOHADA, saisie, grand livre, balance, états financiers"},
++    "comptabilite": {"titre": "Comptabilité générale", "couleur": "#2e7d32",
++                     "description": "Plan SYSCOHADA, journaux, saisie, états financiers"},
++    "analytique": {"titre": "Comptabilité analytique", "couleur": "#00695c",
++                   "description": "Sections, affectations et rentabilité, depuis les écritures générales"},
+     "reporting": {"titre": "Reporting", "couleur": "#6a1b9a",
+                   "description": "Tableaux de bord, analyses, balances âgées, synthèses"},
+ }
+@@ -65,7 +67,8 @@
+ 
+ 
+ DOSSIER = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
+-EXECUTABLES = {"commercial": "ERP_Commercial", "comptabilite": "ERP_Comptabilite", "reporting": "ERP_Reporting"}
++EXECUTABLES = {"commercial": "ERP_Commercial", "comptabilite": "ERP_Comptabilite",
++               "analytique": "ERP_Analytique", "reporting": "ERP_Reporting"}
+ 
+ 
+ def lancer_module(code):
+diff --git a/desktop/analytique.py b/desktop/analytique.py
+new file mode 100644
+--- /dev/null
++++ b/desktop/analytique.py
+@@ -0,0 +1,9 @@
++"""ERP OHADA — Comptabilité analytique. Fenêtre distincte, même base d'écritures générales.
++
++Les écrans analytiques sans équivalent natif sont ouverts dans l'interface web du même serveur.
++"""
++from pages import ECRANS_ANALYTIQUE
++from shell import lancer
++
++if __name__ == "__main__":
++    lancer("analytique", ECRANS_ANALYTIQUE)

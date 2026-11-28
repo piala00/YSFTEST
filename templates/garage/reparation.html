@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Réparation {{ ordre.numero }}{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Réparation {{ ordre.numero }} <span class="badge text-bg-{% if ordre.statut == 'OUVERT' %}warning{% elif ordre.statut == 'CLOTURE' %}success{% else %}secondary{% endif %} fs-6">{{ ordre.get_statut_display }}</span></h1></div>
+<div class="card mb-3 card-body small">Véhicule <a href="{% url 'transport:vehicule_fiche' ordre.vehicule_id %}"><strong>{{ ordre.vehicule }}</strong></a> ·
+  entré le {{ ordre.date_entree|date:"d/m/Y" }}{% if ordre.kilometrage %} à {{ ordre.kilometrage }} km{% endif %}{% if ordre.date_sortie %} · sorti le {{ ordre.date_sortie|date:"d/m/Y" }}{% endif %}
+  · {{ ordre.immobilisation_jours }} jour(s) · {{ ordre.panne }}{% if ordre.intervenant %} · {{ ordre.intervenant }}{% endif %}
+  {% if ordre.ecriture %} · écriture <a href="{% url 'comptabilite:ecriture_detail' ordre.ecriture.pk %}">{{ ordre.ecriture.numero }}</a>{% endif %}</div>
+<div class="card mb-3"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Nature</th><th>Désignation</th><th class="num">Qté</th><th class="num">Prix unitaire</th><th class="num">Montant</th><th>Paiement</th><th></th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td>{{ l.get_nature_display }}</td><td>{{ l.designation }}</td><td class="num">{{ l.quantite|floatformat:"-2" }}</td>
+    <td class="num">{{ l.prix_unitaire|montant }}</td><td class="num">{{ l.montant|montant }}</td><td>{{ l.get_paiement_display }}{% if l.fournisseur %} · {{ l.fournisseur.nom }}{% endif %}</td>
+    <td>{% if ordre.statut == "OUVERT" %}<form method="post">{% csrf_token %}<input type="hidden" name="ligne" value="{{ l.pk }}"><button class="btn btn-sm btn-link text-danger p-0" name="action" value="supprimer" title="Retirer"><i class="bi bi-x-lg"></i></button></form>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted text-center p-3">Aucune pièce ni travail.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="4">Coût total (comptabilisé : {{ ordre.cout_comptabilise|montant }})</td><td class="num">{{ ordre.cout|montant }}</td><td colspan="2"></td></tr></tfoot></table>
+{% if ordre.statut == "OUVERT" %}<form method="post" class="card-body border-top">{% csrf_token %}<div class="row g-2 align-items-end small">
+  {% for f in form %}<div class="col-md-{% if f.name == 'designation' %}3{% else %}2{% endif %}"><label class="form-label mb-0" for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}</div>{% endfor %}
+  <div class="col-md-1"><button class="btn btn-sm btn-outline-primary w-100" name="action" value="ligne">Ajouter</button></div></div></form>{% endif %}</div>
+{% if ordre.statut == "OUVERT" %}<form method="post" class="card card-body d-flex flex-row flex-wrap gap-2 align-items-end">{% csrf_token %}
+  <div><label class="form-label small mb-0" for="c-date">Sortie du garage</label><input type="date" id="c-date" name="date" value="{{ aujourdhui|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="c-caisse">Caisse (achats payés comptant)</label><select id="c-caisse" name="caisse" class="form-select form-select-sm">{% for c in caisses %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select></div>
+  <button class="btn btn-sm btn-success" name="action" value="cloturer">Terminer la réparation</button>
+  {% if not lignes %}<button class="btn btn-sm btn-outline-secondary" name="action" value="annuler">Annuler l'ordre</button>{% endif %}
+  <div class="form-text w-100">À la sortie, les pièces et travaux extérieurs passent en charges du véhicule ; la main d'œuvre interne est déjà dans la paie.</div></form>{% endif %}
+{% endblock %}

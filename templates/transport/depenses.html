@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Dépenses des véhicules{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Dépenses des véhicules</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'transport:depense_create' %}"><i class="bi bi-plus"></i> Saisir une dépense</a></div>
+<form class="d-flex flex-wrap gap-2 align-items-end mb-3">
+  <div><label class="form-label small mb-0" for="dv-du">Du</label><input type="date" id="dv-du" name="du" value="{{ du|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="dv-au">Au</label><input type="date" id="dv-au" name="au" value="{{ au|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+  <div><label class="form-label small mb-0" for="dv-v">Véhicule</label><select id="dv-v" name="vehicule" class="form-select form-select-sm"><option value="">Tous</option>
+    {% for v in vehicules %}<option value="{{ v.pk }}" {% if v.pk|stringformat:"s" == vehicule %}selected{% endif %}>{{ v.immatriculation }}</option>{% endfor %}</select></div>
+  <button class="btn btn-sm btn-outline-secondary">Afficher</button></form>
+<div class="card"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>Date</th><th>N°</th><th>Véhicule</th><th>Nature</th><th>Libellé</th><th>Départ</th><th>Compte</th><th class="num">Montant</th><th>Écriture</th></tr></thead>
+  <tbody>{% for d in depenses %}<tr><td>{{ d.date|date:"d/m/Y" }}</td><td>{{ d.numero }}</td><td>{{ d.vehicule.immatriculation }}</td><td>{{ d.get_nature_display }}</td>
+    <td>{{ d.libelle }}</td><td>{% if d.depart %}<a href="{% url 'transport:depart_detail' d.depart_id %}">{{ d.depart.numero }}</a>{% endif %}</td><td>{{ d.compte.numero }}</td>
+    <td class="num">{{ d.montant|montant }}</td><td>{% if d.ecriture %}<a href="{% url 'comptabilite:ecriture_detail' d.ecriture.pk %}">{{ d.ecriture.numero }}</a>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center p-4">Aucune dépense sur la période.</td></tr>{% endfor %}</tbody>
+  <tfoot><tr class="total"><td colspan="7">Total</td><td class="num">{{ total|montant }}</td><td></td></tr></tfoot>
+</table></div>
+{% endblock %}

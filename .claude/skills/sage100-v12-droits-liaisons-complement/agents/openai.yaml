@@ -1,0 +1,4 @@
+interface:
+  display_name: "Droits et liaisons Sage"
+  short_description: "Preuves tracées et limites pour ERP OHADA"
+  default_prompt: "Utilise $sage100-v12-droits-liaisons-complement pour répondre avec les sources et les limites de version."

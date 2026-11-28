@@ -1,0 +1,154 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ERP{% endblock %} · {% if module %}{{ module.titre }}{% else %}ERP OHADA{% endif %}</title>
+  <link href="{% static 'vendor/bootstrap.min.css' %}" rel="stylesheet">
+  <link href="{% static 'vendor/bootstrap-icons.min.css' %}" rel="stylesheet">
+  <link href="{% static 'css/erp.css' %}" rel="stylesheet">
+  {% if module %}<style>:root { --module: {{ module.couleur }}; }</style>{% endif %}
+  {% block head %}{% endblock %}
+  {% if erp_actualiser %}<meta name="erp-actualiser" content="{{ erp_actualiser|join:' ' }}">{% endif %}
+  {% if module %}<script>
+  // Espace de travail : l'accueil est le bureau, chaque commande s'ouvre dans une fenêtre interne.
+  window.ERP_MDI = {module: "{{ module.code }}", accueil: "{% url module.accueil %}", accueils: {{ accueils|safe }}};
+  (function () {
+    var m = window.ERP_MDI, ici = location.pathname + location.search;
+    if (window.top !== window.self) { document.documentElement.classList.add('dans-fenetre'); return; }
+    // Page ouverte directement (lien, actualisation) : on revient au bureau et on la rouvre dans une fenêtre
+    if (location.pathname !== m.accueil && !/[?&]seul=1/.test(location.search) && window.innerWidth >= 768) {
+      try { sessionStorage.setItem('erp-mdi-ouvrir-' + m.module, ici); location.replace(m.accueil); } catch (e) {}
+    }
+  })();
+  </script>{% endif %}
+</head>
+<body{% if selection %} class="selection-validee"{% endif %}{% if module and est_accueil %} data-bureau="1"{% endif %}>
+{% if dossier_simulation %}<div class="alert alert-warning py-2 mb-2" role="status"><strong>SIMULATION — données fictives</strong> · dossier distinct de votre société.
+  {% if user.is_superuser %}<a href="{% url 'core:poste' %}?onglet=simulation" target="_top">Changer de dossier ou revenir à la société</a>{% endif %}</div>{% endif %}
+{% if user.is_authenticated %}
+  <form id="form-logout" method="post" action="{% url 'logout' %}" class="d-none">{% csrf_token %}</form>
+  <header class="topbar d-print-none {% if not module %}topbar-portail{% endif %}">
+    <a class="app-nom" href="{% if module %}{% url module.accueil %}{% else %}{% url 'core:portail' %}{% endif %}">
+      <i class="bi {{ module.icone|default:'bi-grid-3x3-gap-fill' }}"></i>
+      {% if module %}{{ module.titre }}{% else %}ERP OHADA{% endif %}
+    </a>
+    <span class="contexte">{{ societe.raison_sociale }}{% if exercice_courant %} · Exercice {{ exercice_courant.code }}{% endif %}</span>
+    {% if societe.source_mode == "MIROIR" %}<span class="badge text-bg-warning" title="La saisie se fait encore dans l'ancien logiciel ; l'ERP en reçoit une copie à chaque synchronisation (consultation, états, contrôles). La saisie s'ouvrira ici à la bascule."><i class="bi bi-arrow-repeat"></i> Copie synchronisée{% if derniere_synchro %} · {{ derniere_synchro.debut|date:"d/m H:i" }}{% endif %}</span>{% endif %}
+    <div class="ms-auto d-flex align-items-center gap-2">
+      {% if not module %}
+      <div class="dropdown">
+        <button class="btn btn-sm btn-topbar dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-grid-3x3-gap"></i> Logiciels</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          {% for m in modules %}<li><a class="dropdown-item" href="{% url m.accueil %}" target="erp_{{ m.code }}"><i class="bi {{ m.icone }}" style="color:{{ m.couleur }}"></i> {{ m.titre }}</a></li>{% endfor %}
+          {% if user.is_staff %}<li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-gear"></i> Administration</a></li>{% endif %}
+        </ul>
+      </div>
+      {% endif %}
+      <button form="form-logout" class="btn btn-sm btn-topbar" title="Quitter"><i class="bi bi-person-circle"></i> {{ user.username }} <i class="bi bi-box-arrow-right"></i></button>
+    </div>
+  </header>
+
+  {% if module %}
+  <nav class="barre-menus d-print-none" id="barre-menus">
+    {% for o in onglets %}
+      <div class="menu">
+        <button type="button" class="menu-titre {% if o.code == onglet_actif.code %}courant{% endif %}">{{ o.titre }}</button>
+        {% include "core/_menu.html" with noeuds=o.elements %}
+      </div>
+    {% endfor %}
+    <button type="button" id="bascule-outils" class="bascule-outils" title="Afficher ou masquer la barre d'outils (plus d'espace)"><i class="bi bi-tools"></i></button>
+  </nav>
+  <div class="barre-outils d-print-none" role="toolbar" aria-label="Barre d'outils">
+    <button type="button" data-action="ajouter" title="Ajouter"><i class="bi bi-plus-square"></i></button>
+    <button type="button" data-action="modifier" title="Voir/Modifier"><i class="bi bi-pencil-square"></i></button>
+    <span class="sep"></span>
+    <button type="button" data-action="couper" title="Couper"><i class="bi bi-scissors"></i></button>
+    <button type="button" data-action="copier" title="Copier"><i class="bi bi-files"></i></button>
+    <button type="button" data-action="coller" title="Coller"><i class="bi bi-clipboard"></i></button>
+    <span class="sep"></span>
+    <button type="button" data-action="rechercher" title="Rechercher"><i class="bi bi-search"></i></button>
+    <button type="button" data-action="imprimer" title="Imprimer"><i class="bi bi-printer"></i></button>
+    <button type="button" data-action="actualiser" title="Actualiser"><i class="bi bi-arrow-clockwise"></i></button>
+    <span class="sep"></span>
+    <button type="button" data-action="barre_verticale" title="Barre verticale"><i class="bi bi-layout-sidebar"></i></button>
+    <a href="{% url module.accueil %}" title="Page d'accueil"><i class="bi bi-house-door"></i></a>
+  </div>
+  <div class="d-flex espace">
+    <aside class="arbre d-print-none{% if barre_verticale %} accordeon{% endif %}">
+      {% for g in barre_verticale %}
+      <div class="groupe-barre{% if forloop.first %} ouvert{% endif %}" data-groupe="{{ forloop.counter }}">
+        <button type="button" class="groupe-titre">{{ g.titre }}</button>
+        <ul class="groupe-liens">
+          {% for l in g.liens %}<li>{% if l.url %}<a href="{{ l.url }}">{{ l.titre }}</a>{% else %}<span class="desactive" title="Non disponible dans l'ERP">{{ l.titre }}</span>{% endif %}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+      {% if barre_verticale %}<div class="groupe-barre" data-groupe="menus"><button type="button" class="groupe-titre">Tous les menus</button><div class="groupe-liens">{% endif %}
+      <select class="form-select form-select-sm arbre-choix" id="arbre-choix" aria-label="Barre de navigation">
+        {% for o in onglets %}{% if o.code != "aide" %}<option value="{{ o.code }}" {% if o.code == onglet_arbre.code %}selected{% endif %}>{{ o.titre }}</option>{% endif %}{% endfor %}
+      </select>
+      {% for o in onglets %}{% if o.code != "aide" %}
+        <div class="arbre-menu" data-menu="{{ o.code }}" {% if o.code != onglet_arbre.code %}hidden{% endif %}>
+          {% include "core/_arbre.html" with noeuds=o.elements niveau=0 prefixe=o.code %}
+        </div>
+      {% endif %}{% endfor %}
+      {% if barre_verticale %}</div></div>{% endif %}
+    </aside>
+  {% endif %}
+  <main class="flex-grow-1 main{% if module %} espace-travail{% if est_accueil %} mdi{% endif %}{% else %} p-4{% endif %}">
+    {% if module and est_accueil %}
+    {# Bureau : l'écran d'accueil reste au fond ; les fenêtres internes (déplaçables, redimensionnables) s'ouvrent par-dessus #}
+    <div class="bureau" id="bureau">
+    {% elif module %}
+    {# Page seule (petit écran ou ?seul=1) : une fenêtre au centre, les menus restent autour #}
+    <div class="onglets-fenetres d-print-none" id="onglets-fenetres" data-module="{{ module.code }}" data-accueil="{% url module.accueil %}"></div>
+    <section class="fenetre">
+      <div class="fenetre-titre d-print-none">
+        <i class="bi {{ module.icone }}"></i>
+        <span id="fenetre-titre">{% if element_actif %}{{ element_actif.titre }}{% endif %}</span>
+        <span class="fenetre-boutons">
+          <button type="button" id="fenetre-reduire" title="Réduire"><i class="bi bi-dash-lg"></i></button>
+          <button type="button" id="fenetre-agrandir" title="Agrandir"><i class="bi bi-fullscreen"></i></button>
+          <a class="fenetre-fermer" href="{% url module.accueil %}" id="fenetre-fermer" title="Fermer"><i class="bi bi-x-lg"></i></a>
+        </span>
+      </div>
+      <div class="fenetre-contenu">
+    {% endif %}
+    {% if fil_ariane and not est_accueil %}<nav class="fil-ariane d-print-none"><span>{{ onglet_actif.titre }}</span>{% for n in fil_ariane %} <i class="bi bi-chevron-right"></i> <span>{{ n.titre }}</span>{% endfor %}</nav>{% endif %}
+    {% if licence_bandeau %}<div class="alert alert-{% if licence_bandeau.lecture_seule %}danger{% elif licence_bandeau.statut == "grace" %}warning{% else %}info{% endif %} py-2 small d-print-none d-flex align-items-center gap-2">
+      <i class="bi bi-key"></i><span>{{ licence_bandeau.message }}</span>{% if user.is_superuser %}<a class="ms-auto" href="{% url 'licence' %}" target="_top">Licence</a>{% endif %}</div>{% endif %}
+    {% include "core/_messages.html" %}
+    {% if selection %}<div class="barre-selection d-print-none"><i class="bi bi-funnel"></i> <span>{{ selection.texte|default:"Sélection" }}</span>
+      <span class="ms-auto d-flex gap-2"><a class="btn btn-sm btn-outline-secondary" href="{{ selection.modifier }}"><i class="bi bi-sliders"></i> Modifier la sélection</a>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+      {% if selection.export %}<a class="btn btn-sm btn-outline-success" href="{{ selection.export }}"><i class="bi bi-filetype-csv"></i> Exporter</a>{% endif %}</span></div>
+    <div class="d-none d-print-block small mb-2">Sélection : {{ selection.texte }}</div>{% endif %}
+    {% block content %}{% endblock %}
+    {% if module and est_accueil %}</div>
+    <div class="fenetres-mdi d-print-none" id="fenetres-mdi"></div>
+    <div class="fenetres-reduites d-print-none" id="fenetres-reduites"></div>
+    {% elif module %}</div></section>{% endif %}
+  </main>
+  {% if module %}</div>{% endif %}
+{% else %}
+  {% block public %}{% endblock %}
+{% endif %}
+<script>
+(function () {
+  try { if (localStorage.getItem('erp-outils-caches') === '1') document.body.classList.add('outils-caches'); } catch (e) {}
+  var b = document.getElementById('bascule-outils');
+  if (b) b.addEventListener('click', function () {
+    var cache = document.body.classList.toggle('outils-caches');
+    try { localStorage.setItem('erp-outils-caches', cache ? '1' : '0'); } catch (e) {}
+  });
+})();
+</script>
+<script src="{% static 'vendor/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'js/menus.js' %}"></script>
+<script src="{% static 'js/filtrage_liste.js' %}"></script>
+<script src="{% static 'js/graphiques.js' %}" data-chart="{% static 'vendor/chart.umd.min.js' %}"></script>
+{% if module and est_accueil %}<script src="{% static 'js/fenetres.js' %}"></script>{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

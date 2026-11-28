@@ -1,0 +1,8 @@
+question_id;question;preuve_manquante;regle;source_ids
+UX-colonnes;Colonnes par défaut et personnalisation;Captures V12 des listes fraîchement ouvertes, préférences réinitialisées dans une copie, colonnes initiales et catalogue complet.;Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S03,S04,S09
+UX-boutons;Précédent / Suivant / Rechercher;Texte, icône, ordre, état actif et comportement des boutons V12.;Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S03,S04
+UX-clavier;Raccourcis clavier;Touches exactes et portée selon fenêtre, menu et mode.;Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S03,S04
+UX-encours;Message de blocage encours;Message V12 exact, seuil, profil, boutons et conséquences de chaque choix.;Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S04,S09
+UX-stock;Message stock insuffisant;Tester la nature de stock, quantité disponible, dépôt, suivi et droit de dépasser dans une copie.;Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S04
+UX-periode;Message période clôturée;"Distinguer saisie, transfert et clôture ; relever période et exercice concernés.";Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S03,S04
+UX-accueil;Page d’accueil;Accueil par produit, version, offre, profil, société ouverte et préférences.;Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S03,S04

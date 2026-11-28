@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Sauvegarde de fin de journée{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Sauvegarde de fin de journée</h1></div>
+
+<div class="card mb-3"><div class="card-body">
+  <p class="mb-2">En fin de journée, l'agence produit une sauvegarde complète de ses données et la remet à la
+    direction pour archivage de sécurité. Si une boîte aux lettres est configurée, le fichier chiffré est déposé
+    automatiquement pour la direction ; sinon il est téléchargé, à transmettre par le canal habituel (clé USB,
+    WhatsApp…). La direction ne restaure jamais automatiquement : elle archive la sauvegarde reçue.</p>
+  <form method="post">{% csrf_token %}
+    <button name="action" value="remettre" class="btn btn-primary"><i class="bi bi-hdd-stack"></i> Sauvegarder et remettre à la direction</button>
+  </form>
+</div></div>
+
+{% if est_siege %}
+<div class="card mb-3"><div class="card-header fw-semibold"><i class="bi bi-inbox"></i> Sauvegardes d'agences reçues</div>
+<div class="card-body p-0">
+  {% if recues %}<table class="table table-sm mb-0"><thead class="table-light"><tr><th>Agence</th><th>Journée</th><th>Fichier</th><th></th></tr></thead>
+  <tbody>{% for r in recues %}<tr>
+    <td>{% if r.agence %}{{ r.agence.code }} — {{ r.agence.nom }}{% else %}{{ r.agence_code }}{% endif %}</td>
+    <td>{% if r.date %}{{ r.date|date:"d/m/Y" }}{% endif %}</td>
+    <td class="small text-muted">{{ r.nom }}</td>
+    <td class="text-end"><form method="post" class="m-0">{% csrf_token %}<input type="hidden" name="nom" value="{{ r.nom }}">
+      <button name="action" value="recuperer" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-download"></i> Récupérer</button></form></td>
+  </tr>{% endfor %}</tbody></table>
+  {% else %}<div class="text-muted p-3">Aucune sauvegarde d'agence reçue pour le moment.</div>{% endif %}
+</div></div>
+{% endif %}
+
+<div class="card"><div class="card-header fw-semibold"><i class="bi bi-clock-history"></i> Dernières sauvegardes de fin de journée</div>
+<div class="card-body p-0">
+  {% if historique %}<table class="table table-sm mb-0"><thead class="table-light"><tr><th>Journée</th><th>Agence</th><th>Direction</th><th class="num">Taille</th><th>Remise</th><th>Par</th></tr></thead>
+  <tbody>{% for s in historique %}<tr>
+    <td>{{ s.date|date:"d/m/Y" }}</td><td>{{ s.site_code }}</td><td>{{ s.destination_code|default:"—" }}</td>
+    <td class="num">{{ s.taille|filesizeformat }}</td><td>{{ s.get_moyen_display }}</td><td>{{ s.auteur }}</td>
+  </tr>{% endfor %}</tbody></table>
+  {% else %}<div class="text-muted p-3">Aucune sauvegarde de fin de journée enregistrée.</div>{% endif %}
+</div></div>
+{% endblock %}

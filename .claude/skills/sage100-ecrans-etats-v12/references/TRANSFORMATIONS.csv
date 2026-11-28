@@ -1,0 +1,155 @@
+domaine;type_origine;type_cible;autorise;remarque;source
+VENTE;Devis;Devis;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Devis;Bon de commande;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+VENTE;Devis;Préparation de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Devis;Bon de livraison;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+VENTE;Devis;Facture;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+VENTE;Devis;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Devis;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Devis;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Devis;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de commande;Devis;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de commande;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de commande;Préparation de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de commande;Bon de livraison;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+VENTE;Bon de commande;Facture;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+VENTE;Bon de commande;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de commande;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de commande;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de commande;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Préparation de livraison;Devis;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Préparation de livraison;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Préparation de livraison;Préparation de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Préparation de livraison;Bon de livraison;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+VENTE;Préparation de livraison;Facture;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+VENTE;Préparation de livraison;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Préparation de livraison;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Préparation de livraison;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Préparation de livraison;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de livraison;Devis;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de livraison;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de livraison;Préparation de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de livraison;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de livraison;Facture;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+VENTE;Bon de livraison;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de livraison;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de livraison;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de livraison;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Devis;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Préparation de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Devis;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Préparation de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon de retour;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Devis;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Préparation de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Bon d’avoir financier;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+VENTE;Facture de retour;Devis;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture de retour;Bon de commande;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture de retour;Préparation de livraison;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture de retour;Bon de livraison;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture de retour;Facture;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture de retour;Bon de retour;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture de retour;Bon d’avoir financier;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture de retour;Facture de retour;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture de retour;Facture d’avoir;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Devis;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Bon de commande;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Préparation de livraison;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Bon de livraison;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Facture;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Bon de retour;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Bon d’avoir financier;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Facture de retour;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+VENTE;Facture d’avoir;Facture d’avoir;NON_FONCTION_UI;"Fonction Transformer absente sur ces deux types selon l’aide ; ne démontre pas une impossibilité universelle OM.";H01 | https://sage100cloud.online-help.sage.fr/saisir-len-tete-dun-document-des-ventes/ | rubrique Transformer
+ACHAT;Préparation de commande;Préparation de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Préparation de commande;Bon de commande;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+ACHAT;Préparation de commande;Bon de livraison;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+ACHAT;Préparation de commande;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Préparation de commande;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Préparation de commande;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Préparation de commande;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Préparation de commande;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de commande;Préparation de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de commande;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de commande;Bon de livraison;OUI_SOUS_CONDITIONS;"Processus OM V12.20 documenté ; vérifier disponibilité, stock et paramètres. Ne garantit pas le bouton dans toute édition.";"M02 | https://fr-kb.sage.com/portal/app/portlets/results/viewdocument.jsp?solutionid=230322160554890 | PDF p.437-438 ; imprimées 436-437"
+ACHAT;Bon de commande;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de commande;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de commande;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de commande;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de commande;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de livraison;Préparation de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de livraison;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de livraison;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de livraison;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de livraison;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de livraison;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de livraison;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de livraison;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture;Préparation de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de retour;Préparation de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de retour;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de retour;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de retour;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de retour;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de retour;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de retour;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon de retour;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon d’avoir financier;Préparation de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon d’avoir financier;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon d’avoir financier;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon d’avoir financier;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon d’avoir financier;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon d’avoir financier;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon d’avoir financier;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Bon d’avoir financier;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture de retour;Préparation de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture de retour;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture de retour;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture de retour;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture de retour;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture de retour;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture de retour;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture de retour;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture d’avoir;Préparation de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture d’avoir;Bon de commande;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture d’avoir;Bon de livraison;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture d’avoir;Facture;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture d’avoir;Bon de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture d’avoir;Bon d’avoir financier;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture d’avoir;Facture de retour;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+ACHAT;Facture d’avoir;Facture d’avoir;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Mouvement d’entrée;Mouvement d’entrée;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Mouvement d’entrée;Mouvement de sortie;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Mouvement d’entrée;Virement de dépôt à dépôt;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Mouvement de sortie;Mouvement d’entrée;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Mouvement de sortie;Mouvement de sortie;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Mouvement de sortie;Virement de dépôt à dépôt;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Virement de dépôt à dépôt;Mouvement d’entrée;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Virement de dépôt à dépôt;Mouvement de sortie;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01
+STOCK;Virement de dépôt à dépôt;Virement de dépôt à dépôt;INCONNU;"Paire non établie. Ne signifie pas interdite ; ne pas déduire une autorisation par transitivité.";INCONNUES.csv : U01

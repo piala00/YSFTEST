@@ -1,0 +1,15 @@
+id;cas;attendu
+T01;Les 20 colonnes R12;"Retrouver chacune et sa page ; conserver type logique distinct du physique"
+T02;Unité vente code 3;"Retrouver le libellé dans le dossier ; ne pas décréter 3=kg"
+T03;Contrôle encours code 1;"Conserver selon risque ; ne pas importer comme avertir sans mapping"
+T04;Normes 0,1,2;"Nationale inclut 0 et 1 ; IFRS inclut 0 et 2 ; pas somme des deux vues"
+T05;Simulation demandée;"Signaler le filtre universel inconnu ; ne pas détourner EC_CType"
+T06;Tiers en sommeil avec solde;Conserver dans la reprise historique et tracer son état
+T07;Journal absent;"Conserver l’anomalie dans le profil ; éviter perte silencieuse via INNER JOIN"
+T08;Double import même lot;"Aucune création en double ; même dossier et identifiant source"
+T09;Date saisie différente période;Réconcilier sur période/jour comptable, pas EC_Date seul
+T10;Base Render gratuite;"Signaler 30 j et absence de sauvegardes gérées ; ne pas promettre la durée de l’application"
+T11;Neon 15 USD;"Refuser le forfait fixe ; calculer usage DB et ajouter Django"
+T12;Railway Hobby usage 7 USD;"Facture théorique 7 hors postes additionnels ; pas 5+7"
+T13;Supabase restauration fichiers;Vérifier une sauvegarde des objets séparée de la DB
+T14;Archive pg_restore list réussie;Restaurer réellement en recette puis rapprocher les totaux

@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Dépôts de stockage{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Dépôts de stockage</h1>
+  <a class="btn btn-primary btn-sm" href="{% url 'commercial:depot_create' %}"><i class="bi bi-plus"></i> Nouveau dépôt</a></div>
+<div class="card"><table class="table table-sm table-hover mb-0">
+<thead><tr><th>Code</th><th>Intitulé</th><th>Ville</th><th>Responsable</th><th class="num">Articles en stock</th><th class="num">Valeur (CMUP)</th><th></th></tr></thead><tbody>
+{% for d in object_list %}<tr><td><a href="{% url 'commercial:depot_update' d.pk %}">{{ d.code }}</a></td><td>{{ d.intitule }}</td><td>{{ d.ville }}</td><td>{{ d.responsable }}</td>
+<td class="num">{{ d.nb_articles }}</td><td class="num">{{ d.valeur|montant }}</td>
+<td>{% if d.principal %}<span class="badge text-bg-primary">Principal</span>{% endif %}{% if not d.actif %} <span class="badge bg-secondary">Inactif</span>{% endif %}
+ <a class="small ms-2" href="{% url 'commercial:stock' %}?depot={{ d.pk }}">Stock</a></td></tr>
+{% empty %}<tr><td colspan="7" class="text-muted text-center p-4">Aucun dépôt.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

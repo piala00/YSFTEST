@@ -1,0 +1,50 @@
+ERP OHADA — MISE À JOUR : COMPTABILITÉ À 7 CHIFFRES / DEUX MODULES
+===================================================================
+
+1. NOUVEAUX DOSSIERS (COMMERCIAL ET TRANSPORT)
+   Le lancement habituel de « python manage.py init_erp » paramètre un plan
+   comptable à 7 chiffres dès la création du plan SYSCOHADA.
+   Les zéros s'ajoutent à droite : 4111 > 4111000, 701 > 7010000.
+
+2. DOSSIERS EXISTANTS
+   IMPORTANT : sauvegardez d'abord la base et vérifiez qu'aucune autre
+   synchronisation n'est en cours. Les numéros existants ne sont pas
+   modifiés automatiquement après installation du correctif.
+
+   a. Vérifier les migrations et l'état de la base (en environnement de test).
+      python manage.py migrate
+   b. Simuler :
+      python manage.py longueur_comptes --longueur 7
+   c. Examiner les collisions et comptes incompatibles signalés.
+      Réglez-les manuellement avec votre comptable, sans fusion automatique.
+   d. Vérifier une sauvegarde et exécuter dans une fenêtre de maintenance :
+      python manage.py longueur_comptes --longueur 7 --appliquer
+   e. Contrôler ensuite balances, journaux, lettrage, règlements et états.
+
+   La conversion ne modifie que Compte.numero (les montants et les clés
+   étrangères des écritures restent identiques). La conversion est refusée
+   s'il existe une collision, un compte trop long ou un dossier synchronisé
+   en miroir avec un logiciel source.
+
+   Ne lancez pas cette commande directement sur la production sans tests
+   et sauvegarde. La restauration de la sauvegarde est le plan de repli.
+
+3. ÉCRAN D'ACCUEIL
+   Version web : deux tuiles « Comptabilité générale » et « Comptabilité
+   analytique », disponibles suivant les droits utilisateurs.
+   Client bureau : deux fenêtres distinctes, mais une seule base comptable.
+   Compiler les exécutables avec desktop/COMPILER.bat, qui inclut désormais
+   ERP_Analytique.exe. Les états sans écran natif s'ouvrent sur le serveur web.
+
+4. CONTENU DE L'ANALYTIQUE
+   Commerce : sections analytiques, balance et ventilation.
+   Transport : états principaux Véhicules et Propriétaires ; les sections
+   sont disponibles pour l'affectation et les filtrages.
+   Toutes les sommes de l'analytique sont dérivées des écritures générales
+   validées : aucune deuxième comptabilité monétaire n'est créée.
+
+5. VALIDATION
+   Les sources ont été contrôlées par compilation syntaxique Python.
+   Les tests Django et l'interface Windows n'ont pas été exécutés dans
+   l'environnement de préparation ; ils doivent être vérifiés sur une base
+   de test avant déploiement.

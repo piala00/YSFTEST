@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}TVA{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Récapitulatif TVA</h1><span class="text-muted">du {{ p.date_debut|date:"d/m/Y" }} au {{ p.date_fin|date:"d/m/Y" }}</span></div>
+{% include "comptabilite/_periode.html" %}
+{% if not societe.assujettie_tva %}<div class="alert alert-info">La société est paramétrée comme <strong>non assujettie à la TVA</strong> : elle ne collecte pas de TVA et ne déduit pas celle de ses achats. Les montants ci-dessous ne concernent que les écritures saisies avant le changement de régime ou à la main.</div>{% endif %}
+<div class="card" style="max-width:600px"><table class="table mb-0">
+<tr><td>TVA collectée (443)</td><td class="num">{{ tva.collectee|montant }}</td></tr>
+<tr><td>TVA déductible (445)</td><td class="num">{{ tva.deductible|montant }}</td></tr>
+<tr class="total"><td>{% if tva.solde >= 0 %}TVA due à reverser (4441){% else %}Crédit de TVA à reporter (4449){% endif %}</td><td class="num">{{ tva.solde|absolu|montant }}</td></tr>
+{% if tva.solde > 0 %}<tr class="small text-muted"><td class="ps-4">dont principal (taux 17,5 % ou 10 %) · CAC 10 % du principal</td><td class="num">{{ tva.principal|montant }} · {{ tva.cac|montant }}</td></tr>{% endif %}
+</table></div>
+<p class="small text-muted mt-2" style="max-width:600px">Répartition principal / CAC calculée à partir du total (TVA × 10/11), à titre indicatif.
+L'arrondi de la base au millier inférieur (CGI art. 141) n'est pas appliqué automatiquement : sa granularité reste à confirmer.</p>
+{% endblock %}

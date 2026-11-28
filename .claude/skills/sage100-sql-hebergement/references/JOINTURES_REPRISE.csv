@@ -1,0 +1,7 @@
+id;enfant;parent;condition;statut;source;preuve;controle
+J01;F_COMPTET;F_COMPTEG;enfant.CG_NumPrinc=parent.CG_Num;LIEN_DOCUMENTE;M01 PDF 63 / imprimée 61;DOC-OFFICIEL;Conserver les tiers orphelins en anomalie
+J02;F_ECRITUREC;F_JOURNAUX;enfant.JO_Num=parent.JO_Num;LIEN_DOCUMENTE;M01 PDF 406 / imprimée 404;DOC-OFFICIEL;Mesurer les journaux absents avant filtrage
+J03;F_ECRITUREC;F_COMPTEG;enfant.CG_Num=parent.CG_Num AND parent.CG_Type=0;LIEN_DOCUMENTE;M01 PDF 406 / imprimée 404;DOC-OFFICIEL;Vérifier unicité et orphelins
+J04;F_ECRITUREC;F_COMPTET;enfant.CT_Num=parent.CT_Num;LIEN_DOCUMENTE;M01 PDF 406 / imprimée 404;DOC-OFFICIEL;Tiers vide possible : garder les écritures générales
+J05;F_ARTICLE;P_UNITE;enfant.AR_UniteVen=parent.cbIndice;RAPPROCHEMENT_LOGIQUE_A_VALIDER_EN_SQL;M01 PDF 160-161 et 207;A-CONFIRMER;Contrôler exposition physique de cbIndice et unicité des indices
+J06;F_COMPTET;P_CATTARIF;enfant.N_CatTarif=parent.cbIndice;RAPPROCHEMENT_LOGIQUE_A_VALIDER_EN_SQL;M01 PDF 60 et 166;A-CONFIRMER;"Même contrôle ; ne jamais joindre sur les deux CT_Intitule"

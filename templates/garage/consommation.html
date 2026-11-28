@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Consommation de carburant{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Carburant et garage par véhicule du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</h1></div>
+{% include "transport/_periode_vehicules.html" %}
+<div class="card"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Véhicule</th><th class="num">Litres</th><th class="num">Coût carburant</th><th class="num">Km parcourus</th><th class="num">L/100 km</th><th class="num">Réparations</th><th class="num">Jours au garage</th><th class="num">Colis transportés</th></tr></thead>
+  <tbody>{% for l in lignes %}<tr><td><a href="{% url 'transport:vehicule_fiche' l.vehicule.pk %}">{{ l.vehicule.immatriculation }}</a></td>
+    <td class="num">{{ l.litres|floatformat:"-1" }}</td><td class="num">{{ l.cout_carburant|montant }}</td><td class="num">{{ l.km|default:"" }}</td>
+    <td class="num fw-semibold">{{ l.consommation|default:"" }}</td><td class="num">{{ l.reparations|length }}</td><td class="num">{{ l.jours_garage }}</td><td class="num">{{ l.colis }}</td></tr>
+  {% empty %}<tr><td colspan="8" class="text-muted text-center p-4">Aucun véhicule.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="small text-muted mt-2">Consommation : litres des pleins (sauf le premier) ÷ kilomètres entre le premier et le dernier relevé de compteur de la période. Relevez le compteur à chaque plein.</p>
+{% endblock %}

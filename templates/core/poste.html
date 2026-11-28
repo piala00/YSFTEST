@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Administration du poste{% endblock %}
+{% block head %}{% if preparation_simulation %}<meta http-equiv="refresh" content="20">{% endif %}{% endblock %}
+{% block content %}
+<div class="page-title"><h1><i class="bi bi-pc-display" style="color:var(--module)"></i> Administration du poste</h1></div>
+{% include "core/_onglets_poste.html" %}
+{% if indisponible %}
+<div class="alert alert-info">Ces opérations (sauvegardes de la base, simulation, démarrage avec Windows) se font dans le programme
+  compilé <strong>ERP-OHADA-&lt;Édition&gt;.exe</strong>. Le logiciel n'a pas été lancé par lui sur ce serveur.</div>
+{% else %}
+<div class="row g-3">
+{% if onglet_poste == "poste" %}
+  <div class="col-12"><div class="card card-body py-2 d-flex flex-row align-items-center gap-2">
+    <i class="bi bi-key"></i><span class="small">Licence : {% if licence_etat.mode == "licence" %}{{ licence_etat.licence.client }} · {{ licence_etat.postes }} postes{% if licence_etat.echeance %} · jusqu'au {{ licence_etat.echeance|date:"d/m/Y" }}{% else %} · définitive{% endif %}{% else %}version d'essai{% endif %}{% if licence_etat.message %} — {{ licence_etat.message }}{% endif %}</span>
+    {% if pro_ok %}<a class="btn btn-sm btn-outline-primary ms-auto" href="{% url 'core:base_donnees' %}"><i class="bi bi-database-gear"></i> Base de données</a>{% endif %}
+    <a class="btn btn-sm btn-outline-primary{% if not pro_ok %} ms-auto{% endif %}" href="{% url 'licence' %}">Licence et code d'activation</a></div></div>
+  <div class="col-12"><div class="card card-body h-100">
+    <h2 class="h6"><i class="bi bi-folder2-open"></i> Ce serveur</h2>
+    <table class="table table-sm small mb-2"><tbody>
+      <tr><th>Édition</th><td>{{ etat.edition|capfirst }} · port {{ etat.port|stringformat:"d" }}</td></tr>
+      <tr><th>Dossier des données</th><td><code>{{ etat.donnees }}</code></td></tr>
+      <tr><th>Base</th><td>{{ etat.base }} · {{ etat.taille_base|filesizeformat }}</td></tr>
+      <tr><th>Fonctionnement</th><td>{% if etat.service %}<span class="text-success">service Windows</span> : tourne en arrière-plan, démarre avec l'ordinateur et se relance tout seul
+        {% else %}fenêtre du programme (la fermer arrête le logiciel){% endif %}</td></tr>
+      {% if not etat.service %}<tr><th>Démarrage avec Windows</th><td>{% if etat.demarrage_installateur %}<span class="text-success">oui, pour tous les utilisateurs</span>
+        <div class="form-text">Réglé à l'installation : pour le retirer, relancez l'installateur sans cette option.</div>
+        {% elif etat.demarrage_auto %}<span class="text-success">oui</span>{% else %}non{% endif %}</td></tr>{% endif %}
+    </tbody></table>
+    {% if etat.windows and not etat.demarrage_installateur and not etat.service %}<form method="post">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" name="action" value="demarrage_auto">
+      {% if etat.demarrage_auto %}Ne plus démarrer avec Windows{% else %}Démarrer le logiciel à l'ouverture de session Windows{% endif %}</button></form>{% endif %}
+    <div class="form-text">Le programme peut être remplacé par une nouvelle version : les données ne sont pas dans son dossier.</div>
+  </div></div>
+
+  <div class="col-12"><div class="card card-body h-100 border-danger">
+    <h2 class="h6 text-danger"><i class="bi bi-exclamation-octagon"></i> Repartir à zéro</h2>
+    <p class="small text-muted mb-2">Efface <strong>toute la société</strong> (données et comptes) et revient au premier
+      démarrage, pour créer ou restaurer une autre société. {% if not pro_ok %}Utile en fin d'essai si vous ne prenez pas
+      la licence.{% else %}Sauvegardez d'abord si vous voulez garder ces données.{% endif %} Action irréversible.</p>
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-center">{% csrf_token %}
+      <input name="confirmation" class="form-control form-control-sm" style="max-width:220px" placeholder="tapez EFFACER" aria-label="Confirmation">
+      <button class="btn btn-sm btn-outline-danger" name="action" value="effacer_societe"
+              onclick="return confirm('Effacer définitivement toute la société et repartir à zéro ?')">Effacer la société</button>
+    </form>
+  </div></div>
+
+{% endif %}
+  {% if onglet_poste == "simulation" and etat.edition == "transport" %}
+  <div class="col-12">{% include "core/_dossiers_simulation.html" %}</div>
+  {% endif %}
+</div>
+{% if onglet_poste == "simulation" and etat.edition != "transport" %}<div class="alert alert-info">La simulation de transport nécessite l'édition Transport.</div>{% endif %}
+{% endif %}
+{% endblock %}

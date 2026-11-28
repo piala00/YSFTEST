@@ -1,0 +1,254 @@
+"""Configuration Django de l'ERP.
+
+La base de données est choisie via la variable d'environnement DB_ENGINE :
+  - sqlite      (par défaut, développement)
+  - postgresql  (production web)
+  - mssql       (SQL Server, environnement Windows / Sage)
+"""
+import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_env_file():
+    env_file = BASE_DIR / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+_load_env_file()
+
+
+def env(key, default=None):
+    return os.environ.get(key, default)
+
+
+def env_bool(key, default=False):
+    return env(key, str(default)).lower() in ("1", "true", "yes", "on")
+
+
+SECRET_KEY = env("SECRET_KEY", "dev-insecure-change-me")
+DEBUG = env_bool("DEBUG", True)
+# Refuser d'enregistrer un départ bien avant son heure prévue (désactivé pendant les tests, qui tournent à toute heure)
+import sys as _sys  # noqa: E402
+
+CONTROLE_HEURE_DEPART = env_bool("CONTROLE_HEURE_DEPART", "test" not in _sys.argv)
+ALLOWED_HOSTS = [h.strip() for h in env("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+
+# Hébergement Render (version en ligne de test) : le nom d'hôte public est fourni par la plateforme
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = True
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.humanize",
+    "rest_framework",
+    "rest_framework.authtoken",
+    "apps.core",
+    "apps.commercial",
+    "apps.comptabilite",
+    "apps.reporting",
+    "apps.transport",
+    "apps.echanges",
+    "apps.garage",
+    "apps.personnel",
+    "apps.partenaires",
+    "apps.api",
+    "apps.relais",
+    "apps.licences",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",       # fichiers statiques servis sans serveur web séparé
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.core.middleware.ArchiveLectureSeuleMiddleware",  # exercices clôturés : consultation seule
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "apps.core.middleware.PremiereConfigurationMiddleware",  # premier démarrage du programme compilé
+    "apps.licences.middleware.LicenceMiddleware",        # lecture seule après expiration, postes
+    "apps.core.middleware.AutorisationsMiddleware",      # Fichier › Autorisations d'accès
+    "apps.core.journal.RequeteCouranteMiddleware",       # utilisateur du journal des événements
+    "apps.core.selection.SelectionMiddleware",           # fenêtre de sélection avant les états
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+# Les fenêtres internes du bureau (façon Sage) affichent les pages du logiciel dans des cadres : même site seulement
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
+
+ROOT_URLCONF = "erp.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "apps.core.context_processors.societe",
+                "apps.core.context_dossier.dossier",
+                "apps.licences.context_processors.licence",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "erp.wsgi.application"
+
+DB_ENGINE = env("DB_ENGINE", "sqlite").lower()
+if env("DATABASE_URL"):
+    # postgresql://utilisateur:mot_de_passe@hôte:port/base (format des hébergeurs)
+    from urllib.parse import unquote, urlsplit
+
+    _url = urlsplit(env("DATABASE_URL"))
+    DB_ENGINE = "postgresql"
+    os.environ.update({"DB_NAME": _url.path.lstrip("/"), "DB_USER": unquote(_url.username or ""),
+                       "DB_PASSWORD": unquote(_url.password or ""), "DB_HOST": _url.hostname or "",
+                       "DB_PORT": str(_url.port or 5432)})
+if DB_ENGINE == "postgresql":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("DB_NAME", "erp"),
+            "USER": env("DB_USER", "erp"),
+            "PASSWORD": env("DB_PASSWORD", ""),
+            "HOST": env("DB_HOST", "localhost"),
+            "PORT": env("DB_PORT", "5432"),
+        }
+    }
+elif DB_ENGINE == "mssql":
+    DATABASES = {
+        "default": {
+            "ENGINE": "mssql",
+            "NAME": env("DB_NAME", "ERP"),
+            "USER": env("DB_USER", ""),               # vide : authentification Windows
+            "PASSWORD": env("DB_PASSWORD", ""),
+            "HOST": env("DB_HOST", "localhost"),
+            "PORT": env("DB_PORT", ""),               # vide : port de l'instance nommée
+            "OPTIONS": {
+                # pyodbc avec ODBC 17/18, ou « mssql_python » (pilote fourni).
+                "python_driver": env("DB_PYTHON_DRIVER", ""),
+                "driver": env("DB_DRIVER", ""),
+                "extra_params": env("DB_EXTRA_PARAMS", "TrustServerCertificate=yes"),
+                # Délai/reprises configurables pour distinguer une indisponibilité réelle d'un test de repli.
+                "connection_timeout": int(env("DB_CONNECTION_TIMEOUT", "0")),
+                "connection_retries": int(env("DB_CONNECTION_RETRIES", "5")),
+                "connection_retry_backoff_time": int(env("DB_CONNECTION_RETRY_BACKOFF_TIME", "5")),
+            },
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            # SQLITE_FICHIER : autre fichier de base, ex. pour un essai de reprise séparé (essai-janvier.sqlite3)
+            "NAME": BASE_DIR / env("SQLITE_FICHIER", "db.sqlite3"),
+            # Plusieurs postes du réseau local sur le même serveur : attendre un verrou plutôt qu'échouer,
+            # et journal WAL (lectures pendant les écritures)
+            "OPTIONS": {"timeout": 20, "init_command": "PRAGMA journal_mode=WAL;"},
+        }
+    }
+
+# Copie miroir : la société travaille sur SQLite (rapide, hors ligne) et une copie complète est reportée
+# automatiquement dans une seconde base, en général SQL Server (commande « miroir », programme .exe toutes les heures).
+#   MIROIR_DB_ENGINE=mssql  MIROIR_DB_HOST=…  MIROIR_DB_NAME=ERP_MIROIR  MIROIR_DB_USER=… (vide : compte Windows)
+#   MIROIR_DB_PASSWORD=…  MIROIR_DB_PYTHON_DRIVER=mssql_python  (ou postgresql, ou sqlite + MIROIR_SQLITE_FICHIER)
+MIROIR_INTERVALLE_MINUTES = int(env("MIROIR_INTERVALLE_MINUTES", "60"))
+_miroir = env("MIROIR_DB_ENGINE", "").lower()
+if _miroir == "mssql":
+    DATABASES["miroir"] = {
+        "ENGINE": "mssql", "NAME": env("MIROIR_DB_NAME", "ERP_MIROIR"), "USER": env("MIROIR_DB_USER", ""),
+        "PASSWORD": env("MIROIR_DB_PASSWORD", ""), "HOST": env("MIROIR_DB_HOST", "localhost"), "PORT": env("MIROIR_DB_PORT", ""),
+        "OPTIONS": {k: v for k, v in {"python_driver": env("MIROIR_DB_PYTHON_DRIVER", ""), "driver": env("MIROIR_DB_DRIVER", ""),
+                                      "extra_params": env("MIROIR_DB_EXTRA_PARAMS", "TrustServerCertificate=yes")}.items() if v},
+    }
+elif _miroir == "postgresql":
+    DATABASES["miroir"] = {
+        "ENGINE": "django.db.backends.postgresql", "NAME": env("MIROIR_DB_NAME", "erp_miroir"),
+        "USER": env("MIROIR_DB_USER", "erp"), "PASSWORD": env("MIROIR_DB_PASSWORD", ""),
+        "HOST": env("MIROIR_DB_HOST", "localhost"), "PORT": env("MIROIR_DB_PORT", "5432"),
+    }
+elif _miroir == "sqlite":
+    DATABASES["miroir"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / env("MIROIR_SQLITE_FICHIER", "miroir.sqlite3")}
+
+# Relais Internet des échanges entre sites (à activer seulement sur le serveur en ligne qui sert de boîte aux lettres)
+# Programme compilé : assistant de premier démarrage (compte administrateur créé depuis le navigateur)
+ERP_ASSISTANT = env_bool("ERP_ASSISTANT", False)
+ERP_DOSSIER_SIMULATION = env("ERP_DOSSIER_SIMULATION", "")
+SESSION_COOKIE_NAME = env("ERP_SESSION_COOKIE", "sessionid")
+# Programme compilé : licence contrôlée (essai, échéance, lecture seule, nombre de postes)
+ERP_LICENCE = env_bool("ERP_LICENCE", False)
+# Édition du logiciel livré : "transport" ou "commerce" composent un logiciel distinct (le métier de
+# l'autre n'est pas présenté) ; vide (dév/tests) = tous les modules. Posée par le lanceur (edition.txt).
+ERP_EDITION = env("ERP_EDITION", "").strip().lower()
+RELAIS_ACTIF = env_bool("RELAIS_ACTIF", False)
+RELAIS_DOSSIER = Path(env("RELAIS_DOSSIER", str(BASE_DIR / "relais-stockage")))
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+]
+
+# Un seul mot de passe par session de travail : l'activité prolonge la session (fenêtre
+# glissante), donc un utilisateur qui travaille n'a jamais à se reconnecter en cours de route.
+# La session ne se ferme pas non plus à la fermeture du navigateur (le programme compilé rouvre
+# un profil dédié stable). Durée réglable par ERP_SESSION_HEURES (défaut 1 semaine).
+try:
+    SESSION_COOKIE_AGE = max(1, int(env("ERP_SESSION_HEURES", "168"))) * 3600
+except (TypeError, ValueError):
+    SESSION_COOKIE_AGE = 168 * 3600
+SESSION_SAVE_EVERY_REQUEST = True           # fenêtre glissante : chaque page repousse l'échéance
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+LANGUAGE_CODE = "fr"
+TIME_ZONE = env("TIME_ZONE", "Africa/Douala")
+USE_I18N = True
+USE_TZ = True
+USE_THOUSAND_SEPARATOR = True
+
+STATIC_URL = "static/"
+STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "core:portail"
+LOGOUT_REDIRECT_URL = "login"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated",
+                                   "apps.core.droits.DroitsMenusAPI"],          # autorisations d'accès par menu
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 50,
+    "COERCE_DECIMAL_TO_STRING": False,
+}

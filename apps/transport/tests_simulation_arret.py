@@ -1,0 +1,168 @@
+"""Arrêt coopératif d'une génération de simulation (G-SIM-04).
+
+Deux niveaux : les marqueurs d'arrêt (apps.core.dossiers_simulation) et le respect de la demande
+d'arrêt par la commande « simulation » (s'arrête proprement après la tranche en cours).
+"""
+import importlib.util
+import io
+import tempfile
+from pathlib import Path
+from unittest import mock
+
+from django.conf import settings
+from django.core.management import call_command
+from django.test import SimpleTestCase, TestCase
+
+from apps.core import dossiers_simulation as ds
+
+_spec = importlib.util.spec_from_file_location(
+    "erp_ohada_sim", settings.BASE_DIR / "deploy" / "executable" / "erp_ohada.py")
+lanceur = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(lanceur)
+
+
+class MarqueurArretTests(SimpleTestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dossier = Path(self.tmp.name)
+
+    def test_demander_puis_detecter_puis_effacer(self):
+        self.assertFalse(ds.arret_demande(self.dossier))
+        ds.demander_arret(self.dossier)
+        self.assertTrue(ds.arret_demande(self.dossier))
+        ds.effacer_arret(self.dossier)
+        self.assertFalse(ds.arret_demande(self.dossier))
+
+    def test_effacer_sans_marqueur_ne_leve_pas(self):
+        ds.effacer_arret(self.dossier)                     # aucun marqueur : silencieux
+        self.assertFalse(ds.arret_demande(self.dossier))
+
+    def test_lien_symbolique_refuse(self):
+        cible = self.dossier / "cible"
+        cible.write_text("x", encoding="utf-8")
+        lien = self.dossier / ".arreter"
+        try:
+            lien.symlink_to(cible)
+        except (OSError, NotImplementedError):
+            self.skipTest("liens symboliques indisponibles")
+        self.assertFalse(ds.arret_demande(self.dossier))   # un lien n'est jamais un marqueur valide
+        with self.assertRaises(ValueError):
+            ds.demander_arret(self.dossier)
+
+
+class SimulationArretTests(TestCase):
+    """La commande « simulation » s'arrête après la tranche en cours quand l'arrêt est demandé."""
+
+    def _commande(self, **patch):
+        from apps.transport.management.commands.simulation import Command
+
+        commande = Command()
+        contexte = (mock.patch("apps.transport.management.commands.simulation.arret_demande", **patch)
+                    if patch else mock.patch("apps.transport.management.commands.simulation.arret_demande",
+                                             return_value=False))
+        with contexte:
+            call_command(commande, mois="2026-09", nombre_mois=2, jours=1, vehicules=4, salaries=5,
+                         echelle=0.05, forcer=True, graine=1, stdout=io.StringIO())
+        return commande
+
+    def test_arret_apres_la_premiere_tranche(self):
+        commande = self._commande(return_value=True)       # arrêt demandé dès la fin du 1er mois
+        self.assertTrue(commande.interrompu)
+        self.assertEqual(len(commande.par_mois), 1)         # 2 mois demandés, 1 seul généré
+
+    def test_sans_arret_les_deux_mois_sont_generes(self):
+        commande = self._commande()                         # aucun arrêt demandé
+        self.assertFalse(commande.interrompu)
+        self.assertEqual(len(commande.par_mois), 2)
+
+
+class ArreterSimulationPosteTests(SimpleTestCase):
+    """Action poste « simulation_arreter » : dépose le marqueur d'arrêt pour la génération en cours."""
+
+    def test_depose_le_marqueur_pour_la_generation_active(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            racine = Path(tmp)
+            ident = "a" * 32
+            dossier = racine / "dossiers-simulation" / ident
+            dossier.mkdir(parents=True)
+            proc = mock.Mock()
+            proc.poll.return_value = None                    # processus toujours en cours
+            with mock.patch.dict(lanceur.SIMULATION, {"processus": proc, "dossier": ident}, clear=False), \
+                 mock.patch.object(lanceur, "racine_dossiers", return_value=racine):
+                lanceur.arreter_simulation(racine)
+            self.assertTrue(ds.arret_demande(dossier))
+
+    def test_refuse_si_aucune_generation(self):
+        with mock.patch.dict(lanceur.SIMULATION, {"processus": None, "dossier": ""}, clear=False):
+            with self.assertRaises(ValueError):
+                lanceur.arreter_simulation(Path(tempfile.gettempdir()))
+
+
+class AgencesParametrablesTests(TestCase):
+    """Nombre d'agences simulées paramétrable (les départs/jour l'étaient déjà)."""
+
+    def test_le_nombre_d_agences_limite_les_gares(self):
+        from apps.transport.models import Gare
+        from apps.transport.management.commands.simulation import Command
+
+        call_command(Command(), mois="2026-09", jours=1, nombre_mois=1, vehicules=4, salaries=5,
+                     echelle=0.05, agences=3, forcer=True, graine=1, stdout=io.StringIO())
+        self.assertEqual(Gare.objects.count(), 3)
+
+    def test_agences_hors_bornes_refuse(self):
+        from django.core.management.base import CommandError
+        from apps.transport.management.commands.simulation import Command
+
+        with self.assertRaises(CommandError):
+            call_command(Command(), mois="2026-09", jours=1, vehicules=4, salaries=5,
+                         echelle=0.05, agences=1, forcer=True, stdout=io.StringIO())
+
+
+class CriteresAgencesTests(SimpleTestCase):
+    def test_agences_retenu_dans_les_criteres(self):
+        self.assertEqual(ds.normaliser_criteres({"agences": 4})["agences"], 4)
+
+    def test_agences_absent_vaut_zero_toutes(self):
+        self.assertEqual(ds.normaliser_criteres({})["agences"], 0)
+
+    def test_agences_hors_bornes_refuse(self):
+        with self.assertRaises(ValueError):
+            ds.normaliser_criteres({"agences": 9})
+
+
+class TerminerInterrompuTests(SimpleTestCase):
+    """Le manifeste du dossier retient qu'une génération a été arrêtée proprement (données valides)."""
+
+    def test_interruption_propre_marquee_et_consultable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, dossier = ds.creer(Path(tmp), "2026-09", "3")
+            with mock.patch.object(ds, "verifier_base"):           # pas de vraie base ERP dans ce test
+                ds.terminer(dossier, interrompu=True, dernier_mois="2026-10-31")
+            d = ds.lire_json(dossier / ds.MANIFESTE)
+            self.assertEqual(d["etat"], "prete")                   # consultable / ouvrable comme société
+            self.assertTrue(d["interrompu"])
+            self.assertEqual(d["dernier_mois"], "2026-10")
+
+    def test_erreur_n_est_pas_une_interruption_propre(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, dossier = ds.creer(Path(tmp), "2026-09", "1")
+            ds.terminer(dossier, erreur="panne", interrompu=True)
+            d = ds.lire_json(dossier / ds.MANIFESTE)
+            self.assertEqual(d["etat"], "erreur")
+            self.assertFalse(d["interrompu"])
+
+
+class BilanPeriodeTests(TestCase):
+    """Le bilan est honnête sur une période partielle (charges mensuelles vs recettes de quelques jours)."""
+
+    def test_periode_partielle_signalee_et_jours_affiches(self):
+        from apps.transport.management.commands.simulation import Command
+
+        with tempfile.TemporaryDirectory() as tmp:
+            rapport = Path(tmp) / "BILAN.md"
+            call_command(Command(), mois="2026-09", jours=1, nombre_mois=1, vehicules=2, salaries=2,
+                         echelle=0.01, forcer=True, graine=1, rapport=str(rapport), stdout=io.StringIO())
+            texte = rapport.read_text(encoding="utf-8")
+        self.assertIn("jours simulés", texte)          # période exprimée en jours réels
+        self.assertIn("Période partielle", texte)       # avertissement : résultat non représentatif

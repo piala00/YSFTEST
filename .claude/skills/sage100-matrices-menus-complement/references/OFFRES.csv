@@ -1,0 +1,9 @@
+ordre;colonne_csv;mode;edition;base_documentee
+1;on_premise_essentials;On premise;Essentials;MS SQL Express
+2;on_premise_standard;On premise;Standard;MS SQL Express
+3;on_premise_premium;On premise;Premium;MS SQL Server
+4;cloud_sage_essentials;Cloud Sage / 100 Hébergée;Essentials;Azure SQL Database
+5;cloud_sage_premium;Cloud Sage / 100 Hébergée;Premium;Azure SQL Database
+6;spc_essentials;Cloud Partenaire / 100 SPC;Essentials;Azure SQL Database
+7;spc_standard;Cloud Partenaire / 100 SPC;Standard;Azure SQL Database
+8;spc_premium;Cloud Partenaire / 100 SPC;Premium;Azure SQL Database

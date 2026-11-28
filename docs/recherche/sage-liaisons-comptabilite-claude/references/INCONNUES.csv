@@ -1,0 +1,19 @@
+﻿inconnue_id;priorite;perimetre;question;preuve_attendue
+U01;BLOQUANT_VERSION;Toutes éditions;Relever les versions exactes de chaque module, OM, pilote et connecteur;Captures À propos et matrice de compatibilité officielle
+U02;IMPORTANT;Identité société;L’égalité exacte raison sociale/activité/forme juridique conditionne-t-elle la liaison sur la cible ?;Modifier un champ à la fois dans une copie, relever message et connexion, ne pas généraliser un conseil de forum
+U03;IMPORTANT;Identité société;Propagation actuelle après modification entre Comptabilité, GC, Immo et MDP;Comparer écrans, valeurs stockées et nouvelles pièces avant/après
+U04;BLOQUANT_DONNEES;Référentiels;Visibilité immédiate de chaque champ créé depuis chaque module;Recette croisée même société / base commune / autre société / connecteur séparé
+U05;IMPORTANT;Tiers;Valeurs réellement injectées par les écrans, défauts et champs obligatoires par rôle;Créer client et fournisseur dans chaque module avec droits limités
+U06;IMPORTANT;Droits;Noms, portée et héritage exacts des droits V12 de création tiers et comptabilisation;Relever droits effectifs par profil et points d’entrée
+U07;BLOQUANT_DROITS;Connecteurs;Contrôles des droits dans chaque API et sous compte technique;Tester refus avec compte limité, y compris tâche planifiée
+U08;IMPORTANT;Paie 100;Canal et format de transfert vers la version de Comptabilité retenue;Consulter la modélisation complète et exporter un lot anonymisé de test
+U09;IMPORTANT;Trésorerie;Traitements exacts d’alimentation et d’écriture Sage 100;Relever les menus et options du module installé
+U10;IMPORTANT;CRM;Intégration actuellement supportée avec Sage 100 V12 et licence nécessaire;Matrice éditeur actuelle et connecteur déployé
+U11;BLOQUANT_SQL;SQL;Types physiques, index et FK réels;Lecture seule de sys.tables/sys.columns/sys.indexes/sys.foreign_keys dans une copie autorisée
+U12;IMPORTANT;Règlements;Marqueurs physiques et comportement de rejeu par version;Recette partiel, multiple, rejet, prélettrage, changement d’exercice
+U13;IMPORTANT;SCD / GPAO;Lien et traitement comptable propres à ces produits;Relever architecture et chaîne document → GC → Comptabilité ou autre canal
+U14;IMPORTANT;Familles Sage;Connecteurs X3, FRP 1000, Sage 50 vers Sage 100 réellement supportés;Ne rien activer sans spécification produit, sens et format vérifiés
+U15;IMPORTANT;OHADA;Équivalence des options locales et adéquation au plan OHADA;Valider une configuration locale documentée sans recopier les exemples PCG français
+U16;IMPORTANT;Historique;Effets précis d’un renommage tiers ou collectif sur écritures et documents anciens;Tester fiche, pièce validée, PDF historique et réimpression séparément
+U17;IMPORTANT;Reprise;Mécanisme d’idempotence natif et atomicité de chaque transfert Sage;Tester échec partiel, relance et reprise sans présumer une transaction globale
+U18;IMPORTANT;BAP;Circuit et permissions effectives de validation/paiement par offre;Résoudre toute formulation documentaire ambiguë par recette et confirmation éditeur

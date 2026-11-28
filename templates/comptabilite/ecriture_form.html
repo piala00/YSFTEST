@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Saisie d'écriture{% endblock %}
+{% block head %}
+<style>
+/* Grille de saisie façon Sage : des cellules plates, sans cadre individuel.
+   Les champs remplissent toute la cellule ; seuls de fins filets séparent les
+   colonnes et les lignes. La cellule en cours d'édition est surlignée. */
+#lignes{border-collapse:collapse}
+#lignes thead th{background:#f4f6f8;border-bottom:1px solid #c9d1d8;font-weight:600;padding:.3rem .5rem}
+#lignes tbody td{border-right:1px solid #e9edf0;border-bottom:1px solid #eef1f4;padding:0;vertical-align:middle}
+#lignes tbody td:last-child{border-right:0}
+#lignes tbody td .form-control,
+#lignes tbody td .form-select{border:0;border-radius:0;background:transparent;box-shadow:none;height:auto;min-height:30px;padding:.25rem .5rem;width:100%}
+#lignes tbody td .form-control:focus,
+#lignes tbody td .form-select:focus{background:#fff8dd;outline:2px solid #86b7fe;outline-offset:-2px;box-shadow:none;position:relative;z-index:1}
+#lignes tbody tr:hover td{background:#f8fafc}
+#lignes tbody tr:hover td .form-control,
+#lignes tbody tr:hover td .form-select{background:transparent}
+#lignes tfoot td{border-top:2px solid #c9d1d8;padding:.3rem .5rem}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Saisie d'écriture {% if ecriture.pk %}<small class="text-muted fs-6">{{ ecriture.numero }}</small>{% endif %}</h1></div>
+<form method="post">{% csrf_token %}
+<div class="card mb-3"><div class="card-body"><div class="row g-3">
+{% for field in form %}<div class="col-md-3"><label class="form-label small">{{ field.label }} *</label>{{ field }}{% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>{% endfor %}
+</div></div></div>
+<div class="card"><div class="card-body p-0">
+{{ formset.management_form }}
+{% if formset.non_form_errors %}<div class="alert alert-danger m-2">{{ formset.non_form_errors }}</div>{% endif %}
+<table class="table table-sm mb-0" id="lignes"><thead class="table-light"><tr><th style="width:22%">Compte</th><th style="width:15%">Tiers</th><th style="width:10%">Section</th><th style="width:10%">Véhicule</th><th>Libellé</th><th style="width:13%">Débit</th><th style="width:13%">Crédit</th><th></th></tr></thead>
+<tbody>{% for f in formset %}<tr class="ligne"><td>{{ f.id }}{{ f.compte }}{% for e in f.errors.values %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td><td>{{ f.tiers }}</td><td>{{ f.section }}</td><td>{{ f.vehicule }}</td><td>{{ f.libelle }}</td><td>{{ f.debit }}</td><td>{{ f.credit }}</td>
+<td>{% if f.instance.pk %}{{ f.DELETE }}{% else %}<span class="d-none">{{ f.DELETE }}</span>{% endif %}</td></tr>{% endfor %}</tbody>
+<tfoot><tr><td colspan="5"><button type="button" class="btn btn-sm btn-outline-secondary" id="ajout-ligne"><i class="bi bi-plus"></i> Ligne</button></td>
+<td class="num fw-bold" id="tot-d">0</td><td class="num fw-bold" id="tot-c">0</td><td></td></tr>
+<tr><td colspan="5" class="text-end">Écart</td><td colspan="2" class="text-center fw-bold" id="ecart">0</td><td></td></tr></tfoot></table>
+</div></div>
+<div class="mt-3 d-flex gap-2">
+  <button class="btn btn-outline-primary" name="brouillard"><i class="bi bi-save"></i> Enregistrer au brouillard</button>
+  <button class="btn btn-success" name="valider"><i class="bi bi-check2-circle"></i> Enregistrer et valider</button>
+</div></form>
+{% endblock %}
+{% block scripts %}
+<script>
+// Saisie des écritures façon Sage : totaux et écart en direct, ligne ajoutée toute seule,
+// contrepartie (montant d'équilibre) proposée automatiquement, et déplacement au clavier (Entrée).
+const n = el => parseFloat(((el && el.value) || '0').replace(',', '.')) || 0;
+function totaux() {
+  let d = 0, c = 0;
+  document.querySelectorAll('.ligne-debit').forEach(e => d += n(e));
+  document.querySelectorAll('.ligne-credit').forEach(e => c += n(e));
+  return {d, c};
+}
+function recalc() {
+  const {d, c} = totaux();
+  document.getElementById('tot-d').textContent = d.toLocaleString('fr-FR');
+  document.getElementById('tot-c').textContent = c.toLocaleString('fr-FR');
+  const ecart = document.getElementById('ecart');
+  ecart.textContent = (d - c).toLocaleString('fr-FR');
+  ecart.className = 'text-center fw-bold ' + (d === c && d > 0 ? 'text-success' : 'text-danger');
+}
+function ajouterLigne() {
+  const total = document.getElementById('id_lignes-TOTAL_FORMS'), idx = parseInt(total.value);
+  const tr = document.querySelector('#lignes tr.ligne:last-child').cloneNode(true);
+  // On retire l'habillage « champ recherchable » du clone : il sera reconstruit à neuf.
+  tr.querySelectorAll('.combo').forEach(c => c.remove());
+  tr.querySelectorAll('select.combo-select-cache').forEach(s => { s.classList.remove('combo-select-cache'); delete s.dataset.combo; });
+  tr.querySelectorAll('input, select').forEach(el => {
+    if (el.name) el.name = el.name.replace(/lignes-\d+-/, `lignes-${idx}-`);
+    if (el.id) el.id = el.id.replace(/lignes-\d+-/, `lignes-${idx}-`);
+    if (el.type === 'checkbox') el.checked = false; else if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+  });
+  document.querySelector('#lignes tbody').appendChild(tr); total.value = idx + 1;
+  if (window.ERP_filtrage_liste) window.ERP_filtrage_liste(tr);
+  return tr;
+}
+function derniereLigne() { return document.querySelector('#lignes tr.ligne:last-child'); }
+// Dès qu'on remplit le compte de la dernière ligne, on prépare la ligne suivante (comme Sage).
+function compteRempli(el) {
+  const tr = el.closest('tr.ligne');
+  if (tr && tr === derniereLigne() && (el.value || '').trim()) {
+    equilibrer(tr);
+    ajouterLigne();
+  }
+}
+// Propose le montant qui équilibre l'écriture dans la ligne encore vide (contrepartie Sage).
+function equilibrer(tr) {
+  const d = tr.querySelector('.ligne-debit'), c = tr.querySelector('.ligne-credit');
+  if (!d || !c || n(d) || n(c)) return;
+  const t = totaux(), ecart = t.d - t.c;
+  if (ecart > 0) c.value = ecart; else if (ecart < 0) d.value = -ecart;
+  recalc();
+}
+// Journaux de caisse / trésorerie : le compte de caisse est crédité (ou débité)
+// automatiquement en contrepartie, et le libellé de la ligne est repris (comme Sage).
+const TRESO = JSON.parse('{{ journaux_tresorerie|escapejs }}' || '{}');
+function compteTresorerie() {
+  const j = document.getElementById('id_journal');
+  return j && TRESO[j.value] ? String(TRESO[j.value]) : null;
+}
+function ligneVide(sauf) {
+  return Array.from(document.querySelectorAll('#lignes tr.ligne')).find(r => {
+    if (r === sauf) return false;
+    const c = r.querySelector('.ligne-compte');
+    return c && !(c.value || '').trim() && !n(r.querySelector('.ligne-debit')) && !n(r.querySelector('.ligne-credit'));
+  });
+}
+// Après avoir saisi une ligne de dépense/recette (compte + montant) dans un journal
+// de trésorerie, on porte la contrepartie sur le compte de caisse et on reprend le
+// libellé. La contrepartie d'une même ligne est mise à jour, pas dupliquée.
+function contrepartieTresorerie(tr) {
+  const compteCaisse = compteTresorerie();
+  if (!compteCaisse) return;
+  const compte = tr.querySelector('.ligne-compte');
+  if (!compte || !(compte.value || '').trim() || compte.value === compteCaisse) return;
+  const d = n(tr.querySelector('.ligne-debit')), c = n(tr.querySelector('.ligne-credit'));
+  if (!d && !c) return;
+  let cible = (tr._caisse && document.body.contains(tr._caisse)) ? tr._caisse : null;
+  if (!cible) { cible = ligneVide(tr) || ajouterLigne(); tr._caisse = cible; }
+  // Contrepartie : si la ligne était au débit, on crédite la caisse, et inversement.
+  const dS = cible.querySelector('.ligne-debit'), cS = cible.querySelector('.ligne-credit');
+  if (d) { cS.value = d; dS.value = ''; } else { dS.value = c; cS.value = ''; }
+  const libS = cible.querySelector('[name$="-libelle"]'), lib = tr.querySelector('[name$="-libelle"]');
+  if (libS && lib && lib.value && !libS.value) libS.value = lib.value;
+  const compteSuiv = cible.querySelector('.ligne-compte');
+  if (compteSuiv && compteSuiv.value !== compteCaisse) { compteSuiv.value = compteCaisse; compteSuiv.dispatchEvent(new Event('change', {bubbles: true})); }
+  recalc();
+}
+document.addEventListener('input', e => {
+  if (e.target.matches('.ligne-debit, .ligne-credit')) recalc();
+  if (e.target.matches('.ligne-compte')) compteRempli(e.target);
+});
+document.addEventListener('change', e => {
+  if (e.target.matches('.ligne-compte')) compteRempli(e.target);
+  if (e.target.matches('.ligne-debit, .ligne-credit')) contrepartieTresorerie(e.target.closest('tr.ligne'));
+});
+// Entrée = champ suivant (jamais d'envoi involontaire du formulaire depuis une cellule).
+document.getElementById('lignes').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const champs = Array.from(document.querySelectorAll('#lignes input:not([type=hidden]):not([type=checkbox]), #lignes select'))
+    .filter(el => el.offsetParent !== null);
+  const i = champs.indexOf(e.target);
+  if (i > -1 && i + 1 < champs.length) champs[i + 1].focus();
+});
+document.getElementById('ajout-ligne').addEventListener('click', () => ajouterLigne());
+recalc();
+</script>
+{% endblock %}

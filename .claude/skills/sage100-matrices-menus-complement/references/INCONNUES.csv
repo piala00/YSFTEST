@@ -1,0 +1,4 @@
+question_id;question;preuve_manquante;regle;source_ids
+MENUS-CPTA;Toutes lignes S02, chemins et éditions;"Indentation et chemins UI complets non établis avec cette extraction textuelle ; vérifier les cellules signalées et la correspondance V12.";Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S03
+MENUS-GC;Différences seules avec AUDIT_SAGE_V12_GESCOM.md;Obtenir le fichier de référence puis effectuer une comparaison exacte, sans refaire passer une liste déjà livrée pour une différence.;Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S04
+MENUS-EDITION-AIDE;Édition et ? en Gestion commerciale;Capturer barre de menus et contenu de Édition et ? sur V12 cible.;Ne pas fabriquer la réponse ni considérer une proposition ERP comme un comportement Sage.;S04

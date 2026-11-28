@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Catalogue des états{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Catalogue des états <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<p class="small text-muted">Chaque état s'ouvre sur la période choisie. Les montants viennent tous des écritures validées de la
+  comptabilité générale ; les états analytiques et le reporting en sont des regroupements (rien n'est saisi deux fois).</p>
+<div class="row g-3">{% for famille, liens in familles %}
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header fw-semibold">{{ famille }}</div>
+    <ul class="list-group list-group-flush small">{% for l in liens %}
+      <li class="list-group-item"><a href="{{ l.url }}">{{ l.titre }}</a><br><span class="text-muted">{{ l.description }}</span></li>{% endfor %}</ul>
+  </div></div>{% endfor %}
+</div>
+{% endblock %}

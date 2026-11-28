@@ -1,0 +1,57 @@
+{
+  "statut": "EXEMPLE_FICTIF_NON_AUTHENTIFIE_AUCUN_IMPORT_REEL",
+  "manifest": {
+    "protocol": "erp-ohada-agency-exchange",
+    "schema_version": 1,
+    "package_uuid": "11111111-1111-4111-8111-111111111111",
+    "societe_uuid": "22222222-2222-4222-8222-222222222222",
+    "source_site_uuid": "33333333-3333-4333-8333-333333333333",
+    "destination": "central",
+    "created_at_utc": "2026-10-24T12:00:00Z",
+    "business_timezone": "Africa/Douala",
+    "stream_uuid": "44444444-4444-4444-8444-444444444444",
+    "sequence_from": 1,
+    "sequence_to": 1,
+    "event_count": 1,
+    "files": [
+      {
+        "name": "events.jsonl",
+        "bytes": 532,
+        "sha256": "1dc063ff4f92bd5f11e5501c8e20c987769cf006a35c765a96b0316ae41ad8b4"
+      }
+    ]
+  },
+  "event": {
+    "event_uuid": "55555555-5555-4555-8555-555555555555",
+    "sequence": 1,
+    "entity_type": "invoice",
+    "entity_uuid": "66666666-6666-4666-8666-666666666666",
+    "revision": 1,
+    "operation": "validated",
+    "business_date": "2026-10-24",
+    "occurred_at_utc": "2026-10-24T11:58:00Z",
+    "origin_actor_uuid": null,
+    "origin_actor_label": "Automate de démonstration",
+    "dependencies": [
+      "77777777-7777-4777-8777-777777777777"
+    ],
+    "payload_version": 1,
+    "payload": {
+      "local_reference": "F-DEMO-001",
+      "currency": "XAF",
+      "total": "100000.00",
+      "mode": "faits_origine_sans_revalidation_centrale"
+    }
+  },
+  "ack": {
+    "package_uuid": "11111111-1111-4111-8111-111111111111",
+    "event_uuid": "55555555-5555-4555-8555-555555555555",
+    "status": "pending_dependency",
+    "reason": "client_mapping_missing"
+  },
+  "auth": {
+    "algorithm": "HMAC-SHA256",
+    "key_id": "SITE-DEMO-KEY-ID",
+    "mac": "A_CALCULER_AVEC_CLE_HORS_PAQUET"
+  }
+}

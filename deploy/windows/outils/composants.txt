@@ -1,0 +1,11 @@
+Django>=6.1,<6.2
+djangorestframework>=3.15
+whitenoise>=6.6
+waitress>=3.0
+tzdata
+mssql-django>=2.0
+# Pilote SQL Server fourni avec le programme (aucun pilote ODBC à installer)
+mssql-python>=0.13
+cryptography>=42
+openpyxl>=3.1,<4
+reportlab>=4.2,<5

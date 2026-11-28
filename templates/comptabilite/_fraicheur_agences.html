@@ -1,0 +1,22 @@
+{% if fraicheur_agences %}
+<section class="border rounded p-2 px-3 mb-3 small" aria-label="Fraîcheur des données reçues des agences">
+  <div class="fw-semibold">Fraîcheur des données reçues des agences</div>
+  <div class="d-flex flex-wrap gap-2 mt-1">
+    {% for agence in fraicheur_agences %}
+    <div class="border rounded px-2 py-1">
+      <strong>{{ agence.nom }} ({{ agence.code }})</strong>
+      {% if agence.derniere_reception %}
+        <span>Dernier lot reçu : {{ agence.derniere_reception|date:"d/m/Y H:i" }} (il y a {{ agence.derniere_reception|timesince }}).</span>
+      {% else %}
+        <span class="text-muted">Aucun lot reçu enregistré.</span>
+      {% endif %}
+      <span class="text-muted">Séquence intégrée : {{ agence.sequence_integree }}.</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="text-muted mt-1">
+    Horodatage du dernier lot reçu sur ce dossier ; cet indicateur ne constitue pas une mesure de connexion réseau en temps réel.
+    L'absence de lot ne signifie pas nécessairement que l'agence est hors ligne.
+  </div>
+</section>
+{% endif %}

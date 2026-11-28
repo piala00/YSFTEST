@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load erp %}
+{% block title %}Signaler une erreur à l'agence{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Signaler une erreur à l'agence {{ ecriture.site_origine }}</h1></div>
+<div class="card p-3 mb-3 small">Pièce <strong>{{ ecriture.numero }}</strong> du {{ ecriture.date|date:"d/m/Y" }} · {{ ecriture.journal }} · {{ ecriture.libelle }}
+  <table class="table table-sm mb-0 mt-2"><thead><tr><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead><tbody>
+  {% for l in ecriture.lignes.all %}<tr><td>{{ l.compte.numero }} {{ l.compte.intitule }}</td><td>{{ l.libelle }}</td><td class="num">{{ l.debit|montant_ou_vide }}</td><td class="num">{{ l.credit|montant_ou_vide }}</td></tr>{% endfor %}</tbody></table></div>
+<form method="post" class="card p-3" style="max-width:48rem">{% csrf_token %}
+  <p class="small text-muted mb-2">La direction ne modifie pas la comptabilité de l'agence : la demande part avec le prochain fichier d'échange,
+    l'agence corrige (extourne puis bonne écriture) ou conteste, et sa réponse revient avec ses écritures.</p>
+  <label class="form-label" for="motif">Erreur constatée *</label>
+  <textarea id="motif" name="motif" class="form-control mb-2" rows="3" required></textarea>
+  <label class="form-label" for="correction_attendue">Correction attendue</label>
+  <textarea id="correction_attendue" name="correction_attendue" class="form-control mb-2" rows="2" placeholder="ex. imputer au compte 6222000 au lieu de 6252000"></textarea>
+  <label class="form-label" for="echeance">À corriger avant le</label>
+  <input type="date" id="echeance" name="echeance" value="{{ echeance|date:'Y-m-d' }}" class="form-control mb-3" style="max-width:12rem">
+  <div><button class="btn btn-primary"><i class="bi bi-flag"></i> Envoyer la demande à l'agence</button>
+    <a class="btn btn-link" href="{% url 'comptabilite:ecriture_detail' ecriture.pk %}">Annuler</a></div>
+</form>
+{% endblock %}

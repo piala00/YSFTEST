@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Clôture de l'exercice{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Fin d'exercice — clôture</h1></div>
+<div class="alert alert-warning small">La clôture reporte les soldes des comptes de bilan (classes 1 à 5, par tiers) dans le journal des à-nouveaux de l'exercice suivant, affecte le résultat en 131 (bénéfice) ou 139 (perte), puis interdit toute écriture dans l'exercice. Faites une sauvegarde avant.</div>
+<div class="card"><table class="table table-sm mb-0"><thead class="table-light"><tr><th>Exercice</th><th>Période</th><th>Statut</th><th>Contrôles</th><th></th></tr></thead><tbody>
+{% for e, erreurs in exercices %}<tr><td>{{ e.code }}</td><td>{{ e.date_debut|date:"d/m/Y" }} – {{ e.date_fin|date:"d/m/Y" }}</td>
+<td>{% if e.cloture %}<span class="badge bg-secondary">Clôturé</span>{% else %}<span class="badge bg-success">Ouvert</span>{% endif %}</td>
+<td class="small">{% if e.cloture %}—{% else %}{% for m in erreurs %}<div class="text-danger">{{ m }}</div>{% empty %}<span class="text-success">Prêt à clôturer</span>{% endfor %}{% endif %}</td>
+<td>{% if not e.cloture and not erreurs %}<form method="post" onsubmit="return confirm('Clôturer définitivement l\'exercice {{ e.code }} ?')">{% csrf_token %}<input type="hidden" name="exercice" value="{{ e.pk }}"><button class="btn btn-danger btn-sm">Clôturer</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

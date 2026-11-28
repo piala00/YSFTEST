@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport journalier d'agence — Modèle</title>
+<style>
+@page {size:A4 landscape; margin:12mm 13mm;}
+*{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;margin:26px auto;max-width:1100px;font-size:12px;line-height:1.35}
+header{text-align:center;border:1px solid #111;padding:10px;margin-bottom:12px}h1{font-size:17px;margin:0 0 4px}h2{font-size:12px;margin:13px 0 5px} .meta{display:flex;justify-content:space-between;gap:12px;margin-top:6px;text-align:left}
+small{font-size:10px}table{border-collapse:collapse;width:100%;margin:4px 0 10px}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}td,th{border:1px solid #444;padding:5px 7px;vertical-align:top}th{background:#f0f0f0;text-align:left}td.num,th.num{text-align:right;white-space:nowrap}tr.total td{font-weight:bold;background:#f3f3f3}.split{display:grid;grid-template-columns:1fr 1fr;gap:14px} .notice{padding:7px;border:1px solid #888;font-size:10px}.signature{display:flex;justify-content:space-between;gap:18px;margin-top:19px}.sig{width:30%;border-top:1px solid #111;padding-top:5px;text-align:center}footer{font-size:10px;color:#333;margin-top:8px} @media print{body{margin:0;max-width:unset} .notice{display:none}}
+</style></head><body>
+<header><h1>RAPPORT JOURNALIER D'AGENCE</h1><div><b>COMPAGNIE DE TRANSPORT — EXEMPLE FICTIF</b></div><div class="meta"><span><b>Agence :</b> Bertoua<br><b>Date :</b> 25/10/2026</span><span><b>N° rapport :</b> RJ-BTA-20261025-01<br><b>Responsable :</b> Chef d'agence</span><span><b>Statut :</b> Exemple — non clôturé<br><b>Généré le :</b> 25/10/2026</span></div></header>
+<div class="notice">Simulation de présentation seulement : les données sont fictives, aucune transaction réelle n'est lue.</div>
+<h2>1. RECETTES DE BILLETTERIE — DÉPARTS EFFECTUÉS</h2>
+<table><thead><tr><th>Code véhicule</th><th>Nom du véhicule</th><th>Service</th><th>Trajet</th><th>Départ</th><th class="num">Places</th><th class="num">Prix unitaire (FCFA)</th><th class="num">Montant (FCFA)</th></tr></thead><tbody>
+<tr><td>C-001</td><td>Car 01</td><td>Classique</td><td>Bertoua → Yaoundé</td><td>08:00</td><td class="num">30</td><td class="num">7 000</td><td class="num">210 000</td></tr>
+<tr><td>V-004</td><td>Car 04</td><td>VIP</td><td>Bertoua → Garoua-Boulaï</td><td>10:00</td><td class="num">20</td><td class="num">12 000</td><td class="num">240 000</td></tr>
+<tr><td>C-009</td><td>Car 09</td><td>Classique</td><td>Bertoua → Abong-Mbang</td><td>14:00</td><td class="num">10</td><td class="num">5 000</td><td class="num">50 000</td></tr>
+<tr class="total"><td colspan="5">TOTAL BILLETTERIE</td><td class="num">60</td><td></td><td class="num">500 000</td></tr></tbody></table>
+<h2>2. RECETTES DES BAGAGES PAYANTS</h2>
+<table><thead><tr><th>Véhicule</th><th>Désignation</th><th>Destination</th><th class="num">Quantité</th><th class="num">Montant (FCFA)</th></tr></thead><tbody>
+<tr><td>C-001</td><td>Carton supplémentaire</td><td>Yaoundé</td><td class="num">1</td><td class="num">10 000</td></tr>
+<tr><td>V-004</td><td>Bagage excédentaire</td><td>Garoua-Boulaï</td><td class="num">1</td><td class="num">5 000</td></tr>
+<tr><td>C-009</td><td>Sac volumineux</td><td>Abong-Mbang</td><td class="num">1</td><td class="num">8 000</td></tr>
+<tr class="total"><td colspan="3">TOTAL BAGAGES</td><td class="num">3</td><td class="num">23 000</td></tr></tbody></table>
+<h2>3. SORTIES EFFECTUÉES PAR L'AGENCE</h2>
+<table><thead><tr><th>N° pièce</th><th>Désignation</th><th>Affectation</th><th>Mode de paiement</th><th class="num">Montant (FCFA)</th></tr></thead><tbody>
+<tr><td>S001</td><td>Carburant</td><td>C-001</td><td>Espèces</td><td class="num">45 000</td></tr>
+<tr><td>S002</td><td>Péage</td><td>V-004</td><td>Espèces</td><td class="num">12 000</td></tr>
+<tr><td>S003</td><td>Fournitures de bureau</td><td>Agence</td><td>Espèces</td><td class="num">6 000</td></tr>
+<tr class="total"><td colspan="4">TOTAL SORTIES</td><td class="num">63 000</td></tr></tbody></table>
+<h2>4. SITUATION DE CAISSE ET REVERSEMENT</h2>
+<table><thead><tr><th>Désignation</th><th class="num">Montant (FCFA)</th></tr></thead><tbody>
+<tr><td>Billets encaissés dans l'agence ce jour</td><td class="num">500 000</td></tr><tr><td>Bagages encaissés dans l'agence ce jour</td><td class="num">23 000</td></tr><tr><td>Colis encaissés dans l'agence ce jour</td><td class="num">0</td></tr>
+<tr class="total"><td>TOTAL ENCAISSEMENTS</td><td class="num">523 000</td></tr><tr><td>Dont espèces</td><td class="num">443 000</td></tr><tr><td>Dont Mobile Money / banque</td><td class="num">80 000</td></tr><tr><td>Solde espèces d'ouverture</td><td class="num">0</td></tr><tr><td>Sorties réglées en espèces</td><td class="num">63 000</td></tr>
+<tr class="total"><td>ESPÈCES DISPONIBLES AVANT REVERSEMENT</td><td class="num">380 000</td></tr><tr><td>Espèces effectivement reversées</td><td class="num">380 000</td></tr><tr><td>Espèces restant à la caisse</td><td class="num">0</td></tr><tr class="total"><td>ÉCART DE CAISSE</td><td class="num">0</td></tr>
+<tr class="total"><td>RECETTE NETTE TOUS MOYENS (hors solde antérieur)</td><td class="num">460 000</td></tr></tbody></table>
+<div class="signature"><div class="sig">Le caissier</div><div class="sig">Le chef d'agence</div><div class="sig">Le comptable / contrôleur</div></div>
+<footer>Hypothèse de simulation : ventes et paiements des billets/bagages réalisés le jour du départ à la même agence. Dans les données réelles, les tableaux d'exploitation et de caisse peuvent légitimement avoir des totaux différents.</footer>
+</body></html>

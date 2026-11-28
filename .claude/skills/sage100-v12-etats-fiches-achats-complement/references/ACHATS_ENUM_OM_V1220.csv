@@ -1,0 +1,10 @@
+symbole;sens;source_id;localisation;limite
+DocumentTypeAchatArchive;Archive;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.
+DocumentTypeAchatAvoir;Bon d’avoir financier;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.
+DocumentTypeAchatCommande;Préparation de commande fournisseur;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.
+DocumentTypeAchatCommandeConf;Bon de commande fournisseur;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.
+DocumentTypeAchatDemande;Demande d’achat;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.
+DocumentTypeAchatFacture;Facture;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.
+DocumentTypeAchatFactureCpta;Facture comptabilisée;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.
+DocumentTypeAchatLivraison;Bon de livraison;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.
+DocumentTypeAchatReprise;Bon de retour;S02;PDF 460–461 / imprimées 458–459;Enumération OM, non liste exacte des fenêtres de création.

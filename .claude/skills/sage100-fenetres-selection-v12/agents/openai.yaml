@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sage 100 fenêtres de sélection"
+  short_description: "Sélections, recherches et filtres Sage tracés par version"
+  default_prompt: "Utilise $sage100-fenetres-selection-v12 pour spécifier une fenêtre de sélection de mon ERP en distinguant les faits Sage et les points à vérifier."

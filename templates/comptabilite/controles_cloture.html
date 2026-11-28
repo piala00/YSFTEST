@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Contrôles de clôture{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Contrôles de clôture <small class="text-muted fs-6">du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}</small></h1></div>
+{% include "comptabilite/_periode_analytique.html" %}
+<div class="row g-2 mb-3">
+  <div class="col-4 col-lg-2"><div class="card kpi p-2"><div class="label">À corriger</div><div class="value {% if anomalies %}text-danger{% endif %}">{{ anomalies }}</div></div></div>
+  <div class="col-4 col-lg-2"><div class="card kpi p-2"><div class="label">À voir</div><div class="value {% if a_voir %}text-warning{% endif %}">{{ a_voir }}</div></div></div>
+  <div class="col-4 col-lg-2"><div class="card kpi p-2"><div class="label">Conformes</div><div class="value text-success">{{ ok }}</div></div></div>
+</div>
+<div class="card mb-3"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Contrôle</th><th>Résultat</th><th class="num">Valeur</th><th>Explication</th></tr></thead>
+  <tbody>{% for g in groupes %}<tr class="table-light"><td colspan="4" class="fw-semibold">{{ g.groupe }}</td></tr>
+    {% for c in g.lignes %}<tr><td>{% if c.url %}<a href="{{ c.url }}">{{ c.titre }}</a>{% else %}{{ c.titre }}{% endif %}</td>
+      <td>{% if c.statut == "ok" %}<span class="text-success"><i class="bi bi-check-circle"></i> Conforme</span>
+        {% elif c.statut == "anomalie" %}<span class="text-danger fw-semibold"><i class="bi bi-x-octagon"></i> À corriger</span>
+        {% elif c.statut == "a_voir" %}<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> À voir</span>
+        {% elif c.statut == "erreur" %}<span class="text-danger"><i class="bi bi-bug"></i> Contrôle impossible</span>
+        {% else %}<span class="text-muted"><i class="bi bi-info-circle"></i> Information</span>{% endif %}</td>
+      <td class="num">{{ c.valeur }}</td><td class="text-muted">{{ c.detail }}</td></tr>{% endfor %}
+  {% endfor %}</tbody>
+</table></div>
+<p class="small text-muted">Aucun contrôle ne modifie les comptes. « À voir » : situation à expliquer, pas forcément une erreur. Les règles fiscales de clôture
+  (provisions, amortissements, impôts) restent à valider par l'expert-comptable.</p>
+{% endblock %}

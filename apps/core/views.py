@@ -1,0 +1,446 @@
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, ListView, UpdateView
+
+from .forms import ExerciceForm, SocieteForm
+from .models import Exercice, Societe
+from .navigation import MODULES_PAR_CODE
+
+
+@login_required
+def portail(request):
+    from . import droits as d
+
+    from .models import Societe
+    from .navigation import modules_proposes
+
+    tuiles = [(m, d.acces_de(request.user, m.code)) for m in modules_proposes(Societe.get())]
+    if not request.user.is_superuser:
+        tuiles = [(m, acces) for m, acces in tuiles if acces != d.AUCUN]     # chacun ne voit que ses logiciels
+        if len(tuiles) == 1:
+            return redirect(tuiles[0][0].accueil)
+    return render(request, "core/portail.html", {"tuiles": tuiles})
+
+
+@login_required
+def a_propos(request):
+    from django import get_version
+
+    from .navigation import VERSION
+
+    return render(request, "core/a_propos.html", {"version": VERSION, "django": get_version()})
+
+
+@login_required
+def accueil_module(request, module):
+    """Page d'accueil d'un logiciel : raccourcis, indicateurs et dernières pièces (les menus restent en haut)."""
+    from .accueil import PAGES
+
+    from . import droits as d
+
+    contexte = PAGES[module]()
+    droits = d.Droits(request.user, MODULES_PAR_CODE[module])
+    if not droits.libre:
+        # Raccourcis et indicateurs limités à ce que le profil peut ouvrir
+        contexte["raccourcis"] = [{**g, "liens": [l for l in g["liens"] if d.url_permise(droits, l["url"])]}
+                                  for g in contexte["raccourcis"]]
+        contexte["raccourcis"] = [g for g in contexte["raccourcis"] if g["liens"]]
+        contexte["indicateurs"] = [i for i in contexte["indicateurs"] if not i["url"] or d.url_permise(droits, i["url"])]
+    return render(request, "core/module_accueil.html", {"module_def": MODULES_PAR_CODE[module], **contexte})
+
+
+class SocieteUpdateView(LoginRequiredMixin, UpdateView):
+    form_class = SocieteForm
+    template_name = "core/form.html"
+    success_url = reverse_lazy("commercial:societe")
+    extra_context = {"titre": "Paramètres de la société"}
+
+    def get_object(self, queryset=None):
+        return Societe.get()
+
+    def get_context_data(self, **kwargs):
+        from .navigation import fichiers_lies, module_pour_chemin
+
+        module = module_pour_chemin(self.request.path)
+        return super().get_context_data(**kwargs, fichiers_lies=fichiers_lies(module) if module else [])
+
+    def form_valid(self, form):
+        reponse = super().form_valid(form)
+        if "regime_tva" in form.changed_data:
+            from apps.comptabilite import services
+
+            if self.object.regime_tva == Societe.TVA_AUTOMATIQUE:
+                services.configurer_tva_automatique()
+                messages.info(self.request, "TVA configurée automatiquement : 19,25 %, 11 % et 0 % (Structure › Taux de taxes).")
+            elif self.object.regime_tva == Societe.TVA_MANUELLE:
+                services.configurer_tva_manuelle()
+                messages.info(self.request, "Configuration manuelle : aucune TVA n'est proposée sur les nouveaux articles.")
+        messages.success(self.request, "Paramètres enregistrés.")
+        return reponse
+
+
+class ExerciceListView(LoginRequiredMixin, ListView):
+    model = Exercice
+    template_name = "core/exercice_list.html"
+
+
+class ExerciceCreateView(LoginRequiredMixin, CreateView):
+    model = Exercice
+    form_class = ExerciceForm
+    template_name = "core/form.html"
+    success_url = reverse_lazy("comptabilite:exercices")
+    extra_context = {"titre": "Nouvel exercice"}
+
+
+class ExerciceUpdateView(LoginRequiredMixin, UpdateView):
+    model = Exercice
+    form_class = ExerciceForm
+    template_name = "core/form.html"
+    success_url = reverse_lazy("comptabilite:exercices")
+    extra_context = {"titre": "Modifier l'exercice"}
+
+
+# ---------------------------------------------------------------------------
+# Fichier › Autorisations d'accès
+# ---------------------------------------------------------------------------
+@login_required
+def autorisations(request, module):
+    """Profils, utilisateurs et droits par menu (réservé à l'administrateur)."""
+    from django.contrib.auth import get_user_model
+    from django.contrib.auth.models import Group
+    from django.shortcuts import redirect
+
+    from . import droits as d
+    from .models import AccesLogiciel, DroitAcces
+
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {
+            "chemin": "Fichier › Autorisations d'accès", "operation": "gérer les autorisations",
+            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    User = get_user_model()
+    logiciel = MODULES_PAR_CODE.get(request.GET.get("logiciel") or request.POST.get("logiciel") or module, MODULES_PAR_CODE[module])
+    profil = Group.objects.filter(pk=request.GET.get("profil") or request.POST.get("profil")).first()
+    url = f"{request.path}?logiciel={logiciel.code}"
+
+    if request.method == "POST":
+        from apps.licences.licence import peut_activer_un_compte
+
+        action = request.POST.get("action")
+        if action == "profil_creer" and request.POST.get("nom", "").strip():
+            profil, _ = Group.objects.get_or_create(name=request.POST["nom"].strip()[:150])
+            messages.success(request, f"Profil « {profil} » créé : réglez ses droits ci-dessous.")
+        elif action == "profil_supprimer" and profil:
+            if profil.user_set.exists():
+                messages.error(request, f"Le profil « {profil} » a encore des utilisateurs : changez-les de profil d'abord.")
+            else:
+                messages.success(request, f"Profil « {profil} » supprimé.")
+                profil.delete()
+                profil = None
+        elif action == "activer":
+            cible = User.objects.filter(username=request.POST.get("nom_utilisateur", "")).exclude(pk=request.user.pk).first()
+            permis, motif = peut_activer_un_compte()
+            if cible is None:
+                messages.error(request, "Utilisateur introuvable.")
+            elif not cible.is_active and not permis:
+                messages.error(request, motif)
+            else:
+                cible.is_active = not cible.is_active
+                cible.save(update_fields=["is_active"])
+                messages.success(request, f"Compte « {cible} » {'réactivé' if cible.is_active else 'désactivé (il ne peut plus se connecter)'}.")
+        elif action == "utilisateur":
+            nom = request.POST.get("nom_utilisateur", "").strip()
+            cible = Group.objects.filter(pk=request.POST.get("profil_utilisateur")).first()
+            utilisateur = User.objects.filter(username=nom).first()
+            if not nom:
+                messages.error(request, "Indiquez le nom de l'utilisateur.")
+            elif utilisateur is None and not request.POST.get("mot_de_passe"):
+                messages.error(request, "Nouvel utilisateur : indiquez un mot de passe.")
+            elif utilisateur is None and not peut_activer_un_compte()[0]:
+                messages.error(request, peut_activer_un_compte()[1])
+            else:
+                if utilisateur is None:
+                    utilisateur = User.objects.create_user(nom, "", request.POST["mot_de_passe"])
+                elif request.POST.get("mot_de_passe"):
+                    utilisateur.set_password(request.POST["mot_de_passe"])
+                    utilisateur.save()
+                if utilisateur.is_superuser:
+                    messages.warning(request, f"{utilisateur} est administrateur : il garde tous les droits.")
+                utilisateur.groups.set([cible] if cible else [])
+                for l in MODULES_PAR_CODE.values():                # fichiers liés : utilisateur, invité ou aucun accès
+                    acces = request.POST.get(f"acces_{l.code}", d.UTILISATEUR)
+                    if acces == d.UTILISATEUR:
+                        AccesLogiciel.objects.filter(utilisateur=utilisateur, module=l.code).delete()
+                    elif acces in dict(d.ACCES):
+                        AccesLogiciel.objects.update_or_create(utilisateur=utilisateur, module=l.code, defaults={"acces": acces})
+                messages.success(request, f"Utilisateur « {utilisateur} » : profil {cible or 'aucun (tous les droits)'}.")
+        elif action == "droits" and profil:
+            _, parents = d.arbre(logiciel)
+            jumeaux = d.jumeaux(logiciel)
+            existants = {r.code: r for r in DroitAcces.objects.filter(groupe=profil, module=logiciel.code)}
+            lies = set()
+            for code in [o.code for o in logiciel.onglets] + list(parents):
+                valeur = request.POST.get(f"droit_{code}", "")
+                if valeur not in d.LIBELLES:
+                    valeur = ""
+                if valeur == (existants[code].niveau if code in existants else ""):
+                    continue
+                # Le même écran dans un fichier lié (tiers, plan comptable, journaux…) reçoit le même droit
+                for module_code, code_cible in [(logiciel.code, code)] + jumeaux.get(code, []):
+                    if valeur:
+                        DroitAcces.objects.update_or_create(groupe=profil, module=module_code, code=code_cible, defaults={"niveau": valeur})
+                    else:
+                        DroitAcces.objects.filter(groupe=profil, module=module_code, code=code_cible).delete()
+                    if module_code != logiciel.code:
+                        lies.add(MODULES_PAR_CODE[module_code].titre)
+            messages.success(request, f"Droits du profil « {profil} » dans {logiciel.titre} enregistrés."
+                             + (f" Écrans communs reportés dans : {', '.join(sorted(lies))}." if lies else ""))
+        return redirect(url + (f"&profil={profil.pk}" if profil else ""))
+
+    lignes = []
+    if profil:
+        droits = d.Droits(request.user, logiciel)
+        droits.total, droits.profil = False, profil
+        droits.reglages = dict(DroitAcces.objects.filter(groupe=profil, module=logiciel.code).values_list("code", "niveau"))
+        onglets, parents = d.arbre(logiciel)
+        droits._parents = parents
+        jumeaux = d.jumeaux(logiciel)
+        for onglet, elements in onglets:
+            enfants = {e.code for e, _ in elements if parents.get(e.code) == onglet.code}
+            lignes.append({"code": onglet.code, "parent": "", "titre": onglet.titre, "profondeur": 0, "a_enfants": bool(enfants),
+                           "reglage": droits.reglages.get(onglet.code, ""), "effectif": d.LIBELLES[droits.niveau(onglet.code)]})
+            for el, profondeur in elements:
+                lignes.append({"code": el.code, "parent": parents[el.code], "titre": el.titre, "profondeur": profondeur,
+                               "a_enfants": bool(el.tous_enfants()), "reglage": droits.reglages.get(el.code, ""),
+                               "lie": ", ".join(sorted({MODULES_PAR_CODE[m].titre for m, _ in jumeaux.get(el.code, [])})),
+                               "effectif": d.LIBELLES[droits.niveau(parents[el.code])]})
+    utilisateurs = list(User.objects.order_by("username").prefetch_related("groups", "acces_logiciels"))
+    libelles_acces = dict(d.ACCES)
+    for u in utilisateurs:
+        reglages = {a.module: a.acces for a in u.acces_logiciels.all()}
+        u.acces_par_logiciel = [(l, reglages.get(l.code, d.UTILISATEUR), libelles_acces[reglages.get(l.code, d.UTILISATEUR)])
+                                for l in MODULES_PAR_CODE.values()]
+    return render(request, "core/autorisations.html", {
+        "profils": Group.objects.order_by("name"), "profil": profil, "logiciel": logiciel, "logiciels": MODULES_PAR_CODE.values(),
+        "utilisateurs": utilisateurs, "lignes": lignes, "niveaux": d.NIVEAUX, "acces_choix": d.ACCES,
+        "acces_json": {u.username: {l.code: code for l, code, _ in u.acces_par_logiciel} for u in utilisateurs},
+    })
+
+
+@login_required
+def journal_evenements(request, module):
+    """Fichier › Journal des événements (administrateur) : qui a fait quoi, quand, avec le détail des champs."""
+    from django.contrib.auth import get_user_model
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+
+    from . import droits as d
+    from .models import JournalEvenement
+
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {
+            "chemin": "Fichier › Journal des événements", "operation": "consulter le journal",
+            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    g = request.GET
+    qs = JournalEvenement.objects.select_related("utilisateur")
+    if g.get("du"):
+        qs = qs.filter(date__date__gte=g["du"])
+    if g.get("au"):
+        qs = qs.filter(date__date__lte=g["au"])
+    if g.get("utilisateur"):
+        qs = qs.filter(utilisateur__username=g["utilisateur"])
+    if g.get("action"):
+        qs = qs.filter(action=g["action"])
+    if g.get("type"):
+        qs = qs.filter(objet_type=g["type"])
+    if g.get("q"):
+        qs = qs.filter(Q(objet_libelle__icontains=g["q"]) | Q(objet_id=g["q"]))
+    page = Paginator(qs, 100).get_page(g.get("page"))
+    return render(request, "core/journal_evenements.html", {
+        "page": page, "actions": JournalEvenement.ACTIONS,
+        "types": JournalEvenement.objects.order_by("objet_type").values_list("objet_type", flat=True).distinct(),
+        "utilisateurs": get_user_model().objects.order_by("username").values_list("username", flat=True),
+        "filtres": g.urlencode().replace("page=", "_="),
+    })
+
+
+@login_required
+def sauvegarde(request, module):
+    """Fichier › Sauvegarde et restauration (administrateur)."""
+    from django.http import HttpResponse
+    from django.shortcuts import redirect
+    from django.utils import timezone
+
+    from . import droits as d, journal
+    from . import sauvegarde as s
+
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {
+            "chemin": "Fichier › Sauvegarde et restauration", "operation": "sauvegarder ou restaurer",
+            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    from apps.licences.licence import fonctions_pro_disponibles
+
+    pro_ok, pro_message = fonctions_pro_disponibles()
+    if request.method == "POST" and not pro_ok:
+        messages.error(request, pro_message)
+        return redirect(request.path)
+    if request.method == "POST" and request.POST.get("action") == "sauvegarder":
+        contenu = s.sauvegarder()
+        journal.enregistrer("SAUVEGARDE", libelle=f"{len(contenu) // 1024} Ko")
+        reponse = HttpResponse(contenu, content_type="application/json; charset=utf-8")
+        reponse["Content-Disposition"] = f'attachment; filename="erp-sauvegarde-{timezone.localtime():%Y%m%d-%H%M}.json"'
+        return reponse
+    if request.method == "POST" and request.POST.get("action") == "sauvegarder_chiffre":
+        from . import coffre_sauvegarde as cs
+
+        mot_de_passe = request.POST.get("mot_de_passe", "")
+        if len(mot_de_passe) < 8 or mot_de_passe != request.POST.get("mot_de_passe_confirmation", ""):
+            messages.error(request, "Choisissez un mot de passe d'au moins 8 caractères, saisi deux fois à l'identique.")
+            return redirect(request.path)
+        octets = cs.chiffrer(s.sauvegarder(), mot_de_passe)
+        journal.enregistrer("SAUVEGARDE", libelle=f"chiffrée, {len(octets) // 1024} Ko")
+        reponse = HttpResponse(octets, content_type="application/octet-stream")
+        reponse["Content-Disposition"] = f'attachment; filename="erp-sauvegarde-{timezone.localtime():%Y%m%d-%H%M}.erpcoffre"'
+        return reponse
+    if request.method == "POST" and request.POST.get("action") == "restaurer_chiffre":
+        from . import coffre_sauvegarde as cs
+
+        fichier = request.FILES.get("fichier")
+        if not fichier or request.POST.get("confirmation") != "RESTAURER":
+            messages.error(request, "Choisissez le fichier chiffré, saisissez le mot de passe et tapez RESTAURER pour confirmer.")
+            return redirect(request.path)
+        try:
+            contenu = cs.dechiffrer(fichier.read(), request.POST.get("mot_de_passe", ""))
+            s.lire(contenu)  # Refuser les anciens exports partiels avant toute opération.
+            from . import poste
+
+            if poste.disponible():
+                poste.appeler("sauvegarder")  # Une erreur empêche le remplacement.
+            entete = s.restaurer(contenu)
+        except (ValueError, UnicodeDecodeError) as exc:
+            messages.error(request, str(exc))
+        except Exception as exc:
+            messages.error(request, f"Restauration impossible, aucune donnée modifiée : {exc}")
+        else:
+            from django.contrib.auth import logout
+
+            auteur = request.user.get_username()
+            logout(request)
+            journal.enregistrer("RESTAURATION", libelle=f"sauvegarde chiffrée du {entete.get('date', '')[:16]}",
+                                details={"auteur_avant_restauration": auteur})
+            messages.success(request, f"Données restaurées depuis la sauvegarde chiffrée ({entete['objets']} enregistrements). "
+                                      "Reconnectez-vous si besoin.")
+        return redirect(request.path)
+    if request.method == "POST" and request.POST.get("action") == "restaurer":
+        fichier = request.FILES.get("fichier")
+        if not fichier or request.POST.get("confirmation") != "RESTAURER":
+            messages.error(request, "Choisissez le fichier et tapez RESTAURER pour confirmer.")
+        else:
+            try:
+                contenu = fichier.read().decode("utf-8")
+                s.lire(contenu)  # Refuser les anciens exports partiels avant toute opération.
+                from . import poste
+
+                if poste.disponible():
+                    poste.appeler("sauvegarder")  # Une erreur empêche le remplacement.
+                entete = s.restaurer(contenu)
+            except (ValueError, UnicodeDecodeError) as exc:
+                messages.error(request, str(exc))
+            except Exception as exc:          # fichier incohérent : la transaction a tout annulé
+                messages.error(request, f"Restauration impossible, aucune donnée modifiée : {exc}")
+            else:
+                from django.contrib.auth import logout
+
+                auteur = request.user.get_username()
+                logout(request)  # Le compte courant peut ne pas exister dans la sauvegarde restaurée.
+                journal.enregistrer("RESTAURATION", libelle=f"sauvegarde du {entete.get('date', '')[:16]}",
+                                    details={"auteur_avant_restauration": auteur})
+                messages.success(request, f"Données restaurées ({entete['objets']} enregistrements). "
+                                          "Reconnectez-vous si besoin.")
+        return redirect(request.path)
+    contexte = {"pro_ok": pro_ok, "pro_message": pro_message}
+    if module == "core":          # accès depuis le hub « Administration du poste » : afficher ses onglets
+        contexte["onglet_poste"] = "sauvegarde_integrale"
+    return render(request, "core/sauvegarde.html", contexte)
+
+
+def reprise_dossier(request, module):
+    """Fichier › Reprise d'un dossier existant : synchronisation depuis la base SQL Server de l'ancien logiciel
+    (SELECT uniquement) pendant la transition, puis bascule (administrateur)."""
+    import datetime
+
+    from django.core.exceptions import ValidationError
+
+    from . import droits as d
+    from . import reprise_sage
+    from .models import LotSynchronisation, Societe
+    from .reprise_sage import source
+
+    if not request.user.is_superuser:
+        return render(request, "core/acces_refuse.html", {
+            "chemin": "Fichier › Reprise d'un dossier existant", "operation": "reprendre un dossier",
+            "niveau": "réservé à l'administrateur", "profil": d.profil_de(request.user) or "sans profil"}, status=403)
+    aujourdhui = datetime.date.today()
+    societe = Societe.get()
+    p = request.POST
+    # Dossier déjà synchronisé : « ORDINATEUR[\\INSTANCE]/BASE », proposé d'office (un autre dossier serait refusé)
+    adresse, _, base_suivie = (societe.source_dossier or "").rpartition("/")
+    machine_suivie, instance_suivie = source.separer_serveur(adresse)
+    valeurs = {"machine": p.get("machine", machine_suivie or "localhost"), "instance": p.get("instance", instance_suivie),
+               "base": p.get("base", base_suivie),
+               "utilisateur": p.get("utilisateur", ""), "authentification": p.get("authentification", "windows"),
+               "debut_exercice": p.get("debut_exercice", (societe.source_debut_exercice or aujourdhui.replace(month=1, day=1)).isoformat()),
+               "date_bascule": p.get("date_bascule", aujourdhui.isoformat()), "historique_depuis": p.get("historique_depuis", "")}
+    valeurs["serveur"] = source.adresse_serveur(valeurs["machine"], valeurs["instance"])
+    contexte = {"valeurs": valeurs, "bases": [], "instances": [], "rapport": None, "titre": "Reprise d'un dossier existant", "societe_sync": societe}
+    action = p.get("action")
+    if request.method == "POST" and action:
+        utilisateur = valeurs["utilisateur"] if valeurs["authentification"] == "sql" else ""
+        mot_de_passe = p.get("mot_de_passe", "") if utilisateur else ""
+        try:
+            if action == "instances":
+                contexte["instances"] = source.instances_sql(valeurs["machine"])
+                if not contexte["instances"]:
+                    messages.warning(request, "Aucune instance détectée sur cet ordinateur (service SQL Server Browser arrêté "
+                                              "ou pare-feu) : saisissez le nom de l'instance, par exemple SAGE100 ou SQLEXPRESS.")
+                elif len(contexte["instances"]) == 1 and not valeurs["instance"]:
+                    valeurs["instance"] = contexte["instances"][0]["nom"]
+                    valeurs["serveur"] = source.adresse_serveur(valeurs["machine"], valeurs["instance"])
+            elif action == "rechercher":
+                connexion = source.connecter(valeurs["serveur"], "master", utilisateur, mot_de_passe)
+                contexte["bases"] = source.bases_sage(connexion)
+                if not contexte["bases"]:
+                    messages.warning(request, f"Aucun dossier trouvé sur l'instance {valeurs['serveur']} "
+                                              "(ou droits de lecture insuffisants).")
+                elif not valeurs["base"]:
+                    valeurs["base"] = contexte["bases"][0]["nom"]
+            elif action == "basculer":
+                if p.get("confirmation_bascule") != "BASCULER":
+                    raise ValueError("Tapez BASCULER pour confirmer la bascule (elle est définitive).")
+                reprise_sage.basculer(request.user)
+                messages.success(request, "Bascule effectuée : la synchronisation est arrêtée, la saisie se fait désormais dans l'ERP.")
+            else:
+                dates = {}
+                for cle in ("debut_exercice", "date_bascule", "historique_depuis"):
+                    dates[cle] = datetime.date.fromisoformat(valeurs[cle]) if valeurs[cle] else None
+                if not valeurs["base"] or not dates["debut_exercice"] or not dates["date_bascule"]:
+                    raise ValueError("Choisissez la base de données (dossier), le début d'exercice et la date des données.")
+                appliquer = action == "synchroniser"
+                if appliquer and p.get("confirmation") != "SYNCHRONISER":
+                    raise ValueError("Tapez SYNCHRONISER pour confirmer (la simulation n'enregistre rien).")
+                connexion = source.connecter(valeurs["serveur"], valeurs["base"], utilisateur, mot_de_passe)
+                origine = source.SourceSQL(connexion, dates["debut_exercice"], dates["date_bascule"], dates["historique_depuis"],
+                                           dossier_nom=f"{valeurs['serveur']}/{valeurs['base']}")
+                rapport = reprise_sage.importer(origine, dates["date_bascule"], appliquer=appliquer, utilisateur=request.user,
+                                                debut_exercice=dates["debut_exercice"])
+                contexte["rapport"] = rapport
+                if appliquer and rapport.conforme:
+                    messages.success(request, "Synchronisation enregistrée. Continuez à saisir dans l'ancien logiciel jusqu'à la bascule.")
+        except (ValidationError, ValueError, ConnectionError, Exception) as exc:   # message clair, rien n'est enregistré
+            texte = " ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+            messages.error(request, f"Opération impossible : {texte}")
+        societe.refresh_from_db()
+    contexte["lots"] = LotSynchronisation.objects.select_related("utilisateur")[:8]
+    return render(request, "core/reprise_dossier.html", contexte)

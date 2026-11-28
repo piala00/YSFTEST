@@ -1,0 +1,101 @@
+﻿id,table,champ,sens,version_reference,section_page,preuve,statut,present_installation,attention
+C001,F_DOCENTETE,DO_Domaine,Domaine document,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C002,F_DOCENTETE,DO_Type,Type de document,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C003,F_DOCENTETE,DO_Piece,Numéro pièce,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C004,F_DOCENTETE,DO_Date,Date,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C005,F_DOCENTETE,DO_Tiers,Référence tiers ou dépôt selon domaine,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C006,F_DOCENTETE,DO_Ref,Référence externe,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C007,F_DOCENTETE,DE_No,Dépôt,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C008,F_DOCENTETE,DO_Statut,Statut,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C009,F_DOCENTETE,DO_Valide,Validation,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C010,F_DOCENTETE,DO_Provenance,Provenance de facture,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C011,F_DOCENTETE,DO_MajCpta,État de comptabilisation,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C012,F_DOCENTETE,DO_Cloture,Clôture,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C013,F_DOCENTETE,CT_NumPayeur,Compte payeur,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C014,F_DOCENTETE,CO_No,Représentant,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C015,F_DOCENTETE,DO_PieceOrig,Pièce d origine,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C016,F_DOCENTETE,DO_EStatut,Statut électronique,12.20,241-245,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C017,F_DOCLIGNE,DO_Domaine,Domaine document,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C018,F_DOCLIGNE,DO_Type,Type,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C019,F_DOCLIGNE,DO_Piece,Numéro pièce,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C020,F_DOCLIGNE,DL_No,Identifiant ligne,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C021,F_DOCLIGNE,DL_Ligne,Ordre de la ligne,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C022,F_DOCLIGNE,AR_Ref,Référence article,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C023,F_DOCLIGNE,CT_Num,Tiers,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C024,F_DOCLIGNE,DE_No,Dépôt mouvementé,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C025,F_DOCLIGNE,DL_Design,Désignation,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C026,F_DOCLIGNE,DL_Qte,Quantité,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C027,F_DOCLIGNE,DL_QteBC,Quantité commandée,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C028,F_DOCLIGNE,DL_QteBL,Quantité livrée/facturée,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C029,F_DOCLIGNE,DL_MvtStock,Nature du mouvement stock,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C030,F_DOCLIGNE,DL_MontantHT,Montant HT ligne,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C031,F_DOCLIGNE,DL_MontantTTC,Montant TTC ligne,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C032,F_DOCLIGNE,DL_PieceBC,Origine commande,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C033,F_DOCLIGNE,DL_PieceBL,Origine livraison,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C034,F_DOCLIGNE,DL_TremPied,Ligne remise de pied,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C035,F_DOCLIGNE,DL_TremExep,Ligne remise exceptionnelle,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C036,F_DOCLIGNE,AG_No1,Gamme 1,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C037,F_DOCLIGNE,AG_No2,Gamme 2,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C038,F_DOCLIGNE,EU_Qte,Quantité conditionnement,12.20,256-261,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C039,F_CREGLEMENT,RG_No,Identifiant règlement,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C040,F_CREGLEMENT,CT_NumPayeur,Tiers payeur,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C041,F_CREGLEMENT,RG_Date,Date règlement,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C042,F_CREGLEMENT,RG_Montant,Montant règlement,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C043,F_CREGLEMENT,RG_Impute,État imputé,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C044,F_CREGLEMENT,RG_Valide,État validé,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C045,F_CREGLEMENT,RG_Compta,État transféré/comptabilisé,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C046,F_CREGLEMENT,RG_TypeReg,Type de règlement,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C047,F_CREGLEMENT,N_Reglement,Mode de règlement,12.20,277-280,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C048,F_DOCREGL,DR_No,Identifiant échéance,12.20,274-276,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C049,F_DOCREGL,DO_Domaine,Domaine,12.20,274-276,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C050,F_DOCREGL,DO_Type,Type document,12.20,274-276,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C051,F_DOCREGL,DO_Piece,Pièce,12.20,274-276,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C052,F_DOCREGL,DR_Date,Date de l échéance,12.20,274-276,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C053,F_DOCREGL,DR_Montant,Montant,12.20,274-276,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C054,F_DOCREGL,DR_TypeRegl,Type ligne règlement,12.20,274-276,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C055,F_DOCREGL,EC_No,Lien écriture,12.20,274-276,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C056,F_REGLECH,RG_No,Numéro règlement,12.20,415,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C057,F_REGLECH,DR_No,Numéro échéance,12.20,415,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C058,F_ARTICLE,AR_Ref,Référence article,12.20,211-215,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C059,F_ARTICLE,FA_CodeFamille,Code famille,12.20,211-215,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C060,F_ARTICLE,AR_Design,Désignation article,12.20,211-215,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C061,F_ARTSTOCK,AR_Ref,Référence article,12.20,413,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C062,F_ARTSTOCK,DE_No,Dépôt,12.20,413,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C063,F_GAMSTOCK,AR_Ref,Référence article,12.20,414,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C064,F_GAMSTOCK,AG_No1,Gamme 1,12.20,414,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C065,F_GAMSTOCK,AG_No2,Gamme 2,12.20,414,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C066,F_GAMSTOCK,DE_No,Dépôt,12.20,414,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C067,F_DEPOT,DE_No,Identifiant dépôt,12.20,233,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C068,F_FAMILLE,FA_CodeFamille,Code famille,12.20,411,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C069,F_FAMILLE,FA_Type,Type famille,12.20,411,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C070,F_COMPTET,CT_Num,Référence tiers,12.20,409-413,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C071,F_ECRITUREC,EC_No,Identifiant écriture,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C072,F_ECRITUREC,JO_Num,Journal,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C073,F_ECRITUREC,JM_Date,Période,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C074,F_ECRITUREC,EC_Date,Date,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C075,F_ECRITUREC,EC_Jour,Jour,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C076,F_ECRITUREC,EC_Piece,Pièce,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C077,F_ECRITUREC,EC_Sens,Débit/crédit,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C078,F_ECRITUREC,EC_Montant,Montant,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C079,F_ECRITUREC,EC_Cloture,Écriture clôturée,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C080,F_ECRITUREC,CG_Num,Compte général,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C081,F_ECRITUREC,CT_Num,Compte tiers,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C082,F_ECRITUREC,EC_Lettre,Lettrage,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C083,F_ECRITUREC,EC_Point,Pointage,12.20,103-107,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C084,F_JOURNAUX,JO_Num,Numéro journal,12.20,399-409,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C085,F_COMPTEG,CG_Num,Numéro compte,12.20,399-409,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C086,F_TAXE,TA_Code,Code de taxe,12.20,409-413,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C087,F_ECDOCDN,EC_No,Écriture,12.20,409,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C088,F_ECDOCDN,DO_Type,Type de document,12.20,409,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C089,F_ECDOCDN,DO_Piece,Numéro de pièce,12.20,409,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C090,F_CMLIEN,DL_NoIn,Ligne entrée,12.20,416,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C091,F_CMLIEN,DL_NoOut,Ligne sortie,12.20,416,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C092,F_LOTSERIE,AR_Ref,Référence article,12.20,415,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C093,F_LOTSERIE,DE_No,Dépôt,12.20,415,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C094,F_LOTSERIE,DL_NoIn,Ligne entrée,12.20,415,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C095,F_LOTSERIE,DL_NoOut,Ligne sortie,12.20,415,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C096,F_ARTCLIENT,AR_Ref,Article,12.20,216-217,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C097,F_ARTCLIENT,CT_Num,Client particulier,12.20,216-217,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C098,F_ARTCLIENT,AC_Categorie,Catégorie tarif,12.20,216-217,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C099,F_ARTCLIENT,AC_PrixVen,Prix de vente,12.20,216-217,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis
+C100,F_ARTCLIENT,AC_RefClient,Référence article client,12.20,216-217,S06-01,DECRIT_DANS_MANUEL,NON_TESTE,Le sens métier complet et la présence V5-V11 ne sont pas établis

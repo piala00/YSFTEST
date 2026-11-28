@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Pointages{% endblock %}
+{% block content %}
+<div class="page-title"><h1>Pointages de la fiche de stock</h1>
+  <div class="d-flex gap-2"><a class="btn btn-sm btn-outline-secondary {% if not request.GET.statut %}active{% endif %}" href="?">Tous</a>
+  <a class="btn btn-sm btn-outline-danger {% if request.GET.statut == 'ECART' %}active{% endif %}" href="?statut=ECART">Écarts</a>
+  <a class="btn btn-sm btn-primary" href="{% url 'commercial:pointage' %}">Pointer un bon</a></div></div>
+<div class="card"><table class="table table-sm mb-0">
+  <thead><tr><th>N°</th><th>Date</th><th>Bon</th><th>Dépôt</th><th>Fichiste</th><th>Résultat</th></tr></thead>
+  <tbody>{% for p in pointages %}<tr><td><a href="{% url 'commercial:pointage_detail' p.pk %}">{{ p.numero }}</a></td><td>{{ p.date|date:"d/m/Y" }}</td>
+    <td>{{ p.document.numero_affiche }}</td><td>{{ p.depot }}</td><td>{{ p.fichiste|default:"" }}</td>
+    <td>{% if p.statut == "CONFORME" %}<span class="badge text-bg-success">Conforme</span>{% else %}<span class="badge text-bg-danger">Écart</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center p-4">Aucun pointage.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

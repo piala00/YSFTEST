@@ -1,0 +1,35 @@
+from django.conf import settings
+from django.contrib import admin
+from django.contrib.auth import views as auth_views
+from django.urls import include, path
+
+from apps.commercial import urls as commercial_urls
+from apps.core.urls_communes import urls_communes
+from apps.licences import views as licences_views
+
+# Deux logiciels distincts : en édition Transport, le commerce pur (documents de vente, articles,
+# stocks) n'est PAS monté — seuls les écrans comptables communs (tiers, règlements, caisse) restent.
+_commercial = commercial_urls.communs if settings.ERP_EDITION == "transport" else commercial_urls.urlpatterns
+
+urlpatterns = [
+    path("", include("apps.core.urls")),
+    path("admin/", admin.site.urls),
+    path("connexion/", auth_views.LoginView.as_view(), name="login"),
+    path("deconnexion/", auth_views.LogoutView.as_view(), name="logout"),
+    path("commercial/", include((_commercial, "commercial"))),
+    # Comptabilité analytique : module distinct, mêmes écritures (préfixe plus précis d'abord)
+    path("comptabilite/analytique/", include("apps.comptabilite.urls_analytique")),
+    path("comptabilite/", include("apps.comptabilite.urls")),
+    path("reporting/", include("apps.reporting.urls")),
+    # Logiciels des services du transport : leurs pages communes, puis les écrans (espace de noms « transport »)
+    path("transport/billetterie/", include((urls_communes("billetterie"), "billetterie"))),
+    path("transport/colis/", include((urls_communes("colis"), "colis"))),
+    path("transport/garage/", include("apps.garage.urls")),
+    path("transport/partenaires/", include("apps.partenaires.urls")),
+    path("transport/", include("apps.transport.urls")),
+    path("personnel/", include("apps.personnel.urls")),
+    path("api/", include("apps.api.urls")),
+    path("relais/", include("apps.relais.urls")),
+    path("licence/", licences_views.licence, name="licence"),
+    path("licence/tarifs/", licences_views.tarifs, name="tarifs"),
+]
