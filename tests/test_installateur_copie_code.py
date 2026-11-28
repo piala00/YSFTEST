@@ -59,9 +59,10 @@ class CopieCodeInstallateurTests(unittest.TestCase):
         )
         self.assertIn("Get-CimInstance -ClassName Win32_Process", script)
         self.assertIn("Get-InstallerProcessIds", script)
-        self.assertIn("FindMainWindow([int[]]processIds)", script)
+        self.assertIn("FindMainWindow([int[]]$processIds)", script)
         self.assertIn('window.ClassName == "TWizardForm"', script)
         self.assertIn('window.Text.IndexOf("ERP OHADA"', script)
+        self.assertIn("ProcessIdForWindow($wizard)", script)
         self.assertNotIn("$processus.HasExited", script)
 
     def test_journal_inno_setup_et_diagnostic_processus_sont_conserves(self):
