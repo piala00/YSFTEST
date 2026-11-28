@@ -13,7 +13,7 @@
 |---|---:|---:|
 | Tests chronométrés | 327 | 496 |
 | `run_suite` | 397,405 s | 499,996 s |
-| `setup_databases` | à extraire du journal | à extraire du journal |
+| `setup_databases` | 16,827 s | 17,512 s |
 | `teardown_databases` | 3,632 s | 3,915 s |
 | Connexions ouvertes | 95 | 100 |
 | Temps cumulé d'ouverture | 0,252 s | 0,230 s |
@@ -47,7 +47,7 @@ Les durées de `create_test_db` incluent notamment les migrations Django ; `dest
 - Django 6.1.3, `django/db/transaction.py` : entrée/sortie de `Atomic`, savepoints et rollbacks — [source taguée](https://github.com/django/django/blob/6.1.3/django/db/transaction.py).
 - Microsoft mssql-django 2.0.0, `mssql/creation.py` : le backend surcharge `_create_test_db` et `_destroy_test_db`, tandis que les méthodes publiques `create_test_db` et `destroy_test_db` restent héritées — [source taguée](https://github.com/microsoft/mssql-django/blob/2.0.0/mssql/creation.py).
 
-Cette inspection justifie de mesurer les méthodes publiques héritées pour obtenir des durées cohérentes par alias, sans supposer que les méthodes internes du backend SQL Server sont celles de Django.
+Cette inspection justifie de mesurer les méthodes publiques héritées pour obtenir des durées cohérentes par alias, sans supposer que les méthodes internes du backend SQL Server sont celles de Django. Le backend surcharge `_destroy_test_db` sans appeler `super()` : pour SQL Server, la durée de destruction est donc garantie par `destroy_test_db`, mais la sous-phase privée n'est pas séparée. Pour la création, le backend appelle `super()._create_test_db()` ; la sous-phase DDL héritée est donc mesurée distinctement.
 
 ## Validation attendue
 
