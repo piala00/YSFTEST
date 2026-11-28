@@ -184,7 +184,8 @@ class ClotureDjangoMigreeTests(unittest.TestCase):
                 rubrique = db.execute("SELECT code, libelle, valeur FROM personnel_rubriquepaie").fetchone()
                 self.assertEqual(rubrique[:2], ('PRIME', 'Prime de route'))
                 self.assertEqual(Decimal(str(rubrique[2])), Decimal('1000'))
-                self.assertEqual(db.execute("""SELECT matricule, nom, service, site_origine, agence.code
+                self.assertEqual(db.execute("""SELECT employe.matricule, employe.nom, employe.service,
+                           employe.site_origine, agence.code
                     FROM personnel_employe AS employe
                     JOIN core_agence AS agence ON agence.id=employe.agence_id
                     WHERE employe.matricule='EMP-01'""").fetchone(),
@@ -580,20 +581,26 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 ).fetchone()[0], 1)
                 lignes = db.execute("""
                     SELECT c.numero, COALESCE(s.code, ''), COALESCE(t.code, ''),
-                           COALESCE(v.immatriculation, ''), l.debit, l.credit
+                           COALESCE(v.immatriculation, ''), COALESCE(employe.matricule, ''),
+                           l.debit, l.credit
                     FROM comptabilite_ligneecriture l
                     JOIN comptabilite_compte c ON c.id=l.compte_id
                     LEFT JOIN comptabilite_sectionanalytique s ON s.id=l.section_id
                     LEFT JOIN commercial_tiers t ON t.id=l.tiers_id
                     LEFT JOIN transport_vehicule v ON v.id=l.vehicule_id
+                    LEFT JOIN personnel_employe employe ON employe.id=l.employe_id
                 """).fetchall()
-                soldes = {(compte, section, tiers, vehicule):
+                # Le report doit conserver la dimension employé : deux soldes
+                # portant le même compte/tiers/section/véhicule restent distincts
+                # lorsqu'un seul d'entre eux est imputé à un salarié.
+                soldes = {(compte, section, tiers, vehicule, employe):
                           Decimal(str(debit)) - Decimal(str(credit))
-                          for compte, section, tiers, vehicule, debit, credit in lignes}
+                          for compte, section, tiers, vehicule, employe, debit, credit in lignes}
                 self.assertEqual(soldes, {
-                    ('411000', 'G-YDE', 'PROP-01', 'CE-123-AA'): Decimal('105.50'),
-                    ('411000', 'G-DLA', 'PROP-01', 'CE-123-AA'): Decimal('50.00'),
-                    ('101000', '', '', ''): Decimal('-155.50'),
+                    ('411000', 'G-YDE', 'PROP-01', 'CE-123-AA', 'EMP-01'): Decimal('125.50'),
+                    ('411000', 'G-YDE', 'PROP-01', 'CE-123-AA', ''): Decimal('-20.00'),
+                    ('411000', 'G-DLA', 'PROP-01', 'CE-123-AA', ''): Decimal('50.00'),
+                    ('101000', '', '', '', ''): Decimal('-155.50'),
                 })
                 self.assertEqual(sum(soldes.values()), Decimal('0.00'))
             with connexion_sqlite(ancien) as db:
@@ -908,9 +915,9 @@ assert not Ecriture.objects.filter(numero='OD-2026-1').exists()
                 contrepassation = db.execute('SELECT last_insert_rowid()').fetchone()[0]
                 db.execute("""
                     INSERT INTO comptabilite_ligneecriture
-                    (ecriture_id, compte_id, tiers_id, section_id, vehicule_id,
+                    (ecriture_id, compte_id, tiers_id, section_id, vehicule_id, employe_id,
                      libelle, debit, credit, lettrage, source_cle)
-                    SELECT ?, compte_id, tiers_id, section_id, vehicule_id,
+                    SELECT ?, compte_id, tiers_id, section_id, vehicule_id, employe_id,
                            'Contrepassation', credit, debit, '', ''
                     FROM comptabilite_ligneecriture WHERE ecriture_id=?
                 """, (contrepassation, piece_initiale))
