@@ -120,3 +120,45 @@ Correction proposée et publiée dans le commit suivant la validation #805 :
 Tests ciblés ajoutés : `DiagnosticSqlSimulationTests` vérifie que `SQL_TEST_TIMINGS` seul n'active pas le profileur, que la variable dédiée l'active, et que les valeurs désactivantes le maintiennent éteint. Le workflow exécute ce groupe séparément avant la suite SQLite. Le comparatif de performance A/B reste à obtenir dans le run qui suit ce commit ; aucun gain n'est revendiqué avant cette mesure.
 
 Aucun changement de logique comptable, de transactions, de scénario métier ou de délai d'exécution n'est introduit par cette séparation.
+
+
+## Analyse détaillée du run #878 — 28/11/2026
+
+Le run [#878](https://github.com/piala00/YSFTEST/actions/runs/46139965308) a terminé **9 jobs sur 9 en succès** sur le commit `db0210f1e8fcb39b651485a64e98dff24efc4602`. Les deux shards SQL Server sont restés très en dessous du timeout GNU de 16 minutes :
+
+| Mesure #878 | Shard 0 | Shard 1 |
+|---|---:|---:|
+| Tests exécutés | 328 | 505 |
+| `run_suite` | 345,151 s | 379,633 s |
+| `setup_databases` | 13,460 s | 12,553 s |
+| `teardown_databases` | 3,881 s | 3,695 s |
+| Ouvertures de connexions cumulées | 0,164 s | 0,148 s |
+| Fermetures cumulées | 0,026 s | 0,023 s |
+| `cursor_execute` | 330 160 appels / 152,869 s | 256 749 appels / 134,253 s |
+
+### Cause mesurée du test de simulation le plus long
+
+`apps.transport.tests.SimulationPlusieursMoisTests.test_jusqu_a_une_date_le_dernier_mois_s_arrete_a_ce_jour` a pris **99,000 s dans son corps**. La simulation exécute 61 journées (01/01/2026 au 02/03/2026) :
+
+- Temps cumulé des journées : 94,316 s ; moyenne 1,546 s/jour.
+- Journée la plus courte : 0,877 s ; la plus longue : 2,159 s.
+- Les phases initialisation, fins de mois et bilan expliquent le reste.
+- Le test porte 114 374 appels `cursor_execute`, pour 46,316 s cumulées dans le wrapper SQL.
+- Les connexions ne sont pas le goulot : leur coût cumulé est inférieur à 0,2 s par shard.
+
+Le scope `atomic` attribué à `setUpClass` dure 119,878 s, mais il s'agit de la transaction de classe qui reste ouverte pendant les tests, pas de 119 s de préparation. La documentation officielle Django 6.1 indique que `TestCase` ouvre deux blocs `atomic()` imbriqués, l'un pour la classe et l'autre pour chaque test : https://docs.djangoproject.com/en/6.1/topics/testing/tools/#testcase
+
+Un compteur `cursor_execute err=1` apparaît encore dans le résumé du shard 0, sans ligne `[SQL-DB-EXCEPTION]` correspondante. Aucun test n'a échoué. Il reste à attribuer cet écart entre le compteur et le journal d'exception ; il n'est pas classé comme erreur métier résolue.
+
+### Instrumentation publiée après #878
+
+Les commits suivants ajoutent un profilage léger, sans `execute_wrapper` et sans changer les transactions métier :
+
+- `e4e0e4a9` : sous-phases quotidiennes (achats, billets/colis, scénarios, départs/carburant/arrivées, opérations de fin de journée), ventes, chargements et opérations transport.
+- `0e911930` : test de parcours multi-mois vérifiant les marqueurs agrégés.
+- `0b99da8d` : test unitaire d'agrégation des sous-phases.
+- `fb4786b1` : séparation des agrégats détaillés du profileur SQL exhaustif ; évite de mélanger les dictionnaires des phases globales avec les anciennes listes des sous-phases.
+
+Les marqueurs attendus sont `[SIM-JOURNEE-PHASE]` et `[SIM-DETAIL-TOTAL]`. Les temps des sous-phases sont inclusifs et peuvent se recouvrir ; ils ne doivent pas être additionnés au temps total du jour. Ces changements sont publiés sur la branche de travail, mais **ne sont pas encore validés par une nouvelle exécution GitHub Actions**. Aucun gain de performance n'est revendiqué avant l'analyse des nouvelles traces.
+
+La branche de travail est désormais à 57 commits en avance et 2 commits derrière `ccr-5592a371-fusjt2`. Aucun rebase, fusion vers la cible ou déploiement n'a été effectué.
