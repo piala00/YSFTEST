@@ -166,6 +166,10 @@ Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=
 fr.FinishedLabel=L'installation est terminée.%n%nLe serveur tourne en arrière-plan (service Windows « {#Nom} ») si vous l'avez choisi. Au premier démarrage, le navigateur ouvre l'assistant : création ou restauration d'une société, puis compte administrateur. Sans licence, le logiciel fonctionne en essai (29 ouvertures ; sauvegarde et restauration réservées à la licence). Les données sont dans C:\ProgramData\ERP-OHADA ; elles sont conservées si vous désinstallez le logiciel.
 
 [Code]
+const
+  FormatPressePapiersTexte = 1;
+  FormatPressePapiersUnicode = 13;
+
 var
   PageBase: TInputOptionWizardPage;
   PageSQL: TInputQueryWizardPage;
@@ -312,17 +316,66 @@ begin
     Result := 'http://' + Result;
 end;
 
+function OuvrirPressePapiers(Fenetre: HWND): BOOL;
+  external 'OpenClipboard@user32.dll stdcall';
+function ViderPressePapiers: BOOL;
+  external 'EmptyClipboard@user32.dll stdcall';
+function FermerPressePapiers: BOOL;
+  external 'CloseClipboard@user32.dll stdcall';
+function FormatPressePapiersDisponible(Format: UINT): BOOL;
+  external 'IsClipboardFormatAvailable@user32.dll stdcall';
+
 procedure CopierCodeInstallation(Sender: TObject);
+var
+  PressePapiersVide, CopieVerifiee: Boolean;
 begin
+  BoutonCopierCode.Caption := 'Copier le code';
   if CodeInstallation = '' then
   begin
+    BoutonCopierCode.Caption := 'Code indisponible';
     MsgBox('Le code de ce serveur est indisponible. Relancez l''installateur ou contactez l''éditeur.', mbError, MB_OK);
     exit;
   end;
-  { WM_COPY sur un champ natif Windows : compatible avec Inno Setup 6. }
+
+  { Vérifier d'abord que le presse-papiers est accessible. Ne jamais annoncer
+    une réussite sur le seul retour de WM_COPY, qui ne fournit pas de statut. }
+  if not OuvrirPressePapiers(ChampCodeInstallation.Handle) then
+  begin
+    BoutonCopierCode.Caption := 'Copie impossible';
+    MsgBox('Le presse-papiers Windows est occupé ou inaccessible. Réessayez ; vous pouvez aussi sélectionner le code puis faire Ctrl+C.', mbError, MB_OK);
+    exit;
+  end;
+  try
+    PressePapiersVide := ViderPressePapiers();
+  finally
+    FermerPressePapiers();
+  end;
+  if not PressePapiersVide then
+  begin
+    BoutonCopierCode.Caption := 'Copie impossible';
+    MsgBox('Windows n''a pas autorisé la préparation du presse-papiers. Sélectionnez le code puis faites Ctrl+C.', mbError, MB_OK);
+    exit;
+  end;
+
+  { Le champ natif sélectionne exactement le code affiché puis exécute WM_COPY. }
+  ChampCodeInstallation.SetFocus;
   SendMessage(ChampCodeInstallation.Handle, $00B1, 0, -1); { EM_SETSEL }
   SendMessage(ChampCodeInstallation.Handle, $0301, 0, 0);  { WM_COPY }
-  BoutonCopierCode.Caption := 'Code copié !';
+
+  { WM_COPY ne renvoie pas de résultat exploitable : vérifier qu'un format texte
+    est effectivement présent après avoir vidé le presse-papiers. }
+  CopieVerifiee :=
+    FormatPressePapiersDisponible(FormatPressePapiersUnicode) or
+    FormatPressePapiersDisponible(FormatPressePapiersTexte);
+  if CopieVerifiee then
+    BoutonCopierCode.Caption := 'Code copié !'
+  else
+  begin
+    BoutonCopierCode.Caption := 'Copie impossible';
+    ChampCodeInstallation.SetFocus;
+    SendMessage(ChampCodeInstallation.Handle, $00B1, 0, -1); { EM_SETSEL }
+    MsgBox('La copie n''a pas abouti. Le code reste sélectionné : appuyez sur Ctrl+C, puis collez-le dans votre message à l''éditeur.', mbError, MB_OK);
+  end;
 end;
 
 procedure InitializeWizard();
