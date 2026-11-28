@@ -125,7 +125,7 @@ class InstallationTests(SimpleTestCase):
             publique = Path(dossier) / "parametres.dat"
             rapport = Path(dossier) / "diagnostic.json"
             fichier.write_bytes(self.fichier())
-            publique.write_bytes(b"ERPID\\x01" + self.publique)
+            publique.write_bytes(b"ERPID\x01" + self.publique)
             code = outil([
                 "diagnostiquer-installation", "--fichier", str(fichier),
                 "--publique", str(publique), "--edition", "transport",
