@@ -454,8 +454,8 @@ def instrument_database_activity():
     # Les connexions ouvertes/fermées sont déjà mesurées par instrument_tests().
     # On complète avec les attentes de connexion et les opérations transactionnelles.
     for operation in (
-        "ensure_connection", "commit", "rollback", "set_autocommit",
-        "savepoint", "savepoint_commit", "savepoint_rollback",
+        "ensure_connection", "connect", "close", "commit", "rollback",
+        "set_autocommit", "savepoint", "savepoint_commit", "savepoint_rollback",
     ):
         original = getattr(BaseDatabaseWrapper, operation, None)
         if original is not None:
