@@ -77,6 +77,22 @@ class CopieCodeInstallateurTests(unittest.TestCase):
         self.assertIn("$preuve.controles_suivant = @(Get-ControlSnapshot)", script)
         self.assertIn("rangée inférieure, deuxième bouton depuis la droite", script)
 
+    def test_nettoyage_ne_propage_pas_un_code_retour_natif_residuel(self):
+        script = (ROOT / "tests_navigateur" / "installateur_copie_code_windows.ps1").read_text(
+            encoding="utf-8"
+        )
+        # GitHub Actions termine un step pwsh par "exit $LASTEXITCODE".
+        # Un taskkill qui retourne 1 après que le wizard s'est déjà fermé faisait
+        # donc échouer le job malgré la preuve presse-papiers déjà validée.
+        self.assertNotIn("taskkill.exe", script)
+        self.assertIn("Stop-Process -Id $pidActuel -Force -ErrorAction Stop", script)
+        self.assertIn("$pidActuel -eq $PID", script)
+        self.assertIn("$global:LASTEXITCODE = 0", script)
+        self.assertIn(
+            "if (Get-Process -Id $pidActuel -ErrorAction SilentlyContinue) {",
+            script,
+        )
+
     def test_journal_inno_setup_et_diagnostic_processus_sont_conserves(self):
         script = (ROOT / "tests_navigateur" / "installateur_copie_code_windows.ps1").read_text(
             encoding="utf-8"
