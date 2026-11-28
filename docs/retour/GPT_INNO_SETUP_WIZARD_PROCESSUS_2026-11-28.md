@@ -44,3 +44,11 @@ Le test ne désactive ni l'UAC, ni la signature, ni les contrôles de licence. I
 - Les deux éditions doivent produire chacune un rapport JSON `resultat=OK`.
 
 Aucune fusion, aucun déploiement, aucune donnée réelle, aucune clé privée publiée.
+
+## Complément — PID réel de la fenêtre
+
+Après la recherche du wizard, le script récupère aussi le PID propriétaire du HWND via `GetWindowThreadProcessId`. Ce PID est ajouté à la liste de nettoyage, y compris lorsque la fenêtre a été trouvée par le repli global sur la classe `TWizardForm` et le titre `ERP OHADA`. Le repli global est limité au runner CI isolé, qui ne lance qu'un seul installateur à la fois.
+
+Le retour de `Get-InstallerProcessIds` est un tableau d'entiers directement énuméré par PowerShell ; le script évite un tableau imbriqué. Le nettoyage couvre l'arbre du lanceur et le PID propriétaire du wizard.
+
+Référence Microsoft : https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid
