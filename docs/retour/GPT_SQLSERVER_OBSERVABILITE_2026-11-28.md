@@ -53,6 +53,6 @@ Cette inspection justifie de mesurer les méthodes publiques héritées pour obt
 
 ## Validation attendue
 
-Le test unitaire `tests.test_sqlserver_runner_partition` couvre l'agrégateur, les alias des connexions et curseurs, la conservation du retour et des paramètres, la propagation des exceptions et la mesure d'une méthode de cycle de vie. La CI complète doit ensuite montrer les nouveaux marqueurs `[SQL-DB-SUMMARY]`, `[SQL-DB-TEST-TOP]` et `[SQL-DB-SLOW]` dans les deux shards SQL Server.
+Le test unitaire `tests.test_sqlserver_runner_partition` couvre l'agrégateur, les alias des connexions et curseurs, la conservation du retour et des paramètres, la propagation des exceptions et la mesure d'une méthode de cycle de vie. Le job SQL Server archive maintenant chaque journal dans `ERP-SQLServer-Diagnostics-0/1` et échoue si `[SQL-DB-SUMMARY]` ou `[SQL-DB-TEST-TOP]` manque. La CI complète doit montrer les nouveaux marqueurs `[SQL-DB-SUMMARY]`, `[SQL-DB-TEST-TOP]` et `[SQL-DB-SLOW]` dans les deux shards SQL Server.
 
 La limite GNU `timeout ... 16m` reste inchangée. Aucun timeout n'est allongé ; aucune fusion, aucun déploiement et aucune donnée réelle ne sont autorisés.
