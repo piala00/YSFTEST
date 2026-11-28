@@ -109,6 +109,32 @@ class SuiviColisComptableTests(TestCase):
         self.assertEqual(self.client.post(url,{'action':'payer_indemnite','incident':i.pk,'caisse':self.ca.pk}).status_code,403)
 
 
+class DiagnosticSqlSimulationTests(SimpleTestCase):
+    """Le profileur SQL exhaustif ne doit pas être activé par le runner CI."""
+
+    def test_les_temps_du_runner_ne_declenchent_pas_le_profileur_exhaustif(self):
+        from .management.commands.simulation import diagnostic_sql_actif
+
+        self.assertFalse(diagnostic_sql_actif({"SQL_TEST_TIMINGS": "1"}))
+
+    def test_le_profileur_exhaustif_requiert_une_variable_dediee(self):
+        from .management.commands.simulation import diagnostic_sql_actif
+
+        for valeur in ("1", "true", "yes", "on"):
+            with self.subTest(valeur=valeur):
+                self.assertTrue(diagnostic_sql_actif({"SIMULATION_SQL_DIAGNOSTIC": valeur}))
+
+    def test_les_valeurs_desactivantes_ne_declenchent_pas_le_profileur(self):
+        from .management.commands.simulation import diagnostic_sql_actif
+
+        for valeur in ("", "0", "false", "off", "no"):
+            with self.subTest(valeur=valeur):
+                self.assertFalse(diagnostic_sql_actif({
+                    "SQL_TEST_TIMINGS": "1",
+                    "SIMULATION_SQL_DIAGNOSTIC": valeur,
+                }))
+
+
 class SimulationMetierIntegreeTests(TestCase):
     def test_scenarios_complets_et_rapprochements_gl_stock(self):
         from .management.commands.simulation import Command
