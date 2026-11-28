@@ -41,6 +41,8 @@ jobs:
       - run: pip install -r requirements.txt tblib
       - name: Vérifier l'affectation stable des classes SQL Server
         run: python -m unittest tests.test_sqlserver_runner_partition -v
+      - name: Tests ciblés — profil SQL de simulation sur activation explicite
+        run: python manage.py test apps.transport.tests_simulation_metier.DiagnosticSqlSimulationTests --noinput -v2
       - name: Tests ciblés — canaux de vente et ventilation analytique
         run: python manage.py test apps.transport.tests_analytique_canal --noinput -v2
       - name: Tests ciblés — exports PDF et Excel analytiques
