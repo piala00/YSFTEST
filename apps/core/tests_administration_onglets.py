@@ -66,7 +66,13 @@ class AdministrationOngletsTests(TestCase):
         with mock.patch.object(connection.introspection, "get_table_description", side_effect=description), \
                 mock.patch.object(structure_base, "_colonnes_sql_server", return_value=colonnes_groupees):
             diagnostic = structure_base.analyser()
-        self.assertIn(Societe._meta.db_table, tables_replues)
+        if connection.vendor == "microsoft":
+            # Sur SQL Server, toutes les autres tables doivent rester servies
+            # par la lecture groupée : un seul repli ciblé est attendu.
+            self.assertEqual(tables_replues, [Societe._meta.db_table])
+        else:
+            # Les autres moteurs ne disposent pas de ce chemin groupé SQL Server.
+            self.assertIn(Societe._meta.db_table, tables_replues)
         self.assertFalse(diagnostic["ok"])
         self.assertIn(f"Colonne absente : {Societe._meta.db_table}.raison_sociale.", diagnostic["anomalies"])
 
