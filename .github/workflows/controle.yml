@@ -159,10 +159,14 @@ jobs:
         timeout-minutes: 18
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           # Borne la suite meme si un subprocess ou une requete SQL reste bloque.
           # Le code 124/137 distingue le timeout d'un echec de test ordinaire.
-          timeout --verbose --signal=TERM --kill-after=30s 16m python -u tests_navigateur/sqlserver_test_runner.py
+          # Le journal local permet aussi de vérifier que la télémétrie est bien émise.
+          log_file="${RUNNER_TEMP}/sqlserver-shard-${{ matrix.shard }}.log"
+          timeout --verbose --signal=TERM --kill-after=30s 16m python -u tests_navigateur/sqlserver_test_runner.py 2>&1 | tee "$log_file"
+          grep -q '^\[SQL-DB-SUMMARY\]' "$log_file"
+          grep -q '^\[SQL-DB-TEST-TOP\]' "$log_file"
       - name: Diagnostic SQL Server apres echec ou timeout
         if: failure()
         shell: bash
@@ -174,6 +178,14 @@ jobs:
           df -h || true
           echo '=== Connectivite SQL Server ==='
           timeout 5 bash -c 'echo > /dev/tcp/127.0.0.1/11433' && echo 'Port SQL accessible' || echo 'Port SQL inaccessible'
+      - name: Archiver les diagnostics SQL Server
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ERP-SQLServer-Diagnostics-${{ matrix.shard }}
+          path: ${RUNNER_TEMP}/sqlserver-shard-${{ matrix.shard }}.log
+          if-no-files-found: warn
+          retention-days: 7
 
 
   activation-compilee:
