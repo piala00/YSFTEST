@@ -70,3 +70,41 @@ class PaieTests(TestCase):
         self.assertEqual(solde("422"), 0)
         self.assertEqual(solde("422", employe=chauffeur), 0)
         self.assertEqual(solde("422", employe=guichetiere), 0)
+
+    def test_salaire_ventile_sur_vehicule_conserve_le_service_historique(self):
+        employe = Employe.objects.create(
+            matricule="MEC-01", nom="Mécanicien Fictif", service=Employe.GARAGE,
+            vehicule=self.car, salaire_base=50000,
+        )
+        paie = PeriodePaie.objects.create(annee=2026, mois=4)
+        self.assertEqual(paie.generer(), 1)
+        paie.valider()
+
+        ligne = paie.ecriture.lignes.get(compte__numero="661")
+        self.assertEqual(ligne.vehicule_id, self.car.pk)
+        self.assertEqual(ligne.section.plan, "Services")
+        self.assertEqual(ligne.section.code, "SV-GARAGE")
+
+        # Une modification ultérieure de la fiche ne doit pas reclasser une paie déjà validée.
+        employe.service = Employe.CONDUITE
+        employe.save(update_fields=["service"])
+
+        from apps.comptabilite.plan_analytique import balance_axe, faits
+
+        debut, fin = datetime.date(2026, 4, 1), datetime.date(2026, 4, 30)
+        mouvements = list(faits(debut, fin))
+        charges = [f for f in mouvements if f["employes"] == employe.pk and not f["produit"]]
+        self.assertEqual(sum((-f["montant"] for f in charges), Decimal("0")), Decimal("50000"))
+        self.assertEqual({f["services"] for f in charges}, {Employe.GARAGE})
+        self.assertEqual({f["vehicules"] for f in charges}, {self.car.pk})
+
+        services = balance_axe("services", debut, fin)
+        garage = next(e for e in services["elements"] if e["cle"] == Employe.GARAGE)
+        self.assertEqual(garage["charges"], Decimal("50000"))
+        self.assertTrue(services["rapproche"])
+
+        vehicules = balance_axe("vehicules", debut, fin)
+        car = next(e for e in vehicules["elements"] if e["cle"] == self.car.pk)
+        self.assertEqual(car["charges"], Decimal("50000"))
+        self.assertTrue(vehicules["rapproche"])
+

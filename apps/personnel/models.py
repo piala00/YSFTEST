@@ -69,7 +69,7 @@ class Employe(models.Model):
         return f"{self.matricule} - {self.nom}"
 
     def section_service(self):
-        """Section analytique de son service (plan « Services ») : y vont ses charges hors véhicules."""
+        """Section analytique du service réel, conservée sur chaque charge même si elle est ventilée sur un véhicule."""
         from apps.comptabilite.models import SectionAnalytique
 
         return SectionAnalytique.objects.get_or_create(
@@ -242,13 +242,15 @@ class PeriodePaie(models.Model):
             service = b.employe.section_service()
 
             def charges(compte, montant, libelle):
-                """Charge répartie sur les véhicules selon le mode d'imputation de l'employé ; sinon sur son service."""
+                """Ventile la charge sur les véhicules sans perdre le service réel du salarié."""
                 if not repartition:
                     return [{"compte": compte, "debit": montant, "section": service,
                              "employe": b.employe, "libelle": libelle}]
                 parts = [_arrondi(montant * f) for _, f in repartition[:-1]]
                 parts.append(montant - sum(parts, ZERO))
-                return [{"compte": compte, "debit": m, "vehicule": v, "section": v.section,
+                # Le véhicule reste une dimension portée par vehicule_id ; la section SV- fige le
+                # service au moment de la paie, même si la fiche de l'employé évolue ensuite.
+                return [{"compte": compte, "debit": m, "vehicule": v, "section": service,
                          "employe": b.employe, "libelle": libelle}
                         for (v, _), m in zip(repartition, parts) if m]
 

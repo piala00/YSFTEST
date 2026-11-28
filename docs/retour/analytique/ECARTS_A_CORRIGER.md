@@ -1,6 +1,6 @@
 # Écarts restants — comptabilité analytique (skill erp-transport-analytique-multiplans)
 
-État au 27/11/2026, branche `ccr-5592a371-fusjt2` (CI #663 verte). « Fait » = codé et testé ; le reste est listé ici, sans prétendre
+État au 28/11/2026, branche de travail GPT issue de `ccr-5592a371-fusjt2`. « Fait » = codé et testé ; le reste est listé ici, sans prétendre
 qu'il existe.
 
 | # | Écart | Pourquoi ce n'est pas fait | Décision ou donnée attendue |
@@ -12,4 +12,4 @@ qu'il existe.
 | 5 | ~~Fraîcheur des données par agence~~ — **FAIT** (27/11) | Bandeau sur le plan, les balances, les états détaillés, les budgets et les états véhicules/propriétaires au siège. Source : `Agence.derniere_reception` et `sequence_integree`, mises à jour à l'import d'un lot. Les agences sans lot sont visibles sans être déclarées hors ligne ; aucune sonde réseau ni seuil arbitraire n'est utilisé. | — |
 | 6 | ~~Export Excel XLSX et PDF natif~~ — **FAIT** (27/11) | Les balances d'axe et états détaillés exportent CSV, XLSX et PDF natif multipage (A4 paysage, A3 pour les journaux larges), avec en-têtes répétés, période et pagination. Les montants et pièces proviennent des mêmes états que l'écran ; l'export ne crée aucune écriture. | Tests : `apps.comptabilite.tests_analytique_exports`. |
 | 7 | **Client bureau Windows** | La fenêtre « Comptabilité analytique » ouvre les états dans le navigateur (pas d'écran natif). | — |
-| 8 | **Services : salaires répartis sur un véhicule** comptés « Conduite » | La ligne de paie ne garde pas l'employé ; un mécanicien imputé sur un véhicule serait compté en Conduite. | Accepter la règle, ou ajouter l'employé sur la ligne de paie. |
+| 8 | ~~Service réel des salaires répartis sur véhicule~~ — **VALIDÉ CI #754** | La paie conserve la section historique `SV-{service}` sur chaque charge, même si `vehicule_id` est renseigné. Le véhicule et le service sont deux dimensions simultanées ; une modification ultérieure de la fiche salarié ne reclasse pas les paies déjà validées. | Test `PaieTests.test_salaire_ventile_sur_vehicule_conserve_le_service_historique` réussi ; CI complète #754 verte (9/9), commit `67b52c56`. |

@@ -275,9 +275,8 @@ class _Contexte:
         return self.gammes[cle]
 
     def service(self, numero, vehicule_id, section):
-        """Section du plan Services portée par la ligne (paie hors véhicule…), sinon le service qui produit le fait :
-        billetterie, colis ; carburant, route et salaires répartis sur un véhicule : conduite ; garage. Le reste
-        (assurances, loyers, frais généraux sans section) reste non affecté."""
+        """Section SV- de la paie (y compris ventilée sur véhicule), sinon le service producteur du fait.
+        Les paies historiques sans section SV- conservent l'ancien classement par rubrique."""
         if section and section["plan"] == "Services" and section["code"].startswith("SV-"):
             return section["code"][3:]
         if not self.transport:

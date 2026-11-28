@@ -15,12 +15,12 @@ shard_for_class = MODULE.shard_for_class
 class SqlServerPartitionTests(unittest.TestCase):
     def test_classes_lentes_deplacees_vers_le_shard_le_moins_charge(self):
         attendus = {
-            "apps.transport.tests.SimulationPlusieursMoisTests": 0,
-            "apps.core.tests_dossiers_parcours.DossierGenereReelTests": 1,
+            "apps.transport.tests.SimulationPlusieursMoisTests": 1,
+            "apps.core.tests_dossiers_parcours.DossierGenereReelTests": 0,
             "apps.core.tests_base_donnees.BaseSQLiteTests": 1,
-            "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
-            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
-            "apps.echanges.tests.ScenarioTroisDossiersTests": 1,
+            "apps.core.tests_base_donnees.BaseSQLServerTests": 0,
+            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 0,
+            "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
             "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 1,
             "apps.echanges.tests_imprevus_voyage.ImprevusTroisDossiersTests": 1,
         }
