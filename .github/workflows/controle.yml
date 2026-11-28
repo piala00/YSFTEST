@@ -45,6 +45,8 @@ jobs:
         run: python manage.py test apps.transport.tests_analytique_canal --noinput -v2
       - name: Tests ciblés — exports PDF et Excel analytiques
         run: python manage.py test apps.comptabilite.tests_analytique_exports --noinput -v2
+      - name: Tests ciblés — paie et analytique par service
+        run: python manage.py test apps.personnel.tests.PaieTests --noinput -v2
       - name: Tests (SQLite)
         run: python manage.py test --noinput --parallel 4 -v1
       - name: Métadonnées SQL Server groupées (tests unitaires sans serveur)
