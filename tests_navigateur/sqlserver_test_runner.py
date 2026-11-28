@@ -367,21 +367,25 @@ def shard_for_class(key, count):
         raise ValueError("nombre de shards invalide")
     assigned = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big") % count
     if count == 2:
-        # Mesure réelle CI #675 (27/11/2026) :
-        # shard 0 = 311 tests / 576.651s ; shard 1 = 500 tests / 463.859s.
-        # Connexions ouvertes/fermées : 0.328/0.040s et 0.266/0.031s ;
-        # teardown : 3.846s et 4.049s. Les connexions ne sont donc pas le goulot.
-        # Le shard 0 porte SimulationPlusieursMois (155.018s), DossierGenereReel
-        # (32.040s) et BaseSQLite (27.295s). Déplacer les deux dernières classes
-        # donne une estimation 517.316s / 523.194s ; la simulation reste au shard 0.
-        # Les classes restent indivisibles pour conserver setUpClass/tearDownClass.
+        # Mesures réelles CI #754 (28/11/2026), SQL Server 2022 :
+        # shard 0 = 317 tests / 558.881s ; shard 1 = 506 tests / 374.638s.
+        # Le shard 0 porte SimulationPlusieursMoisTests (163.811s + 22.175s ;
+        # transaction de classe observée : 191.265s). Le shard 1 porte quatre
+        # classes coûteuses : BaseSQLServer 32.014s, AdministrationOnglets 26.969s,
+        # ScenarioTroisDossiers 20.991s et DossierGenereReel 19.915s.
+        # Les déplacer vers le shard 0, et la simulation vers le shard 1, estime
+        # 467.505s / 466.014s sans fractionner les classes ni augmenter le timeout.
+        # setup_databases=22.766/12.664s ; teardown=4.723/3.720s.
+        # Connexions ouvertes=0.333/0.181s et fermetures=0.043/0.023s :
+        # elles ne dominent pas le temps. Les atomic sont inclusifs et imbriqués ;
+        # Django TestCase garde un atomic de classe + un atomic par test.
         overrides = {
-            "apps.transport.tests.SimulationPlusieursMoisTests": 0,
-            "apps.core.tests_dossiers_parcours.DossierGenereReelTests": 1,
+            "apps.transport.tests.SimulationPlusieursMoisTests": 1,
+            "apps.core.tests_dossiers_parcours.DossierGenereReelTests": 0,
             "apps.core.tests_base_donnees.BaseSQLiteTests": 1,
-            "apps.core.tests_base_donnees.BaseSQLServerTests": 1,
-            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 1,
-            "apps.echanges.tests.ScenarioTroisDossiersTests": 1,
+            "apps.core.tests_base_donnees.BaseSQLServerTests": 0,
+            "apps.core.tests_administration_onglets.AdministrationOngletsTests": 0,
+            "apps.echanges.tests.ScenarioTroisDossiersTests": 0,
             "apps.echanges.tests_synchro.SynchronisationRelaisInternetTests": 1,
             "apps.echanges.tests_imprevus_voyage.ImprevusTroisDossiersTests": 1,
         }
