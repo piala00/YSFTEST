@@ -5,6 +5,7 @@ name and elapsed time of the last unfinished test in GitHub Actions logs.
 """
 import hashlib
 import atexit
+from functools import wraps
 import faulthandler
 import os
 import subprocess
@@ -17,6 +18,10 @@ import unittest
 from threading import Lock, local
 
 
+_ACTIVE_TEST = None
+_DATABASE_METRICS_REPORTER = None
+
+
 def instrument_tests():
     original_run = unittest.TestCase.run
     threshold = float(os.environ.get("SQL_TEST_SLOW_SECONDS", "15"))
@@ -26,6 +31,17 @@ def instrument_tests():
     resources = {}
     resource_lock = Lock()
     atomic_local = local()
+    traceback_seconds = max(0.0, float(os.environ.get("SQL_TEST_TRACEBACK_SECONDS", "180")))
+
+    def arm_traceback_dump():
+        if traceback_seconds:
+            faulthandler.cancel_dump_traceback_later()
+            faulthandler.dump_traceback_later(
+                traceback_seconds, repeat=False, file=sys.stderr
+            )
+
+    def cancel_traceback_dump():
+        faulthandler.cancel_dump_traceback_later()
 
     def _resource_record(name, kind, elapsed, alias=None, exceptional=False, rollback=False):
         """Agrège les ouvertures/fermetures réelles et les blocs atomic, par test ou fixture."""
@@ -127,6 +143,11 @@ def instrument_tests():
         print(f"[SQL-TEST-TERMINATED] signal={signum}", flush=True)
         report_slowest()
         report_resources()
+        if _DATABASE_METRICS_REPORTER is not None:
+            try:
+                _DATABASE_METRICS_REPORTER()
+            except Exception as exc:  # le diagnostic ne doit pas masquer SIGTERM
+                print(f"[SQL-DB-REPORT-ERROR] {exc!r}", flush=True)
         faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
         signal.signal(signum, signal.SIG_DFL)
         os.kill(os.getpid(), signum)
@@ -135,15 +156,21 @@ def instrument_tests():
         signal.signal(signal.SIGTERM, on_termination)
 
     def timed_run(self, result=None):
+        global _ACTIVE_TEST
         test_name = unittest.TestCase.id(self)
+        previous_test = _ACTIVE_TEST
+        _ACTIVE_TEST = test_name
         started = time.monotonic()
         active["name"], active["started"] = test_name, started
         print(f"[SQL-TEST-START] {test_name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_run(self, result)
         finally:
+            cancel_traceback_dump()
             elapsed = time.monotonic() - started
             active["name"], active["started"] = None, None
+            _ACTIVE_TEST = previous_test
             durations.append((elapsed, test_name))
             marker = "SLOW" if elapsed >= threshold else "END"
             print(f"[SQL-TEST-{marker}] {elapsed:.3f}s {test_name}", flush=True)
@@ -203,6 +230,7 @@ def instrument_tests():
     original_class_teardown = unittest.TestSuite._tearDownPreviousClass
 
     def timed_class_setup(self, test, result):
+        global _ACTIVE_TEST
         previous = getattr(result, "_previousTestClass", None)
         current = test.__class__
         if previous is current:
@@ -210,16 +238,22 @@ def instrument_tests():
         fixture_name = f"setUpClass {current.__module__}.{current.__qualname__}"
         started = time.monotonic()
         prior = (active["name"], active["started"])
+        prior_test = _ACTIVE_TEST
+        _ACTIVE_TEST = fixture_name
         active["name"], active["started"] = fixture_name, started
         print(f"[SQL-FIXTURE-START] {fixture_name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_class_setup(self, test, result)
         finally:
+            cancel_traceback_dump()
             active["name"], active["started"] = prior
+            _ACTIVE_TEST = prior_test
             print(f"[SQL-FIXTURE-END] {fixture_name} {time.monotonic() - started:.3f}s", flush=True)
             report_resource(fixture_name)
 
     def timed_class_teardown(self, test, result):
+        global _ACTIVE_TEST
         previous = getattr(result, "_previousTestClass", None)
         current = test.__class__ if test is not None else None
         if previous is None or previous is current:
@@ -227,12 +261,17 @@ def instrument_tests():
         started = time.monotonic()
         name = f"{previous.__module__}.{previous.__qualname__}"
         prior = (active["name"], active["started"])
+        prior_test = _ACTIVE_TEST
+        _ACTIVE_TEST = f"tearDownClass {name}"
         active["name"], active["started"] = f"tearDownClass {name}", started
         print(f"[SQL-FIXTURE-START] tearDownClass {name}", flush=True)
+        arm_traceback_dump()
         try:
             return original_class_teardown(self, test, result)
         finally:
+            cancel_traceback_dump()
             active["name"], active["started"] = prior
+            _ACTIVE_TEST = prior_test
             print(f"[SQL-FIXTURE-END] tearDownClass {name} "
                   f"{time.monotonic() - started:.3f}s", flush=True)
             report_resource(f"tearDownClass {name}")
@@ -346,6 +385,268 @@ def instrument_database_lifecycle():
         setattr(DiscoverRunner, phase, timed)
 
 
+
+def _alias_pour_base(receiver):
+    """Résout l'alias Django, y compris Atomic(using=None), DatabaseCreation et CursorWrapper."""
+    alias = getattr(receiver, "alias", None)
+    if alias is None:
+        alias = getattr(receiver, "using", None)
+    if alias is None:
+        connexion = getattr(receiver, "db", None)
+        if connexion is None:
+            connexion = getattr(receiver, "connection", None)
+        alias = getattr(connexion, "alias", None)
+    return alias or "default"
+
+
+def _enregistrer_mesure(metrics, operation, elapsed, failed=False, nested=False, exceptional=False):
+    """Agrège une durée en séparant les erreurs réelles du contexte d'exception attendu."""
+    metric = metrics.setdefault(operation, {
+        "count": 0, "total": 0.0, "max": 0.0,
+        "errors": 0, "exceptions": 0, "nested": 0,
+    })
+    metric["count"] += 1
+    metric["total"] += elapsed
+    metric["max"] = max(metric["max"], elapsed)
+    metric["errors"] += int(failed)
+    metric["exceptions"] += int(exceptional)
+    metric["nested"] += int(nested)
+
+
+def _enregistrer_mesure_par_test(par_alias, par_test, alias, test_name, operation,
+                                  elapsed, failed=False, nested=False, exceptional=False):
+    """Conserve l'alias global et attribue la mesure au contexte qui l'a réellement ouverte."""
+    _enregistrer_mesure(
+        par_alias.setdefault(alias, {}), operation, elapsed,
+        failed=failed, nested=nested, exceptional=exceptional,
+    )
+    if test_name:
+        _enregistrer_mesure(
+            par_test.setdefault((test_name, alias), {}), operation, elapsed,
+            failed=failed, nested=nested, exceptional=exceptional,
+        )
+
+
+def _enregistrer_atomic_scope(enregistrer, receiver, transaction, elapsed,
+                              failed=False, exceptional=False):
+    """Attribue l'atomic à son propriétaire ; une transaction TestCase couvre toute la classe."""
+    proprietaire = transaction["test_name"]
+    if proprietaire.startswith("setUpClass "):
+        # Django ouvre ici la transaction de classe de TestCase. Elle reste
+        # active pendant les tests et se ferme dans tearDownClass : ce n'est
+        # pas une durée de setUpClass.
+        proprietaire = "transaction_classe " + proprietaire[len("setUpClass "):]
+    enregistrer(
+        receiver, "atomic_scope", elapsed, failed=failed,
+        nested=transaction["nested"],
+        test_name_override=proprietaire,
+        exceptional=exceptional,
+    )
+
+
+def _emballer_methode(original, operation, enregistrer):
+    """Chronomètre une méthode en conservant strictement retour et exceptions."""
+    @wraps(original)
+    def timed(self, *args, **kwargs):
+        started = time.monotonic()
+        failed = False
+        try:
+            return original(self, *args, **kwargs)
+        except BaseException:
+            failed = True
+            raise
+        finally:
+            enregistrer(self, operation, time.monotonic() - started, failed)
+    return timed
+
+
+def instrument_database_activity():
+    """Mesure requêtes SQL, connexions, transactions et cycle de vie des bases."""
+    global _DATABASE_METRICS_REPORTER
+
+    if _DATABASE_METRICS_REPORTER is not None:
+        return _DATABASE_METRICS_REPORTER
+
+    from django.db.backends.base.base import BaseDatabaseWrapper
+    from django.db.backends.base.creation import BaseDatabaseCreation
+    from django.db.backends.utils import CursorWrapper
+    from django.db.transaction import Atomic
+
+    par_alias = {}
+    par_test = {}
+    pile = local()
+    etat = {"reported": False}
+    slow_seconds = max(0.0, float(os.environ.get("SQL_DB_SLOW_SECONDS", "5")))
+
+    def enregistrer(receiver, operation, elapsed, failed=False, nested=False,
+                    test_name_override=None, exceptional=False):
+        alias = _alias_pour_base(receiver)
+        test_name = _ACTIVE_TEST if test_name_override is None else test_name_override
+        _enregistrer_mesure_par_test(
+            par_alias, par_test, alias, test_name, operation, elapsed,
+            failed=failed, nested=nested, exceptional=exceptional,
+        )
+        # Une exception SQL peut être attendue et interceptée par un test.
+        # L'identifier sans SQL ni paramètres permet de retrouver son propriétaire.
+        if failed:
+            print(
+                f"[SQL-DB-EXCEPTION] operation={operation} alias={alias} "
+                f"elapsed={elapsed:.3f}s test={test_name or '[runner]'} "
+                f"exception_context={int(exceptional)}",
+                flush=True,
+            )
+        if elapsed >= slow_seconds:
+            print(
+                f"[SQL-DB-SLOW] operation={operation} alias={alias} "
+                f"elapsed={elapsed:.3f}s error={int(failed)} "
+                f"exception_context={int(exceptional)} "
+                f"test={test_name or '[runner]'}",
+                flush=True,
+            )
+
+    # Les marqueurs [SQL-RESOURCE] historiques restent disponibles.
+    # Ce registre ajoute un agrégat commun par alias/test pour connexions et transactions.
+    for operation in (
+        "ensure_connection", "connect", "close", "commit", "rollback",
+        "set_autocommit", "savepoint", "savepoint_commit", "savepoint_rollback",
+    ):
+        original = getattr(BaseDatabaseWrapper, operation, None)
+        if original is not None:
+            setattr(
+                BaseDatabaseWrapper, operation,
+                _emballer_methode(original, operation, enregistrer),
+            )
+
+    # Chronométrer les appels de curseur sans conserver SQL ni paramètres.
+    for operation in ("execute", "executemany", "callproc"):
+        original = getattr(CursorWrapper, operation, None)
+        if original is not None:
+            setattr(
+                CursorWrapper, operation,
+                _emballer_methode(original, f"cursor_{operation}", enregistrer),
+            )
+
+    # Le cycle public inclut migrations et fermeture ; les méthodes internes
+    # héritées séparent aussi la phase DDL quand le backend appelle super().
+    for operation in (
+        "create_test_db", "_create_test_db", "destroy_test_db", "_destroy_test_db",
+        "clone_test_db", "_clone_test_db", "serialize_db_to_string",
+        "deserialize_db_from_string",
+    ):
+        original = getattr(BaseDatabaseCreation, operation, None)
+        if original is not None:
+            setattr(
+                BaseDatabaseCreation, operation,
+                _emballer_methode(original, operation, enregistrer),
+            )
+
+    original_enter = Atomic.__enter__
+    original_exit = Atomic.__exit__
+
+    def timed_atomic_enter(self):
+        started = time.monotonic()
+        test_name = _ACTIVE_TEST or "[runner]"
+        failed = False
+        try:
+            result = original_enter(self)
+        except BaseException:
+            failed = True
+            raise
+        finally:
+            enregistrer(
+                self, "atomic_enter", time.monotonic() - started,
+                failed, test_name_override=test_name,
+            )
+        transactions = getattr(pile, "transactions", [])
+        alias = _alias_pour_base(self)
+        nested = any(item["alias"] == alias for item in transactions)
+        transactions.append({
+            "id": id(self), "alias": alias, "started": started,
+            "nested": nested, "test_name": test_name,
+        })
+        pile.transactions = transactions
+        return result
+
+    def timed_atomic_exit(self, exc_type, exc_value, traceback):
+        started = time.monotonic()
+        failed = False
+        try:
+            return original_exit(self, exc_type, exc_value, traceback)
+        except BaseException:
+            failed = True
+            raise
+        finally:
+            enregistrer(
+                self, "atomic_exit", time.monotonic() - started,
+                failed, exceptional=exc_type is not None,
+            )
+            transactions = getattr(pile, "transactions", [])
+            index = next(
+                (i for i in range(len(transactions) - 1, -1, -1)
+                 if transactions[i]["id"] == id(self)),
+                None,
+            )
+            if index is not None:
+                transaction = transactions.pop(index)
+                _enregistrer_atomic_scope(
+                    enregistrer, self, transaction,
+                    time.monotonic() - transaction["started"],
+                    failed=failed, exceptional=exc_type is not None,
+                )
+                pile.transactions = transactions
+
+    Atomic.__enter__ = timed_atomic_enter
+    Atomic.__exit__ = timed_atomic_exit
+
+    def reporter():
+        if etat["reported"]:
+            return
+        etat["reported"] = True
+        try:
+            if not par_alias:
+                print("[SQL-DB-SUMMARY] aucune opération observée", flush=True)
+                return
+            for alias, operations in sorted(par_alias.items(), key=lambda item: str(item[0])):
+                details = []
+                for operation, metric in sorted(operations.items()):
+                    details.append(
+                        f"{operation}:n={metric['count']},total={metric['total']:.3f}s,"
+                        f"max={metric['max']:.3f}s,err={metric['errors']},"
+                        f"exception_context={metric['exceptions']},nested={metric['nested']}"
+                    )
+                print(f"[SQL-DB-SUMMARY] alias={alias} " + " ".join(details), flush=True)
+
+            def score(item):
+                # Les opérations sont imbriquées ; classer sur le plus grand total
+                # d'une opération évite de les additionner artificiellement.
+                return max(
+                    (metric["total"] for metric in item[1].values()),
+                    default=0.0,
+                )
+
+            for (test_name, alias), operations in sorted(
+                par_test.items(), key=score, reverse=True
+            )[:15]:
+                details = " ".join(
+                    f"{name}={metric['count']}/{metric['total']:.3f}s"
+                    f"/max:{metric['max']:.3f}s/err:{metric['errors']}"
+                    f"/exception_context:{metric['exceptions']}"
+                    for name, metric in sorted(operations.items())
+                )
+                print(
+                    f"[SQL-DB-TEST-TOP] {test_name} alias={alias} {details}",
+                    flush=True,
+                )
+        except Exception as exc:
+            import traceback
+            print(f"[SQL-DB-REPORT-ERROR] {exc!r}", flush=True)
+            traceback.print_exc(file=sys.stderr)
+
+    _DATABASE_METRICS_REPORTER = reporter
+    atexit.register(reporter)
+    return reporter
+
+
 def shard_for_class(key, count):
     """Affectation stable d'une classe entière, ajustée avec les durées CI observées."""
     if count < 1:
@@ -417,9 +718,9 @@ def main():
     os.chdir(repository_root)
     os.environ.setdefault("SQL_TEST_TIMINGS", "1")
     faulthandler.enable(all_threads=True)
-    faulthandler.dump_traceback_later(120, repeat=True, file=sys.stderr)
     instrument_tests()
     instrument_database_lifecycle()
+    instrument_database_activity()
     partition_suite()
     # Preserve explicit Django test labels/options for targeted diagnosis.
     # The default invocation still runs the complete assigned CI shard.

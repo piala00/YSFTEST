@@ -41,6 +41,12 @@ jobs:
       - run: pip install -r requirements.txt tblib
       - name: Vérifier l'affectation stable des classes SQL Server
         run: python -m unittest tests.test_sqlserver_runner_partition -v
+      - name: Vérifier la copie contrôlée du code dans l'installateur Windows
+        run: python -m unittest tests.test_installateur_copie_code -v
+      - name: Tests ciblés — diagnostic hors ligne .erpinst
+        run: python manage.py test apps.licences.tests_installation --noinput -v2
+      - name: Tests ciblés — profil SQL de simulation sur activation explicite
+        run: python manage.py test apps.transport.tests_simulation_metier.DiagnosticSqlSimulationTests --noinput -v2
       - name: Tests ciblés — canaux de vente et ventilation analytique
         run: python manage.py test apps.transport.tests_analytique_canal --noinput -v2
       - name: Tests ciblés — exports PDF et Excel analytiques
@@ -155,14 +161,29 @@ jobs:
           pip install -r requirements.txt "mssql-django>=2.0" mssql-python
       - name: Attendre SQL Server
         run: for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/11433) 2>/dev/null && exit 0; sleep 2; done; exit 1
+      - name: Diagnostic ciblé — simulation multi-mois (SQL détaillé)
+        if: matrix.shard == 0
+        env:
+          SIMULATION_SQL_DIAGNOSTIC: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_file="${RUNNER_TEMP}/sqlserver-simulation-diagnostic.log"
+          python -u manage.py test apps.transport.tests.SimulationPlusieursMoisTests.test_jusqu_a_une_date_le_dernier_mois_s_arrete_a_ce_jour --noinput -v2 2>&1 | tee "$log_file"
+          grep -q '^\[SIM-SQL-ETAPE\]' "$log_file"
+          grep -q '^\[SIM-PHASE-TOTAL\]' "$log_file"
       - name: Tests (SQL Server 2022)
         timeout-minutes: 18
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           # Borne la suite meme si un subprocess ou une requete SQL reste bloque.
           # Le code 124/137 distingue le timeout d'un echec de test ordinaire.
-          timeout --verbose --signal=TERM --kill-after=30s 16m python -u tests_navigateur/sqlserver_test_runner.py
+          # Le journal local permet aussi de vérifier que la télémétrie est bien émise.
+          log_file="${RUNNER_TEMP}/sqlserver-shard-${{ matrix.shard }}.log"
+          timeout --verbose --signal=TERM --kill-after=30s 16m python -u tests_navigateur/sqlserver_test_runner.py 2>&1 | tee "$log_file"
+          grep -q '^\[SQL-DB-SUMMARY\]' "$log_file"
+          grep -q '^\[SQL-DB-TEST-TOP\]' "$log_file"
       - name: Diagnostic SQL Server apres echec ou timeout
         if: failure()
         shell: bash
@@ -174,6 +195,22 @@ jobs:
           df -h || true
           echo '=== Connectivite SQL Server ==='
           timeout 5 bash -c 'echo > /dev/tcp/127.0.0.1/11433' && echo 'Port SQL accessible' || echo 'Port SQL inaccessible'
+      - name: Archiver les diagnostics SQL Server
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ERP-SQLServer-Diagnostics-${{ matrix.shard }}
+          path: ${{ runner.temp }}/sqlserver-shard-${{ matrix.shard }}.log
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Archiver le profil détaillé de la simulation
+        if: always() && matrix.shard == 0
+        uses: actions/upload-artifact@v4
+        with:
+          name: ERP-SQLServer-Simulation-Diagnostic
+          path: ${{ runner.temp }}/sqlserver-simulation-diagnostic.log
+          if-no-files-found: warn
+          retention-days: 7
 
 
   activation-compilee:
@@ -400,6 +437,13 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
           & $iscc /Q "/DEdition=${{ matrix.nom }}" "/DPort=${{ matrix.port }}" "/DVersion=1.0.${{ github.run_number }}" deploy\installateur\erp_ohada.iss
           if ($LASTEXITCODE -ne 0) { throw "Compilation de l'installateur en échec" }
+      - name: Vérifier le vrai clic « Copier le code » dans le wizard Inno Setup
+        shell: pwsh
+        run: |
+          & .\tests_navigateur\installateur_copie_code_windows.ps1 `
+            -Installateur "dist\ERP-OHADA-${{ matrix.nom }}-Installation.exe" `
+            -Edition "${{ matrix.edition }}" `
+            -Rapport "$env:RUNNER_TEMP\copie-code-interactive-${{ matrix.edition }}.json"
       - name: Compiler l'outil propriétaire pour la recette de signature
         if: env.ERP_DISTRIBUTION_FICTIVE == '1'
         shell: pwsh
@@ -536,11 +580,13 @@ jobs:
           name: ERP-Installateur-${{ matrix.nom }}-Diagnostics
           path: |
             ${{ runner.temp }}/installateur-*.log
+            ${{ runner.temp }}/wizard-copie-code-*.log
             ${{ runner.temp }}/installation.log
             ${{ runner.temp }}/mise-a-jour.log
             ${{ runner.temp }}/NETTOYAGE-INTERFACE-*.json
             ${{ runner.temp }}/NETTOYAGE-INTERFACE-ERREUR.txt
             ${{ runner.temp }}/NETTOYAGE-DIAGNOSTIC-*.json
+            ${{ runner.temp }}/copie-code-interactive-*.json
             ${{ runner.temp }}/activation-fictive/autorisation-*-preuve.json
           if-no-files-found: warn
           retention-days: 7

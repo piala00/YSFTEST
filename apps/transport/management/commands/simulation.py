@@ -36,6 +36,48 @@ ROUTES = [("DLA", "YDE", 240, 6000, 10000), ("DLA", "BFS", 280, 5000, 9000), ("Y
           ("YDE", "NGD", 620, 10000, 15000), ("NGD", "GAR", 290, 6000, 9000), ("DLA", "KRI", 170, 4000, 7000),
           ("YDE", "EBW", 160, 3500, 6000), ("YDE", "BFS", 300, 5000, 8000)]
 PRIX_LITRE = Decimal("840")
+
+
+def diagnostic_sql_actif(environ=None):
+    """Active le profil SQL exhaustif uniquement sur demande explicite.
+
+    SQL_TEST_TIMINGS appartient au runner CI : il mesure les tests et les
+    accès DB sans activer un execute_wrapper coûteux dans chaque journée.
+    """
+    variables = os.environ if environ is None else environ
+    valeur = str(variables.get("SIMULATION_SQL_DIAGNOSTIC", "")).strip().lower()
+    return valeur in {"1", "true", "yes", "on"}
+
+
+def traces_phases_actives(environ=None):
+    """Temps de phase légers du runner, distincts du profileur SQL exhaustif."""
+    variables = os.environ if environ is None else environ
+    valeur = str(variables.get("SQL_TEST_TIMINGS", "")).strip().lower()
+    return valeur in {"1", "true", "yes", "on"} or diagnostic_sql_actif(variables)
+
+
+def tracer_phase_sql(phase, debut, active=None):
+    """Trace une phase sans activer l'instrumentation SQL coûteuse et retourne sa durée."""
+    if active is None:
+        active = traces_phases_actives()
+    if not active:
+        return None
+    secondes = time.perf_counter() - debut
+    print(f"[SIM-PHASE] {phase} {secondes:.3f}s", flush=True)
+    return secondes
+
+
+def _cumuler_phase_sql(agregats, phase, secondes):
+    """Regroupe les phases datées par famille sans instrumentation des requêtes SQL."""
+    famille = str(phase).split(" ", 1)[0]
+    mesure = agregats.setdefault(famille, {"appels": 0, "secondes": 0.0, "max": 0.0})
+    duree = max(0.0, float(secondes))
+    mesure["appels"] += 1
+    mesure["secondes"] += duree
+    mesure["max"] = max(mesure["max"], duree)
+    return mesure
+
+
 SAISON = {1: 0.85, 2: 0.9, 7: 1.05, 8: 1.12, 12: 1.15}                    # remplissage relatif (fictif)
 ARTICLES = [("FILT", "Filtre à huile", "PIECE", 100, 5000), ("PLAQ", "Plaquettes de frein", "PIECE", 60, 8000),
             ("PNEU", "Pneu 315/80", "PNEU", 40, 110000), ("HUIL", "Huile moteur (litre)", "LUBRIFIANT", 200, 3500),
@@ -119,14 +161,18 @@ class Command(SimulationMetierMixin, BaseCommand):
             nb_jours = min(o["jours"] or 31, calendar.monthrange(a, m)[1])
             self.mois.append([d for d in (datetime.date(a, m, j) for j in range(1, nb_jours + 1)) if fin is None or d <= fin])
         self.jours = [j for jours in self.mois for j in jours]
-        # La CI capture stdout des commandes dans les tests. Ces traces
-        # facultatives restent visibles directement dans les logs GitHub.
-        diagnostic_sql = bool(os.environ.get('SQL_TEST_TIMINGS'))
+        # SQL_TEST_TIMINGS active les traces légères ; le profileur SQL exhaustif
+        # reste réservé à SIMULATION_SQL_DIAGNOSTIC.
+        diagnostic_sql = diagnostic_sql_actif()
+        phases_actives = traces_phases_actives()
+        # Les totaux légers sont disponibles avec SQL_TEST_TIMINGS ; ils ne
+        # déclenchent jamais execute_wrapper ni le profilage SQL exhaustif.
+        self._sim_phases_cumulees = {} if phases_actives else None
+
         def trace_phase(phase, debut):
-            if diagnostic_sql:
-                print(f'[SIM-PHASE] {phase} {time.perf_counter() - debut:.3f}s', flush=True)
-        # Cumuler les sous-phases pour repérer les coûts dominants sur plusieurs mois.
-        self._sim_phases_cumulees = {} if diagnostic_sql else None
+            secondes = tracer_phase_sql(phase, debut, active=phases_actives)
+            if secondes is not None and self._sim_phases_cumulees is not None:
+                _cumuler_phase_sql(self._sim_phases_cumulees, phase, secondes)
         debut_phase = time.perf_counter()
         self.exercices()
         self.moment(self.jours[0], 6)
@@ -251,11 +297,15 @@ class Command(SimulationMetierMixin, BaseCommand):
         texte = self.texte_bilan(bilan, o)
         trace_phase('bilan_et_controles', debut_phase)
         self.stdout.write(texte)
-        if diagnostic_sql:
-            for phase, (appels, secondes) in sorted(
-                    self._sim_phases_cumulees.items(), key=lambda item: item[1][1], reverse=True):
+        if phases_actives:
+            for phase, mesure in sorted(
+                    self._sim_phases_cumulees.items(),
+                    key=lambda item: item[1]["secondes"], reverse=True):
+                appels = mesure["appels"]
+                secondes = mesure["secondes"]
                 print(f"[SIM-PHASE-TOTAL] phase={phase} appels={appels} "
-                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f}", flush=True)
+                      f"total_s={secondes:.3f} avg_s={secondes/appels:.3f} "
+                      f"max_s={mesure['max']:.3f}", flush=True)
         if o["rapport"]:
             with open(o["rapport"], "w", encoding="utf-8") as f:
                 f.write(texte)
@@ -277,7 +327,7 @@ class Command(SimulationMetierMixin, BaseCommand):
             return self.assurer_especes(montant, jour)
         # Mesurer séparément les recalculs du solde, suspects de croître avec
         # l'historique des écritures. Ne pas mettre en cache un solde mutable.
-        diagnostic = bool(os.environ.get("SQL_TEST_TIMINGS"))
+        diagnostic = diagnostic_sql_actif()
         debut = time.perf_counter() if diagnostic else None
         try:
             solde = solde_tresorerie(self.ca.compte_tresorerie, jour)
@@ -410,7 +460,7 @@ class Command(SimulationMetierMixin, BaseCommand):
 
         r = self.r
         colis_avant_jour = self.compteurs['colis']
-        diagnostic_sql = bool(os.environ.get('SQL_TEST_TIMINGS'))
+        diagnostic_sql = diagnostic_sql_actif()
         debut_etape = time.perf_counter()
 
         def mesurer_etape(nom):

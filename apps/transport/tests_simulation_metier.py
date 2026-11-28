@@ -2,6 +2,8 @@
 import datetime
 import io
 import random
+import os
+from unittest.mock import patch
 from decimal import Decimal
 from types import SimpleNamespace
 from django.contrib.auth import get_user_model
@@ -107,6 +109,79 @@ class SuiviColisComptableTests(TestCase):
         i=IncidentColis.objects.get(colis=c)
         self.assertEqual(self.client.post(url,{'action':'autoriser_indemnite','incident':i.pk,'montant':'10000','compte':self.compte.pk}).status_code,403)
         self.assertEqual(self.client.post(url,{'action':'payer_indemnite','incident':i.pk,'caisse':self.ca.pk}).status_code,403)
+
+
+class DiagnosticSqlSimulationTests(SimpleTestCase):
+    """Le profileur SQL exhaustif ne doit pas être activé par le runner CI."""
+
+    def test_les_temps_du_runner_ne_declenchent_pas_le_profileur_exhaustif(self):
+        from .management.commands.simulation import diagnostic_sql_actif
+
+        self.assertFalse(diagnostic_sql_actif({"SQL_TEST_TIMINGS": "1"}))
+
+    def test_le_profileur_exhaustif_requiert_une_variable_dediee(self):
+        from .management.commands.simulation import diagnostic_sql_actif
+
+        for valeur in ("1", "true", "yes", "on"):
+            with self.subTest(valeur=valeur):
+                self.assertTrue(diagnostic_sql_actif({"SIMULATION_SQL_DIAGNOSTIC": valeur}))
+
+    def test_les_valeurs_desactivantes_ne_declenchent_pas_le_profileur(self):
+        from .management.commands.simulation import diagnostic_sql_actif
+
+        for valeur in ("", "0", "false", "off", "no"):
+            with self.subTest(valeur=valeur):
+                self.assertFalse(diagnostic_sql_actif({
+                    "SQL_TEST_TIMINGS": "1",
+                    "SIMULATION_SQL_DIAGNOSTIC": valeur,
+                }))
+
+    def test_le_runner_active_les_temps_de_phase_sans_profileur_exhaustif(self):
+        from .management.commands.simulation import diagnostic_sql_actif, traces_phases_actives
+
+        environnement = {"SQL_TEST_TIMINGS": "1"}
+        self.assertTrue(traces_phases_actives(environnement))
+        self.assertFalse(diagnostic_sql_actif(environnement))
+        self.assertFalse(traces_phases_actives({"SQL_TEST_TIMINGS": "0"}))
+
+    def test_trace_de_phase_visible_dans_la_sortie_du_runner(self):
+        from .management.commands.simulation import tracer_phase_sql
+
+        sortie = io.StringIO()
+        with patch.dict(os.environ, {"SQL_TEST_TIMINGS": "1"}, clear=True), \
+                patch("apps.transport.management.commands.simulation.time.perf_counter", return_value=12.5), \
+                patch("sys.stdout", sortie):
+            secondes = tracer_phase_sql("journee 2026-11-28", 10.0)
+
+        self.assertEqual(sortie.getvalue(), "[SIM-PHASE] journee 2026-11-28 2.500s\n")
+        self.assertEqual(secondes, 2.5)
+
+    def test_les_temps_de_phase_s_agregent_sans_profileur_sql_exhaustif(self):
+        from .management.commands.simulation import _cumuler_phase_sql, diagnostic_sql_actif
+
+        environnement = {"SQL_TEST_TIMINGS": "1"}
+        self.assertFalse(diagnostic_sql_actif(environnement))
+        mesures = {}
+        _cumuler_phase_sql(mesures, "journee 2026-01-01", 1.25)
+        _cumuler_phase_sql(mesures, "journee 2026-01-02", 2.75)
+        _cumuler_phase_sql(mesures, "fin_de_mois 2026-01", 0.5)
+
+        self.assertEqual(mesures["journee"]["appels"], 2)
+        self.assertEqual(mesures["journee"]["secondes"], 4.0)
+        self.assertEqual(mesures["journee"]["max"], 2.75)
+        self.assertEqual(mesures["fin_de_mois"]["appels"], 1)
+
+    def test_trace_de_phase_absente_hors_instrumentation(self):
+        from .management.commands.simulation import tracer_phase_sql
+
+        sortie = io.StringIO()
+        with patch.dict(os.environ, {"SQL_TEST_TIMINGS": "0", "SIMULATION_SQL_DIAGNOSTIC": "0"}, clear=True), \
+                patch("apps.transport.management.commands.simulation.time.perf_counter") as chrono, \
+                patch("sys.stdout", sortie):
+            tracer_phase_sql("initialisation", 10.0)
+
+        chrono.assert_not_called()
+        self.assertEqual(sortie.getvalue(), "")
 
 
 class SimulationMetierIntegreeTests(TestCase):
