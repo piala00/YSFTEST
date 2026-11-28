@@ -161,4 +161,4 @@ Les commits suivants ajoutent un profilage léger, sans `execute_wrapper` et san
 
 Les marqueurs attendus sont `[SIM-JOURNEE-PHASE]` et `[SIM-DETAIL-TOTAL]`. Les temps des sous-phases sont inclusifs et peuvent se recouvrir ; ils ne doivent pas être additionnés au temps total du jour. Ces changements sont publiés sur la branche de travail, mais **ne sont pas encore validés par une nouvelle exécution GitHub Actions**. Aucun gain de performance n'est revendiqué avant l'analyse des nouvelles traces.
 
-La branche de travail est désormais à 57 commits en avance et 2 commits derrière `ccr-5592a371-fusjt2`. Aucun rebase, fusion vers la cible ou déploiement n'a été effectué.
+La branche de travail reste distincte de `ccr-5592a371-fusjt2`. Aucun rebase, fusion vers la cible ou déploiement n'a été effectué.
