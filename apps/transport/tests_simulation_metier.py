@@ -171,6 +171,19 @@ class DiagnosticSqlSimulationTests(SimpleTestCase):
         self.assertEqual(mesures["journee"]["max"], 2.75)
         self.assertEqual(mesures["fin_de_mois"]["appels"], 1)
 
+    def test_sous_phases_metier_s_agregent_sans_profileur_sql(self):
+        from .management.commands.simulation import _cumuler_detail_simulation
+
+        mesures = {}
+        _cumuler_detail_simulation(mesures, "journee.billets_et_colis", 0.5)
+        _cumuler_detail_simulation(mesures, "journee.billets_et_colis", 1.25)
+        _cumuler_detail_simulation(mesures, "transport.depart", 0.75)
+
+        self.assertEqual(mesures["journee.billets_et_colis"]["appels"], 2)
+        self.assertEqual(mesures["journee.billets_et_colis"]["secondes"], 1.75)
+        self.assertEqual(mesures["journee.billets_et_colis"]["max"], 1.25)
+        self.assertEqual(mesures["transport.depart"]["appels"], 1)
+
     def test_trace_de_phase_absente_hors_instrumentation(self):
         from .management.commands.simulation import tracer_phase_sql
 
